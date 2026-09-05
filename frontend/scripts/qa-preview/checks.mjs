@@ -221,13 +221,39 @@ export function checksEstaticos({ tipo }) {
   /* ---- C3: seta de voltar só em detalhe/registro ---- */
   {
     const seta = faixa && (q('.app-voltar', faixa) || q('[aria-label*="oltar"]', faixa));
+    /*
+      A SETA QUE SOBE UM NÍVEL NÃO É REDUNDANTE (05/09).
+
+      A R11 diz que "Voltar" em listagem é redundante, porque o menu já leva
+      a pessoa a qualquer lugar. Isso vale quando a seta sai da trilha — mas
+      dez relatórios de Compras reprovaram aqui por uma seta que faz o
+      contrário: `/compras/relatorios/ciclo` volta para
+      `/compras/relatorios`, que é o índice de onde a pessoa veio e que o
+      menu NÃO oferece. Consertar pela mensagem, ali, seria tirar dez setas
+      e deixar dez telas sem caminho de volta.
+
+      Isto podia virar dez declarações no manifesto, uma por tela, com o
+      mesmo texto. Não precisa: dá para MEDIR. Se o destino da seta é um
+      prefixo próprio da rota atual, ela sobe um nível da própria trilha — e
+      aí é a affordance de retorno, não um botão redundante. Declaração que
+      dá para medir é declaração que um dia fica velha sem ninguém notar.
+    */
+    const destinoDaSeta = seta && seta.getAttribute && seta.getAttribute('href');
+    const semBarra = (v) => String(v || '').replace(/\/+$/, '');
+    const aqui = semBarra(location.pathname);
+    const sobeUmNivel = Boolean(destinoDaSeta)
+      && destinoDaSeta !== '#'
+      && semBarra(destinoDaSeta) !== ''
+      && aqui.startsWith(`${semBarra(destinoDaSeta)}/`);
     if (tipo === 'detalhe' || tipo === 'form') {
       r.C3 = seta && visivel(seta)
         ? { estado: 'PASSOU' }
         : { estado: 'FALHOU', motivo: 'tela de detalhe/registro sem a seta de voltar à esquerda' };
+    } else if (seta && visivel(seta) && sobeUmNivel) {
+      r.C3 = { estado: 'PASSOU', motivo: `a seta sobe um nível da própria rota (${aqui} → ${destinoDaSeta}), que é o índice de onde a pessoa veio — não é o "Voltar" redundante da R11` };
     } else {
       r.C3 = seta && visivel(seta)
-        ? { estado: 'FALHOU', motivo: 'seta de voltar em tela de LISTAGEM (R11: redundante)' }
+        ? { estado: 'FALHOU', motivo: `seta de voltar em tela de LISTAGEM levando para FORA da trilha (${aqui} → ${destinoDaSeta || 'sem href'}) — R11: redundante, o menu já leva lá` }
         : { estado: 'N/A', motivo: 'listagem — seta só em detalhe/registro' };
     }
   }
@@ -333,10 +359,46 @@ export function checksEstaticos({ tipo }) {
       pela R11 em 02/09, que foi o que deu origem ao escopo declarado.
     */
     const naLinha = (el) => Boolean(el.closest('td, tr'));
-    const suspeitos = qa('.app-actionbar a[href], .app-mais-menu a[href]')
+    /*
+      A C6 OLHA A FAIXA, NÃO QUALQUER `.app-actionbar` (05/09).
+
+      `.app-actionbar` é uma classe de ARRANJO, e o Dashboard a usa para
+      alinhar os atalhos do bloco "Ir direto para" — que estão no CORPO da
+      página de propósito, seguindo a regra de 04/09 ("caminho para outra
+      tela mora no hub, não na barra de ações"). O check leu a classe como
+      se fosse a barra de ações da tela e reprovou justamente a tela que
+      obedeceu à regra.
+
+      É o mesmo engano da barra de ações dentro do `<td>`, já corrigido em
+      03/09, e a lição que ficou dele vale inteira aqui: marca de arranjo
+      não é declaração de papel. O papel está no LUGAR — a faixa fixa e o
+      menu "⋯" são onde a pessoa procura o que fazer nesta tela.
+    */
+    const suspeitos = qa('.app-page-header .app-actionbar a[href], .app-mais-menu a[href]')
       .filter(visivel)
       .filter((el) => !naLinha(el))
       .filter((el) => !el.classList.contains('app-voltar'))
+      /*
+        CADASTRO EM ROTA PRÓPRIA É AÇÃO, NÃO CAMINHO (05/09).
+
+        A R1 já registra, como decisão do projeto, que a ação de cadastrar
+        pode abrir em MODAL ou em ROTA DEDICADA — e ela mesma devolve "N/A —
+        cadastro em página própria" nesse caso. A C6 não sabia disso e
+        reprovava o "+ Novo Lead" do Kanban, que é exatamente a ação
+        principal da tela na forma que o projeto aprovou. Duas regras da
+        mesma casa discordando sobre a mesma tela: quem paga é quem tem de
+        escolher qual obedecer.
+
+        A isenção é estreita de propósito: só a AÇÃO PRINCIPAL, só com
+        rótulo de cadastro, e só quando o destino é a rota de cadastro
+        (`/novo`, `/nova`). Qualquer outro link continua sendo caminho.
+      */
+      .filter((el) => {
+        const ehPrincipal = el.classList.contains('btn-primary');
+        const rotuloDeCadastro = /^\+?\s*(novo|nova)\b/i.test((el.textContent || '').trim());
+        const destinoDeCadastro = /\/(novo|nova)$/i.test(new URL(el.getAttribute('href'), location.origin).pathname);
+        return !(ehPrincipal && rotuloDeCadastro && destinoDeCadastro);
+      })
       .filter((el) => {
         const url = new URL(el.getAttribute('href'), location.origin);
         /*

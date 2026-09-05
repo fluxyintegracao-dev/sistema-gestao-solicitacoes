@@ -16,6 +16,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  CelulaDupla,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -123,10 +124,26 @@ const COLUNAS = [
     tipo: 'identidade',
     noCard: 'titulo',
     texto: campoTexto('titulo_codigo'),
+    /*
+      T6 — mesmo remendo da ContratosRelatorioOperacional (hoje): esta
+      coluna é `identidade`, entra no piso de 160px quando as outras vinte
+      e uma colunas somam mais que o contêiner, e "TIT-MTJLBFMT4DL0-V1..."
+      é o formato real do código — mais largo que o piso. Sem `title` em
+      nenhum ANCESTRAL o `td` recorta com `overflow: hidden` e a T6 reprova.
+      A CelulaDupla trunca no span e leva o texto completo no `title` do
+      wrapper. O `title` explícito é necessário porque `principal` aqui é
+      o <Link>, não a string — o title default da CelulaDupla faria
+      `${principal}` virar "[object Object]".
+    */
     render: (row) => (
-      <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${row.titulo_id}`}>
-        {row.titulo_codigo || '-'}
-      </Link>
+      <CelulaDupla
+        principal={(
+          <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${row.titulo_id}`}>
+            {row.titulo_codigo || '-'}
+          </Link>
+        )}
+        title={row.titulo_codigo || '-'}
+      />
     )
   },
   { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: campoTexto('tipo') },
@@ -148,15 +165,27 @@ const COLUNAS = [
       ? <StatusBadge status={row.status_movimento} kind={familiaDoStatus(row.status_movimento)} />
       : '-')
   },
-  { id: 'parceiro_nome', titulo: 'Parceiro', tipo: 'texto', render: campoTexto('parceiro_nome') },
+  /*
+    T6 — as cinco colunas de texto abaixo (parceiro, obra, categoria, conta
+    e usuario da baixa) correm o MESMO risco do título: são `tipo: 'texto'`,
+    também nascem em 180px e cedem ao piso de 160px quando a soma das vinte
+    e uma colunas estoura o contêiner (o relatório tem colunas
+    configuráveis — a pessoa pode deixar as vinte e uma visíveis ao mesmo
+    tempo). Razão social de parceiro, nome de obra/categoria/conta e nome de
+    usuário são texto LIVRE cadastrado por quem usa o sistema, sem teto de
+    tamanho — nenhuma garantia de caber em 160px. `tipo`/`origem` ficam de
+    fora: vocabulário fechado e curto (PAGAR/RECEBER, RH_DP/COMERCIAL...),
+    não haveria o que truncar.
+  */
+  { id: 'parceiro_nome', titulo: 'Parceiro', tipo: 'texto', texto: campoTexto('parceiro_nome'), render: (row) => <CelulaDupla principal={row.parceiro_nome || '-'} /> },
   { id: 'parceiro_cpf_cnpj', titulo: 'CPF/CNPJ', tipo: 'codigo', render: campoTexto('parceiro_cpf_cnpj') },
-  { id: 'obra_nome', titulo: 'Obra', tipo: 'texto', render: campoTexto('obra_nome') },
-  { id: 'categoria_nome', titulo: 'Categoria', tipo: 'texto', render: campoTexto('categoria_nome') },
+  { id: 'obra_nome', titulo: 'Obra', tipo: 'texto', texto: campoTexto('obra_nome'), render: (row) => <CelulaDupla principal={row.obra_nome || '-'} /> },
+  { id: 'categoria_nome', titulo: 'Categoria', tipo: 'texto', texto: campoTexto('categoria_nome'), render: (row) => <CelulaDupla principal={row.categoria_nome || '-'} /> },
   { id: 'numero_documento', titulo: 'Documento', tipo: 'codigo', render: campoTexto('numero_documento') },
   { id: 'data_emissao', titulo: 'Emissao', tipo: 'data', render: campoData('data_emissao') },
   { id: 'data_vencimento', titulo: 'Vencimento', tipo: 'data', render: campoData('data_vencimento') },
   { id: 'data_movimento', titulo: 'Data baixa', tipo: 'data', render: campoData('data_movimento') },
-  { id: 'conta_bancaria_nome', titulo: 'Conta', tipo: 'texto', render: campoTexto('conta_bancaria_nome') },
+  { id: 'conta_bancaria_nome', titulo: 'Conta', tipo: 'texto', texto: campoTexto('conta_bancaria_nome'), render: (row) => <CelulaDupla principal={row.conta_bancaria_nome || '-'} /> },
   { id: 'valor_original', titulo: 'Valor original', tipo: 'valor', render: campoValor('valor_original') },
   { id: 'valor_saldo', titulo: 'Saldo', tipo: 'valor', render: campoValor('valor_saldo') },
   { id: 'valor_baixado', titulo: 'Valor baixado', tipo: 'valor', render: campoValor('valor_baixado') },
@@ -165,7 +194,7 @@ const COLUNAS = [
   { id: 'multa', titulo: 'Multa', tipo: 'valor', render: campoValor('multa') },
   { id: 'desconto', titulo: 'Desconto', tipo: 'valor', render: campoValor('desconto') },
   { id: 'valor_quitacao', titulo: 'Quitacao', tipo: 'valor', render: campoValor('valor_quitacao') },
-  { id: 'usuario_baixa', titulo: 'Usuario baixa', tipo: 'texto', render: campoTexto('usuario_baixa') },
+  { id: 'usuario_baixa', titulo: 'Usuario baixa', tipo: 'texto', texto: campoTexto('usuario_baixa'), render: (row) => <CelulaDupla principal={row.usuario_baixa || '-'} /> },
   { id: 'origem', titulo: 'Origem', tipo: 'texto', render: campoTexto('origem') }
 ];
 

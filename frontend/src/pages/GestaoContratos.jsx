@@ -39,6 +39,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  CelulaDupla,
   TabelaPadrao,
   FormSecao,
   CampoForm,
@@ -1313,12 +1314,35 @@ export default function GestaoContratos() {
                 // R17: o codigo do contrato nomeia o registro desta lista.
                 tipo: 'identidade',
                 noCard: 'titulo',
-                render: c => c.codigo
+                /*
+                  T6 — mesmo remendo da ContratosRelatorioOperacional (hoje):
+                  a coluna de identidade nasce em 180px e cede ao piso de
+                  160px com sete colunas nesta tabela; "CT-MTJLBFMT4DL0-0..."
+                  e formato real de codigo, mais largo que o piso. Sem
+                  `title` em nenhum ANCESTRAL o `td` recorta com
+                  `overflow: hidden` e a T6 reprova. A CelulaDupla trunca no
+                  span e leva o texto completo no `title` do wrapper.
+                */
+                render: c => <CelulaDupla principal={c.codigo} />
               },
-              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: c => c.obra?.nome || '-' },
-              { id: 'ref_contrato', titulo: 'Ref. do Contrato', tipo: 'texto', render: c => c.ref_contrato || '-' },
-              { id: 'descricao', titulo: 'Descrição', tipo: 'texto', render: c => c.descricao || '-' },
-              { id: 'apropriacao', titulo: 'Itens de Apropriação', tipo: 'texto', render: c => resumoApropriacoesContrato(c) },
+              /*
+                As tres colunas de texto livre abaixo (obra, referencia e
+                descricao) correm o mesmo risco: `tipo: 'texto'` tambem
+                nasce em 180px e cede ao mesmo piso de 160px, e sao valores
+                cadastrados sem teto de tamanho.
+              */
+              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: c => <CelulaDupla principal={c.obra?.nome || '-'} /> },
+              { id: 'ref_contrato', titulo: 'Ref. do Contrato', tipo: 'texto', render: c => <CelulaDupla principal={c.ref_contrato || '-'} /> },
+              { id: 'descricao', titulo: 'Descrição', tipo: 'texto', render: c => <CelulaDupla principal={c.descricao || '-'} /> },
+              {
+                id: 'apropriacao',
+                titulo: 'Itens de Apropriação',
+                tipo: 'texto',
+                // T6: `resumoApropriacoesContrato` concatena varios itens com
+                // "; " — o pior caso e mais longo ainda que uma unica razao
+                // social, mesmo tratamento.
+                render: c => <CelulaDupla principal={resumoApropriacoesContrato(c)} />
+              },
             {
               id: 'total_solicitado',
               titulo: 'Solicitado',
@@ -1627,13 +1651,28 @@ export default function GestaoContratos() {
             noCard: 'titulo',
             ordenavel: true,
             valorOrdenacao: c => String(c.codigo || ''),
-            render: c => c.codigo
+            /*
+              T6 — a coluna de identidade nasce em 180px e cede ao piso de
+              160px com doze colunas nesta tabela (a que reprovou a matriz:
+              "CT-MTJLBFMT4DL0-0..."). Sem `title` em nenhum ANCESTRAL o `td`
+              recorta com `overflow: hidden`. A CelulaDupla trunca no span e
+              leva o texto completo no `title` do wrapper.
+            */
+            render: c => <CelulaDupla principal={c.codigo} />
             },
-            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: c => c.obra?.nome || '-' },
-            { id: 'ref_contrato', titulo: 'Ref. do Contrato', tipo: 'texto', render: c => c.ref_contrato || '-' },
-            { id: 'descricao', titulo: 'Descrição', tipo: 'texto', render: c => c.descricao || '-' },
-            { id: 'credores', titulo: 'Credores', tipo: 'texto', render: c => resumoCredoresContrato(c) },
-            { id: 'apropriacao', titulo: 'Itens de Apropriação', tipo: 'texto', render: c => resumoApropriacoesContrato(c) },
+            /*
+              As cinco colunas de texto livre abaixo (obra, referencia,
+              descricao, credores e apropriacoes) correm o mesmo risco:
+              `tipo: 'texto'` tambem nasce em 180px e cede ao mesmo piso de
+              160px, e sao valores cadastrados sem teto de tamanho —
+              credores e apropriacoes ainda concatenam VARIOS itens com
+              "; ", o que so aumenta o pior caso.
+            */
+            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: c => <CelulaDupla principal={c.obra?.nome || '-'} /> },
+            { id: 'ref_contrato', titulo: 'Ref. do Contrato', tipo: 'texto', render: c => <CelulaDupla principal={c.ref_contrato || '-'} /> },
+            { id: 'descricao', titulo: 'Descrição', tipo: 'texto', render: c => <CelulaDupla principal={c.descricao || '-'} /> },
+            { id: 'credores', titulo: 'Credores', tipo: 'texto', render: c => <CelulaDupla principal={resumoCredoresContrato(c)} /> },
+            { id: 'apropriacao', titulo: 'Itens de Apropriação', tipo: 'texto', render: c => <CelulaDupla principal={resumoApropriacoesContrato(c)} /> },
             {
               id: 'solicitado',
               titulo: 'Solicitado',

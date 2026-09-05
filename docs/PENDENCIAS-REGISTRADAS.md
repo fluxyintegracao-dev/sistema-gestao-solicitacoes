@@ -2664,3 +2664,30 @@ leitura, uma de cada vez, e as duas reprovaram com o motivo certo.
 a pergunta seguinte nunca é "consertei?" — é "**quantas formas existem, e
 qual é o número medido agora?**". Detector que acerta o caso que você
 mostrou e erra os outros três continua parecendo certo.
+
+---
+
+## 05/09 — Espera em segundo plano sem prazo e sem dono (o cliente pegou)
+
+Deixei três esperas rodando em segundo plano. O cliente perguntou se elas
+tinham função. Duas não tinham: escrevi laços cuja condição **nunca se
+satisfaz** (um esperava um arquivo que ninguém ia criar; o outro, um
+processo com nome que não existe). Uma girou 73 minutos.
+
+A terceira é a que importa. Ela tinha função real — publicar assim que a
+matriz terminasse, para o preview não trocar de build no meio da corrida.
+Só que a matriz terminou, eu publiquei à mão, **e ela continuou armada**.
+Pior: o padrão que ela vigiava (`qa-preview/verificar.mjs`) volta a aparecer
+toda vez que as PROVAS rodam, porque elas carregam o mesmo arquivo. Ou seja,
+havia um `git push` automático solto, capaz de disparar no meio de qualquer
+edição — exatamente o descontrole que eu estava tentando evitar ao segurar o
+push.
+
+Segurar a publicação com a mão e deixar um gatilho automático ao lado é ter
+os dois problemas: a espera manual e o disparo imprevisível.
+
+**A regra que fica:** espera em segundo plano tem de ter **prazo e dono** —
+o que a encerra, e quem a cancela. Se eu não consigo dizer as duas coisas na
+hora de criar, ela não deve existir. E gatilho que faz coisa irreversível
+(publicar, escrever, apagar) é cancelado assim que a razão dele acaba, não
+quando alguém repara nele.

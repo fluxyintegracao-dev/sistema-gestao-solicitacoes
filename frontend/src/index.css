@@ -10812,7 +10812,25 @@ body {
   width: 100%;
   max-width: min(100%, 88rem);
   min-width: 0;
-  overflow-x: hidden;
+  /*
+    R18 — `clip`, nunca `hidden`. SEGUNDA CAUSA NA MESMA DIV (05/09).
+
+    Esta tela reprovou nas mesmas três células (R18, C1 e X2) em duas
+    rodadas seguidas. Na primeira a causa era `container-type: inline-size`
+    no `compras-responsive.css`; consertei aquilo e a tela voltou a
+    reprovar exatamente igual, agora por esta linha. Duas declarações de
+    arquivos diferentes matando o mesmo `sticky` no MESMO elemento — achar
+    uma e parar de procurar foi o meu erro.
+
+    O mecanismo é o de sempre: `overflow-x: hidden` faz o `overflow-y`
+    computar `auto`, a página vira scrollport e a faixa fixa (R13) gruda
+    NELA em vez de na janela — sumia na rolagem e sobrepunha a topbar em
+    493px. `clip` recorta igual, sem criar scrollport: o que esta regra
+    existe para fazer (não deixar filtro, card e tabela empurrarem a página
+    para fora) continua valendo. Mesmo caso já registrado em
+    `.financeiro-relatorios-page`, medido em 04/09 com 492px.
+  */
+  overflow-x: clip;
 }
 
 .layout-shell .compras-cotacoes-page > *,
@@ -10834,7 +10852,11 @@ body {
 }
 
 .layout-shell .compras-cotacoes-page .compras-table-card {
-  overflow: hidden;
+  /* Mesma troca, aqui de forma preventiva: hoje esta tabela não declara
+     coluna fixa, então não há `sticky` para matar e o R18 não tem alvo.
+     No dia em que ela ganhar uma, `hidden` reprovaria pelo mesmo mecanismo
+     de cima. Trocar agora sai de graça e recorta igual. */
+  overflow: clip;
 }
 
 .layout-shell .compras-cotacoes-page .compras-table-wrapper {

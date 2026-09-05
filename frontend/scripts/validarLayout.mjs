@@ -1275,9 +1275,42 @@ function validarOverflowEmClasse(telas) {
   return { falhas };
 }
 
+/*
+  AS CLASSES QUE SAO "A PAGINA" — LIDAS DAS TELAS, NAO ESCRITAS POR MIM.
+
+  Toda `className` passada ao componente `Pagina`, mais as tres que ele
+  proprio aplica. Lista escrita a mao envelheceria na primeira tela nova.
+*/
+function classesDePagina() {
+  const classes = new Set(['page', 'solicitacoes-page', 'app-pagina']);
+  let lidos = 0;
+  const varrerJsx = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) { varrerJsx(caminho); continue; }
+      if (!item.name.endsWith('.jsx')) continue;
+      lidos += 1;
+      const codigo = fs.readFileSync(caminho, 'utf8');
+      for (const m of codigo.matchAll(/<Pagina[\s\S]{0,400}?className=["']([^"']+)["']/g)) {
+        m[1].split(/\s+/).filter(Boolean).forEach((c) => classes.add(c));
+      }
+    }
+  };
+  varrerJsx(path.join(frontendRoot, 'src'));
+  // Varredura que nao varreu devolve o conjunto minimo e o check vira
+  // silencio — o mesmo engano do "zero" de 04/09. Aqui ela tem de ter lido
+  // arquivo.
+  if (lidos === 0) {
+    throw new Error('[R18] a varredura de classes de pagina nao leu nenhum .jsx — o caminho mudou e o check estaria abonando tudo.');
+  }
+  return classes;
+}
+
 function validarOverflow() {
   const falhas = [];
   const avisos = [];
+  const CLASSES_DE_PAGINA = classesDePagina();
   const caminhoTrinco = path.join(frontendRoot, 'scripts', 'trinco-overflow-css.json');
   const trincoOverflow = new Set(
     fs.existsSync(caminhoTrinco)
@@ -1413,10 +1446,41 @@ function validarOverflow() {
         congelado, e o número só desce.
       */
       const nomeSeletor = seletor.split('\n').pop().trim().slice(0, 60);
+      /*
+        O TRINCO NAO ABONA O CONTEINER DA PAGINA (05/09).
+
+        A `cotacoes` reprovou nas mesmas tres celulas (R18, C1, X2) em duas
+        rodadas seguidas. Na primeira a causa era `container-type`; consertei
+        e ela voltou igual, agora por um `overflow-x: hidden` em
+        `.layout-shell .compras-cotacoes-page`, no index.css — que estava
+        CONGELADO NO TRINCO, isto e, este validador via a linha e a abonava
+        como passivo herdado enquanto a faixa fixa daquela tela estava
+        quebrada no preview.
+
+        Passivo congelado nao e passivo inofensivo: e passivo ainda nao
+        consertado. Numa folha de tabela ou num card isso e aceitavel — pode
+        nao haver `sticky` nenhum dentro. No CONTEINER DA PAGINA nao ha
+        duvida a resolver: a faixa fixa (R13) esta sempre dentro dele, entao
+        `overflow: hidden` ali quebra o sticky por construcao, e congelar e
+        so adiar a mesma reprovacao.
+
+        As classes de pagina nao sao uma lista minha: sao lidas das telas —
+        toda `className` passada ao componente `Pagina`, mais as tres que ele
+        mesmo aplica (`page`, `solicitacoes-page`, `app-pagina`). O que vale
+        e o ULTIMO composto do seletor: `.x .compras-table-card` mira o card,
+        nao a pagina.
+      */
+      const ultimoComposto = nomeSeletor.split(/\s+|>/).filter(Boolean).pop() || '';
+      const miraAPagina = [...CLASSES_DE_PAGINA].some((c) => ultimoComposto.includes(`.${c}`));
       const mensagem = `${rel}:${linha} [R18] overflow hidden em "${nomeSeletor}" — cria contexto de rolagem e mata o position:sticky de faixa fixa, coluna fixa e cabeçalho de tabela dentro dele. Use \`overflow: clip\` (corta igual, sem criar scrollport); se for recorte de texto, acompanhe de text-overflow/white-space.`;
-      if (rel.endsWith('index.css')) {
+      if (rel.endsWith('index.css') && !miraAPagina) {
         if (!trincoOverflow.has(nomeSeletor)) falhas.push(`${mensagem} [NOVO — o trinco do index.css só desce]`);
         else vistosNoTrinco.add(nomeSeletor);
+        continue;
+      }
+      if (miraAPagina) {
+        falhas.push(`${mensagem} [CONTEINER DE PAGINA — o trinco NAO abona: a faixa fixa esta sempre dentro deste elemento, entao aqui o sticky quebra por construcao]`);
+        vistosNoTrinco.add(nomeSeletor);
         continue;
       }
       falhas.push(mensagem);

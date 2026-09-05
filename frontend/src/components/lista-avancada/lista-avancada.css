@@ -101,21 +101,36 @@
 
 /* Controle SEGMENTADO Tabela/Cards: dois segmentos numa moldura só —
    alternativas mutuamente exclusivas, o ativo em destaque. */
+/*
+  ALVO MÍNIMO NO CONTROLE SEGMENTADO (05/09) — M1/R2.
+
+  Os dois botões de modo de visualização mediam 81×30px: a altura fixa de
+  38px do grupo, menos a borda (2px) e o respiro interno (6px), sobrava 30
+  para o botão. Dois pixels abaixo do piso, nas duas maiores listagens do
+  sistema (Solicitações e Solicitações Arquivadas).
+
+  A altura sai do grupo e vai para o BOTÃO, via `--alvo-clique` — que é o
+  token do piso (32px no mouse, 44px no toque). Com o respiro em 2px a
+  conta fecha nos mesmos 38px de antes no mouse (32 + 4 + 2), então a
+  fileira continua alinhada com os botões de contorno ao lado; no toque os
+  dois crescem juntos, porque o `.la-btn` passa a usar o mesmo token.
+*/
 .la-modo {
   display: inline-flex;
+  align-items: center;
   border: 1px solid var(--btn-outline-border);
   border-radius: 10px;
   overflow: clip;
   background: var(--btn-outline-bg);
-  padding: 3px;
+  padding: 2px;
   gap: 2px;
-  height: 38px;
   box-sizing: border-box;
 }
 
 .la-modo button {
   display: inline-flex;
   align-items: center;
+  min-height: var(--alvo-clique, 32px);
   gap: 5px;
   padding: 0 11px;
   border: none;
@@ -141,7 +156,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 38px;
+  /* Mesma altura do controle segmentado ao lado, agora derivada do token
+     do alvo mínimo em vez de um 38 cravado — no toque os dois crescem
+     juntos e a fileira não desalinha. */
+  min-height: calc(var(--alvo-clique, 32px) + 6px);
   padding: 0 12px;
   border: 1px solid var(--btn-outline-border);
   border-radius: 10px;

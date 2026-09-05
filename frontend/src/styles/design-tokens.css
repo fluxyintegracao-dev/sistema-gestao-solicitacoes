@@ -176,41 +176,19 @@
 /* =====================================================================
    HUBS DE NAVEGAÇÃO (nível 1 e nível 2)
    ===================================================================== */
-.hub-page {
-  /* Aproveita a largura da tela: o conteúdo cresce até 1520px. */
-  padding: 16px clamp(14px, 3vw, 32px) 32px;
-  max-width: 1520px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-/* A HOME MIGROU PARA `Pagina`/`PageHeader` (05/09).
-   O ritmo vertical, o respiro do topo e a faixa fixa passaram a vir dos
-   componentes padrão; da tela sobra só a LARGURA ÚTIL — os mesmos 1520px
-   que a `.hub-page` já usava, para os cards de módulo não perderem a
-   quarta coluna nos monitores largos.
+/* HUB PRINCIPAL E HUB DE MÓDULO MIGRARAM PARA `Pagina`/`PageHeader` (05/09,
+   mesmo commit para as duas telas). O ritmo vertical, o respiro do topo e a
+   faixa fixa passaram a vir dos componentes padrão; da tela sobra só a
+   LARGURA ÚTIL — os mesmos 1520px que a `.hub-page` já usava como div
+   própria, para os cards de módulo/subitem não perderem a quarta coluna
+   nos monitores largos.
    Especificidade dupla de propósito: `responsive-system.css` carrega
    DEPOIS e tem um `.layout-main :where(…, .page, …) { max-width: 100% }`
    que empataria com um seletor de uma classe só e venceria por ordem. */
-.app-pagina.hub-home-page {
+.app-pagina.hub-home-page,
+.app-pagina.hub-page {
   max-width: 1520px;
   margin-inline: auto;
-}
-
-.hub-header {
-  margin: 2px 0 12px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.hub-header-acoes {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-  padding-top: 4px;
 }
 
 /* Blocos personalizáveis da Home (mesmo motor do detalhe). A superfície,
@@ -253,10 +231,11 @@
   isso no ladrilho padrão (`.app-stat` usa `--ui-surface-2`), e é esse
   tratamento que se aplica aqui.
 
-  Fora de bloco nada muda: o hub de MÓDULO (nível 2) continua desenhando
-  os mesmos cards direto sobre o canvas, e lá o branco é que os destaca.
-  O card tracejado "Adicionar" fica de fora porque o fundo dele é a
-  ausência de fundo.
+  O hub de MÓDULO (nível 2) migrou depois (mesmo dia) e caiu na mesma
+  regra: a grade de subitens também mora dentro de um `BlocoConteudo`
+  agora, então `.hub-card` recua junto — não existe mais "fora de bloco"
+  nos dois níveis de hub. O card tracejado "Adicionar" (só da Home) fica
+  de fora porque o fundo dele é a ausência de fundo.
 */
 .app-bloco .hub-card,
 .app-bloco .hub-pendencia-cartao,
@@ -264,13 +243,6 @@
 .app-bloco .hub-obras-resumo-item,
 .app-bloco .hub-atalho-card:not(.hub-atalho-card--adicionar) {
   background: var(--ui-surface-2);
-}
-
-.hub-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--app-heading-color);
-  margin: 0;
 }
 
 .hub-subtitle {

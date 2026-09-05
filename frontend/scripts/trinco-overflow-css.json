@@ -1,7 +1,7 @@
 {
   "regra": "R18 no index.css",
   "criado_em": "2026-09-04",
-  "porque": "Passivo herdado de 11.800 linhas de CSS de tela. Cada overflow:hidden aqui e ancestral em potencial de faixa fixa ou coluna fixa e a mata em silencio. O numero SO DESCE: seletor novo reprova.",
+  "porque": "Passivo herdado de 11.800 linhas de CSS de tela. Cada overflow:hidden aqui e ancestral em potencial de faixa fixa ou coluna fixa e a mata em silencio. O numero SO DESCE: seletor novo reprova. 05/09: sairam os dois seletores da tela de cotacoes (consertados para clip). E o trinco deixou de poder abonar CONTEINER DE PAGINA: foi exatamente um seletor congelado aqui que manteve a faixa fixa da cotacoes quebrada no preview por duas rodadas. Passivo congelado nao e passivo inofensivo.",
   "seletores": [
     ".app-modal-surface",
     ".cotacao-publica-context",
@@ -18,8 +18,6 @@
     ".financeiro-report-card",
     ".layout-shell .app-dense-table-card",
     ".layout-shell .compra-detalhe-itens-table td",
-    ".layout-shell .compras-cotacoes-page",
-    ".layout-shell .compras-cotacoes-page .compras-table-card",
     ".layout-shell .compras-responsive-table",
     ".layout-shell .compras-table-wrapper",
     ".layout-shell .contratos-anexos-modal__panel",
@@ -39,5 +37,6 @@
     ".solicitacoes-table--mobile tr",
     ".solicitacoes-table-scroll",
     ".stat-ring"
-  ]
+  ],
+  "atualizado_em": "2026-09-05"
 }

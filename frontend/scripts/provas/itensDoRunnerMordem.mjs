@@ -74,7 +74,19 @@ const CASOS_T3 = [
     item: 'T3',
     d: 't3AlcaMorta',
     planta: 'alça que não recebe o ponteiro — arrastar não muda a largura',
-    ramo: 'coluna arrastada mudou'
+    /*
+      O RAMO MUDOU DE SINTOMA PARA CAUSA (05/09), e esta prova foi quem
+      cobrou a mudança.
+
+      Antes o T3 dizia "coluna arrastada mudou 0px" — o sintoma. Ao ganhar a
+      conferência de mira, ele passou a dizer QUEM está por cima da alça,
+      que é a causa e serve para consertar. No caminho, a primeira versão
+      dessa conferência devolveu SEM DADO neste defeito plantado: eu tinha
+      transformado defeito de tela em lacuna de evidência, e foi esta prova
+      que pegou. O ramo esperado acompanha a mensagem nova; o que a prova
+      garante continua igual — alça inalcançável REPROVA.
+    */
+    ramo: 'está COBERTA por'
   },
   {
     item: 'T3',

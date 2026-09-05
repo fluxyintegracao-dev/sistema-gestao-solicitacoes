@@ -275,8 +275,23 @@ const RESOLVEDORES = {
     const formas = [
       { nome: 'âncora na linha', loc: linha.locator('a[href]').first() },
       {
+        /*
+          O VERBO, NÃO A PALAVRA (05/09).
+
+          Escrevi este seletor procurando "detalh" no título do botão,
+          porque foi assim que a `SolicitacoesCompra` escreve ("Abrir
+          detalhes"). A `PedidosCompra` escreve "Abrir pedido", e o
+          resolvedor caiu de novo no clique na linha, que não navega — o
+          detalhe do PEDIDO DE COMPRA, a tela de 2859 linhas onde a compra
+          vira compromisso de pagamento, voltou como "não abriu".
+
+          Terceira vez que eu conserto este mesmo resolvedor casando com a
+          amostra que tinha na mão em vez do PAPEL do elemento. O papel aqui
+          é o verbo: nesta base o botão que abre um registro começa com
+          "Abrir" — "Abrir detalhes", "Abrir pedido", "Abrir titulo".
+        */
         nome: 'botão de abrir na célula de ações',
-        loc: linha.locator('button[title*="detalh" i], button[aria-label*="detalh" i]').first()
+        loc: linha.locator('button[title^="Abrir" i], button[aria-label^="Abrir" i]').first()
       },
       { nome: 'clique na própria linha', loc: linha }
     ];
@@ -603,9 +618,40 @@ async function mirarAlca(page, alca) {
       if (alvo.classList.contains('resizable-th-handle')) return null;
       const r = alvo.getBoundingClientRect();
       const nome = alvo.getAttribute('class') || alvo.tagName.toLowerCase();
-      return { fora: false, quem: String(nome).slice(0, 80), base: Math.round(r.bottom) };
+      /*
+        QUEM COBRE DIZ DE QUEM É A CULPA (05/09) — a prova de mordida me
+        pegou.
+
+        A primeira versão desta função tratava QUALQUER cobertura como erro
+        de mira do harness e devolvia SEM DADO. A prova plantou o defeito de
+        verdade — uma alça que não recebe o ponteiro porque o próprio
+        cabeçalho da coluna está por cima — e o item, que antes reprovava,
+        passou a dizer "não foi exercitado". Eu tinha transformado um
+        defeito da tela em lacuna de evidência: o conserto de um falso
+        negativo abrindo um falso positivo do outro lado.
+
+        A separação é o que a PESSOA vive. Se quem cobre é a MOLDURA do
+        sistema (a faixa fixa, a topbar), o problema é onde eu mirei: basta
+        rolar. Se quem cobre é qualquer outra coisa, o clique de uma pessoa
+        de verdade também cairia nela — e aí a affordance não funciona,
+        que é exatamente o que o T3 existe para pegar.
+      */
+      const molduraDoSistema = alvo.closest('.app-page-header, .fx-topbar, .fx-breadcrumb, .fx-atalhos-fileira, .sidebar, .topbar-shell');
+      return {
+        fora: false,
+        daMoldura: Boolean(molduraDoSistema),
+        quem: String(nome).slice(0, 80),
+        base: Math.round(r.bottom)
+      };
     }, ponto);
     if (!quemRecebe) return { ponto };
+    if (quemRecebe.fora === false && !quemRecebe.daMoldura) {
+      return {
+        ponto: null,
+        estado: 'FALHOU',
+        motivo: `a alça de redimensionamento da coluna está COBERTA por "${quemRecebe.quem}" — o ponteiro (o de qualquer pessoa, não só o do robô) não chega nela, e arrastar não faz nada`
+      };
+    }
     ultimo = quemRecebe;
     // Coberto por elemento fixo (a faixa) → rola PARA CIMA o tanto que
     // falta para a alça sair de baixo dele. Fora da janela → aproxima.
@@ -1396,6 +1442,24 @@ const errosDeJs = [];
         /*
           NEM TODO REDIRECIONAMENTO É POLÍTICA DE ACESSO (05/09).
 
+          Duas famílias caem aqui, e nenhuma é bloqueio de permissão:
+
+          1. ETAPA DE FLUXO — as telas de revisão de compra (abaixo).
+          2. MODO DO SISTEMA — as 11 telas do SST, que o MODO SIMPLIFICADO
+             manda para /sst/pgr. Elas saíram do menu na mesma leva e pela
+             mesma constante; enquanto o modo estiver ligado a capacidade
+             existe e não é alcançável. A matriz dizia "acesso/política
+             bloqueando o usuário de QA" em 11 telas por causa de uma
+             configuração do sistema.
+
+          A DECLARAÇÃO NOMEIA O DESTINO, E ISSO É O QUE A TORNA SEGURA: ela
+          só dispensa a medição quando o desvio vai EXATAMENTE para onde foi
+          declarado. Desligado o modo simplificado, não há desvio nenhum e as
+          11 telas voltam a ser medidas sozinhas; se o desvio passar a ir
+          para outro lugar, aí é bloqueio de verdade e reprova. Declaração
+          que dispensa medição sem condição nenhuma é o mesmo que apagar o
+          check.
+
           As duas telas de REVISÃO de compra (`/solicitacoes-compra/revisar`
           e a da compra direta) são etapas de um FLUXO: os dados delas não
           vêm do servidor, vêm do rascunho que a tela "nova" grava no
@@ -1413,8 +1477,9 @@ const errosDeJs = [];
           evidência DECLARADA, com o motivo à vista, e a decisão de cobrir
           isso de outro jeito está registrada em docs/PENDENCIAS-REGISTRADAS.md.
         */
-        if (rotaAtual !== rota && tela.soPeloFluxo) {
-          throw new Error(`SO-PELO-FLUXO: ${tela.soPeloFluxo} (redirecionou de ${rota} para ${rotaAtual})`);
+        const declarada = tela.naoAlcancavel;
+        if (rotaAtual !== rota && declarada && (!declarada.destino || rotaAtual === declarada.destino)) {
+          throw new Error(`NAO-ALCANCAVEL: ${declarada.motivo} (redirecionou de ${rota} para ${rotaAtual})`);
         }
         if (rotaAtual !== rota) {
           throw new Error(`redirecionada de ${rota} para ${rotaAtual} — acesso/política bloqueando o usuário de QA`);
@@ -1790,19 +1855,20 @@ const errosDeJs = [];
           afirmações que ninguém verificou.
         */
         const [PRIMEIRO, ...DEMAIS] = ITENS_DOD;
-        // Tela declarada como "só pelo fluxo" não é reprovação: é lacuna de
-        // evidência, com o motivo dito por extenso. FALHOU aqui seria acusar
-        // a tela de um comportamento que é o correto dela.
-        const soPeloFluxo = String(resultado.erro || '').startsWith('SO-PELO-FLUXO: ');
+        // Tela DECLARADA não alcançável (etapa de fluxo, modo do sistema)
+        // não é reprovação: é lacuna de evidência, com o motivo dito por
+        // extenso. FALHOU aqui seria acusar a tela de um comportamento que é
+        // o correto dela.
+        const naoAlcancavelDeclarada = String(resultado.erro || '').startsWith('NAO-ALCANCAVEL: ');
         if (!resultado.itens[PRIMEIRO]) {
-          resultado.itens[PRIMEIRO] = soPeloFluxo
-            ? { estado: 'SEM DADO', motivo: `a tela NÃO FOI MEDIDA: ${String(resultado.erro).replace('SO-PELO-FLUXO: ', '')}` }
+          resultado.itens[PRIMEIRO] = naoAlcancavelDeclarada
+            ? { estado: 'SEM DADO', motivo: `a tela NÃO FOI MEDIDA: ${String(resultado.erro).replace('NAO-ALCANCAVEL: ', '')}` }
             : { estado: 'FALHOU', motivo: `a tela NÃO ABRIU: ${resultado.erro}` };
         }
         DEMAIS.forEach((item) => {
           if (!resultado.itens[item]) {
-            resultado.itens[item] = soPeloFluxo
-              ? { estado: 'SEM DADO', motivo: 'não medido — a tela é etapa de fluxo (ver o motivo na primeira coluna)' }
+            resultado.itens[item] = naoAlcancavelDeclarada
+              ? { estado: 'SEM DADO', motivo: 'não medido — a tela é declarada não alcançável (ver o motivo na primeira coluna)' }
               : { estado: 'NAO ABRIU', motivo: 'não medido — a tela não abriu (ver o motivo na primeira coluna)' };
           }
         });

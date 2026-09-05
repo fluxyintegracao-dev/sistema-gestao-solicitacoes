@@ -473,7 +473,19 @@ export default function GestaoApropriacoes() {
     <Pagina>
       <PageHeader
         titulo="Gestao de apropriacoes"
-        contagem={obraSelecionada && !loading ? `${apropriacoes.length} apropriacao(oes)` : null}
+        /*
+          A FAIXA SEMPRE TEM NUMERO (C2, 05/09).
+
+          A contagem so existia com uma obra escolhida; sem obra a faixa
+          ficava sem numero nenhum, que e justamente o estado em que a tela
+          abre. Quem chega precisa saber sobre quanta coisa esta olhando —
+          e antes de escolher a obra o total da tela e quantas obras ela
+          alcanca. Mesmo criterio de 05/09: a faixa leva o TOTAL, os blocos
+          levam os recortes.
+        */
+        contagem={obraSelecionada && !loading
+          ? `${apropriacoes.length} apropriacao(oes)`
+          : `${obras.length} obra(s)`}
         descricao="Cadastro compartilhado das apropriacoes vinculadas as obras para solicitacoes, financeiro e compras."
         acaoPrincipal={{ rotulo: 'Nova apropriacao', onClick: () => { limparFormulario(); focarFormulario(); } }}
       />
