@@ -960,8 +960,8 @@ function validarImportesDeHooks() {
  *
  * Custou as três telas do SST que o cliente encontrou "quebradas ao abrir",
  * e eu tinha atribuído isso a elas terem sido migradas sem medição. Não era:
- * o defeito era meu, de hoje, na `TabelaPadrao` — componente que 124 telas
- * usam. Ao acrescentar a rolagem infinita local (18f9253) eu escrevi cinco
+ * o defeito era meu, de hoje, na `TabelaPadrao` — componente importado por
+ * 152 arquivos de tela, 80 deles passando `carregando=`. Ao acrescentar a rolagem infinita local (18f9253) eu escrevi cinco
  * hooks ABAIXO das três saídas antecipadas que o componente já tinha.
  *
  * O que isso faz: a tabela monta vazia (dado não chegou), para no

@@ -756,7 +756,9 @@ sem ninguém saber dizer por quê.
   inteira**: erro #310, `Rendered more hooks than during the previous
   render`. A tela não degrada, **some** — vira "Não foi possível abrir esta
   tela".
-- **O alcance**: a `TabelaPadrao` é usada por **124 telas**. O gatilho é a
+- **O alcance**: a `TabelaPadrao` é importada por **152 arquivos de tela**,
+  **80** deles passando `carregando=` (medido, não estimado — o "124" que eu
+  vinha repetindo era de cabeça). O gatilho é a
   transição mais comum do sistema (vazio → com dado), e há duas variantes
   latentes do mesmo defeito: `carregando → pronto`, e atravessar o corte de
   tela móvel com a tabela cheia.

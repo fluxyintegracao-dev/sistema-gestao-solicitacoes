@@ -617,6 +617,30 @@ do sistema.
 O critério vigente desde 02/09 é seu: entre "cabe mais" e "lê-se melhor",
 vence a leitura. Aplicar isso muda o arranjo da tela, e é o esperado.
 
+### N49. Existe um caminho para gravar o número do pedido, com trilha de auditoria montada, e nenhuma tela o alcança
+
+**O que acontece hoje.** Existe um formulário de um campo só — "Número do
+pedido", com o botão "Gravar número" — pronto e funcionando, que grava esse
+número na solicitação. **Nenhuma tela do sistema exibe esse formulário**: ele
+existe e não é usado por ninguém.
+
+**Efeito prático.** O caminho no servidor existe, é validado e é **auditado**
+— cada gravação registraria quem mudou o número do pedido e quando. O campo é
+lido na busca e na ordenação da lista de solicitações, ou seja, **o dado é
+usado pelo sistema**. Mas não há nenhuma tela em que alguém possa escrevê-lo.
+Alguém montou o caminho inteiro, com registro de auditoria, e a porta de
+entrada nunca foi ligada.
+
+**Onde está no código.** `frontend/src/pages/SolicitacaoDetalhe/Pedido.jsx`
+(108 linhas, sem nenhum outro arquivo apontando para ele) e a rota
+`PATCH /solicitacoes/:id/pedido` no servidor — `backend/src/routes.js`, linha
+1565, com o evento de auditoria `SOLICITACAO_PEDIDO_UPDATED`.
+
+**O que decidir.** Ligar o formulário numa tela (o detalhe da solicitação é o
+lugar natural), ou remover as duas pontas? **Decisão do cliente em 05/09:**
+fica como está, sem rota e sem remoção, registrado para o responsável decidir
+se quer ligar.
+
 ## RESUMO PARA DECIDIR
 
 | # | Achado | Classe | Urgência |
@@ -710,4 +734,61 @@ porque cada colaborador tem exatamente uma pendência crítica.
 
 Fica registrado porque a suspeita era razoável e a resposta é verificável —
 se alguém a levantar de novo, o caminho já está andado.
+
+### N52. O mapa de risco é desenhado a partir de quatro tabelas que ninguém alimenta — e ignora o risco que está na mesma resposta
+
+**O que acontece.** A tela "Mapa de risco operacional" (`/sst/relatorios/heatmap`)
+abre vazia. Não há um quadrado no mapa.
+
+**O que a API respondeu, medido no preview em 05/09.** `GET /api/sst/heatmap`
+devolve **200**, e no mesmo documento:
+
+- `heatmap` = **lista vazia** — é o que a tela desenha;
+- `scores` = **110 registros** de conformidade, cada um com pendências
+  críticas contadas;
+- e o painel do SST, na mesma base e no mesmo minuto, informa
+  `pendencias_criticas = 99` sobre `total_colaboradores_ativos = 99`.
+
+**Por quê.** `gerarHeatmapSst`
+(`backend/src/modules/sst/analytics/sstExecutiveAnalyticsService.js`, linha
+109) monta o mapa **exclusivamente** a partir de quatro tabelas gravadas:
+`SstPendenciaOperacional`, `SstBloqueioOperacional`, `SstAcidente` e
+`SstRisco`. As quatro estão vazias nesta base — ninguém as alimenta.
+
+As 99 pendências críticas que o sistema conhece **não estão nessas tabelas**:
+são **derivadas** dos dados de RH (99 colaboradores ativos, nenhum com ASO
+cadastrado — `/api/sst/aso` devolve `rows: 0`). O mapa não as vê porque não
+olha para lá. E os 110 `scores`, que viajam na mesma resposta e já trazem a
+criticidade por escopo, **não são plotados**: a função devolve os dois, e a
+tela desenha só o primeiro.
+
+**Não é consulta quebrada nem base sem registro — é fonte errada.** Este é o
+ponto que separa este achado dos outros dois estados possíveis:
+
+| | o que seria | é isto? |
+|---|---|---|
+| Consulta quebrada | 4xx/5xx, ou erro no servidor | **Não.** 200, roda limpo. |
+| Base sem registro | nada de risco em lugar nenhum | **Não.** 110 scores e 99 pendências críticas na mesma resposta. |
+| Fonte errada | a consulta lê a tabela que ninguém preenche, e a que tem o dado fica de fora | **Sim.** |
+
+**Efeito prático.** Um diretor abre uma tela chamada "Mapa de risco
+operacional" e vê o mapa limpo. A leitura natural é "nenhuma obra em risco".
+O sistema, no mesmo instante, sabe que **99 de 99 colaboradores ativos estão
+sem ASO** — o que é justamente uma pendência crítica de segurança do
+trabalho, e das que geram autuação. **Mapa vazio não é ausência de risco: é
+ausência de medição, e as duas se parecem exatamente.**
+
+É o mesmo defeito do N50, pela outra ponta: lá o mesmo nome recebia dois
+números, aqui o número existe e não chega à tela que foi feita para mostrá-lo.
+
+**Quem decide.** Duas saídas possíveis, e a escolha é do responsável pelo
+SST, não minha: (a) alimentar as quatro tabelas operacionais, e o mapa passa
+a funcionar como foi desenhado; ou (b) o mapa passar a somar também as
+pendências derivadas de RH, e mostrar hoje as 99. A opção (b) muda o que o
+mapa significa — por isso não a apliquei.
+
+**Ao lado, o que NÃO é achado: o PGR.** A tela `/sst/pgr` também abre vazia,
+e essa é base sem registro de verdade — medido no mesmo minuto:
+`ambientes`, `riscos`, `agentes`, `aso`, `ltcat` e `pgr` devolvem todos
+**200 com `rows: 0` e `total: 0`**. Nada a corrigir: falta cadastrar.
 

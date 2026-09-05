@@ -4,24 +4,12 @@
   "porque": "Token e classe que a tela usa e que NUNCA foram declarados. O CSS nao resolve, a declaracao e descartada, e o estilo nunca chega a tela. Classe fantasma e pior que valor errado: parece intencao. O numero SO DESCE.",
   "nomes": {
     "--c-card": 8,
-    "--c-fg": 1,
-    "--c-primary-soft": 2,
-    "--c-success-soft": 1,
     "--c-surface-alt": 8,
-    "--c-surface-hover": 6,
     "--c-surface-muted": 13,
     "--c-surface-subtle": 1,
-    "--c-text-muted": 1,
-    "--c-warning-soft": 1,
-    "--c-warning-strong": 1,
-    "--z-dropdown-portal": 1,
     ".alert-danger": 5,
     ".app-alert--success": 5,
-    ".app-alert--warning": 10,
-    ".app-filter-actions": 4,
-    ".badge-neutral": 1,
     ".badge-soft": 3,
-    ".btn-xs": 7,
     ".cr-field--search": 1,
     ".cr-governance": 1,
     ".cr-inline-state": 2,
@@ -32,9 +20,6 @@
     ".cr-works-access": 1,
     ".form-field": 79,
     ".form-help": 1,
-    ".hub-header-texto": 1,
-    ".la-cards-grupo": 1,
-    ".link-primary": 3,
-    ".sol-page-header": 2
+    ".la-cards-grupo": 1
   }
 }
