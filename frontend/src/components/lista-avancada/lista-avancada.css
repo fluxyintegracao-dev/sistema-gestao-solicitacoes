@@ -319,6 +319,16 @@
 .la-colunas-wrap { position: relative; }
 .la-colunas-pop { left: auto; right: 0; }
 
+/* Marcar/desmarcar todas: fica ACIMA da busca e das opções, separado por uma
+   linha, para não se confundir com uma opção da lista. */
+.la-rapido-lote {
+  display: flex;
+  gap: var(--esp-3);
+  padding: 0 var(--esp-1) var(--esp-2);
+  margin-bottom: var(--esp-1);
+  border-bottom: 1px solid var(--ui-border);
+}
+
 /* Campo de busca do menu de marcação: aparece só em dimensão com muitas
    opções (ver FiltroRapido). Gruda no topo para não sumir na rolagem — e
    `clip` em vez de `hidden` no pai, pela R18, é o que deixa isso funcionar. */

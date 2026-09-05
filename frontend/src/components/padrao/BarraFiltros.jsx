@@ -42,7 +42,7 @@ import { FiltroRapido } from '../lista-avancada/ListaAvancada';
  */
 export default function BarraFiltros({
   busca,               // { valor, aoMudar, placeholder }
-  campos = [],         // [{ id, rotulo, tipo, valor, aoMudar, min, max }]
+  campos = [],         // [{ id, rotulo, tipo, valor, aoMudar, min, max, step, placeholder, sugestoes }]
   filtros = [],        // [{ id, rotulo, unico?, opcoes: [{ valor, rotulo }] }]
   ativos = {},         // { [id]: Set<string> }
   aoAlternar,
@@ -87,6 +87,21 @@ export default function BarraFiltros({
 
       {campos.length > 0 && (
         <div className="app-filtros-campos">
+          {/*
+              `placeholder`, `step` e `sugestoes` (05/09) — o componente estava
+              engolindo capacidade das telas.
+
+              Achado em duas migrações no mesmo dia: os filtros de Solicitações
+              tinham um DATALIST de responsáveis que sumiu na migração, e os de
+              Compras perderam `step="0.01"` nos campos de valor e os
+              placeholders de exemplo ("Ex: SOL-12345"). Nada disso era enfeite
+              — o datalist era a única sugestão que a pessoa tinha para um campo
+              que aceita nome livre.
+
+              Componente compartilhado que não repassa o que a tela precisa não
+              padroniza: ele apaga. Quem migra fica entre perder a capacidade
+              ou não usar o padrão, e as duas saídas são ruins.
+          */}
           {campos.map((campo) => (
             <label key={campo.id} className="app-filtros-campo">
               <span className="app-filtros-campo-rotulo">{campo.rotulo}</span>
@@ -95,8 +110,18 @@ export default function BarraFiltros({
                 value={campo.valor ?? ''}
                 min={campo.min}
                 max={campo.max}
+                step={campo.step}
+                placeholder={campo.placeholder}
+                list={campo.sugestoes?.length ? `sugestoes-${campo.id}` : undefined}
                 onChange={(event) => campo.aoMudar(event.target.value)}
               />
+              {campo.sugestoes?.length ? (
+                <datalist id={`sugestoes-${campo.id}`}>
+                  {campo.sugestoes.map((sugestao) => (
+                    <option key={String(sugestao)} value={String(sugestao)} />
+                  ))}
+                </datalist>
+              ) : null}
             </label>
           ))}
         </div>

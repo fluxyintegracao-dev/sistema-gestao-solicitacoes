@@ -1166,6 +1166,44 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
               aria-label={`Buscar em ${dim.rotulo}`}
             />
           ) : null}
+          {/*
+              MARCAR/DESMARCAR TODAS (05/09) — capacidade que existia e sumiu.
+
+              Os menus de filtro escritos à mão nas Solicitações tinham
+              "Selecionar todas" por dimensão. A migração para o `FiltroRapido`
+              a perdeu: "Limpar" tinha equivalente (a etiqueta removível e o
+              "Limpar tudo"), mas marcar todas NÃO tinha nenhum.
+
+              Só aparece quando há mais de uma opção — num filtro de uma opção
+              seria um botão que faz o mesmo que a própria opção. E respeita a
+              BUSCA: com texto digitado, marca o que está à vista, que é a
+              regra de "pergunta sobre o que se vê" aplicada à marcação.
+
+              Numa dimensão `unico` ele não existe: marcar todas contradiz o
+              proprio conceito de valor unico.
+          */}
+          {opcoesVisiveis.length > 1 && !dim.unico ? (
+            <div className="la-rapido-lote">
+              <button
+                type="button"
+                className="la-link"
+                onClick={() => opcoesVisiveis
+                  .filter((o) => !selecionados.has(String(o.valor)))
+                  .forEach((o) => onToggle(String(o.valor)))}
+              >
+                {busca.trim() ? 'Marcar as visíveis' : 'Marcar todas'}
+              </button>
+              <button
+                type="button"
+                className="la-link"
+                onClick={() => opcoesVisiveis
+                  .filter((o) => selecionados.has(String(o.valor)))
+                  .forEach((o) => onToggle(String(o.valor)))}
+              >
+                Desmarcar
+              </button>
+            </div>
+          ) : null}
           {temBusca && opcoesVisiveis.length === 0 ? (
             <p className="la-vazio">Nenhuma opção com esse texto.</p>
           ) : null}

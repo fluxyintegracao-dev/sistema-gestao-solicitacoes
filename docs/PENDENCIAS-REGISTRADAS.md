@@ -2257,3 +2257,41 @@ mostra. Não é defeito da tela — é escolha minha de rota. Trocado por
   `VITE_SST_SIMPLIFIED_MODE=false`), e as 12 passam a valer com a matriz.
 
 Não as duas coisas. Enquanto você não decide, a rodada do SST fica **aberta**.
+
+## 05/09 — Componente compartilhado que não repassa o que a tela precisa não padroniza: apaga
+
+Três agentes, em migrações diferentes do mesmo dia, relataram a mesma coisa
+por caminhos independentes: **perderam capacidade porque o componente padrão
+não tinha por onde passar.**
+
+| O que se perdeu | Onde |
+|---|---|
+| Datalist de responsáveis (a única sugestão de um campo de nome livre) | filtros de Solicitações |
+| `step="0.01"` nos campos de valor | filtros de Compras |
+| Placeholders de exemplo ("Ex: SOL-12345") | filtros de Compras |
+| "Selecionar todas" por dimensão | filtros de Solicitações |
+| Slot de ícone no ladrilho | painéis do SST |
+| Busca dentro do menu de marcação (500 colaboradores em caixa) | SstTimeline |
+
+Nenhuma delas era enfeite, e o padrão de erro é o mesmo: **quem migra fica
+entre perder a capacidade ou não usar o padrão, e as duas saídas são ruins.**
+Um componente compartilhado que engole capacidade não está padronizando — está
+apagando, e vai apagando um pouco a cada tela que adota.
+
+Todos os seis foram para o componente:
+- `BarraFiltros.campos` repassa `step`, `placeholder` e `sugestoes` (datalist);
+- `FiltroRapido` ganhou "Marcar todas"/"Desmarcar" (só com mais de uma opção,
+  nunca em dimensão `unico`, e respeitando a busca: com texto digitado ele diz
+  **"Marcar as visíveis"**, porque agir sobre o que não está à vista é o mesmo
+  defeito do "pergunta sobre 3, apaga 47");
+- `FiltroRapido` ganhou busca acima de 12 opções;
+- `StatTile` ganhou `icone` (era fragmento enfiado no rótulo, que o leitor de
+  tela lia junto do texto);
+- `.app-stat--info` passou a existir (o ladrilho aceitava `tom="info"` e
+  renderizava neutro, engolindo a distinção em silêncio);
+- `.app-alert--warning` passou a existir (era fantasma usada em telas já
+  aprovadas, funcionando por acidente de a base ser âmbar).
+
+**A regra que fica**: quando um agente relatar "precisei disso e o componente
+não tem", isso é dívida do componente, não da tela — e cobrar dele é mais
+barato do que deixar cada tela resolver por fora, que é como nasce dialeto.
