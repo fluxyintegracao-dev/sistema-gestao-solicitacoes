@@ -264,6 +264,11 @@ export default function CrmLeads() {
           ações da linha continuam sendo botões focáveis.
         */}
         <TabelaPadrao
+          // Rodape "N de M" (05/09): esta lista vem PAGINADA do servidor, entao
+          // o que esta a vista e uma fatia — sem o total, quem rola nao sabe se
+          // adianta continuar.
+          total={Number(dados.total || 0)}
+          rotuloRegistro="lead"
           colunas={[
             {
               id: 'id',

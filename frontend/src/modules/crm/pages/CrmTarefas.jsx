@@ -213,6 +213,11 @@ export default function CrmTarefas() {
         />
 
         <TabelaPadrao
+          // Rodape "N de M" (05/09): esta lista vem PAGINADA do servidor, entao
+          // o que esta a vista e uma fatia — sem o total, quem rola nao sabe se
+          // adianta continuar.
+          total={Number(total || 0)}
+          rotuloRegistro="tarefa"
           colunas={[
             {
               id: 'titulo',

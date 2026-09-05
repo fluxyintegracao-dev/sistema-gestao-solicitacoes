@@ -1255,6 +1255,22 @@ fieldset.form-section {
 
 /* Rodapé de lista paginada (R16b, 02/09). Um dono só: antes cada tela
    reinventava com app-page-actions e cor fixa. */
+/*
+  RODAPÉ DE CONTAGEM DA TABELA — "N de M" (05/09).
+
+  Mesma escala e mesma cor do texto da paginação, porque é a mesma classe de
+  informação: onde a pessoa está dentro do conjunto. Alinhado à direita, sob
+  a borda da tabela, e sem borda própria — é rodapé, não é bloco.
+*/
+.app-tabela-rodape {
+  margin: var(--esp-2) 0 0;
+  text-align: right;
+  font-size: var(--fonte-corpo);
+  line-height: var(--lh-corpo);
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .app-paginacao {
   display: flex;
   align-items: center;

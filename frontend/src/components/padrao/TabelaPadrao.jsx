@@ -390,7 +390,28 @@ export default function TabelaPadrao({
   aoOrdenar,            // (coluna, direcao|null) => void — LISTA PAGINADA NO SERVIDOR: a tela reconsulta; o componente NÃO ordena local
   linhaSelecionada,     // (item) => boolean — realce e aria-selected da linha
   classeLinha,          // (item) => string|null — ênfase da tela (subtotal, total…) sem mentir com aria-selected
-  acoesTabela           // ReactNode extra na barra acima da tabela
+  acoesTabela,          // ReactNode extra na barra acima da tabela
+  /*
+    RODAPÉ DE CONTAGEM — "N de M" (decisão do cliente, 05/09).
+
+    Tabela que carrega em FATIAS não diz quantas linhas existem, e quem
+    olha não tem como saber se rolar adianta: as 50 linhas à vista podem
+    ser tudo, ou podem ser 50 de 1.200. A faixa fixa até traz a contagem
+    (é o que a C2 cobra), mas ela some do campo de visão assim que a
+    pessoa desce a tabela — justamente quando a pergunta aparece.
+
+    Por isso o rodapé é do COMPONENTE e nasce LIGADO: capacidade que
+    depende de cada tela lembrar de acrescentar é capacidade que 200 telas
+    vão ter de formas diferentes, e o projeto já pagou por isso.
+
+    `total` é o tamanho do conjunto INTEIRO, quando a tela o conhece
+    (listas paginadas no servidor). Sem ele o rodapé diz só o que está à
+    vista, que ainda responde "quantas linhas tem aqui" — mentir um total
+    que não se sabe seria pior que não dizer.
+  */
+  total,                // number|undefined — total do conjunto, além da fatia à vista
+  rotuloRegistro = 'linha',
+  rodapeContagem = true // saída explícita para a tabela em que o rodapé é ruído
 }) {
   const ehMovel = useEhMovel();
   const shellRef = useRef(null);
@@ -830,6 +851,10 @@ export default function TabelaPadrao({
   ];
 
   const totalColunas = colunasTabela.length;
+  // Total conhecido é NÚMERO finito e não menor que o que está à vista: um
+  // total menor que a fatia é dado errado da tela, e escrever "50 de 12"
+  // seria transformar o defeito dela em informação para a pessoa.
+  const temTotalConhecido = Number.isFinite(Number(total)) && Number(total) >= itens.length;
 
   /* ---- Agrupamento: linhas de grupo intercaladas ---------------------- */
   const blocos = agruparPor
@@ -1074,6 +1099,19 @@ export default function TabelaPadrao({
           ))}
         </tbody>
       </ResizableTable>
+      {/*
+        `role="status"` e não texto solto: quem filtra ou vira a página
+        precisa OUVIR que o número mudou — é o mesmo motivo do aria-live da
+        paginação. Fora da tabela de propósito: `tfoot` entraria na conta de
+        largura das colunas e no arrasto.
+      */}
+      {rodapeContagem && itens.length ? (
+        <p className="app-tabela-rodape" role="status">
+          {temTotalConhecido
+            ? `${itens.length} de ${total} ${rotuloRegistro}${Number(total) === 1 ? '' : 's'}`
+            : `${itens.length} ${rotuloRegistro}${itens.length === 1 ? '' : 's'}`}
+        </p>
+      ) : null}
     </div>
   );
 }

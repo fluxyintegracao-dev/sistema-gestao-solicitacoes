@@ -555,6 +555,11 @@ export default function AuditoriaOperacional() {
               do cartão antigo saiu da tela.
             */}
             <TabelaPadrao
+              // Rodape "N de M" (05/09): esta lista vem PAGINADA do servidor, entao
+              // o que esta a vista e uma fatia — sem o total, quem rola nao sabe se
+              // adianta continuar.
+              total={Number(events.total || 0)}
+              rotuloRegistro="evento"
               colunas={[
                 {
                   id: 'ocorrido_em',
