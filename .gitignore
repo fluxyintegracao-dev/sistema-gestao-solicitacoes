@@ -85,3 +85,13 @@ _tmp_brandkit_blue_complete/
 
 # As paginas publicas pertencem ao snapshot, mas nunca transportar metadados Git aninhados.
 legal-pages/.git/
+
+# Andaime de medição dos agentes de QA (05/09).
+# Para medir corte de texto e geometria, um agente monta uma página isolada
+# com o CSS real e a abre num Chromium. Isso é ferramenta de trabalho, não
+# código do sistema — e já entrou no repositório duas vezes por um `git add
+# -A` meu. Ignorar aqui é mais barato que lembrar de limpar toda vez.
+frontend/qa-temp.html
+frontend/__qa_visit_tmp.mjs
+frontend/src/__qaTempMain.jsx
+frontend/src/__qaTemp*.jsx
