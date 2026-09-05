@@ -2,6 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MenuMais from './MenuMais';
 
+/*
+  A AÇÃO PODE TER ESTADO, E O ESTADO TEM DE CHEGAR AO DOM (05/09).
+
+  O botão aqui recebia rótulo, ícone, título e clique — e mais nada. Isso
+  bastou até a Home migrar: o "Personalizar" dela é um botão de LIGA/DESLIGA
+  e carregava `aria-pressed` no arranjo antigo. Ao virar ação secundária da
+  faixa, o atributo simplesmente não tinha por onde passar, e quem usa
+  leitor de tela deixou de saber se o modo estava ligado. Perda silenciosa
+  de capacidade causada pela padronização — exatamente o que a marca de
+  componente compartilhado não garante sozinha.
+
+  `pressionada` é opcional: ação sem estado continua sem `aria-pressed`, que
+  é o certo (um `aria-pressed="false"` num botão comum anuncia um
+  liga/desliga que não existe). `classe` acrescenta, nunca substitui.
+*/
 function BotaoAcao({ acao, classe }) {
   const conteudo = (
     <>
@@ -9,9 +24,10 @@ function BotaoAcao({ acao, classe }) {
       {acao.rotulo}
     </>
   );
+  const classeFinal = acao.classe ? `${classe} ${acao.classe}` : classe;
   if (acao.to) {
     return (
-      <Link className={classe} to={acao.to} title={acao.title}>
+      <Link className={classeFinal} to={acao.to} title={acao.title} aria-label={acao.rotuloAcessivel}>
         {conteudo}
       </Link>
     );
@@ -19,10 +35,12 @@ function BotaoAcao({ acao, classe }) {
   return (
     <button
       type={acao.type || 'button'}
-      className={classe}
+      className={classeFinal}
       onClick={acao.onClick}
       disabled={acao.desabilitada}
       title={acao.title}
+      aria-label={acao.rotuloAcessivel}
+      aria-pressed={typeof acao.pressionada === 'boolean' ? acao.pressionada : undefined}
     >
       {conteudo}
     </button>

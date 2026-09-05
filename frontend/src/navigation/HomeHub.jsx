@@ -615,6 +615,11 @@ export default function HomeHub() {
         descricao={papel || 'Início do sistema'}
         secundarias={isMobileHome ? [] : [{
           rotulo: personalizando ? 'Concluir personalização' : 'Personalizar',
+          // Botão de LIGA/DESLIGA: o estado tem de chegar ao leitor de tela,
+          // e não só ao rótulo. O `aria-pressed` existia no arranjo anterior
+          // e voltou pelo `pressionada` da ação (PageHeader, 05/09).
+          pressionada: personalizando,
+          classe: personalizando ? 'sol-detail-personalizando' : undefined,
           title: personalizando
             ? 'Sair do modo de personalização da Home'
             : 'Reordenar, ocultar e redimensionar os blocos da sua Home',

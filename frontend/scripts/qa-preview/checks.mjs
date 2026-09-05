@@ -920,8 +920,29 @@ export function checksEstaticos({ tipo }) {
 
   /* ---- M1: alvo mínimo 32px ---- */
   {
+    /*
+      A EXCLUSAO ERA POR TAG, E TAG NAO E CHROME (05/09).
+
+      O filtro tirava tudo que estivesse dentro de QUALQUER `<nav>`. A
+      intencao era nao cobrar alvo minimo do menu e da topbar, que sao a
+      moldura do sistema e nao a tela. So que `<nav>` tambem e o elemento
+      certo para navegacao DENTRO da pagina: as abas de Custos e Recebiveis,
+      o passo a passo do planejamento, a paginacao da tabela, a grade de
+      modulos da Home. Tudo isso ficava sem cobranca de alvo.
+
+      Achado na migracao da Home: o "x" que oculta um modulo tem 22x22px, na
+      PRIMEIRA tela do sistema, e o M1 nunca o viu porque os cards moram num
+      `<nav aria-label="Modulos do sistema">`. Regra que se aplica pela tag
+      isenta o que ela nao queria isentar.
+
+      Agora a excecao nomeia a MOLDURA: a topbar real (`.fx-topbar`), a
+      trilha, a fileira de atalhos do topo e as duas classes antigas de
+      casca. O que esta na pagina responde pelo alvo minimo, esteja em
+      `<nav>` ou nao.
+    */
+    const MOLDURA_DO_SISTEMA = '.fx-topbar, .fx-breadcrumb, .fx-atalhos-fileira, .sidebar, .topbar-shell';
     const clicaveis = qa('button, a.btn, [role="button"]').filter(visivel).filter(foraDeModal)
-      .filter((el) => !el.closest('nav, .sidebar, .topbar-shell'));
+      .filter((el) => !el.closest(MOLDURA_DO_SISTEMA));
     const pequenos = clicaveis.filter((el) => {
       const rect = el.getBoundingClientRect();
       return rect.width < 31.5 || rect.height < 31.5;

@@ -1966,25 +1966,71 @@
   pointer-events: none;
 }
 
+/*
+  A CAIXA CRESCE, O DESENHO NÃO (05/09) — M1/R2.
+
+  O botão tinha 22×22px: quatro alvos abaixo do mínimo na PRIMEIRA tela do
+  sistema, e o dedo no celular tinha 22px para acertar entre "abrir o
+  módulo" (o card inteiro) e "ocultar o módulo" (este botão). Errar aqui
+  esconde um módulo sem querer.
+
+  O círculo de 22px é assim de propósito — ele fica encavalado no canto do
+  card, e crescer o DESENHO para 32px o transformaria num botão que disputa
+  atenção com o card. Então quem cresce é a CAIXA: o botão passa a medir
+  `--alvo-clique` (32px no mouse, 44px no toque, pelo token) e o círculo
+  branco com borda é desenhado por um `::before` centrado, com as mesmas
+  medidas de antes.
+
+  Primeira tentativa, registrada porque quase entrou: expandir a área com um
+  `::after` maior, mantendo o botão em 22px. Funciona para o dedo e NÃO para
+  a medição — `getBoundingClientRect()` do botão ignora pseudo-elemento, e o
+  M1 continuaria (com razão) lendo 22×22. Área de toque que não aparece na
+  caixa do elemento é melhoria que ninguém consegue verificar.
+
+  O deslocamento do canto acompanha o token: o círculo tem de ficar onde
+  sempre esteve, então a caixa recua metade do que cresceu.
+*/
 .hub-modulo-remover {
+  --hub-remover-desenho: 22px;
   position: absolute;
-  top: -7px;
-  right: -7px;
+  top: calc(-7px - (var(--alvo-clique) - var(--hub-remover-desenho)) / 2);
+  right: calc(-7px - (var(--alvo-clique) - var(--hub-remover-desenho)) / 2);
   z-index: 2;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  border: 1px solid var(--ui-border);
-  background: var(--card-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--alvo-clique);
+  height: var(--alvo-clique);
+  border: none;
+  background: none;
+  box-shadow: none;
   color: var(--app-muted-color);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
+}
+
+.hub-modulo-remover::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  width: var(--hub-remover-desenho);
+  height: var(--hub-remover-desenho);
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: var(--card-bg);
   box-shadow: var(--ui-shadow-sm);
 }
 
+/* O realce do hover mora no DESENHO, que agora é o pseudo-elemento. */
 .hub-modulo-remover:hover {
   color: var(--sem-danger);
+}
+
+.hub-modulo-remover:hover::before {
   border-color: var(--sem-danger);
 }
 
