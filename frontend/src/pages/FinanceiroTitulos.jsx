@@ -519,11 +519,60 @@ function loadVisibleFilterIds(user, storagePrefix = FILTER_VISIBILITY_STORAGE_PR
   }
 }
 
-function pickVisibleFilters(filters, visibleFilterIds) {
+/*
+  N53 (05/09) — `pickVisibleFilters` SAIU DAQUI. A projeção não acabou: mudou
+  de lugar, e é essa mudança que fecha o achado.
+
+  O QUE ELA FAZIA: recortava o PAYLOAD. O filtro escondido deixava de ser
+  enviado ao servidor. Esconder "Obra" para desafogar a faixa fazia a consulta
+  passar a trazer TODAS as obras, e o total subir. O mesmo usuário, com os
+  mesmos campos preenchidos, obtinha listas diferentes conforme a máquina —
+  porque a escolha de "quais filtros aparecem" mora no navegador. Medido e
+  registrado como N53, classificado CRÍTICO pelo cliente em 05/09: número
+  errado chegando a quem decide, sem nada na tela que denuncie.
+
+  O QUE ENTRA NO LUGAR: o recorte desce um nível e passa a valer sobre o
+  VALOR, não sobre o envio — esconder LIMPA (é o contrato que a tela de
+  Provisionamentos já cumpre). Com isso, filtro invisível já está vazio, o
+  `compactFilters` sozinho não manda nada dele, e o que a pessoa lê na faixa
+  passa a ser o recorte INTEIRO da consulta.
+
+  As duas funções abaixo separam de ONDE o valor veio, porque o tratamento
+  honesto é diferente:
+  - valor que o SISTEMA propõe (o padrão `status: 'ABERTO'`) NÃO ressuscita
+    campo escondido — nasce vazio, senão bastava recarregar a tela para o
+    filtro invisível voltar a restringir;
+  - valor que o USUÁRIO montou (salvo no navegador, ou vindo do link do Hub)
+    NÃO é jogado fora — o campo reaparece, para ele ver o que restringe.
+*/
+const CHAVES_DO_FILTRO = {
+  // Cartão só existe dentro de uma forma de pagamento: `setFilter` já zera um
+  // quando o outro muda, e esconder segue a MESMA dependência — senão sobra
+  // um cartão recortando a lista sem a forma que o explica.
+  forma_pagamento_id: ['forma_pagamento_id', 'cartao_id']
+};
+
+function chavesDoFiltro(filterId) {
+  return CHAVES_DO_FILTRO[filterId] || [filterId];
+}
+
+/* Preenchido = tem valor em QUALQUER uma das fontes passadas (rascunho do
+   formulário e/ou consulta em curso). É o que o painel de visibilidade avisa
+   antes do clique: esconder este aqui limpa alguma coisa. */
+function filtroPreenchido(filterId, ...fontes) {
+  return chavesDoFiltro(filterId).some((chave) => fontes.some(
+    (fonte) => String(fonte?.[chave] ?? '').trim() !== ''
+  ));
+}
+
+/* Aplica a regra "invisível não restringe" a um conjunto de filtros PADRÃO. */
+function limparFiltrosInvisiveis(filters, visibleFilterIds) {
   const visible = new Set(visibleFilterIds);
-  return Object.fromEntries(
-    Object.entries(filters).filter(([key]) => key === 'tipo' || visible.has(key))
-  );
+  const vazios = {};
+  FILTER_DEFINITIONS
+    .filter((item) => !visible.has(item.id))
+    .forEach((item) => chavesDoFiltro(item.id).forEach((chave) => { vazios[chave] = ''; }));
+  return { ...filters, ...vazios };
 }
 
 function formatCurrency(value) {
@@ -890,11 +939,17 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [filterChooserOpen, setFilterChooserOpen] = useState(false);
   const [visibleFilterIds, setVisibleFilterIds] = useState(() => loadVisibleFilterIds(user, visibilityStoragePrefix));
   const [draftFilters, setDraftFilters] = useState(() => {
+    /* N53 (05/09): o PADRÃO nasce respeitando o que está escondido. Sem isso,
+       quem escondesse "Status" (que nasce em ABERTO) veria o filtro invisível
+       voltar a recortar a lista na recarga seguinte — o defeito de novo, por
+       outra porta. Valor SALVO pelo usuário não é mascarado aqui: quem revela
+       o campo dele é o efeito de reconciliação abaixo. */
     try {
       const stored = localStorage.getItem(filterStorageKey);
-      return normalizeFilters(stored ? JSON.parse(stored) : getDefaultFilters(fixedTipo || 'RECEBER'), fixedTipo);
+      const padrao = limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), visibleFilterIds);
+      return normalizeFilters(stored ? JSON.parse(stored) : padrao, fixedTipo);
     } catch (error) {
-      return getDefaultFilters(fixedTipo || 'RECEBER');
+      return limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), visibleFilterIds);
     }
   });
   const [appliedFilters, setAppliedFilters] = useState(null);
@@ -1011,7 +1066,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }, [user?.id, user?.email, visibilityStoragePrefix]);
 
   useEffect(() => {
-    const defaults = getDefaultFilters(fixedTipo || 'RECEBER');
+    // N53 (05/09): mesmo tratamento do estado inicial — padrão não ressuscita
+    // filtro escondido.
+    const defaults = limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), visibleFilterIds);
     let nextFilters = defaults;
 
     try {
@@ -1028,7 +1085,40 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setLoading(false);
     setError('');
     setSelectedTituloIds([]);
+    // `visibleFilterIds` é LIDO aqui e de propósito NÃO entra nas
+    // dependências: este efeito zera consulta, seleção e paginação, e ele
+    // reage a TROCA DE CARTEIRA/USUÁRIO. Se reagisse também à visibilidade,
+    // esconder um campo apagaria a consulta que a pessoa está lendo — o
+    // oposto do que a N53 pede.
   }, [filterStorageKey, fixedTipo]);
+
+  /*
+    N53 (05/09) — RECONCILIAÇÃO: filtro com valor é filtro VISÍVEL.
+
+    O outro lado do contrato. "Esconder limpa" cuida do que a pessoa faz
+    agora; isto cuida do que ela encontra ao abrir a tela. Um valor salvo no
+    navegador (ou vindo do link do Hub) pode chegar sobre um filtro que está
+    escondido nesta máquina — e era exatamente esse par que fazia a mesma
+    consulta responder números diferentes em máquinas diferentes.
+
+    A saída aqui é REVELAR, não apagar: o recorte foi o usuário que montou,
+    então ele aparece na faixa em vez de sumir em silêncio. Depois de rodar,
+    vale a invariante que o resto do arquivo assume: NENHUM filtro invisível
+    carrega valor, então o que a faixa mostra é o recorte inteiro.
+  */
+  useEffect(() => {
+    const preenchidos = FILTER_DEFINITIONS
+      .filter((item) => filtroPreenchido(item.id, draftFilters, appliedFilters))
+      .map((item) => item.id);
+    if (preenchidos.length === 0) return;
+
+    setVisibleFilterIds((atuais) => {
+      if (preenchidos.every((id) => atuais.includes(id))) return atuais;
+      return FILTER_DEFINITIONS
+        .map((item) => item.id)
+        .filter((id) => atuais.includes(id) || preenchidos.includes(id));
+    });
+  }, [draftFilters, appliedFilters]);
 
   // Links das pendências do Hub chegam com a tela já filtrada:
   // ?vencidos=1 (vencimento até ontem) ou ?vencendo_ate=AAAA-MM-DD
@@ -1105,7 +1195,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setError('');
 
     getTitulosFinanceiros({
-      ...compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)),
+      ...compactFilters(appliedFilters),
       paginated: 1,
       page: pagination.page,
       limit: pagination.limit
@@ -1145,7 +1235,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     return () => {
       active = false;
     };
-  }, [appliedFilters, pagination.page, pagination.limit, visibleFilterIds]);
+    // N53 (05/09): `visibleFilterIds` SAIU das dependências, e a ausência dele
+    // é a prova da correção — a consulta não depende mais de qual campo está
+    // à vista. Enquanto dependia, mudar a aparência refazia a busca com outro
+    // conjunto de parâmetros e devolvia outro total.
+  }, [appliedFilters, pagination.page, pagination.limit]);
 
   const categoriasFiltradas = useMemo(() => {
     const tipo = String(draftFilters.tipo || '').toUpperCase();
@@ -1469,8 +1563,15 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       setError('O valor mínimo não pode ser maior que o valor máximo.');
       return;
     }
-    const visibleFilters = pickVisibleFilters(normalized, visibleFilterIds);
-    if (Object.keys(compactFilters(visibleFilters)).length === 0) {
+    /*
+      N53 (05/09): a guarda passa a medir o QUE VAI SER ENVIADO, e não uma
+      projeção separada. Antes ela lia `pickVisibleFilters(...)`, que sempre
+      preservava `tipo` — e `tipo` nunca é vazio, então a mensagem já não
+      podia aparecer. Fica como está para não estreitar consulta que hoje
+      passa (esconder tudo continua consultando a carteira inteira), mas
+      agora ela olha para o payload de verdade.
+    */
+    if (Object.keys(compactFilters(normalized)).length === 0) {
       setError('Selecione ao menos um filtro visivel antes de consultar.');
       setTitulos([]);
       setAppliedFilters(null);
@@ -1487,7 +1588,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }
 
   function clearFilters() {
-    const defaults = getDefaultFilters(fixedTipo || 'RECEBER');
+    // N53 (05/09): "Limpar" devolve o padrão, e o padrão respeita o que está
+    // escondido — senão o botão faria o filtro invisível voltar a recortar.
+    const defaults = limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), visibleFilterIds);
     setDraftFilters(defaults);
     setAppliedFilters(null);
     setTitulos([]);
@@ -1564,7 +1667,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       });
 
       const data = await getTitulosFinanceiros({
-        ...compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)),
+        ...compactFilters(appliedFilters),
         paginated: 1,
         page: pagination.page,
         limit: pagination.limit
@@ -1793,7 +1896,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       }
 
       const data = await getTitulosFinanceiros({
-        ...compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)),
+        ...compactFilters(appliedFilters),
         paginated: 1,
         page: pagination.page,
         limit: pagination.limit
@@ -1922,7 +2025,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
 
     try {
       const result = await gerarRelatorioTitulosFinanceirosPdf(
-        compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds))
+        compactFilters(appliedFilters)
       );
       const objectUrl = URL.createObjectURL(result.blob);
       if (relatorioRequestIdRef.current !== requestId) {
@@ -1992,7 +2095,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       const resultado = await importarCodigosBarrasTitulos({ itens });
       if (appliedFilters) {
         const data = await getTitulosFinanceiros({
-          ...compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds)),
+          ...compactFilters(appliedFilters),
           paginated: 1,
           page: pagination.page,
           limit: pagination.limit
@@ -2055,10 +2158,36 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     localStorage.setItem(getVisibilityStorageKey(user, visibilityStoragePrefix), JSON.stringify(normalized));
   }
 
+  /*
+    N53 (05/09) — ESCONDER LIMPA, e limpa nos DOIS lugares.
+
+    O rascunho do formulário E a consulta em curso. Limpar só o rascunho
+    deixaria a lista à vista recortada por um critério que não está mais em
+    campo nenhum — que é a metade do achado que a tela de Solicitações
+    tinha. Como a busca depende de `appliedFilters`, apagar ali refaz a
+    consulta na hora: a lista alarga junto com a faixa, e o número que a
+    pessoa lê volta a corresponder ao que ela vê.
+
+    Se não havia valor, nada muda: `appliedFilters` é devolvido igual e a
+    consulta não é refeita.
+  */
+  function limparValorDoFiltro(filterId) {
+    const vazios = Object.fromEntries(chavesDoFiltro(filterId).map((chave) => [chave, '']));
+    setDraftFilters((current) => ({ ...current, ...vazios }));
+    setAppliedFilters((current) => {
+      if (!current) return current;
+      if (!filtroPreenchido(filterId, current)) return current;
+      return { ...current, ...vazios };
+    });
+  }
+
   function toggleVisibleFilter(filterId) {
     const current = new Set(visibleFilterIds);
     if (current.has(filterId)) {
       current.delete(filterId);
+      // N53: o filtro escondido não pode continuar restringindo — nem por
+      // ser enviado escondido, nem por deixar de ser enviado. Ele fica VAZIO.
+      limparValorDoFiltro(filterId);
     } else {
       current.add(filterId);
     }
@@ -2508,7 +2637,16 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--c-text)]">Filtros visiveis</div>
-                <div className="text-xs text-[var(--c-muted)]">Salvo apenas para este usuario neste navegador.</div>
+                {/*
+                  N53 (05/09) — o painel passa a DIZER o que o clique faz.
+                  A escolha continua morando neste navegador (e por usuário,
+                  pela chave de `getVisibilityStorageKey`), mas ela não mexe
+                  mais no resultado da consulta em silêncio: esconder limpa o
+                  valor, e a linha do filtro preenchido avisa antes.
+                */}
+                <div className="text-xs text-[var(--c-muted)]">
+                  Salvo apenas para este usuario neste navegador. Esconder um filtro LIMPA o valor dele.
+                </div>
               </div>
               <button
                 type="button"
@@ -2523,15 +2661,35 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             <div className="max-h-[60vh] space-y-1 overflow-y-auto px-3 py-3">
               {FILTER_DEFINITIONS.map((filter) => {
                 const checked = visibleFilterSet.has(filter.id);
+                /*
+                  N53 (05/09) — B do achado, na forma "a interface avisa".
+
+                  A outra saída registrada era tirar o filtro preenchido da
+                  lista de escondíveis. Não foi essa, e o motivo é a regra de
+                  que capacidade não sai: "Status" nasce preenchido (ABERTO)
+                  em toda consulta, e quem trabalha com uma obra fixa tem
+                  "Obra" sempre preenchido — bloquear tornaria justamente
+                  esses dois impossíveis de esconder, que é o uso para o qual
+                  o painel existe. O aviso fica na linha do clique, nomeia a
+                  consequência ANTES e não tira nada de ninguém.
+                */
+                const preenchido = filtroPreenchido(filter.id, draftFilters, appliedFilters);
                 return (
                   <label
                     key={filter.id}
-                    className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-[var(--c-bg)]"
+                    className="flex cursor-pointer items-start justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-[var(--c-bg)]"
                   >
-                    <span className="text-[var(--c-text)]">{filter.label}</span>
+                    <span className="min-w-0">
+                      <span className="block text-[var(--c-text)]">{filter.label}</span>
+                      {checked && preenchido ? (
+                        <span className="mt-1 block text-xs text-[var(--sem-warning)]">
+                          Preenchido: esconder limpa o valor e refaz a consulta.
+                        </span>
+                      ) : null}
+                    </span>
                     <input
                       type="checkbox"
-                      className="h-4 w-4 accent-[var(--c-primary)]"
+                      className="h-4 w-4 shrink-0 accent-[var(--c-primary)]"
                       checked={checked}
                       onChange={() => toggleVisibleFilter(filter.id)}
                     />
