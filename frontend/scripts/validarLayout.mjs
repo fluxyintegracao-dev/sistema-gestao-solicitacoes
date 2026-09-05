@@ -1155,22 +1155,39 @@ function validarOverflow() {
     arquivo onde o defeito mais aparece. Com trinco, porque o passivo é
     grande e a leva não é de CSS.
   */
-  const alvos = [
-    path.join('src', 'styles', 'componentes-padrao.css'),
-    path.join('src', 'index.css')
-  ];
+  const alvos = [path.join('src', 'index.css')];
 
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
       const caminho = path.join(dir, item.name);
       if (item.isDirectory()) varrer(caminho);
-      else if (item.name.endsWith('.css') && /governanca/.test(caminho)) {
+      else if (item.name.endsWith('.css')) {
         alvos.push(path.relative(frontendRoot, caminho));
       }
     }
   };
+  /*
+    A VARREDURA CONHECIA UM MÓDULO SÓ (05/09).
+
+    Isto aqui filtrava por `/governanca/` no caminho — o módulo onde a R18
+    tinha sido escrita. Todo o resto de `src/modules/**` passava batido, e
+    `src/styles/**` também (só `componentes-padrao.css` entrava, à mão).
+
+    O custo apareceu inteiro: `solicitacao-compra/compras-responsive.css`
+    sobrescreve `.app-table-shell` — que o index.css declara `overflow: clip`
+    JUSTAMENTE como defesa da R18 — com `overflow: hidden`, e com
+    especificidade maior (0,2,0 contra 0,1,0). Ou seja: o CSS de um módulo
+    desfazia a defesa escrita para impedir esse defeito, em 13 rotas, e o
+    verificador não olhava o arquivo.
+
+    É a pergunta permanente de novo: não "quantos casos existem?", e sim
+    "de quantos jeitos isso é feito aqui?". Agora varre todo CSS de módulo
+    e de styles.
+  */
   varrer(path.join(frontendRoot, 'src', 'modules'));
+  varrer(path.join(frontendRoot, 'src', 'styles'));
+  varrer(path.join(frontendRoot, 'src', 'components'));
 
   alvos.forEach((rel) => {
     const caminho = path.join(frontendRoot, rel);

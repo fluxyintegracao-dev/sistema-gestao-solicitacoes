@@ -6794,10 +6794,16 @@ input[type="file"]:disabled {
   flex-shrink: 0;
 }
 
-.login-card .alert-icon svg,
-.login-card .alert-close svg {
+.login-card .alert-icon svg {
   width: 100%;
   height: 100%;
+}
+
+/* O ícone do "x" tem tamanho próprio: quem cresceu foi o alvo de clique
+   (M1), não o desenho. */
+.login-card .alert-close svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .login-card .alert-content {
@@ -6822,8 +6828,8 @@ input[type="file"]:disabled {
   appearance: none;
   border: 0;
   background: transparent;
-  width: 1.55rem;
-  height: 1.55rem;
+  min-width: var(--alvo-clique);
+  min-height: var(--alvo-clique);
   padding: 0;
   border-radius: 999px;
   color: currentColor;

@@ -220,6 +220,30 @@ const RESOLVEDORES = {
     await page.goto(`${BASE}${destino}`, { waitUntil: 'domcontentloaded' });
     return destino;
   },
+  /**
+   * Abre o LEAD com mais texto na linha (pior caso de largura — T6/T7).
+   *
+   * A CrmLeads migrada abre o registro por CLIQUE NA LINHA (`aoClicarLinha`),
+   * não por âncora: não há `a[href]` para ler como nas telas do Financeiro.
+   * Então aqui se clica de verdade e se lê a rota que o clique produziu — se
+   * o clique não navegar, o resolvedor falha alto em vez de medir a listagem
+   * achando que é o detalhe.
+   */
+  async crmLeadDetalhe(page) {
+    await page.goto(`${BASE}/crm/leads`, { waitUntil: 'domcontentloaded' });
+    await esperarCarregar(page);
+    const linhas = page.locator('.app-tabela tbody tr');
+    await linhas.first().waitFor({ timeout: 30000 });
+    const total = await linhas.count();
+    let alvo = 0; let maior = -1;
+    for (let i = 0; i < total; i += 1) {
+      const texto = (await linhas.nth(i).innerText()).length;
+      if (texto > maior) { maior = texto; alvo = i; }
+    }
+    await linhas.nth(alvo).click();
+    await page.waitForURL(/\/crm\/leads\/\d+/, { timeout: 30000 });
+    return new URL(page.url()).pathname;
+  },
   /** Abre a fatura de cartão de MAIOR valor real (pior caso — T6/T7). */
   async faturaCartaoDetalhe(page) {
     await page.goto(`${BASE}/financeiro/faturas-cartao`, { waitUntil: 'domcontentloaded' });
@@ -662,7 +686,7 @@ async function checarRedimensionamento(page, tela, resultado) {
   await page.waitForTimeout(400);
 }
 
-async function checarEtiquetasFiltro(page, resultado) {
+async function checarEtiquetasFiltro(page, tela, resultado) {
   const filtro = page.locator('.app-filtros .la-filtro-btn, .la-filtros-linha .la-filtro-btn').first();
   if (!(await filtro.count())) {
     resultado.F3 = { estado: 'N/A', motivo: 'tela sem filtros marcáveis' };
@@ -679,7 +703,44 @@ async function checarEtiquetasFiltro(page, resultado) {
   */
   const opcoes = page.locator('.la-rapido-pop input[type="checkbox"], .la-rapido-pop input[type="radio"]');
   if (!(await opcoes.count())) {
-    resultado.F3 = { estado: 'FALHOU', motivo: 'filtro abriu sem opções de MARCAÇÃO (checkbox/radio)' };
+    /*
+      FILTRO VAZIO POR FALTA DE REGISTRO É *SEM DADO*, NÃO *FALHOU* (05/09).
+
+      A comercial-unidades tem UMA dimensão de filtro, "Empreendimento", e a
+      base do preview não tem empreendimento nenhum: a dimensão nasce sem
+      opção. A tela não está quebrada — não há o que oferecer.
+
+      A prova itensDoRunnerMordem.mjs me pegou DUAS vezes aqui. Primeiro
+      quando li "painel vazio" como sem dado — a tela plantada também abre
+      um painel vazio. Depois quando li o `data-vazio` do componente como
+      declaração: o componente o emite SOZINHO, então a tela plantada
+      ganhou a marca de graça e a distinção seguiu não distinguindo.
+
+      O que distingue é o mesmo formato que a R1 já usa e o cliente
+      aprovou: DECLARAÇÃO DO AUTOR no manifesto (`filtroSemOpcoesNaBase`)
+      MAIS verificação de que a tela realmente diz isso à pessoa. As duas
+      condições, nunca uma. Quem não declarou continua reprovando — e quem
+      declarou e mesmo assim deixa a pessoa no vazio reprova também.
+
+      E SEM DADO não é desculpa: a matriz conta essas células à vista, ao
+      lado das que falharam.
+    */
+    const declaracaoVazio = page.locator('.la-rapido-pop [data-vazio="sem-opcoes"]');
+    const declarado = tela?.filtroSemOpcoesNaBase;
+    if (declarado && (await declaracaoVazio.count())) {
+      const texto = (await declaracaoVazio.first().innerText()).trim();
+      resultado.F3 = {
+        estado: 'SEM DADO',
+        motivo: `dimensão sem opção na base do preview — declarado no manifesto (${declarado}) e dito à pessoa na tela: "${texto}"`
+      };
+    } else if (declarado) {
+      resultado.F3 = {
+        estado: 'FALHOU',
+        motivo: `o manifesto declara ${declarado}, mas a tela abriu o filtro vazio sem dizer nada a quem clicou`
+      };
+    } else {
+      resultado.F3 = { estado: 'FALHOU', motivo: 'filtro abriu sem opções de MARCAÇÃO (checkbox/radio)' };
+    }
     await page.mouse.click(4, 4);
     return;
   }
@@ -1115,7 +1176,7 @@ async function main() {
         fundir(resultado.itens, await page.evaluate(checkStickyEAcessibilidade));
         await checarFaixa(page, resultado.itens);
         await checarAffordanceAlinhamento(page, resultado.itens);
-        await checarEtiquetasFiltro(page, resultado.itens);
+        await checarEtiquetasFiltro(page, tela, resultado.itens);
         await checarRedimensionamento(page, tela, resultado.itens);
         await checarModalCadastro(page, tela, resultado.itens);
         // Variantes da mesma tela (abas com tabela) e blocos RECOLHIDOS:
@@ -1186,7 +1247,7 @@ async function main() {
           const itensDaVariante = {};
           fundir(itensDaVariante, await page.evaluate(checksEstaticos, { tipo: tela.tipo }));
           fundir(itensDaVariante, await page.evaluate(checkStickyEAcessibilidade));
-          await checarEtiquetasFiltro(page, itensDaVariante);
+          await checarEtiquetasFiltro(page, tela, itensDaVariante);
           await checarModalCadastro(page, tela, itensDaVariante);
           fundirVariante(itensDaVariante, sufixo);
 

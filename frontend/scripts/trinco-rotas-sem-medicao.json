@@ -4,21 +4,6 @@
   "porque": "Tela que o usuario ABRE e que nao esta nem no manifesto estatico nem na lista do harness — ninguem a mede. O check antigo comparava as duas listas ENTRE SI e passava verde quando elas concordavam; concordancia nao e cobertura. Medido em 04/09: 181 rotas, 61 medidas, 120 nunca. O numero SO DESCE: rota nova fora das duas listas reprova na hora.",
   "total_em_04_09": 120,
   "telas": [
-    "src/modules/crm/pages/CrmAdminCanais.jsx",
-    "src/modules/crm/pages/CrmAdminIntegracoes.jsx",
-    "src/modules/crm/pages/CrmAdminNumeros.jsx",
-    "src/modules/crm/pages/CrmAutomacoes.jsx",
-    "src/modules/crm/pages/CrmCarteira.jsx",
-    "src/modules/crm/pages/CrmDashboard.jsx",
-    "src/modules/crm/pages/CrmDashboardDistribuicao.jsx",
-    "src/modules/crm/pages/CrmDashboardGerencial.jsx",
-    "src/modules/crm/pages/CrmDashboardSla.jsx",
-    "src/modules/crm/pages/CrmInbox.jsx",
-    "src/modules/crm/pages/CrmKanban.jsx",
-    "src/modules/crm/pages/CrmLeadDetalhe.jsx",
-    "src/modules/crm/pages/CrmLeads.jsx",
-    "src/modules/crm/pages/CrmNovoLead.jsx",
-    "src/modules/crm/pages/CrmTarefas.jsx",
     "src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx",
     "src/modules/fiscal/pages/FiscalAccountingBatches.jsx",
     "src/modules/fiscal/pages/FiscalCompanies.jsx",
@@ -80,7 +65,6 @@
     "src/pages/ComprasRelatorioPendenciasCotacoes.jsx",
     "src/pages/ComprasRelatorioPrecosInsumos.jsx",
     "src/pages/ContratosRelatorioOperacional.jsx",
-    "src/pages/CrmRelatorioExecutivo.jsx",
     "src/pages/NovaSolicitacao.jsx",
     "src/pages/Perfil.jsx",
     "src/pages/PrioridadesDiretoria.jsx",
@@ -91,5 +75,5 @@
     "src/pages/Treinamento.jsx"
   ],
   "atualizado_em": "2026-09-05",
-  "total_em": 85
+  "total_em": 69
 }

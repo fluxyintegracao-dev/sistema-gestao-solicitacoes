@@ -579,7 +579,7 @@
   border: 1px solid var(--modal-border);
   border-radius: 14px;
   box-shadow: var(--modal-shadow);
-  overflow: hidden;
+  overflow: clip;
 }
 
 .fx-cmdk-input-wrap {
@@ -680,7 +680,7 @@
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   text-decoration: none;
-  overflow: hidden;
+  overflow: clip;
   transition: filter 0.15s ease, transform 0.15s ease;
 }
 
@@ -815,7 +815,7 @@
   align-items: center;
   gap: 2px;
   min-width: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .fx-atalho-icone {
@@ -1411,7 +1411,7 @@
   background: var(--ui-surface);
   text-decoration: none;
   color: var(--card-text);
-  overflow: hidden;
+  overflow: clip;
 }
 
 /* Tarja de urgência lateral — a mesma linguagem das listas. */
@@ -1711,7 +1711,7 @@
   height: 12px;
   border-radius: 999px;
   background: var(--ui-surface-soft);
-  overflow: hidden;
+  overflow: clip;
 }
 
 .hub-grafico-barra {

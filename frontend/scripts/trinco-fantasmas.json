@@ -4,7 +4,6 @@
   "porque": "Token e classe que a tela usa e que NUNCA foram declarados. O CSS nao resolve, a declaracao e descartada, e o estilo nunca chega a tela. Classe fantasma e pior que valor errado: parece intencao. O numero SO DESCE.",
   "nomes": {
     "--c-card": 8,
-    "--c-elevated": 2,
     "--c-fg": 1,
     "--c-primary-soft": 2,
     "--c-success-soft": 1,
@@ -36,7 +35,6 @@
     ".hub-header-texto": 1,
     ".la-cards-grupo": 1,
     ".link-primary": 3,
-    ".page-shell": 1,
     ".sol-page-header": 2
   }
 }

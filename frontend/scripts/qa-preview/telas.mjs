@@ -1137,7 +1137,12 @@ export const TELAS = [
     arquivo: 'src/pages/ComercialUnidades.jsx',
     rota: '/comercial/unidades',
     tipo: 'listagem',
-    cadastroInline: "a tela existe PARA cadastrar unidade comercial (R9 revista em 04/09)"
+    cadastroInline: "a tela existe PARA cadastrar unidade comercial (R9 revista em 04/09)",
+    // A única dimensão de filtro é "Empreendimento", e ela sai de
+    // getEmpreendimentosComerciais(): sem empreendimento na base, não há o que
+    // oferecer. Declarado aqui para a F3 poder dizer SEM DADO em vez de
+    // FALHOU — e a F3 ainda exige que a tela DIGA isso a quem clicou.
+    filtroSemOpcoesNaBase: 'a dimensão Empreendimento sai da base de empreendimentos comerciais, vazia no preview'
   },
   {
     id: 'comercial-modelos-contrato',
@@ -1179,6 +1184,108 @@ export const TELAS = [
       F4: "idem F1",
       C4: "não é tela de detalhe de registro"
     }
+  },
+  // ---- Rodada 4: CRM, 16 telas (05/09) ----
+  {
+    id: 'crm-dashboard',
+    arquivo: 'src/modules/crm/pages/CrmDashboard.jsx',
+    rota: '/crm/dashboard',
+    tipo: 'painel'
+  },
+  {
+    id: 'crm-dashboard-gerencial',
+    arquivo: 'src/modules/crm/pages/CrmDashboardGerencial.jsx',
+    rota: '/crm/dashboard-gerencial',
+    tipo: 'painel'
+  },
+  {
+    id: 'crm-dashboard-sla',
+    arquivo: 'src/modules/crm/pages/CrmDashboardSla.jsx',
+    rota: '/crm/dashboard-sla',
+    tipo: 'painel'
+  },
+  {
+    id: 'crm-dashboard-distribuicao',
+    arquivo: 'src/modules/crm/pages/CrmDashboardDistribuicao.jsx',
+    rota: '/crm/dashboard-distribuicao',
+    tipo: 'painel'
+  },
+  {
+    id: 'crm-relatorio-executivo',
+    arquivo: 'src/pages/CrmRelatorioExecutivo.jsx',
+    rota: '/crm/relatorios/executivo',
+    tipo: 'painel'
+  },
+  {
+    id: 'crm-leads',
+    arquivo: 'src/modules/crm/pages/CrmLeads.jsx',
+    rota: '/crm/leads',
+    tipo: 'listagem'
+  },
+  {
+    id: 'crm-novo-lead',
+    arquivo: 'src/modules/crm/pages/CrmNovoLead.jsx',
+    rota: '/crm/leads/novo',
+    tipo: 'form',
+    cadastroInline: "a rota existe PARA cadastrar lead — tirando o formulario nao sobra tela (R9 revista em 04/09)"
+  },
+  {
+    id: 'crm-lead-detalhe',
+    arquivo: 'src/modules/crm/pages/CrmLeadDetalhe.jsx',
+    resolver: 'crmLeadDetalhe',
+    tipo: 'detalhe'
+  },
+  {
+    id: 'crm-carteira',
+    arquivo: 'src/modules/crm/pages/CrmCarteira.jsx',
+    rota: '/crm/carteira',
+    tipo: 'listagem'
+  },
+  {
+    id: 'crm-kanban',
+    arquivo: 'src/modules/crm/pages/CrmKanban.jsx',
+    rota: '/crm/kanban',
+    tipo: 'listagem'
+  },
+  {
+    id: 'crm-tarefas',
+    arquivo: 'src/modules/crm/pages/CrmTarefas.jsx',
+    rota: '/crm/tarefas',
+    tipo: 'listagem'
+  },
+  {
+    id: 'crm-inbox',
+    arquivo: 'src/modules/crm/pages/CrmInbox.jsx',
+    rota: '/crm/inbox',
+    tipo: 'mista'
+  },
+  {
+    id: 'crm-automacoes',
+    arquivo: 'src/modules/crm/pages/CrmAutomacoes.jsx',
+    rota: '/crm/automacoes',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar regra de automacao (R9 revista em 04/09)"
+  },
+  {
+    id: 'crm-admin-canais',
+    arquivo: 'src/modules/crm/pages/CrmAdminCanais.jsx',
+    rota: '/crm/admin/canais',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar canal (R9 revista em 04/09)"
+  },
+  {
+    id: 'crm-admin-numeros',
+    arquivo: 'src/modules/crm/pages/CrmAdminNumeros.jsx',
+    rota: '/crm/admin/numeros',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar numero (R9 revista em 04/09)"
+  },
+  {
+    id: 'crm-admin-integracoes',
+    arquivo: 'src/modules/crm/pages/CrmAdminIntegracoes.jsx',
+    rota: '/crm/admin/integracoes',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA configurar a integracao (R9 revista em 04/09)"
   },
 ];
 

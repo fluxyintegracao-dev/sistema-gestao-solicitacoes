@@ -1103,7 +1103,23 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
       </button>
       {aberto && (
         <div className="la-rapido-pop" role="menu">
-          {(dim.opcoes || []).length === 0 && <p className="la-vazio">Sem opções</p>}
+          {/*
+              Filtro sem opção é um beco: a pessoa clica em "Empreendimento",
+              lê "Sem opções" e não sabe se o filtro quebrou, se ela não tem
+              permissão, ou se não há empreendimento cadastrado. A mensagem
+              nomeia o assunto da dimensão, e a dimensão pode dizer o motivo
+              exato (`dim.vazio`).
+
+              O `data-vazio` não é enfeite: é a DECLARAÇÃO de que a lista
+              está vazia por falta de registro. Sem ela, o verificador não
+              tem como separar "a base não tem esse dado" de "o filtro
+              abriu quebrado" — e painel vazio, sozinho, não distingue as
+              duas coisas (a prova de mordida me pegou tentando isso). */}
+          {(dim.opcoes || []).length === 0 && (
+            <p className="la-vazio" data-vazio="sem-opcoes" role="note">
+              {dim.vazio || `Nenhum registro de ${String(dim.rotulo).toLowerCase()} disponível para filtrar.`}
+            </p>
+          )}
           {/* `dim.unico` (02/09): quando o serviço só aceita UM valor nesta
               dimensão, a marcação é redonda e exclusiva. Com caixa quadrada
               o usuário marcava dois, via duas etiquetas e a lista não

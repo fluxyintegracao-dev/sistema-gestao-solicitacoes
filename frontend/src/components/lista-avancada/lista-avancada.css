@@ -105,7 +105,7 @@
   display: inline-flex;
   border: 1px solid var(--btn-outline-border);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: clip;
   background: var(--btn-outline-bg);
   padding: 3px;
   gap: 2px;
@@ -340,7 +340,7 @@
   height: 30px;
   border: 1px solid var(--sem-info-border);
   border-radius: 7px;
-  overflow: hidden;
+  overflow: clip;
   background: var(--sem-info-bg);
 }
 
@@ -523,7 +523,7 @@
   font-weight: 700;
   padding: 10px;
   cursor: pointer;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .la-th-btn:disabled { cursor: default; }
@@ -678,7 +678,7 @@
   border-radius: 12px;
   background: var(--card-bg);
   cursor: pointer;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .la-card:hover { border-color: var(--ui-border-strong); box-shadow: var(--ui-shadow-sm); }

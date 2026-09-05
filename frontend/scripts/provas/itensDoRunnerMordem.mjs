@@ -251,7 +251,7 @@ async function medir(navegador, servidor, caso) {
     } else if (caso.item === 'C1') {
       await checarFaixa(pagina, resultado);
     } else if (caso.item === 'F3') {
-      await checarEtiquetasFiltro(pagina, resultado);
+      await checarEtiquetasFiltro(pagina, { id: 'prova' }, resultado);
     } else if (caso.item === 'R1') {
       await checarModalCadastro(pagina, { id: 'prova' }, resultado);
     } else if (caso.item === 'X2') {

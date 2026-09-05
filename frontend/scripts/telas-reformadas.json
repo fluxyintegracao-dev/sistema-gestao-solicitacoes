@@ -1,6 +1,21 @@
 {
   "descricao": "Telas sob as regras mecânicas de layout (docs/REGRAS-LAYOUT.md). Cada leva adiciona as suas aqui; o validarLayout.mjs reprova o que sair do padrão.",
   "telas": [
+    "src/modules/crm/pages/CrmAdminCanais.jsx",
+    "src/modules/crm/pages/CrmAdminIntegracoes.jsx",
+    "src/modules/crm/pages/CrmAdminNumeros.jsx",
+    "src/modules/crm/pages/CrmAutomacoes.jsx",
+    "src/modules/crm/pages/CrmCarteira.jsx",
+    "src/modules/crm/pages/CrmDashboard.jsx",
+    "src/modules/crm/pages/CrmDashboardDistribuicao.jsx",
+    "src/modules/crm/pages/CrmDashboardGerencial.jsx",
+    "src/modules/crm/pages/CrmDashboardSla.jsx",
+    "src/modules/crm/pages/CrmInbox.jsx",
+    "src/modules/crm/pages/CrmKanban.jsx",
+    "src/modules/crm/pages/CrmLeadDetalhe.jsx",
+    "src/modules/crm/pages/CrmLeads.jsx",
+    "src/modules/crm/pages/CrmNovoLead.jsx",
+    "src/modules/crm/pages/CrmTarefas.jsx",
     "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx",
     "src/pages/AreasObra.jsx",
     "src/pages/AreasPorSetorOrigem.jsx",
@@ -32,6 +47,7 @@
     "src/pages/ContratoFluxoNovo.jsx",
     "src/pages/ContratoObraCategorias.jsx",
     "src/pages/CoresSistema.jsx",
+    "src/pages/CrmRelatorioExecutivo.jsx",
     "src/pages/DefinirSenha.jsx",
     "src/pages/EmpresasGrupo.jsx",
     "src/pages/FinanceiroBaixas.jsx",
@@ -200,6 +216,7 @@
     ]
   },
   "excecoes_cor": {
-    "src/pages/ConfiguracoesStatusPedidoCompra.jsx": "cor do status é DADO: o hexadecimal é o value do <input type=\"color\"> e o padrão gravado no registro. Token viraria string do token no banco."
+    "src/pages/ConfiguracoesStatusPedidoCompra.jsx": "cor do status é DADO: o hexadecimal é o value do <input type=\"color\"> e o padrão gravado no registro. Token viraria string do token no banco.",
+    "src/modules/crm/pages/CrmKanban.jsx": "cor da etapa e DADO: o hexadecimal e o value do <input type=\"color\"> e o padrao gravado no registro da etapa. Token viraria a string do token no banco — mesmo caso ja registrado da ConfiguracoesStatusPedidoCompra."
   }
 }

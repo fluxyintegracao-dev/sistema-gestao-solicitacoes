@@ -53,7 +53,16 @@
     "test:custos-recebiveis-fase2": "node src/modules/custosRecebiveis/tests/validarFase2.js",
     "test:custos-recebiveis-fase3": "node src/modules/custosRecebiveis/tests/validarFase3.js",
     "test:custos-recebiveis-fase4": "node src/modules/custosRecebiveis/tests/validarFase4.js",
-    "test:custos-recebiveis-prontidao": "node src/modules/custosRecebiveis/tests/validarProntidao.js"
+    "test:custos-recebiveis-prontidao": "node src/modules/custosRecebiveis/tests/validarProntidao.js",
+    "test:banking-enterprise": "node scripts/validarBankingEnterprise.js",
+    "test:compras-delegacao": "node scripts/validarComprasDelegacao.js",
+    "test:compra-oferta-saldo-mesmo-fornecedor": "node scripts/validarCompraOfertaSaldoMesmoFornecedor.js",
+    "test:filtro-valor-titulos": "node scripts/validarFiltroValorTitulos.js",
+    "test:intercompany-cartoes": "node scripts/validarIntercompanyCartoesMultiplasEmpresas.js",
+    "test:live-updates": "node scripts/validarLiveUpdates.js",
+    "test:roteamento-aditivo-juridico": "node scripts/validarRoteamentoAditivoJuridico.js",
+    "audit:permissoes-granulares": "node scripts/auditarPermissoesGranulares.js",
+    "verificar:regras": "npm run test:banking-enterprise && npm run test:compras-delegacao && npm run test:compra-oferta-saldo-mesmo-fornecedor && npm run test:filtro-valor-titulos && npm run test:intercompany-cartoes && npm run test:live-updates && npm run test:roteamento-aditivo-juridico && npm run audit:permissoes-granulares"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",

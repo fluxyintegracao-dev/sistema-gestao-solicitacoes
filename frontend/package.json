@@ -9,7 +9,7 @@
     "prebuild": "npm run gerar:navegacao",
     "build": "vite build",
     "test:responsive": "node scripts/validarResponsividadeFrontend.mjs && node scripts/validarNavegacao.mjs && node scripts/varreduraCancelamento.mjs && npm run provas",
-    "verificar": "node scripts/validarLayout.mjs && node scripts/varreduraAlcance.mjs && npm run test:responsive && npm run build",
+    "verificar": "node scripts/validarLayout.mjs && node scripts/varreduraAlcance.mjs && npm run build && npm run test:responsive",
     "preview": "vite preview",
     "mobile:sync": "npm run build && npx cap sync",
     "mobile:android:add": "npx cap add android",

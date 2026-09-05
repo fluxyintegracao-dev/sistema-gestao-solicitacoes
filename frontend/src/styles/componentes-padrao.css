@@ -31,6 +31,25 @@
   min-height: 18px;
 }
 
+/* M1 — o "x" do Alert é botão, e botão tem alvo de clique. Ele nascia com
+   16px porque nunca teve medida própria: encolhia até o tamanho do ícone.
+   Como o Alert é componente compartilhado, o defeito valia para toda tela em
+   que um aviso aparecesse — por isso só a matriz o pegou, e só numa célula. */
+.alert-close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-width: var(--alvo-clique);
+  min-height: var(--alvo-clique);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
 @media (pointer: coarse) {
   :root { --alvo-clique: 44px; }
   .btn svg { min-width: 20px; min-height: 20px; }
@@ -407,6 +426,9 @@
 .app-stat--danger .app-stat-valor { color: var(--sem-danger); }
 .app-stat--warning .app-stat-valor { color: var(--sem-warning); }
 .app-stat--success .app-stat-valor { color: var(--sem-success); }
+/* --info faltava: o ladrilho aceitava tom="info" e renderizava neutro,
+   engolindo a distincao em silencio. O token ja existia. */
+.app-stat--info .app-stat-valor { color: var(--sem-info); }
 
 .app-stat--vazio .app-stat-valor {
   color: var(--c-muted);

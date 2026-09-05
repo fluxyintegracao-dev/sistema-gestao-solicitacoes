@@ -1,17 +1,36 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { listarLeads } from '../../../services/crm';
 import { useAuth } from '../../../contexts/AuthContext';
-import { TabelaPadrao } from '../../../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  CelulaDupla,
+  BarraFiltros,
+  alternarValorFiltro,
+  Paginacao,
+  Avisos,
+  useAvisos
+} from '../../../components/padrao';
+import StatusBadge from '../../../components/StatusBadge';
 
+const LIMITE_POR_PAGINA = 50;
+
+/*
+  R25/R2 — paleta crua do Tailwind (`bg-indigo-100 text-indigo-700` e as
+  outras seis) trocada por RÓTULO + FAMÍLIA SEMÂNTICA; a cor sai do
+  `StatusBadge`, por token e com ícone.
+*/
 const LIFECYCLE_MAP = {
-  NOVO:        { label: 'Novo',         cls: 'app-status-pill bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' },
-  CONTATO:     { label: 'Contato',      cls: 'app-status-pill bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' },
-  QUALIFICADO: { label: 'Qualificado',  cls: 'app-status-pill bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300' },
-  OPORTUNIDADE:{ label: 'Oportunidade', cls: 'app-status-pill bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-  CONVERTIDO:  { label: 'Convertido',   cls: 'app-status-pill bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-  PERDIDO:     { label: 'Perdido',      cls: 'app-status-pill bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
-  ARQUIVADO:   { label: 'Arquivado',    cls: 'app-status-pill bg-elevated text-muted' }
+  NOVO:         { label: 'Novo',         kind: 'info' },
+  CONTATO:      { label: 'Contato',      kind: 'info' },
+  QUALIFICADO:  { label: 'Qualificado',  kind: 'info' },
+  OPORTUNIDADE: { label: 'Oportunidade', kind: 'warning' },
+  CONVERTIDO:   { label: 'Convertido',   kind: 'success' },
+  PERDIDO:      { label: 'Perdido',      kind: 'danger' },
+  ARQUIVADO:    { label: 'Arquivado',    kind: 'neutral' }
 };
 
 const TEMP_MAP = {
@@ -25,88 +44,121 @@ function fmt(val) {
   return new Date(val).toLocaleDateString('pt-BR');
 }
 
+// O serviço aceita UM valor por dimensão (`buildLeadWhere`), então as
+// dimensões da BarraFiltros levam `unico: true` e aqui se lê o marcado.
+function primeiroValor(conjunto) {
+  const [valor] = Array.from(conjunto || []);
+  return valor || undefined;
+}
+
+// Função, não constante de módulo: Set é mutável e os conjuntos não podem
+// ser compartilhados entre o estado inicial e o "Limpar tudo".
+function filtrosVazios() {
+  return { q: '', status: new Set(), temperatura: new Set() };
+}
+
 export default function CrmCarteira() {
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const { avisos, avisar, fechar } = useAvisos();
   const [leads, setLeads] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ status: '', temperatura: '', q: '' });
+  const [filters, setFilters] = useState(filtrosVazios);
 
   const load = useCallback(() => {
+    /*
+      A consulta identificava a carteira por `assigned_user_id: user?.id`.
+      Com o usuário ainda não resolvido, o parâmetro saía `undefined`, o
+      backend não aplicava filtro nenhum e a tela chamada "Minha Carteira"
+      listava os leads de TODA a base como se fossem do usuário. Sem id não
+      se consulta.
+    */
+    if (!user?.id) return;
     setLoading(true);
-    const params = { page, limit: 50, assigned_user_id: user?.id, ...filters };
-    listarLeads(params)
+    listarLeads({
+      page,
+      limit: LIMITE_POR_PAGINA,
+      assigned_user_id: user.id,
+      q: filters.q || undefined,
+      status: primeiroValor(filters.status),
+      temperatura: primeiroValor(filters.temperatura)
+    })
       .then(({ leads: l, total: t }) => {
         setLeads(l || []);
         setTotal(t || 0);
       })
-      .catch((err) => alert(err.message || 'Erro ao carregar carteira'))
+      .catch((err) => avisar.erro(err.message || 'Erro ao carregar carteira'))
       .finally(() => setLoading(false));
+    // `avisar` é estável (useMemo no useAvisos).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, filters, user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
-  function setFilter(k) {
-    return (e) => {
-      setPage(1);
-      setFilters((f) => ({ ...f, [k]: e.target.value }));
-    };
-  }
+  const totalPaginas = Math.max(1, Math.ceil(Number(total || 0) / LIMITE_POR_PAGINA));
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">Minha Carteira</h1>
-            <p className="page-subtitle">{total} lead{total !== 1 ? 's' : ''} atribuido{total !== 1 ? 's' : ''} a voce.</p>
-          </div>
-          <div className="flex gap-2">
-            <Link to="/crm/leads" className="btn btn-secondary text-sm">Todos os Leads</Link>
-            <Link to="/crm/tarefas" className="btn btn-secondary text-sm">Minhas Tarefas</Link>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      {/*
+        C6/R11 — "Todos os Leads" e "Minhas Tarefas" eram caminho para OUTRA
+        tela na barra de ações, que é lugar de ação SOBRE esta tela. Os dois
+        destinos foram conferidos no hub antes de sair (`crm-leads` e
+        `crm-tarefas` no navigationConfig), então nenhuma porta de entrada
+        se perdeu — eles seguem no menu do módulo e no Ctrl+K.
+        C2/R5: a contagem vira a prop `contagem` da faixa, em vez de um
+        parágrafo de apoio embutido.
+      */}
+      <PageHeader
+        titulo="Minha carteira"
+        contagem={loading ? null : `${total} lead(s)`}
+        descricao="Leads sob sua responsabilidade."
+      />
 
-      {/* Filtros */}
-      <div className="card sol-surface-card p-4 mt-3">
-        <div className="flex flex-wrap gap-3">
-          <label className="app-filter-field flex-1 min-w-[160px]">
-            <span className="app-filter-label">Buscar</span>
-            <input className="input" placeholder="Nome, telefone, email..." value={filters.q} onChange={setFilter('q')} />
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Status</span>
-            <select className="input" value={filters.status} onChange={setFilter('status')}>
-              <option value="">Todos</option>
-              {Object.entries(LIFECYCLE_MAP).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Temperatura</span>
-            <select className="input" value={filters.temperatura} onChange={setFilter('temperatura')}>
-              <option value="">Todas</option>
-              <option value="QUENTE">Quente</option>
-              <option value="MORNO">Morno</option>
-              <option value="FRIO">Frio</option>
-            </select>
-          </label>
-          {(filters.status || filters.temperatura || filters.q) && (
-            <button
-              className="btn btn-secondary text-sm self-end"
-              onClick={() => { setFilters({ status: '', temperatura: '', q: '' }); setPage(1); }}
-            >
-              Limpar
-            </button>
-          )}
-        </div>
-      </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {/* Lista */}
-      <div className="card sol-surface-card mt-3 overflow-hidden">
+      <BlocoConteudo variante="primario" cor="var(--c-primary)">
+        {/*
+          R12/R3/R16 — dois `<select>` de escolha única com a busca ao lado
+          viraram a BarraFiltros: busca única ocupando a faixa, marcação
+          com etiquetas removíveis e "Limpar tudo" (que substitui o botão
+          "Limpar" que só aparecia com filtro ativo). `unico` porque a API
+          aceita um valor por dimensão.
+        */}
+        <BarraFiltros
+          busca={{
+            valor: filters.q,
+            aoMudar: (valor) => { setPage(1); setFilters((prev) => ({ ...prev, q: valor })); },
+            placeholder: 'Nome, telefone, email...'
+          }}
+          filtros={[
+            {
+              id: 'status',
+              rotulo: 'Status',
+              unico: true,
+              opcoes: Object.entries(LIFECYCLE_MAP).map(([valor, v]) => ({ valor, rotulo: v.label }))
+            },
+            {
+              id: 'temperatura',
+              rotulo: 'Temperatura',
+              unico: true,
+              opcoes: Object.entries(TEMP_MAP).map(([valor, v]) => ({ valor, rotulo: v.label }))
+            }
+          ]}
+          ativos={{ status: filters.status, temperatura: filters.temperatura }}
+          aoAlternar={(dim, valor, opcoes) => {
+            setPage(1);
+            setFilters((prev) => ({ ...alternarValorFiltro(prev, dim, valor, opcoes), q: prev.q }));
+          }}
+          aoLimpar={() => { setPage(1); setFilters((prev) => ({ ...filtrosVazios(), q: prev.q })); }}
+        />
+
+        {/*
+          A1: a linha abre o lead e responde ao teclado (o TabelaPadrao dá
+          tabIndex + Enter/Espaço com `aoClicarLinha`); o botão "Ver"
+          continua sendo o controle focável dentro da linha.
+        */}
         <TabelaPadrao
           colunas={[
             {
@@ -114,13 +166,15 @@ export default function CrmCarteira() {
               titulo: 'Nome',
               tipo: 'identidade',
               noCard: 'titulo',
-              render: (lead) => <span className="font-medium text-main">{lead.nome}</span>
+              render: (lead) => (
+                <CelulaDupla principal={lead.nome} sub={lead.empreendimento_interesse} />
+              )
             },
             {
               id: 'telefone',
               titulo: 'Telefone',
               tipo: 'codigo',
-              render: (lead) => <span className="text-sm text-sub">{lead.telefone || '—'}</span>
+              render: (lead) => lead.telefone || '—'
             },
             {
               id: 'status',
@@ -128,8 +182,8 @@ export default function CrmCarteira() {
               tipo: 'status',
               render: (lead) => {
                 const lifecycle = LIFECYCLE_MAP[lead.lifecycle_status]
-                  || { label: lead.lifecycle_status, cls: 'app-status-pill bg-elevated text-muted' };
-                return <span className={lifecycle.cls}>{lifecycle.label}</span>;
+                  || { label: lead.lifecycle_status, kind: 'neutral' };
+                return <StatusBadge status={lifecycle.label} kind={lifecycle.kind} />;
               }
             },
             {
@@ -137,8 +191,8 @@ export default function CrmCarteira() {
               titulo: 'Temp.',
               tipo: 'badge',
               render: (lead) => {
-                const temp = TEMP_MAP[lead.temperatura] || {};
-                return <span title={temp.label}>{temp.emoji || '—'}</span>;
+                const temp = TEMP_MAP[lead.temperatura];
+                return temp ? <span title={temp.label}>{temp.emoji} {temp.label}</span> : '—';
               }
             },
             {
@@ -146,7 +200,8 @@ export default function CrmCarteira() {
               titulo: 'Etapa',
               tipo: 'texto',
               render: (lead) => (lead.etapa ? (
-                <span className="inline-flex items-center gap-1 text-xs text-sub">
+                <span className="inline-flex items-center gap-2">
+                  {/* Cor vinda do DADO (etapa cadastrada), não cor à mão. */}
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: lead.etapa.cor }} />
                   {lead.etapa.nome}
                 </span>
@@ -156,40 +211,61 @@ export default function CrmCarteira() {
               id: 'followup',
               titulo: 'Follow-up',
               tipo: 'data',
-              render: (lead) => (
-                <span className={`text-sm ${lead.proximo_followup_at && new Date(lead.proximo_followup_at) < new Date() ? 'text-red-500 font-medium' : 'text-sub'}`}>
-                  {fmt(lead.proximo_followup_at)}
-                </span>
-              )
+              render: (lead) => fmt(lead.proximo_followup_at)
             },
             {
               id: 'cadastrado',
               titulo: 'Cadastrado',
               tipo: 'data',
-              render: (lead) => <span className="text-sm text-sub">{fmt(lead.createdAt)}</span>
+              render: (lead) => fmt(lead.createdAt)
             }
           ]}
           itens={leads}
           getId={(lead) => lead.id}
           carregando={loading}
-          vazio="Nenhum lead encontrado na sua carteira."
+          vazio={{
+            title: 'Nenhum lead na sua carteira',
+            message: 'Ajuste a busca e os filtros — ou peca a distribuicao de novos leads ao responsavel do funil.'
+          }}
           storageKey="tabela:crm-carteira"
           rotuloRolagem="Minha carteira"
+          colunasConfiguraveis
+          /*
+            O follow-up vencido era pintado de vermelho dentro da célula, com
+            paleta crua. Agora é a TARJA de urgência da linha (o utilitário
+            `.tarja--danger` do sistema): o sinal fica na linha inteira, que
+            é o que a pessoa varre, e a cor sai de token.
+          */
+          urgencia={(lead) => (
+            lead.proximo_followup_at && new Date(lead.proximo_followup_at) < new Date()
+              ? 'danger'
+              : null
+          )}
+          aoClicarLinha={(lead) => navigate(`/crm/leads/${lead.id}`)}
           acoesLinha={(lead) => (
-            <Link to={`/crm/leads/${lead.id}`} className="btn btn-secondary text-xs">Ver</Link>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => navigate(`/crm/leads/${lead.id}`)}
+            >
+              Ver
+            </button>
           )}
           larguraAcoes={140}
         />
-      </div>
 
-      {/* Paginacao */}
-      {total > 50 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button className="btn btn-secondary text-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button>
-          <span className="text-sm text-muted self-center">Pagina {page}</span>
-          <button className="btn btn-secondary text-sm" disabled={page * 50 >= total} onClick={() => setPage(p => p + 1)}>Proxima</button>
-        </div>
-      )}
-    </div>
+        {/* R16b: um dono para o rodapé de lista paginada — o rodapé à mão
+            (dois botões e "Pagina N", sem total nem número de páginas) virou
+            o componente padrão, que diz a posição E o total. */}
+        <Paginacao
+          pagina={page}
+          totalPaginas={totalPaginas}
+          total={Number(total || 0)}
+          rotuloRegistro="lead"
+          carregando={loading}
+          aoMudarPagina={setPage}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

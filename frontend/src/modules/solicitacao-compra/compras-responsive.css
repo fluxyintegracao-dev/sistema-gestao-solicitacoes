@@ -260,7 +260,7 @@
 
 .compras-responsive-scope :is(.compras-table-card, .app-table-shell, .sol-table-wrapper) {
   max-width: 100%;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .compras-responsive-scope :is(.compras-table-wrapper, .compras-responsive-table, .sol-table-wrapper > .sol-table, .app-table-shell > .table) {
@@ -510,11 +510,11 @@
 
   .compras-responsive-scope .topbar-leading {
     flex: 1 1 auto;
-    overflow: hidden;
+    overflow: clip;
   }
 
   .compras-responsive-scope .topbar-context {
-    overflow: hidden;
+    overflow: clip;
   }
 
   .compras-responsive-scope .topbar-breadcrumb {

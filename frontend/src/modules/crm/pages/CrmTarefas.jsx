@@ -1,28 +1,56 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listarTarefas, concluirTarefa, cancelarTarefa } from '../../../services/crm';
-import { TabelaPadrao } from '../../../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  BarraFiltros,
+  alternarValorFiltro,
+  Paginacao,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../../../components/padrao';
+import StatusBadge from '../../../components/StatusBadge';
 
+const POR_PAGINA = 50;
+
+/*
+  R25 — a paleta crua do antigo STATUS_MAP (amber/emerald/red/slate) vira
+  FAMÍLIA SEMÂNTICA do StatusBadge, que resolve cor, ícone e contraste por
+  token. O mapa continua EXPLÍCITO porque a classificação automática do
+  StatusBadge leria "Vencida" e "Cancelada" pelo texto e não conhece o
+  estado derivado (PENDING + prazo no passado = OVERDUE), que é justamente
+  a distinção que esta tela tinha e não pode perder.
+*/
 const STATUS_MAP = {
-  PENDING:   { label: 'Pendente',  cls: 'app-status-pill bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
-  DONE:      { label: 'Concluida', cls: 'app-status-pill bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' },
-  OVERDUE:   { label: 'Vencida',   cls: 'app-status-pill bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' },
-  CANCELLED: { label: 'Cancelada', cls: 'app-status-pill bg-elevated text-muted' }
+  PENDING: { label: 'Pendente', familia: 'warning' },
+  DONE: { label: 'Concluida', familia: 'success' },
+  OVERDUE: { label: 'Vencida', familia: 'danger' },
+  CANCELLED: { label: 'Cancelada', familia: 'neutral' }
 };
 
 const PRIORITY_MAP = {
-  HIGH:   { label: 'Alta',   cls: 'text-red-500' },
-  MEDIUM: { label: 'Media',  cls: 'text-amber-500' },
-  LOW:    { label: 'Baixa',  cls: 'text-blue-400' }
+  HIGH: { label: 'Alta', familia: 'danger' },
+  MEDIUM: { label: 'Media', familia: 'warning' },
+  LOW: { label: 'Baixa', familia: 'info' }
 };
 
 const TYPE_MAP = {
-  CALL:     'Ligacao',
-  VISIT:    'Visita',
+  CALL: 'Ligacao',
+  VISIT: 'Visita',
   WHATSAPP: 'WhatsApp',
-  EMAIL:    'E-mail',
+  EMAIL: 'E-mail',
   PROPOSAL: 'Proposta',
-  OTHER:    'Outro'
+  OTHER: 'Outro'
+};
+
+const FILTROS_VAZIOS = {
+  status: new Set(),
+  task_type: new Set(),
+  vencidas: new Set()
 };
 
 function fmt(val) {
@@ -34,106 +62,155 @@ function isOverdue(task) {
   return task.status === 'PENDING' && task.due_at && new Date(task.due_at) < new Date();
 }
 
+/*
+  R12 — o recorte virou MARCAÇÃO, mas o serviço (`GET /crm/tasks`) aceita UM
+  valor por parâmetro (`status=PENDING`). Marcar dois valores mandaria um
+  parâmetro repetido que o backend ignora: capacidade aparente sem efeito
+  (a família da R15). Por isso as três dimensões são `unico: true` — a marca
+  é redonda, marcar outra substitui, e a etiqueta afirma o que filtra de
+  verdade.
+*/
+function primeiroValor(conjunto) {
+  if (!conjunto || conjunto.size === 0) return '';
+  return [...conjunto][0];
+}
+
 export default function CrmTarefas() {
   const [tasks, setTasks] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ status: '', task_type: '', vencidas: '' });
+  const [filtros, setFiltros] = useState(FILTROS_VAZIOS);
+  // R19/R3: faixa de aviso do sistema no lugar do alert() do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
+  // R21: `confirmar()` devolve OBJETO — todo uso abaixo DESESTRUTURA.
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
+
+  const params = useMemo(() => ({
+    status: primeiroValor(filtros.status),
+    task_type: primeiroValor(filtros.task_type),
+    vencidas: primeiroValor(filtros.vencidas)
+  }), [filtros]);
 
   const load = useCallback(() => {
     setLoading(true);
-    const params = { page, limit: 50, ...filters };
-    listarTarefas(params)
+    listarTarefas({ page, limit: POR_PAGINA, ...params })
       .then(({ tasks: t, total: tot }) => {
         setTasks(t || []);
         setTotal(tot || 0);
       })
-      .catch((err) => alert(err.message || 'Erro ao carregar tarefas'))
+      .catch((err) => avisar.erro(err.message || 'Erro ao carregar tarefas'))
       .finally(() => setLoading(false));
-  }, [page, filters]);
+  }, [page, params, avisar]);
 
   useEffect(() => { load(); }, [load]);
 
-  function setFilter(k) {
-    return (e) => {
-      setPage(1);
-      setFilters((f) => ({ ...f, [k]: e.target.value }));
-    };
+  // R23: marcar aplica na hora (uma requisição por recorte, bem abaixo do
+  // critério de consulta cara) — e volta para a primeira página, senão a
+  // etiqueta afirma um recorte e a tela mostra a página 3 do anterior.
+  function alternarFiltro(dimensao, valor, opcoes) {
+    setPage(1);
+    setFiltros((atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes));
   }
 
-  async function handleComplete(id) {
+  function limparFiltros() {
+    setPage(1);
+    setFiltros(FILTROS_VAZIOS);
+  }
+
+  /*
+    R26 — o alvo é fixado numa `const` ANTES do `await`: o modal do sistema
+    NÃO congela a página (o `window.confirm` congelava), então a lista pode
+    recarregar embaixo enquanto a pergunta está aberta. Perguntar por uma
+    tarefa e concluir outra é defeito de CONSENTIMENTO — a trilha registra
+    uma autorização válida para a ação errada.
+  */
+  async function handleComplete(task) {
+    const alvo = task;
+    /*
+      SEM CONFIRMAÇÃO (05/09): concluir tarefa é a ação DE ROTINA pela qual
+      esta tela existe, e não é destrutiva — o registro continua lá, muda de
+      estado. Perguntar em toda conclusão vira ruído, e pergunta que vira
+      ruído deixa de ser lida. Fica a confirmação do CANCELAR, logo abaixo,
+      que é o caminho que tira a tarefa da fila.
+    */
     try {
-      await concluirTarefa(id);
+      await concluirTarefa(alvo.id);
+      avisar.sucesso(`Tarefa "${alvo.title}" concluida.`);
       load();
     } catch (err) {
-      alert(err.message || 'Erro ao concluir tarefa');
+      avisar.erro(err.message || 'Erro ao concluir tarefa');
     }
   }
 
-  async function handleCancel(id) {
-    if (!confirm('Cancelar esta tarefa?')) return;
+  async function handleCancel(task) {
+    const alvo = task;
+    const { ok } = await confirmar({
+      titulo: 'Cancelar tarefa',
+      mensagem: `Cancelar "${alvo.title}"? A tarefa deixa de aparecer como pendente.`,
+      rotuloConfirmar: 'Cancelar tarefa',
+      destrutiva: true
+    });
+    if (!ok) return;
     try {
-      await cancelarTarefa(id);
+      await cancelarTarefa(alvo.id);
+      avisar.sucesso(`Tarefa "${alvo.title}" cancelada.`);
       load();
     } catch (err) {
-      alert(err.message || 'Erro ao cancelar tarefa');
+      avisar.erro(err.message || 'Erro ao cancelar tarefa');
     }
   }
+
+  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">Tarefas CRM</h1>
-            <p className="page-subtitle">{total} tarefa{total !== 1 ? 's' : ''} encontrada{total !== 1 ? 's' : ''}.</p>
-          </div>
-          <Link to="/crm/dashboard" className="btn btn-secondary text-sm">Dashboard</Link>
-        </div>
-      </div>
+    <Pagina>
+      <PageHeader
+        titulo="Tarefas CRM"
+        contagem={`${total} tarefa${total !== 1 ? 's' : ''}`}
+        descricao="Agenda de contatos, visitas e propostas do funil comercial."
+        secundarias={[{ rotulo: 'Dashboard', to: '/crm/dashboard' }]}
+      />
 
-      {/* Filtros */}
-      <div className="card sol-surface-card p-4 mt-3">
-        <div className="flex flex-wrap gap-3">
-          <label className="app-filter-field">
-            <span className="app-filter-label">Status</span>
-            <select className="input" value={filters.status} onChange={setFilter('status')}>
-              <option value="">Todos</option>
-              <option value="PENDING">Pendente</option>
-              <option value="DONE">Concluida</option>
-              <option value="CANCELLED">Cancelada</option>
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Tipo</span>
-            <select className="input" value={filters.task_type} onChange={setFilter('task_type')}>
-              <option value="">Todos</option>
-              {Object.entries(TYPE_MAP).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Vencidas</span>
-            <select className="input" value={filters.vencidas} onChange={setFilter('vencidas')}>
-              <option value="">Todas</option>
-              <option value="true">Apenas vencidas</option>
-            </select>
-          </label>
-          {(filters.status || filters.task_type || filters.vencidas) && (
-            <button
-              className="btn btn-secondary text-sm self-end"
-              onClick={() => { setFilters({ status: '', task_type: '', vencidas: '' }); setPage(1); }}
-            >
-              Limpar
-            </button>
-          )}
-        </div>
-      </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {/* Lista */}
-      <div className="card sol-surface-card mt-3 overflow-hidden">
+      <BlocoConteudo
+        variante="primario"
+        cor="var(--sem-info)"
+        titulo="Tarefas"
+        contagem={`${tasks.length} em tela`}
+        descricao="Concluir e cancelar pedem confirmacao antes de gravar."
+      >
+        <BarraFiltros
+          filtros={[
+            {
+              id: 'status',
+              rotulo: 'Status',
+              unico: true,
+              opcoes: [
+                { valor: 'PENDING', rotulo: 'Pendente' },
+                { valor: 'DONE', rotulo: 'Concluida' },
+                { valor: 'CANCELLED', rotulo: 'Cancelada' }
+              ]
+            },
+            {
+              id: 'task_type',
+              rotulo: 'Tipo',
+              unico: true,
+              opcoes: Object.entries(TYPE_MAP).map(([valor, rotulo]) => ({ valor, rotulo }))
+            },
+            {
+              id: 'vencidas',
+              rotulo: 'Prazo',
+              unico: true,
+              opcoes: [{ valor: 'true', rotulo: 'Apenas vencidas' }]
+            }
+          ]}
+          ativos={filtros}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+
         <TabelaPadrao
           colunas={[
             {
@@ -148,7 +225,10 @@ export default function CrmTarefas() {
               titulo: 'Lead',
               tipo: 'texto',
               render: (task) => (task.lead ? (
-                <Link to={`/crm/leads/${task.lead.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                <Link
+                  to={`/crm/leads/${task.lead.id}`}
+                  className="text-[var(--c-primary)] hover:underline"
+                >
                   {task.lead.nome}
                 </Link>
               ) : '—')
@@ -157,29 +237,29 @@ export default function CrmTarefas() {
               id: 'tipo',
               titulo: 'Tipo',
               tipo: 'texto',
-              render: (task) => <span className="text-sm text-sub">{TYPE_MAP[task.task_type] || task.task_type}</span>
+              render: (task) => <span className="text-sub">{TYPE_MAP[task.task_type] || task.task_type}</span>
             },
             {
               id: 'prioridade',
               titulo: 'Prioridade',
               tipo: 'badge',
               render: (task) => {
-                const priorityInfo = PRIORITY_MAP[task.priority] || PRIORITY_MAP.MEDIUM;
-                return <span className={`text-sm font-medium ${priorityInfo.cls}`}>{priorityInfo.label}</span>;
+                const prioridade = PRIORITY_MAP[task.priority] || PRIORITY_MAP.MEDIUM;
+                return <StatusBadge status={prioridade.label} kind={prioridade.familia} />;
               }
             },
             {
               id: 'responsavel',
               titulo: 'Responsavel',
               tipo: 'texto',
-              render: (task) => <span className="text-sm text-sub">{task.responsavel?.nome || '—'}</span>
+              render: (task) => <span className="text-sub">{task.responsavel?.nome || '—'}</span>
             },
             {
               id: 'prazo',
               titulo: 'Prazo',
               tipo: 'data',
               render: (task) => (
-                <span className={`text-sm whitespace-nowrap ${isOverdue(task) ? 'text-red-500 font-medium' : 'text-sub'}`}>
+                <span className={`whitespace-nowrap ${isOverdue(task) ? 'text-[var(--sem-danger)] font-medium' : 'text-sub'}`}>
                   {fmt(task.due_at)}
                 </span>
               )
@@ -189,8 +269,8 @@ export default function CrmTarefas() {
               titulo: 'Status',
               tipo: 'status',
               render: (task) => {
-                const statusInfo = STATUS_MAP[isOverdue(task) ? 'OVERDUE' : task.status] || STATUS_MAP.PENDING;
-                return <span className={statusInfo.cls}>{statusInfo.label}</span>;
+                const info = STATUS_MAP[isOverdue(task) ? 'OVERDUE' : task.status] || STATUS_MAP.PENDING;
+                return <StatusBadge status={info.label} kind={info.familia} />;
               }
             }
           ]}
@@ -205,15 +285,15 @@ export default function CrmTarefas() {
             <>
               <button
                 type="button"
-                onClick={() => handleComplete(task.id)}
-                className="btn btn-secondary text-xs text-emerald-700 dark:text-emerald-400"
+                onClick={() => handleComplete(task)}
+                className="btn btn-outline btn-sm"
               >
                 Concluir
               </button>
               <button
                 type="button"
-                onClick={() => handleCancel(task.id)}
-                className="btn btn-secondary text-xs text-red-600 dark:text-red-400"
+                onClick={() => handleCancel(task)}
+                className="btn btn-outline btn-perigo-suave btn-sm"
               >
                 Cancelar
               </button>
@@ -221,16 +301,18 @@ export default function CrmTarefas() {
           ) : null)}
           larguraAcoes={200}
         />
-      </div>
 
-      {/* Paginacao */}
-      {total > 50 && (
-        <div className="flex justify-center gap-2 mt-4">
-          <button className="btn btn-secondary text-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</button>
-          <span className="text-sm text-muted self-center">Pagina {page}</span>
-          <button className="btn btn-secondary text-sm" disabled={page * 50 >= total} onClick={() => setPage(p => p + 1)}>Proxima</button>
-        </div>
-      )}
-    </div>
+        <Paginacao
+          pagina={page}
+          totalPaginas={totalPaginas}
+          total={total}
+          rotuloRegistro="tarefa"
+          carregando={loading}
+          aoMudarPagina={setPage}
+        />
+      </BlocoConteudo>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }
