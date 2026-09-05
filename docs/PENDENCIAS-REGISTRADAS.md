@@ -2942,3 +2942,54 @@ terminar.
 **Melhoria possível, não feita:** o harness poderia comparar o SHA publicado
 com o `git rev-parse HEAD` local no começo e recusar a corrida quando
 diferem — hoje ele confere só o publicado. Fica registrado como proposta.
+
+---
+
+## 05/09 — Os "75 TODO/FIXME" que eu reportei ao cliente não existem
+
+No levantamento de estado que o cliente pediu — e ele pediu explicitamente
+*"não estime de cabeça: confira no repositório"* — eu listei como pendência
+técnica: **"75 TODO/FIXME no `frontend/src`. Nunca varridos nem
+classificados."**
+
+Eu rodei o comando. O comando é que estava errado:
+
+```
+grep -rn "TODO\|FIXME" frontend/src --include=*.jsx --include=*.js | wc -l   → 75
+```
+
+`grep` casa **substring**, e a palavra portuguesa **"TODOS"** contém "TODO".
+Das 75 ocorrências, **69** são o valor de enum `'TODOS'` / `'TODOS_VISIVEIS'`
+usado como filtro em tela (status, escopo de obra, modo de recebimento), e as
+outras 6 são o adjetivo em comentários em português — *"TODO contrato exige
+a negociação detalhada"*, *"TODO campo de dinheiro…"* — todos descrevendo
+regra **já implementada**.
+
+Medido com o marcador de verdade:
+
+| busca | resultado |
+|---|---|
+| `// TODO`, `/* TODO` ou `TODO:` | **1** — e é a frase "TODO contrato exige…" |
+| `FIXME`, sem diferenciar maiúscula | **0** |
+| `@todo` | **0** |
+
+**Não existe nenhum marcador real de dívida técnica no código.** O número que
+eu entreguei era ruído de medição apresentado como fato.
+
+### Por que isto entra no registro
+
+É a mesma família que já me pegou outras vezes hoje, e esta dói mais porque
+foi num documento de prestação de contas: **eu rodei a medição e não olhei o
+que ela tinha medido**. Zero de varredura que não varreu, concordância que
+não é cobertura, e agora contagem que casa substring — as três dizem a mesma
+coisa. Rodar o comando não é conferir; conferir é olhar a amostra do que ele
+devolveu.
+
+**A regra que fica:** antes de reportar um número, olhe as primeiras linhas
+do que o comando casou. Uma amostra de duas linhas teria mostrado
+`TODOS: 'Todos',` na primeira.
+
+**Achado lateral, para depois:** o projeto registra dívida e decisão em
+comentários com código de regra (R6, R19/R3, R21), não com `TODO`. Se um dia
+quisermos mapear dívida de verdade, é esse o padrão a varrer — e aí o
+levantamento tem matéria-prima real. Fica como proposta, não como pendência.
