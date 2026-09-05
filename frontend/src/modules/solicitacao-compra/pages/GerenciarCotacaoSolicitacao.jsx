@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   HiOutlineArrowTopRightOnSquare,
@@ -44,7 +44,45 @@ import {
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
 import { montarLinhasResumoApropriacao } from '../utils/apropriacoes';
-import { Avisos, useAvisos, TabelaPadrao, CelulaDupla } from '../../../components/padrao';
+import {
+  Avisos,
+  BlocoConteudo,
+  CampoForm,
+  CelulaDupla,
+  FormSecao,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  useAvisos,
+  useConfirmacao
+} from '../../../components/padrao';
+
+/*
+  GESTÃO DA COTAÇÃO — a tela onde a cotação vira PEDIDO DE COMPRA.
+
+  É o maior arquivo do sistema e o ponto em que o dinheiro se move. Três
+  coisas desta migração merecem registro, porque não são cosméticas:
+
+  1. R19/R3 — as 60 caixas do navegador saíram. `alert` virou `useAvisos`;
+     `confirm`/`prompt` viraram `useConfirmacao`. O caminho mais caro da
+     tela (`handleEncerrar`) tinha SEIS diálogos encadeados, dois deles
+     pedindo justificativa QUE VAI PARA A AUDITORIA em `window.prompt`, sem
+     validação nenhuma — enquanto o caso menos crítico da mesma tela
+     (encerrar SEM pedido) já exigia 10 caracteres e marcação de ciência. O
+     controle mais fraco estava no caminho mais caro. As duas justificativas
+     agora passam pelo mesmo piso (10 caracteres, campo do sistema).
+
+  2. R21 — TODO retorno de `confirmar()` é DESESTRUTURADO
+     (`const { ok } = await confirmar(...)`). O objeto é sempre truthy: ler
+     `const ok = ...` faria "Cancelar" GERAR OS PEDIDOS DE COMPRA. São 12
+     pontos de confirmação neste arquivo, no caminho que movimenta dinheiro.
+
+  3. R26 — o modal do sistema NÃO congela a página (o `window.confirm`
+     congelava). Todo alvo é fixado numa `const` ANTES do `await`, e a ação
+     usa essa `const` — nunca relê o estado depois da confirmação.
+*/
 
 // helpers
 
@@ -129,16 +167,43 @@ function formatNumeroCompra(value) {
   });
 }
 
-function clsStatus(status) {
+// R25: a cor do status vem do token semântico, nunca da paleta crua — o
+// tema escuro e o piso de contraste do ThemeContext só alcançam os tokens.
+function tomStatus(status) {
   const v = String(status || '').toUpperCase();
-  if (v === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
-  if (v === 'FINALIZADA') return 'app-status-pill bg-slate-100 text-slate-700';
-  if (['RECUSADO', 'CANCELADA', 'CANCELADO', 'INATIVA'].includes(v)) return 'app-status-pill bg-red-100 text-red-700';
-  if (v === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
-  if (v === 'FECHAMENTO_PARCIAL') return 'app-status-pill bg-amber-100 text-amber-800';
-  if (v === 'RASCUNHO') return 'app-status-pill bg-amber-100 text-amber-700';
-  if (v === 'REABERTA') return 'app-status-pill bg-blue-100 text-blue-700';
-  return 'app-status-pill bg-blue-100 text-blue-700';
+  if (['ENCERRADO', 'FINALIZADA'].includes(v)) return 'neutral';
+  if (['RECUSADO', 'CANCELADA', 'CANCELADO', 'INATIVA'].includes(v)) return 'danger';
+  if (['AGUARDANDO_DIRETORIA', 'FECHAMENTO_PARCIAL', 'RASCUNHO'].includes(v)) return 'warning';
+  return 'info';
+}
+
+function estiloTom(tom) {
+  return {
+    background: `var(--sem-${tom}-bg)`,
+    borderColor: `var(--sem-${tom}-border)`,
+    color: `var(--sem-${tom})`
+  };
+}
+
+function PilulaStatus({ status, className = '' }) {
+  const tom = tomStatus(status);
+  return (
+    <span className={`app-status-pill ${className}`.trim()} style={estiloTom(tom)}>
+      {fmtStatus(status)}
+    </span>
+  );
+}
+
+// Etiqueta neutra de contagem/contexto (o antigo `rounded-full bg-slate-100`).
+function Etiqueta({ children, tom = 'neutral', className = '' }) {
+  return (
+    <span
+      className={`app-status-pill ${className}`.trim()}
+      style={estiloTom(tom)}
+    >
+      {children}
+    </span>
+  );
 }
 
 function buildItemKey(item) {
@@ -157,6 +222,12 @@ function itemToCotacaoPayload(item) {
   };
 }
 
+// Piso de justificativa de auditoria — o mesmo número que o caso MENOS
+// crítico da tela (encerrar sem pedido) já exigia. Ele passa a valer também
+// para os dois pontos mais caros: compra acima do solicitado e fechamento
+// parcial.
+const MINIMO_JUSTIFICATIVA = 10;
+
 const CONDICOES_PAGAMENTO_COTACAO = [
   'Pix',
   'Boleto',
@@ -168,10 +239,16 @@ const CONDICOES_PAGAMENTO_COTACAO = [
   'Outros'
 ];
 
+/*
+  M1/R2 (alvo de clique) + R25 (cor por token): o botão de ícone da linha
+  tinha 28px (`h-7 w-7`) e pintava a paleta crua do Tailwind à mão. A classe
+  `compras-icon-action` já existe no sistema, mede 32px e tira toda a cor de
+  token — a medida e a cor voltam a ser decisão do CSS, não da tela.
+*/
 function CotacaoActionButton({ as: Component = 'button', children, className = '', ...props }) {
   return (
     <Component
-      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--c-border)] bg-white text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-40 ${className}`.trim()}
+      className={`compras-icon-action ${className}`.trim()}
       {...props}
     >
       {children}
@@ -352,12 +429,16 @@ function ModalRespostaInternaCotacao({
     <ModalPortal onClose={onFechar} closeOnEscape={!salvando && !enviandoArquivos}>
       <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="editar-resposta-cotacao-titulo">
         <div className="app-modal-surface app-modal-surface--form">
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+        <div
+          className="flex items-start justify-between gap-3 border-b px-4 py-4"
+          style={{ borderColor: 'var(--c-border)' }}
+          data-modal="cabecalho"
+        >
           <div>
-            <h2 id="editar-resposta-cotacao-titulo" className="text-lg font-semibold text-[var(--c-text)]">
+            <h2 id="editar-resposta-cotacao-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
               {form.nova_oferta_saldo ? 'Nova oferta para o saldo' : 'Editar resposta da cotacao'}
             </h2>
-            <p className="text-sm text-[var(--c-muted)]">
+            <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
               {cotacao.fornecedor?.nome || 'Fornecedor'} - {form.nova_oferta_saldo
                 ? 'os valores informados valem somente para esta nova oferta.'
                 : 'a alteracao sera registrada na auditoria como resposta interna.'}
@@ -375,133 +456,141 @@ function ModalRespostaInternaCotacao({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {faixaAvisos}
+          {/*
+            Estas duas faixas NÃO são `useAvisos`: são CONDIÇÃO derivada do
+            conteúdo (a cotação está encerrada / esta é uma oferta de saldo),
+            não evento. Fechá-las não faria o problema sumir — então elas ficam
+            no fluxo, ao lado do que descrevem (fronteira do useAvisos).
+          */}
           {solicitacaoEncerrada ? (
-            <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <div
+              className="mb-3 rounded-lg border px-3 py-2 text-xs"
+              style={estiloTom('warning')}
+            >
               Esta cotacao esta encerrada. Ao salvar, ela sera reaberta somente se a edicao criar nova disponibilidade para este fornecedor. A quantidade originalmente solicitada permanece inalterada.
             </div>
           ) : null}
           {form.nova_oferta_saldo ? (
-            <div className="mb-3 border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+            <div
+              className="mb-3 rounded-lg border px-3 py-2 text-xs"
+              style={estiloTom('info')}
+            >
               O pedido anterior e seu preco permanecem inalterados. Informe abaixo a quantidade, o preco e o prazo oferecidos agora para o saldo restante.
             </div>
           ) : null}
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Valor minimo do pedido</span>
-              <input className="input" inputMode="decimal" value={form.valor_minimo_pedido} onChange={(e) => onChange('valor_minimo_pedido', sanitizeNumeroCompraInput(e.target.value))} />
-            </label>
-            <label className="app-filter-field">
-              <span className="app-filter-label">Desconto concedido</span>
-              <input className="input" inputMode="decimal" value={form.desconto_total} onFocus={(e) => e.target.select()} onChange={(e) => onChange('desconto_total', sanitizeNumeroCompraInput(e.target.value))} />
-            </label>
-            <label className="app-filter-field">
-              <span className="app-filter-label">DIFAL</span>
-              <input className="input" inputMode="decimal" value={form.difal_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChange('difal_valor', formatarMoedaCotacaoInput(e.target.value, 2))} />
-            </label>
-            <label className="app-filter-field">
-              <span className="app-filter-label">Prazo de entrega *</span>
+
+          {/*
+            R12: estes selects são de ENTRADA DE DADO, não de filtro. Antes
+            viviam em `app-filter-field`/`app-filter-label` — a faixa de
+            filtros do sistema — e por isso o validador (com razão) os lia
+            como filtro. `FormSecao`/`CampoForm` dizem o que eles são.
+          */}
+          <FormSecao colunas={3}>
+            <CampoForm label="Valor minimo do pedido">
+              <input className="input input-moeda" inputMode="decimal" value={form.valor_minimo_pedido} onChange={(e) => onChange('valor_minimo_pedido', sanitizeNumeroCompraInput(e.target.value))} />
+            </CampoForm>
+            <CampoForm label="Desconto concedido">
+              <input className="input input-moeda" inputMode="decimal" value={form.desconto_total} onFocus={(e) => e.target.select()} onChange={(e) => onChange('desconto_total', sanitizeNumeroCompraInput(e.target.value))} />
+            </CampoForm>
+            <CampoForm label="DIFAL">
+              <input className="input input-moeda" inputMode="decimal" value={form.difal_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChange('difal_valor', formatarMoedaCotacaoInput(e.target.value, 2))} />
+            </CampoForm>
+            <CampoForm label="Prazo de entrega" obrigatorio>
               <input className="input" type="number" min="1" step="1" value={form.prazo_entrega_dias} onChange={(e) => onChange('prazo_entrega_dias', e.target.value.replace(/\D/g, ''))} />
-            </label>
-            <label className="app-filter-field">
-              <span className="app-filter-label">Tipo do prazo *</span>
+            </CampoForm>
+            <CampoForm label="Tipo do prazo" obrigatorio>
               <select className="input" value={form.prazo_entrega_tipo} onChange={(e) => onChange('prazo_entrega_tipo', e.target.value)}>
                 <option value="DIAS_CORRIDOS">Dias corridos</option>
                 <option value="DIAS_UTEIS">Dias uteis</option>
               </select>
-            </label>
-            <label className="app-filter-field lg:col-span-2">
-              <span className="app-filter-label">Condicao de pagamento *</span>
-              <div className="grid gap-2">
-                <input
-                  className="input"
-                  value={form.condicao_pagamento}
-                  onClick={() => setCondicoesAbertas(true)}
-                  onFocus={() => setCondicoesAbertas(true)}
-                  onChange={(e) => onChange('condicao_pagamento', e.target.value)}
-                  placeholder="Ex.: Boleto 30/60/90"
-                />
-                {condicoesAbertas && (
-                  <div
-                    className="cotacao-condicoes-options rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-sm"
-                    onMouseDown={(event) => event.preventDefault()}
-                  >
-                    <div className="grid gap-1">
-                      {CONDICOES_PAGAMENTO_COTACAO.map((opcao) => (
-                        <label key={opcao} className="cotacao-condicao-option flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={condicoesSelecionadas.has(opcao)}
-                            onChange={() => alternarCondicao(opcao)}
-                          />
-                          <span>{opcao}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <button type="button" className="btn btn-xs btn-outline mt-2 w-full justify-center" onClick={() => setCondicoesAbertas(false)}>
-                      Fechar opcoes
-                    </button>
+            </CampoForm>
+            <CampoForm label="Condicao de pagamento" obrigatorio span={2}>
+              <input
+                className="input"
+                value={form.condicao_pagamento}
+                onClick={() => setCondicoesAbertas(true)}
+                onFocus={() => setCondicoesAbertas(true)}
+                onChange={(e) => onChange('condicao_pagamento', e.target.value)}
+                placeholder="Ex.: Boleto 30/60/90"
+              />
+              {condicoesAbertas && (
+                <div
+                  className="cotacao-condicoes-options mt-2 rounded-xl border p-2"
+                  style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  <div className="grid gap-1">
+                    {CONDICOES_PAGAMENTO_COTACAO.map((opcao) => (
+                      <label key={opcao} className="cotacao-condicao-option flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={condicoesSelecionadas.has(opcao)}
+                          onChange={() => alternarCondicao(opcao)}
+                        />
+                        <span>{opcao}</span>
+                      </label>
+                    ))}
                   </div>
-                )}
-              </div>
-            </label>
-          </div>
+                  <button type="button" className="btn btn-outline btn-sm mt-2 w-full justify-center" onClick={() => setCondicoesAbertas(false)}>
+                    Fechar opcoes
+                  </button>
+                </div>
+              )}
+            </CampoForm>
+          </FormSecao>
 
-          <div className="mt-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3">
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
-              <label className="app-filter-field">
-                <span className="app-filter-label">Frete</span>
-                <select className="input" value={form.frete_tipo} onChange={(e) => onChange('frete_tipo', e.target.value)}>
-                  <option value="SEM_FRETE">Sem frete</option>
-                  <option value="EMBUTIDO">Embutido no preco</option>
-                  <option value="TERCEIRO">Pago a terceiro</option>
+          <FormSecao legenda="Frete" colunas={3}>
+            <CampoForm label="Frete">
+              <select className="input" value={form.frete_tipo} onChange={(e) => onChange('frete_tipo', e.target.value)}>
+                <option value="SEM_FRETE">Sem frete</option>
+                <option value="EMBUTIDO">Embutido no preco</option>
+                <option value="TERCEIRO">Pago a terceiro</option>
+              </select>
+            </CampoForm>
+            {form.frete_tipo !== 'SEM_FRETE' ? (
+              <CampoForm label="Informar frete">
+                <select className="input" value={form.frete_modo} onChange={(e) => onChange('frete_modo', e.target.value)}>
+                  <option value="GLOBAL">Valor global da proposta</option>
+                  <option value="POR_ITEM">Valor por item</option>
                 </select>
-              </label>
-              {form.frete_tipo !== 'SEM_FRETE' ? (
-                <label className="app-filter-field">
-                  <span className="app-filter-label">Informar frete</span>
-                  <select className="input" value={form.frete_modo} onChange={(e) => onChange('frete_modo', e.target.value)}>
-                    <option value="GLOBAL">Valor global da proposta</option>
-                    <option value="POR_ITEM">Valor por item</option>
-                  </select>
-                </label>
-              ) : null}
-              {form.frete_tipo !== 'SEM_FRETE' && form.frete_modo !== 'POR_ITEM' ? (
-                <label className="app-filter-field">
-                  <span className="app-filter-label">Valor do frete *</span>
-                  <input className="input" inputMode="decimal" value={form.frete_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChange('frete_valor', formatarMoedaCotacaoInput(e.target.value, 2))} />
-                </label>
-              ) : null}
-              {form.frete_tipo === 'TERCEIRO' ? (
-                <>
-                  <label className="app-filter-field">
-                    <span className="app-filter-label">Data para pagamento *</span>
-                    <input className="input" type="date" value={form.frete_data_vencimento} onChange={(e) => onChange('frete_data_vencimento', e.target.value)} />
-                  </label>
-                  <label className="app-filter-field">
-                    <span className="app-filter-label">Transportador (opcional)</span>
-                    <input className="input" value={form.frete_transportador_nome} onChange={(e) => onChange('frete_transportador_nome', e.target.value)} />
-                  </label>
-                  <label className="app-filter-field md:col-start-2 lg:col-start-4">
-                    <span className="app-filter-label">CPF/CNPJ (opcional)</span>
-                    <input className="input" inputMode="numeric" maxLength={18} value={maskCpfCnpj(form.frete_transportador_cpf_cnpj)} onChange={(e) => onChange('frete_transportador_cpf_cnpj', maskCpfCnpj(e.target.value))} />
-                  </label>
-                </>
-              ) : null}
-            </div>
-          </div>
+              </CampoForm>
+            ) : null}
+            {form.frete_tipo !== 'SEM_FRETE' && form.frete_modo !== 'POR_ITEM' ? (
+              <CampoForm label="Valor do frete" obrigatorio>
+                <input className="input input-moeda" inputMode="decimal" value={form.frete_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChange('frete_valor', formatarMoedaCotacaoInput(e.target.value, 2))} />
+              </CampoForm>
+            ) : null}
+            {form.frete_tipo === 'TERCEIRO' ? (
+              <>
+                <CampoForm label="Data para pagamento" obrigatorio>
+                  <input className="input" type="date" value={form.frete_data_vencimento} onChange={(e) => onChange('frete_data_vencimento', e.target.value)} />
+                </CampoForm>
+                <CampoForm label="Transportador" hint="Opcional">
+                  <input className="input" value={form.frete_transportador_nome} onChange={(e) => onChange('frete_transportador_nome', e.target.value)} />
+                </CampoForm>
+                <CampoForm label="CPF/CNPJ do transportador" hint="Opcional">
+                  <input className="input" inputMode="numeric" maxLength={18} value={maskCpfCnpj(form.frete_transportador_cpf_cnpj)} onChange={(e) => onChange('frete_transportador_cpf_cnpj', maskCpfCnpj(e.target.value))} />
+                </CampoForm>
+              </>
+            ) : null}
+          </FormSecao>
 
-          <label className="mt-3 block">
-            <span className="app-filter-label">Observacao geral</span>
-            <textarea className="input mt-1 min-h-[64px] w-full" value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
-          </label>
+          <FormSecao colunas={2}>
+            <CampoForm label="Observacao geral" tipo="observacao">
+              <textarea className="input" rows={3} value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
+            </CampoForm>
+          </FormSecao>
 
-          <div className="mt-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 dark:bg-slate-950/20">
+          <div
+            className="mt-3 rounded-lg border p-3"
+            style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)' }}
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-xs font-semibold text-[var(--c-text)]">Arquivos da resposta</div>
-                <div className="text-[11px] text-[var(--c-muted)]">PDF, PNG, JPG ou JPEG. Ate 10 arquivos por envio.</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Arquivos da resposta</div>
+                <div className="text-xs" style={{ color: 'var(--c-muted)' }}>PDF, PNG, JPG ou JPEG. Ate 10 arquivos por envio.</div>
               </div>
               <label className={`btn btn-outline btn-sm cursor-pointer ${enviandoArquivos ? 'pointer-events-none opacity-60' : ''}`}>
                 <input
@@ -525,7 +614,8 @@ function ModalRespostaInternaCotacao({
                   <button
                     key={arquivo.chave || `${arquivo.url}-${index}`}
                     type="button"
-                    className="flex min-w-0 items-center gap-1.5 rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1.5 text-left text-[11px] hover:border-blue-300"
+                    className="flex min-w-0 items-center gap-2 rounded-md border px-2 py-2 text-left text-xs"
+                    style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}
                     title={arquivo.nome_original || `Arquivo ${index + 1}`}
                     onClick={() => onAbrirArquivo(arquivo, index)}
                   >
@@ -535,7 +625,7 @@ function ModalRespostaInternaCotacao({
                 ))}
               </div>
             ) : (
-              <div className="mt-2 text-[11px] text-[var(--c-muted)]">Nenhum arquivo anexado.</div>
+              <div className="mt-2 text-xs" style={{ color: 'var(--c-muted)' }}>Nenhum arquivo anexado.</div>
             )}
           </div>
 
@@ -550,10 +640,10 @@ function ModalRespostaInternaCotacao({
                   noCard: 'titulo',
                   render: (item) => (
                     <div className="min-w-0">
-                      <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
-                      <div className="text-[var(--c-muted)]">{formatNumeroCompra(parseNumeroCompraDigitado(item.quantidade_solicitada))} {item.unidade}</div>
+                      <div className="font-semibold" style={{ color: 'var(--c-text)' }}>{item.nome}</div>
+                      <div style={{ color: 'var(--c-muted)' }}>{formatNumeroCompra(parseNumeroCompraDigitado(item.quantidade_solicitada))} {item.unidade}</div>
                       {form.nova_oferta_saldo ? (
-                        <div className="mt-0.5 text-[10px] text-blue-700">
+                        <div className="mt-1 text-xs" style={{ color: 'var(--sem-info)' }}>
                           Ja comprado deste fornecedor: {formatNumeroCompra(item.quantidade_ja_comprada_fornecedor)} · Saldo da solicitacao: {formatNumeroCompra(item.saldo_solicitacao)}
                         </div>
                       ) : null}
@@ -712,17 +802,28 @@ function ModalRespostaInternaCotacao({
               vazio="Nenhum item nesta cotacao."
             />
           </div>
-          <div className="mt-3 grid gap-2 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 text-xs sm:grid-cols-3 lg:grid-cols-6">
-            <div><span className="block text-[var(--c-muted)]">Mercadorias</span><strong>{fmtMoeda(valorMercadorias)}</strong></div>
-            <div><span className="block text-[var(--c-muted)]">IPI + ICMS + ST</span><strong>{fmtMoeda(valorTributos)}</strong></div>
-            <div><span className="block text-[var(--c-muted)]">DIFAL</span><strong>{fmtMoeda(parseNumeroCompra(form.difal_valor))}</strong></div>
-            <div><span className="block text-[var(--c-muted)]">Frete</span><strong>{fmtMoeda(freteAdicional)}</strong></div>
-            <div><span className="block text-[var(--c-muted)]">Desconto</span><strong>- {fmtMoeda(parseNumeroCompra(form.desconto_total))}</strong></div>
-            <div className="rounded-md bg-slate-900 px-2 py-1.5 text-white"><span className="block text-slate-300">Total estimado</span><strong>{fmtMoeda(valorTotalResposta)}</strong></div>
+          {/*
+            B3 (papéis diferentes): o preço por linha é REFERÊNCIA enquanto se
+            digita; este painel é a DECISÃO — o total que fecha a resposta.
+            Apagar um dos dois quebra um dos dois trabalhos.
+          */}
+          <div className="mt-3">
+            <StatGrid colunas={3}>
+              <StatTile label="Mercadorias" valor={fmtMoeda(valorMercadorias)} />
+              <StatTile label="IPI + ICMS + ST" valor={fmtMoeda(valorTributos)} />
+              <StatTile label="DIFAL" valor={fmtMoeda(parseNumeroCompra(form.difal_valor))} />
+              <StatTile label="Frete" valor={fmtMoeda(freteAdicional)} />
+              <StatTile label="Desconto" valor={`- ${fmtMoeda(parseNumeroCompra(form.desconto_total))}`} />
+              <StatTile label="Total estimado" valor={fmtMoeda(valorTotalResposta)} tom="info" />
+            </StatGrid>
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
+        <div
+          className="flex flex-wrap justify-end gap-2 border-t px-4 py-4"
+          style={{ borderColor: 'var(--c-border)' }}
+          data-modal="rodape"
+        >
           <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando || enviandoArquivos}>Cancelar</button>
           {!solicitacaoEncerrada && !form.nova_oferta_saldo ? (
             <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando || enviandoArquivos}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
@@ -749,17 +850,21 @@ function ModalEncerrarSemPedido({
   if (!aberto) return null;
 
   const itens = Array.isArray(resumo?.itens) ? resumo.itens : [];
-  const justificativaValida = String(justificativa || '').trim().length >= 10;
+  const justificativaValida = String(justificativa || '').trim().length >= MINIMO_JUSTIFICATIVA;
 
   return (
     <ModalPortal onClose={onFechar} closeOnEscape={!processando}>
       <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="encerrar-sem-pedido-titulo">
-        <div className="app-modal-surface app-modal-surface--standard border-red-200 dark:border-red-900/70">
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-4 py-4 sm:px-5">
+        <div className="app-modal-surface app-modal-surface--standard" style={{ borderColor: 'var(--sem-danger-border)' }}>
+        <div
+          className="flex items-start justify-between gap-4 border-b px-4 py-4"
+          style={{ borderColor: 'var(--c-border)' }}
+          data-modal="cabecalho"
+        >
           <div className="min-w-0">
-            <h2 id="encerrar-sem-pedido-titulo" className="text-lg font-semibold text-[var(--c-text)]">Encerrar cotacao sem gerar pedido?</h2>
-            <p className="mt-1 text-sm leading-relaxed text-[var(--c-muted)]">
-              O saldo abaixo sera encerrado definitivamente. Pedidos ja gerados permanecem inalterados.
+            <h2 id="encerrar-sem-pedido-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Encerrar cotacao sem gerar pedido?</h2>
+            <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
+              O saldo abaixo sera encerrado definitivamente. Pedidos ja gerados permanecem inalterados e esta acao nao pode ser desfeita.
             </p>
           </div>
           <button type="button" className="compras-icon-action shrink-0" onClick={onFechar} disabled={processando} title="Fechar" aria-label="Fechar">
@@ -767,64 +872,73 @@ function ModalEncerrarSemPedido({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-          <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Saldo acumulado</span>
-              <strong className="mt-1 block text-base text-[var(--c-text)]">{formatNumeroCompra(resumo?.saldoTotal)}</strong>
-              <span className="mt-0.5 block text-[10px] text-[var(--c-muted)]">Detalhado por item e unidade</span>
-            </div>
-            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Itens com saldo</span>
-              <strong className="mt-1 block text-base text-[var(--c-text)]">{itens.length}</strong>
-            </div>
-            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
-              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Pedidos preservados</span>
-              <strong className="mt-1 block text-base text-[var(--c-text)]">{resumo?.pedidosPreservados || 0}</strong>
-            </div>
-          </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <StatGrid colunas={3}>
+            <StatTile
+              label="Saldo acumulado"
+              valor={formatNumeroCompra(resumo?.saldoTotal)}
+              sub="Detalhado por item e unidade"
+            />
+            <StatTile label="Itens com saldo" valor={itens.length} />
+            <StatTile label="Pedidos preservados" valor={resumo?.pedidosPreservados || 0} />
+          </StatGrid>
 
           {Number(resumo?.selecoesAtuais || 0) > 0 ? (
-            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <div className="mt-3 rounded-lg border px-3 py-3 text-xs leading-relaxed" style={estiloTom('warning')}>
               Existem {resumo.selecoesAtuais} selecoes de compra marcadas na tela. Elas serao ignoradas e nenhum novo pedido sera gerado.
             </div>
           ) : null}
 
-          <div className="mt-4 overflow-hidden rounded-lg border border-[var(--c-border)]">
-            <div className="border-b border-[var(--c-border)] bg-slate-50 px-3 py-2 text-xs font-semibold text-[var(--c-text)] dark:bg-slate-950/50">
+          {/* R18: `clip` recorta sem criar scrollport — `hidden` sequestraria
+              qualquer sticky descendente, em silêncio. */}
+          <div className="mt-4 rounded-lg border" style={{ borderColor: 'var(--c-border)', overflow: 'clip' }}>
+            <div
+              className="border-b px-3 py-2 text-sm font-semibold"
+              style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)', color: 'var(--c-text)' }}
+            >
               Itens que nao serao comprados
             </div>
-            <div className="max-h-48 divide-y divide-[var(--c-border)] overflow-y-auto">
+            <div className="max-h-48 overflow-y-auto">
               {itens.map((item) => (
-                <div key={`${item.item_tipo}-${item.item_referencia_id}`} className="flex items-start justify-between gap-4 px-3 py-2 text-xs">
+                <div
+                  key={`${item.item_tipo}-${item.item_referencia_id}`}
+                  className="flex items-start justify-between gap-4 border-t px-3 py-2 text-xs"
+                  style={{ borderColor: 'var(--c-border)' }}
+                >
                   <div className="min-w-0">
-                    <strong className="block truncate text-[var(--c-text)]" title={item.nome}>{item.nome}</strong>
-                    <span className="text-[var(--c-muted)]">Comprado: {formatNumeroCompra(item.quantidadeFechada)} {item.unidade || ''}</span>
+                    <strong className="block truncate" style={{ color: 'var(--c-text)' }} title={item.nome}>{item.nome}</strong>
+                    <span style={{ color: 'var(--c-muted)' }}>Comprado: {formatNumeroCompra(item.quantidadeFechada)} {item.unidade || ''}</span>
                   </div>
-                  <span className="shrink-0 font-semibold text-red-700 dark:text-red-300">Saldo: {formatNumeroCompra(item.saldo)} {item.unidade || ''}</span>
+                  <span className="shrink-0 font-semibold" style={{ color: 'var(--sem-danger)' }}>Saldo: {formatNumeroCompra(item.saldo)} {item.unidade || ''}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <label className="mt-4 block">
-            <span className="app-filter-label">Justificativa obrigatoria</span>
-            <textarea
-              className="input mt-1 min-h-[96px] w-full"
-              maxLength={2000}
-              value={justificativa}
-              disabled={processando}
-              onChange={(event) => onJustificativaChange(event.target.value)}
-              placeholder="Explique por que o saldo restante nao sera comprado."
-            />
-            <span className={`mt-1 block text-[11px] ${justificativaValida ? 'text-emerald-700' : 'text-[var(--c-muted)]'}`}>
-              Minimo de 10 caracteres. {String(justificativa || '').trim().length}/2000
-            </span>
-          </label>
+          <FormSecao colunas={2}>
+            <CampoForm
+              label="Justificativa"
+              obrigatorio
+              tipo="observacao"
+              hint={`Minimo de ${MINIMO_JUSTIFICATIVA} caracteres. ${String(justificativa || '').trim().length}/2000`}
+            >
+              <textarea
+                className="input"
+                rows={4}
+                maxLength={2000}
+                value={justificativa}
+                disabled={processando}
+                onChange={(event) => onJustificativaChange(event.target.value)}
+                placeholder="Explique por que o saldo restante nao sera comprado."
+              />
+            </CampoForm>
+          </FormSecao>
 
-          <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-red-200 bg-red-50/70 px-3 py-3 text-sm text-red-900 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-200">
+          <label
+            className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-3 text-sm"
+            style={estiloTom('danger')}
+          >
             <input
-              className="mt-0.5"
               type="checkbox"
               checked={confirmado}
               disabled={processando}
@@ -834,7 +948,11 @@ function ModalEncerrarSemPedido({
           </label>
         </div>
 
-        <div className="app-page-actions justify-end border-t border-[var(--c-border)] px-4 py-4 sm:px-5">
+        <div
+          className="app-page-actions justify-end border-t px-4 py-4"
+          style={{ borderColor: 'var(--c-border)' }}
+          data-modal="rodape"
+        >
           <button type="button" className="btn btn-outline" onClick={onFechar} disabled={processando}>Voltar</button>
           <button type="button" className="btn btn-danger" onClick={onConfirmar} disabled={processando || !confirmado || !justificativaValida}>
             {processando ? 'Encerrando...' : 'Encerrar sem gerar pedido'}
@@ -844,6 +962,174 @@ function ModalEncerrarSemPedido({
       </div>
     </ModalPortal>
   );
+}
+
+/*
+  JUSTIFICATIVA DE AUDITORIA — o conserto do ponto mais caro desta tela.
+
+  O `handleEncerrar` (a cotação virando pedido de compra) pedia DUAS
+  justificativas OBRIGATÓRIAS, as duas gravadas na auditoria:
+    - comprar ACIMA da quantidade solicitada (`justificativa_excedente`);
+    - FECHAMENTO PARCIAL (`justificativa`).
+  As duas eram digitadas num `window.prompt`, sem validação nenhuma: um
+  espaço em branco passava, e a única checagem era `if (!texto)` DEPOIS de a
+  pessoa ter fechado a caixa. Enquanto isso, o caso MENOS crítico da mesma
+  tela — encerrar SEM gerar pedido — já exigia 10 caracteres e uma marcação
+  de ciência, com o botão desabilitado até as duas condições. O controle
+  mais fraco estava no caminho mais caro.
+
+  Este hook devolve `Promise<{ ok, texto }>` — a MESMA forma do
+  `useConfirmacao`, para que a disciplina da R21 (desestruturar sempre) valha
+  igual nos dois — mas com o piso do caso menos crítico embutido: mínimo de
+  10 caracteres, contador à vista, marcação de ciência, e o botão de
+  confirmar desabilitado até as duas coisas. Validar DEPOIS não é a mesma
+  coisa que impedir ANTES: o `prompt` deixava enviar e só então reclamava.
+
+  Ele vive aqui, e não no `useConfirmacao`, porque `components/padrao` é
+  compartilhado: acrescentar `minimoCaracteres` + `ciencia` ao hook padrão é
+  mudança de contrato no meio de uma leva, e a R21 registra por que isso não
+  se faz sem o check nascendo junto. A proposta está no relatório.
+*/
+function useJustificativaAuditoria() {
+  const [pedido, setPedido] = useState(null);
+  const [texto, setTexto] = useState('');
+  const [ciente, setCiente] = useState(false);
+  const resolver = useRef(null);
+
+  const responder = useCallback((ok, valor = '') => {
+    setPedido(null);
+    setTexto('');
+    setCiente(false);
+    if (resolver.current) {
+      resolver.current({ ok, texto: valor });
+      resolver.current = null;
+    }
+  }, []);
+
+  // Promessa pendente ao desmontar resolve como "não" — senão o `await` do
+  // chamador fica preso para sempre se a tela sair no meio.
+  useEffect(() => () => {
+    if (resolver.current) {
+      resolver.current({ ok: false, texto: '' });
+      resolver.current = null;
+    }
+  }, []);
+
+  const pedirJustificativa = useCallback((opcoes = {}) => new Promise((resolve) => {
+    if (resolver.current) resolver.current({ ok: false, texto: '' });
+    resolver.current = resolve;
+    setTexto('');
+    setCiente(false);
+    setPedido({
+      titulo: opcoes.titulo || 'Justificativa obrigatoria',
+      mensagem: opcoes.mensagem || '',
+      detalhes: Array.isArray(opcoes.detalhes) ? opcoes.detalhes : [],
+      rotuloCampo: opcoes.rotuloCampo || 'Justificativa',
+      placeholder: opcoes.placeholder || '',
+      rotuloCiencia: opcoes.rotuloCiencia || 'Confirmo o registro acima.',
+      rotuloConfirmar: opcoes.rotuloConfirmar || 'Confirmar',
+      tom: opcoes.tom || 'warning'
+    });
+  }), []);
+
+  const limpo = texto.trim();
+  const textoValido = limpo.length >= MINIMO_JUSTIFICATIVA;
+
+  const elementoJustificativa = pedido ? (
+    <ModalPortal onClose={() => responder(false)}>
+      <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="justificativa-auditoria-titulo">
+        <div className="app-modal-surface app-modal-surface--standard">
+          <div
+            className="flex items-start justify-between gap-4 border-b px-4 py-4"
+            style={{ borderColor: 'var(--c-border)' }}
+            data-modal="cabecalho"
+          >
+            <div className="min-w-0">
+              <h2 id="justificativa-auditoria-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
+                {pedido.titulo}
+              </h2>
+              {pedido.mensagem ? (
+                <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>{pedido.mensagem}</p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="compras-icon-action shrink-0"
+              onClick={() => responder(false)}
+              title="Fechar"
+              aria-label="Fechar"
+            >
+              <HiOutlineXMark />
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            {pedido.detalhes.length ? (
+              <div className="rounded-lg border px-3 py-3 text-xs leading-relaxed" style={estiloTom(pedido.tom)}>
+                <ul className="grid gap-1">
+                  {pedido.detalhes.map((linha) => (
+                    <li key={linha}>{linha}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <FormSecao colunas={2}>
+              <CampoForm
+                label={pedido.rotuloCampo}
+                obrigatorio
+                tipo="observacao"
+                hint={`Minimo de ${MINIMO_JUSTIFICATIVA} caracteres. ${limpo.length}/2000 — o texto vai para a auditoria.`}
+              >
+                <textarea
+                  className="input"
+                  rows={4}
+                  maxLength={2000}
+                  value={texto}
+                  autoFocus
+                  onChange={(evento) => setTexto(evento.target.value)}
+                  placeholder={pedido.placeholder}
+                />
+              </CampoForm>
+            </FormSecao>
+
+            <label
+              className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-3 text-sm"
+              style={estiloTom(pedido.tom)}
+            >
+              <input
+                type="checkbox"
+                checked={ciente}
+                onChange={(evento) => setCiente(evento.target.checked)}
+              />
+              <span>{pedido.rotuloCiencia}</span>
+            </label>
+          </div>
+
+          <div
+            className="app-page-actions justify-end border-t px-4 py-4"
+            style={{ borderColor: 'var(--c-border)' }}
+            data-modal="rodape"
+          >
+            <button type="button" className="btn btn-outline" onClick={() => responder(false)}>Cancelar</button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!textoValido || !ciente}
+              title={!textoValido
+                ? `Informe pelo menos ${MINIMO_JUSTIFICATIVA} caracteres`
+                : (!ciente ? 'Marque a ciencia para continuar' : undefined)}
+              onClick={() => responder(true, limpo)}
+            >
+              {pedido.rotuloConfirmar}
+            </button>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  ) : null;
+
+  return { pedirJustificativa, elementoJustificativa };
 }
 
 function normalizeText(value) {
@@ -869,12 +1155,17 @@ function fornecedorToCotacaoPayload(fornecedor) {
   return { fornecedor_id: Number(fornecedor?.fornecedor_compra_id || fornecedor?.id) };
 }
 
+/*
+  R19: a função avisava com `alert` do navegador nos DOIS caminhos. Agora ela
+  só faz a cópia e devolve se deu certo — quem chama tem a faixa de avisos da
+  própria tela e diz o que aconteceu com o tom semântico certo.
+*/
 async function copiarTexto(texto) {
   try {
     await navigator.clipboard.writeText(texto);
-    alert('Link copiado.');
+    return true;
   } catch {
-    alert('Nao foi possivel copiar o link automaticamente.');
+    return false;
   }
 }
 
@@ -899,7 +1190,22 @@ function gerarMensagemCotacao(fornecedorNome, url, itens = [], pdfUrl = '') {
   ].filter(Boolean).join('\n');
 }
 
+/*
+  ATENÇÃO — este componente NÃO É RENDERIZADO em lugar nenhum hoje.
+
+  `ModalPedidoFinal` (350 linhas) não aparece no JSX da página; o
+  `onRemanejamentoAplicado` chega à `SecaoComparativo` como prop e ela
+  também nunca o chama. O remanejamento entre fornecedores existe em código
+  e não existe para o usuário.
+
+  NÃO REMOVI: remover elemento/capacidade é decisão do responsável (regra 2
+  da disciplina de regras), e o registro está no relatório desta migração.
+  Como o arquivo inteiro tinha de zerar as caixas do navegador (R19), o
+  componente recebeu a própria faixa `useAvisos` — no dia em que for ligado,
+  ele já nasce dentro do padrão em vez de disparar um `alert` do Chrome.
+*/
 function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejamento, onFechar }) {
+  const { avisos, avisar, fechar } = useAvisos();
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [quantidadesRemanejar, setQuantidadesRemanejar] = useState({});
   const [destinoFornecedorId, setDestinoFornecedorId] = useState('');
@@ -1049,22 +1355,29 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
     <ModalPortal onClose={onFechar}>
       <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pedido-final-titulo">
         <div className="app-modal-surface app-modal-surface--standard">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--c-border)]">
-          <h2 id="pedido-final-titulo" className="font-semibold text-[var(--c-text)]">
+        <div
+          className="flex items-center justify-between border-b px-4 py-4"
+          style={{ borderColor: 'var(--c-border)' }}
+          data-modal="cabecalho"
+        >
+          <h2 id="pedido-final-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
             Pedido: {fornecedor.nome}
           </h2>
-          <button type="button" onClick={onFechar} className="text-[var(--c-muted)] hover:text-[var(--c-text)]">Fechar</button>
+          <button type="button" className="compras-icon-action" onClick={onFechar} title="Fechar" aria-label="Fechar">
+            <HiOutlineXMark />
+          </button>
         </div>
 
-        <div className="px-6 py-4 grid gap-4">
+        <div className="grid gap-4 px-4 py-4">
+          <Avisos avisos={avisos} aoFechar={fechar} />
           {/* Itens ganhos */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-medium">Itens que este fornecedor ganhou</span>
               {!modoRemanejar && (
                 <button
                   type="button"
-                  className="text-xs text-blue-600 hover:underline"
+                  className="btn btn-outline btn-sm"
                   onClick={() => setModoRemanejar(true)}
                 >
                   Remanejar itens para outro fornecedor
@@ -1091,7 +1404,7 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                         <span>{it.quantidade} {it.unidade || ''}</span>
                         {modoRemanejar && itensSelecionados.includes(it.resposta_item_id) && (
                           <input
-                            className="input mt-2 h-8 w-24 px-2 text-xs"
+                            className="input mt-2 text-xs"
                             value={quantidadesRemanejar[String(it.resposta_item_id)] ?? ''}
                             aria-label={`Quantidade a remanejar de ${it.nome || 'item'}`}
                             onChange={(event) => setQuantidadesRemanejar((current) => ({
@@ -1146,15 +1459,15 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                   TabelaPadrao nao tem rodape de tabela. */}
               <div className="mt-2 flex items-center justify-end gap-2 text-sm">
                 <span className="font-semibold">Total do pedido:</span>
-                <strong className="font-bold text-emerald-700">{fmtMoeda(totalGanho)}</strong>
+                <strong className="font-bold" style={{ color: 'var(--sem-success)' }}>{fmtMoeda(totalGanho)}</strong>
               </div>
             </div>
           </div>
 
           {/* Remanejamento */}
           {modoRemanejar && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 grid gap-3">
-              <p className="text-sm font-medium text-amber-800">
+            <div className="grid gap-3 rounded-xl border p-4" style={estiloTom('warning')}>
+              <p className="text-sm font-medium">
                 Selecione os itens acima e escolha o fornecedor destino para remanejar.
               </p>
               <select
@@ -1193,7 +1506,7 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                     try {
                       confirmarRemanejamento();
                     } catch (error) {
-                      alert(error.message || 'Nao foi possivel remanejar os itens.');
+                      avisar.erro(error.message || 'Nao foi possivel remanejar os itens.');
                     }
                   }}
                 >
@@ -1206,7 +1519,7 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
           {/* Acoes de envio */}
           {!modoRemanejar && (
             <div className="grid gap-2">
-              <p className="text-xs text-[var(--c-muted)]">Enviar pedido para o fornecedor:</p>
+              <p className="text-xs" style={{ color: 'var(--c-muted)' }}>Enviar pedido para o fornecedor:</p>
               <div className="flex flex-wrap gap-2">
                 {fornecedor.whatsapp && whatsappLink(fornecedor.whatsapp) && (
                   <a
@@ -1229,7 +1542,11 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={() => copiarTexto(mensagemWhatsApp)}
+                  onClick={async () => {
+                    const copiou = await copiarTexto(mensagemWhatsApp);
+                    if (copiou) avisar.sucesso('Mensagem copiada.');
+                    else avisar.erro('Nao foi possivel copiar a mensagem automaticamente.');
+                  }}
                 >
                   Copiar mensagem
                 </button>
@@ -1238,7 +1555,11 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
           )}
         </div>
 
-        <div className="flex justify-end px-6 py-4 border-t border-[var(--c-border)]">
+        <div
+          className="flex justify-end border-t px-4 py-4"
+          style={{ borderColor: 'var(--c-border)' }}
+          data-modal="rodape"
+        >
           <button type="button" className="btn btn-outline" onClick={onFechar}>Fechar</button>
         </div>
         </div>
@@ -1399,11 +1720,11 @@ function SecaoEnvioFornecedores({
     <div className="grid gap-3">
       {/* Envio para fornecedores vinculados via WhatsApp */}
       {linksVinculados.length > 0 && (
-        <div className="cotacao-whatsapp-panel rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-700/70 dark:bg-emerald-950/45">
+        <div className="cotacao-whatsapp-panel rounded-xl border px-3 py-3" style={estiloTom('success')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-100">Enviar cotacoes via WhatsApp</h3>
-              <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-200">
+              <h3 className="text-sm font-semibold">Enviar cotacoes via WhatsApp</h3>
+              <p className="mt-1 text-xs">
                 {linksVinculados.length} fornecedor(es) com mensagem pronta.
               </p>
             </div>
@@ -1414,7 +1735,7 @@ function SecaoEnvioFornecedores({
                   href={link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-xs btn-primary"
+                  className="btn btn-sm btn-primary"
                 >
                   WhatsApp: {nome}
                 </a>
@@ -1426,18 +1747,23 @@ function SecaoEnvioFornecedores({
 
       {/* Adicionar novos fornecedores */}
       {solicitacao.status !== 'ENCERRADO' && (
-        <div className="cotacao-fornecedores-panel min-w-0 max-w-full rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
-          <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.5fr)] 2xl:grid-cols-[minmax(420px,1fr)_minmax(260px,0.45fr)_minmax(280px,320px)]">
-            <div className="grid min-w-0 content-start gap-2.5">
+        <div
+          className="cotacao-fornecedores-panel min-w-0 max-w-full rounded-xl border p-3"
+          style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)' }}
+        >
+          {/* R10: a grade de painéis vem de degraus e de frações, não de
+              larguras em px escritas na tela. */}
+          <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid min-w-0 content-start gap-3">
               {/* Selecao por categoria */}
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-[var(--c-text)]">Selecionar fornecedores existentes</div>
-                  <div className="text-xs text-[var(--c-muted)]">Busque por nome, documento, email ou categoria antes de gerar os links.</div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Selecionar fornecedores existentes</div>
+                  <div className="text-xs" style={{ color: 'var(--c-muted)' }}>Busque por nome, documento, email ou categoria antes de gerar os links.</div>
                 </div>
                 <button
                   type="button"
-                  className="btn btn-outline text-xs"
+                  className="btn btn-outline btn-sm"
                   onClick={() => setSelecionandoPorCategoria(!selecionandoPorCategoria)}
                 >
                   Filtrar por categoria de insumo
@@ -1445,8 +1771,8 @@ function SecaoEnvioFornecedores({
               </div>
 
               {selecionandoPorCategoria && (
-                <div className="grid gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-800/70 dark:bg-blue-950/45">
-                  <p className="text-xs text-blue-700 dark:text-blue-200">
+                <div className="grid gap-2 rounded-xl border p-3" style={estiloTom('info')}>
+                  <p className="text-xs">
                     Selecione uma categoria para auto-selecionar os fornecedores cadastrados que a atendem:
                   </p>
                   <div className="flex gap-2">
@@ -1458,7 +1784,7 @@ function SecaoEnvioFornecedores({
                     />
                     <button
                       type="button"
-                      className="btn btn-primary text-sm"
+                      className="btn btn-primary btn-sm"
                       onClick={selecionarTodosComCategoria}
                       disabled={!categoriaSelecionada.trim() || !fornecedoresComCategoria.length}
                     >
@@ -1466,22 +1792,20 @@ function SecaoEnvioFornecedores({
                     </button>
                   </div>
                   {categoriaSelecionada && fornecedoresComCategoria.length === 0 && (
-                    <p className="text-xs text-blue-600 dark:text-blue-300">Nenhum fornecedor cadastrado com esta categoria.</p>
+                    <p className="text-xs">Nenhum fornecedor cadastrado com esta categoria.</p>
                   )}
                 </div>
               )}
 
               <div>
-                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm font-medium">Fornecedores</span>
                   {fornecedoresSelecionados.length > 0 && (
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/70 dark:text-blue-200">
-                      {fornecedoresSelecionados.length} selecionado(s)
-                    </span>
+                    <Etiqueta tom="info">{fornecedoresSelecionados.length} selecionado(s)</Etiqueta>
                   )}
                 </div>
-                <div className="mb-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_190px_auto]">
-                  <div className="relative">
+                <div className="mb-2 flex flex-wrap items-start gap-2">
+                  <div className="app-busca relative">
                     <input
                       className="input"
                       placeholder="Digite nome, CNPJ, email ou contato"
@@ -1489,11 +1813,14 @@ function SecaoEnvioFornecedores({
                       onChange={(e) => onChangeFornecedorBusca(e.target.value)}
                     />
                     {deveMostrarAutocomplete && (
-                      <div className="cotacao-fornecedores-autocomplete absolute left-0 right-0 top-[calc(100%+6px)] z-20 rounded-xl border border-[var(--c-border)] bg-white shadow-lg dark:bg-slate-950 dark:shadow-black/30">
+                      <div
+                        className="cotacao-fornecedores-autocomplete absolute left-0 right-0 z-20 mt-1 rounded-xl border"
+                        style={{ top: '100%', borderColor: 'var(--c-border)', background: 'var(--c-surface)', boxShadow: 'var(--ui-shadow-lg)' }}
+                      >
                         {buscandoFornecedores ? (
-                          <div className="px-3 py-3 text-sm text-[var(--c-muted)]">Buscando fornecedores...</div>
+                          <div className="px-3 py-3 text-sm" style={{ color: 'var(--c-muted)' }}>Buscando fornecedores...</div>
                         ) : fornecedoresAutocomplete.length === 0 ? (
-                          <div className="px-3 py-3 text-sm text-[var(--c-muted)]">
+                          <div className="px-3 py-3 text-sm" style={{ color: 'var(--c-muted)' }}>
                             Nenhum fornecedor encontrado para essa busca.
                           </div>
                         ) : (
@@ -1504,13 +1831,17 @@ function SecaoEnvioFornecedores({
                               <button
                                 key={selectionKey}
                                 type="button"
-                                className={`flex w-full items-start gap-3 border-b border-[var(--c-border)] px-3 py-2 text-left last:border-b-0 hover:bg-blue-50 dark:hover:bg-blue-950/45 ${checked ? 'bg-blue-50 dark:bg-blue-950/60' : ''}`}
+                                className="flex w-full items-start gap-3 border-b px-3 py-2 text-left last:border-b-0"
+                                style={{
+                                  borderColor: 'var(--c-border)',
+                                  background: checked ? 'var(--sem-info-bg)' : 'transparent'
+                                }}
                                 onClick={() => onToggleFornecedor(selectionKey, !checked, f)}
                               >
                                 <input type="checkbox" checked={checked} readOnly className="mt-1" />
                                 <span className="min-w-0">
-                                  <span className="block font-semibold text-[var(--c-text)]">{f.nome}</span>
-                                  <span className="block text-xs text-[var(--c-muted)]">
+                                  <span className="block font-semibold" style={{ color: 'var(--c-text)' }}>{f.nome}</span>
+                                  <span className="block text-xs" style={{ color: 'var(--c-muted)' }}>
                                     {f.whatsapp ? `WhatsApp: ${f.whatsapp}` : 'Sem WhatsApp'} {f.email ? ` - ${f.email}` : ''}
                                   </span>
                                 </span>
@@ -1521,8 +1852,12 @@ function SecaoEnvioFornecedores({
                       </div>
                     )}
                   </div>
+                  {/* Seletor de CONTEXTO (qual conjunto de fornecedores
+                      listar antes de gerar os links), legítimo pela R12 —
+                      não recorta uma lista já exibida. */}
                   <select
                     className="input"
+                    aria-label="Categoria de insumo do fornecedor"
                     value={categoriaFornecedorId}
                     onChange={(e) => onChangeCategoriaFornecedorId(e.target.value)}
                   >
@@ -1536,16 +1871,22 @@ function SecaoEnvioFornecedores({
                   </button>
                 </div>
                 {!deveMostrarAutocomplete && !deveMostrarListaCategoria && fornecedoresSelecionados.length === 0 && (
-                  <div className="cotacao-fornecedores-empty rounded-lg border border-dashed border-[var(--c-border)] bg-white/70 px-3 py-2.5 text-xs text-[var(--c-muted)] dark:bg-slate-950/45">
+                  <div
+                    className="cotacao-fornecedores-empty rounded-lg border border-dashed px-3 py-3 text-xs"
+                    style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)', color: 'var(--c-muted)' }}
+                  >
                     Digite no campo de busca para localizar fornecedores ou escolha uma categoria para listar os cadastrados.
                   </div>
                 )}
                 {deveMostrarListaCategoria && (
-                  <div className="cotacao-fornecedores-list app-list-stack max-h-[220px] overflow-y-auto rounded-xl border border-[var(--c-border)] bg-white/80 p-2 dark:bg-slate-950/45">
+                  <div
+                    className="cotacao-fornecedores-list app-list-stack max-h-56 overflow-y-auto rounded-xl border p-2"
+                    style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}
+                  >
                     {buscandoFornecedores ? (
-                      <div className="text-sm text-[var(--c-muted)]">Buscando...</div>
+                      <div className="text-sm" style={{ color: 'var(--c-muted)' }}>Buscando...</div>
                     ) : fornecedoresListaCategoria.length === 0 ? (
-                      <div className="text-sm text-[var(--c-muted)]">Nenhum fornecedor encontrado para a categoria selecionada.</div>
+                      <div className="text-sm" style={{ color: 'var(--c-muted)' }}>Nenhum fornecedor encontrado para a categoria selecionada.</div>
                     ) : (
                       fornecedoresListaCategoria.map((f) => (
                         <label key={fornecedorSelectionKey(f)} className="app-list-card flex items-start gap-2 px-3 py-2">
@@ -1557,16 +1898,16 @@ function SecaoEnvioFornecedores({
                           <div>
                             <div className="font-medium">{f.nome}</div>
                             {f.whatsapp && (
-                              <div className="text-xs text-[var(--c-muted)]">WhatsApp: {f.whatsapp}</div>
+                              <div className="text-xs" style={{ color: 'var(--c-muted)' }}>WhatsApp: {f.whatsapp}</div>
                             )}
                             {Array.isArray(f.categoria_insumos) && f.categoria_insumos.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
+                              <div className="mt-1 flex flex-wrap gap-1">
                                 {f.categoria_insumos.map((c) => (
-                                  <span key={c} className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950/70 dark:text-blue-200">{c}</span>
+                                  <Etiqueta key={c} tom="info">{c}</Etiqueta>
                                 ))}
                               </div>
                             )}
-                            <div className="text-xs text-[var(--c-muted)]">
+                            <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
                               {f.email || 'Sem email'} {f.telefone ? ` - ${f.telefone}` : ''}
                             </div>
                           </div>
@@ -1578,36 +1919,44 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
 
-            <div className="cotacao-fornecedores-selecionados grid min-w-0 content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div
+              className="cotacao-fornecedores-selecionados grid min-w-0 content-start gap-3 rounded-xl border p-3"
+              style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}
+            >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="text-sm font-semibold text-[var(--c-text)]">Fornecedores selecionados</div>
-                  <div className="text-xs text-[var(--c-muted)]">Revise antes de gerar os links.</div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Fornecedores selecionados</div>
+                  <div className="text-xs" style={{ color: 'var(--c-muted)' }}>Revise antes de gerar os links.</div>
                 </div>
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-950/70 dark:text-blue-200">
-                  {fornecedoresSelecionadosDetalhes.length}
-                </span>
+                <Etiqueta tom="info">{fornecedoresSelecionadosDetalhes.length}</Etiqueta>
               </div>
               {fornecedoresSelecionadosDetalhes.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-4 text-xs text-[var(--c-muted)]">
+                <div
+                  className="rounded-lg border border-dashed px-3 py-4 text-xs"
+                  style={{ borderColor: 'var(--c-border)', color: 'var(--c-muted)' }}
+                >
                   Nenhum fornecedor selecionado.
                 </div>
               ) : (
-                <div className="app-list-stack max-h-[250px] overflow-y-auto">
+                <div className="app-list-stack max-h-64 overflow-y-auto">
                   {fornecedoresSelecionadosDetalhes.map((fornecedor) => {
                     const selectionKey = fornecedorSelectionKey(fornecedor);
                     return (
-                      <div key={selectionKey} className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2 text-xs dark:bg-slate-900/60">
+                      <div
+                        key={selectionKey}
+                        className="rounded-lg border px-3 py-2 text-xs"
+                        style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)' }}
+                      >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="truncate font-semibold text-[var(--c-text)]">{fornecedor.nome}</div>
-                            <div className="truncate text-[var(--c-muted)]">
+                            <div className="truncate font-semibold" style={{ color: 'var(--c-text)' }}>{fornecedor.nome}</div>
+                            <div className="truncate" style={{ color: 'var(--c-muted)' }}>
                               {fornecedor.whatsapp || fornecedor.telefone || fornecedor.email || 'Sem contato principal'}
                             </div>
                           </div>
                           <button
                             type="button"
-                            className="text-[11px] font-semibold text-red-600 hover:text-red-700 dark:text-red-300"
+                            className="btn btn-outline btn-perigo-suave btn-sm"
                             onClick={() => onToggleFornecedor(selectionKey, false, fornecedor)}
                           >
                             Remover
@@ -1620,32 +1969,38 @@ function SecaoEnvioFornecedores({
               )}
             </div>
 
-            <div className="cotacao-fornecedor-rapido grid min-w-0 content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 xl:col-span-2 2xl:col-span-1 dark:bg-slate-950/65">
+            {/*
+              R9: o cadastro rápido é INLINE de propósito — ele não interrompe
+              outro trabalho, ele É parte de montar a cotação. Tirá-lo daqui
+              obrigaria a abrir e fechar um modal no meio do que a pessoa veio
+              fazer.
+            */}
+            <div
+              className="cotacao-fornecedor-rapido grid min-w-0 content-start gap-3 rounded-xl border p-3 xl:col-span-2 2xl:col-span-1"
+              style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}
+            >
               <div>
-                <div className="text-sm font-semibold text-[var(--c-text)]">Cadastro rapido</div>
-                <div className="text-xs text-[var(--c-muted)]">Inclua um fornecedor novo sem sair da cotacao.</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Cadastro rapido</div>
+                <div className="text-xs" style={{ color: 'var(--c-muted)' }}>Inclua um fornecedor novo sem sair da cotacao.</div>
               </div>
-              <label className="grid gap-1 text-sm">
-                <span className="text-xs font-semibold text-[var(--c-muted)]">Nome do fornecedor</span>
-                <input className="input" placeholder="Ex.: Fornecedor ABC" value={novoFornecedor.nome} onChange={(e) => onChangeNovoFornecedor('nome', e.target.value)} />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="text-xs font-semibold text-[var(--c-muted)]">CPF/CNPJ</span>
-                <input className="input" placeholder="CPF ou CNPJ do fornecedor" value={maskCpfCnpj(novoFornecedor.cnpj)} onChange={(e) => onChangeNovoFornecedor('cnpj', maskCpfCnpj(e.target.value))} inputMode="numeric" maxLength={18} />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="text-xs font-semibold text-[var(--c-muted)]">WhatsApp</span>
-                <input className="input" placeholder="(00) 00000-0000" value={novoFornecedor.whatsapp} onChange={(e) => onChangeNovoFornecedor('whatsapp', e.target.value)} />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="text-xs font-semibold text-[var(--c-muted)]">Email</span>
-                <input className="input" placeholder="email@fornecedor.com" value={novoFornecedor.email} onChange={(e) => onChangeNovoFornecedor('email', e.target.value)} />
-              </label>
-              <label className="grid gap-1 text-sm">
-                <span className="text-xs font-semibold text-[var(--c-muted)]">Contato</span>
-                <input className="input" placeholder="Nome do contato" value={novoFornecedor.contato} onChange={(e) => onChangeNovoFornecedor('contato', e.target.value)} />
-              </label>
-              <div className="grid gap-1.5 pt-1">
+              <FormSecao colunas={2}>
+                <CampoForm label="Nome do fornecedor" span={2}>
+                  <input className="input" placeholder="Ex.: Fornecedor ABC" value={novoFornecedor.nome} onChange={(e) => onChangeNovoFornecedor('nome', e.target.value)} />
+                </CampoForm>
+                <CampoForm label="CPF/CNPJ">
+                  <input className="input" placeholder="CPF ou CNPJ do fornecedor" value={maskCpfCnpj(novoFornecedor.cnpj)} onChange={(e) => onChangeNovoFornecedor('cnpj', maskCpfCnpj(e.target.value))} inputMode="numeric" maxLength={18} />
+                </CampoForm>
+                <CampoForm label="WhatsApp">
+                  <input className="input" placeholder="(00) 00000-0000" value={novoFornecedor.whatsapp} onChange={(e) => onChangeNovoFornecedor('whatsapp', e.target.value)} />
+                </CampoForm>
+                <CampoForm label="Email">
+                  <input className="input" placeholder="email@fornecedor.com" value={novoFornecedor.email} onChange={(e) => onChangeNovoFornecedor('email', e.target.value)} />
+                </CampoForm>
+                <CampoForm label="Contato">
+                  <input className="input" placeholder="Nome do contato" value={novoFornecedor.contato} onChange={(e) => onChangeNovoFornecedor('contato', e.target.value)} />
+                </CampoForm>
+              </FormSecao>
+              <div className="grid gap-2 pt-1">
                 <button type="button" className="btn btn-outline w-full" onClick={onCriarFornecedorRapido}>Cadastrar e selecionar</button>
                 <button type="button" className="btn btn-primary w-full" onClick={onEnviarFornecedores} disabled={enviandoFornecedores}>
                   {enviandoFornecedores ? 'Gerando links...' : 'Gerar links de cotacao'}
@@ -1655,37 +2010,63 @@ function SecaoEnvioFornecedores({
           </div>
 
           {fornecedoresSelecionados.length > 0 && (
-            <div className="mt-4 min-w-0 max-w-full rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div
+              className="mt-4 min-w-0 max-w-full rounded-xl border p-3"
+              style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}
+            >
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-[var(--c-text)]">Itens por fornecedor</div>
-                  <div className="text-xs text-[var(--c-muted)]">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Itens por fornecedor</div>
+                  <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
                     Marque quais itens cada fornecedor recebera no link. Cada coluna vira uma cotacao daquele fornecedor.
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                    {qtdItensSelecionados}/{totalCelulasEnvio} selecao(oes)
-                  </span>
-                  <button type="button" className="btn btn-xs btn-outline" onClick={onSelecionarTodosItensEnvio}>Selecionar tudo</button>
-                  <button type="button" className="btn btn-xs btn-outline" onClick={onLimparItensEnvio}>Limpar</button>
+                  <Etiqueta>{qtdItensSelecionados}/{totalCelulasEnvio} selecao(oes)</Etiqueta>
+                  <button type="button" className="btn btn-sm btn-outline" onClick={onSelecionarTodosItensEnvio}>Selecionar tudo</button>
+                  <button type="button" className="btn btn-sm btn-outline" onClick={onLimparItensEnvio}>Limpar</button>
                 </div>
               </div>
               {fornecedoresSemItens.length > 0 && (
-                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/45 dark:text-amber-100">
+                <div className="mb-3 rounded-lg border px-3 py-2 text-xs font-medium" style={estiloTom('warning')}>
                   Selecione ao menos um item para: {fornecedoresSemItens.map((fornecedor) => fornecedor.nome).join(', ')}.
                 </div>
               )}
+              {/*
+                TABELA CRUA DECLARADA — exceção de R1 e de R10, com motivo.
+
+                É uma MATRIZ de marcação: linhas = itens da solicitação,
+                colunas = UM FORNECEDOR POR COLUNA, geradas em tempo de
+                execução a partir de quem está selecionado. A `TabelaPadrao`
+                não faz coluna dinâmica por dado: `storageKey` guarda largura
+                e ordem por `id` de coluna, e aqui o conjunto de ids muda a
+                cada fornecedor marcado ou desmarcado — a largura salva
+                passaria a valer para outra coluna. Além disso o cabeçalho de
+                cada coluna é um CONTROLE (marcar todos os itens daquele
+                fornecedor), e no componente o `th` é botão de ordenação
+                (R14b), não área de formulário.
+
+                Duas coisas ficam como estão de propósito:
+                - o contêiner com `overflow-x: auto` é o arranjo CORRETO pela
+                  R18 — é o scrollport ao qual a coluna fixa PRECISA grudar;
+                  trocar por `hidden` mataria o sticky em silêncio;
+                - as larguras mínimas por coluna são o que impede a matriz de
+                  colapsar; sem `TabelaPadrao` não há de onde tirá-las.
+
+                O que o componente precisaria ganhar para absorver este caso
+                está escrito no relatório desta migração.
+              */}
               <div
-                className="cotacao-scroll-region max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-[var(--c-border)] pb-2"
+                className="cotacao-scroll-region max-w-full overflow-x-auto overscroll-x-contain rounded-lg border pb-2"
+                style={{ borderColor: 'var(--c-border)' }}
                 role="region"
                 aria-label="Itens por fornecedor"
                 tabIndex={0}
               >
                 <table className="w-max min-w-[980px] text-left text-xs">
-                  <thead className="bg-slate-100 text-[10px] uppercase tracking-wide text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                  <thead className="uppercase tracking-wide" style={{ background: 'var(--ui-surface-2)', color: 'var(--c-muted)' }}>
                     <tr>
-                      <th className="sticky left-0 z-10 min-w-[260px] bg-slate-100 px-3 py-2 dark:bg-slate-900">Item</th>
+                      <th className="sticky left-0 z-10 min-w-[260px] px-3 py-2" style={{ background: 'var(--ui-surface-2)' }}>Item</th>
                       <th className="min-w-[95px] px-3 py-2">Qtd.</th>
                       <th className="min-w-[180px] px-3 py-2">Especificacao</th>
                       <th className="min-w-[115px] px-3 py-2">Necessario</th>
@@ -1694,10 +2075,14 @@ function SecaoEnvioFornecedores({
                         const itensFornecedor = itemKeys.filter((itemKey) => Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])).length;
                         const todosMarcados = itemKeys.length > 0 && itensFornecedor === itemKeys.length;
                         return (
-                          <th key={selectionKey} className="min-w-[190px] border-l border-[var(--c-border)] px-3 py-2 text-center">
+                          <th
+                            key={selectionKey}
+                            className="min-w-[190px] border-l px-3 py-2 text-center"
+                            style={{ borderColor: 'var(--c-border)' }}
+                          >
                             <label className="flex cursor-pointer flex-col items-center gap-1 normal-case tracking-normal">
-                              <span className="line-clamp-2 font-semibold text-slate-700 dark:text-slate-100">{fornecedor.nome}</span>
-                              <span className="text-[10px] text-[var(--c-muted)]">{itensFornecedor}/{itemKeys.length} item(ns)</span>
+                              <span className="line-clamp-2 font-semibold" style={{ color: 'var(--c-text)' }}>{fornecedor.nome}</span>
+                              <span className="text-xs" style={{ color: 'var(--c-muted)' }}>{itensFornecedor}/{itemKeys.length} item(ns)</span>
                               <input
                                 type="checkbox"
                                 checked={todosMarcados}
@@ -1716,8 +2101,8 @@ function SecaoEnvioFornecedores({
                       const itemMarcadoParaTodos = fornecedoresSelecionadosDetalhes.length > 0
                         && fornecedoresSelecionadosDetalhes.every((fornecedor) => Boolean(itensSelecionadosEnvio?.[fornecedorSelectionKey(fornecedor)]?.[itemKey]));
                       return (
-                        <tr key={itemKey} className="border-t border-[var(--c-border)] align-top">
-                          <td className="sticky left-0 z-[1] bg-white px-3 py-2 dark:bg-slate-950">
+                        <tr key={itemKey} className="border-t align-top" style={{ borderColor: 'var(--c-border)' }}>
+                          <td className="sticky left-0 z-[1] px-3 py-2" style={{ background: 'var(--c-surface)' }}>
                             <label className="flex items-start gap-2">
                               <input
                                 className="mt-1"
@@ -1727,18 +2112,22 @@ function SecaoEnvioFornecedores({
                                 aria-label={`Selecionar ${item.nome} para todos os fornecedores`}
                               />
                               <span>
-                                <span className="block font-semibold text-[var(--c-text)]">{item.nome}</span>
-                                <span className="block text-[11px] text-[var(--c-muted)]">{item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}</span>
+                                <span className="block font-semibold" style={{ color: 'var(--c-text)' }}>{item.nome}</span>
+                                <span className="block text-xs" style={{ color: 'var(--c-muted)' }}>{item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}</span>
                               </span>
                             </label>
                           </td>
                           <td className="px-3 py-2">{formatNumeroCompra(item.quantidade)} {item.unidade}</td>
-                          <td className="px-3 py-2 text-[var(--c-muted)]">{item.especificacao || '-'}</td>
+                          <td className="px-3 py-2" style={{ color: 'var(--c-muted)' }}>{item.especificacao || '-'}</td>
                           <td className="px-3 py-2">{fmt(item.necessario_para)}</td>
                           {fornecedoresSelecionadosDetalhes.map((fornecedor) => {
                             const selectionKey = fornecedorSelectionKey(fornecedor);
                             return (
-                              <td key={`${selectionKey}-${itemKey}`} className="border-l border-[var(--c-border)] px-3 py-2 text-center">
+                              <td
+                                key={`${selectionKey}-${itemKey}`}
+                                className="border-l px-3 py-2 text-center"
+                                style={{ borderColor: 'var(--c-border)' }}
+                              >
                                 <input
                                   type="checkbox"
                                   checked={Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])}
@@ -1882,7 +2271,11 @@ function SecaoComparativo({
     const resposta = (item.respostas || []).find((resp) => String(resp.fornecedor_id) === String(fornecedor.fornecedor_id));
     if (!resposta) {
       return (
-        <td key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`} className="min-w-[220px] border-l border-[var(--c-border)] bg-slate-50/70 px-2 py-2 align-top text-xs text-[var(--c-muted)]">
+        <td
+          key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`}
+          className="min-w-[220px] border-l px-2 py-2 align-top text-xs"
+          style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)', color: 'var(--c-muted)' }}
+        >
           -
         </td>
       );
@@ -1899,30 +2292,39 @@ function SecaoComparativo({
     return (
       <td
         key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`}
-        className={`min-w-[270px] border-l border-[var(--c-border)] px-2 py-2 align-top text-xs ${excedeuSolicitado ? 'bg-amber-50' : (isVencedor ? 'bg-emerald-50/80' : 'bg-white')}`}
+        className="min-w-[270px] border-l px-2 py-2 align-top text-xs"
+        style={{
+          borderColor: 'var(--c-border)',
+          background: excedeuSolicitado
+            ? 'var(--sem-warning-bg)'
+            : (isVencedor ? 'var(--sem-success-bg)' : 'var(--c-surface)')
+        }}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="font-semibold text-[var(--c-text)]">{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
-            <div className="text-[11px] text-[var(--c-muted)]">
+            <div className="font-semibold" style={{ color: 'var(--c-text)' }}>{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
+            <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
               Total cotado: {resposta.preco ? fmtMoeda(resposta.valor_total_cotado) : '-'}
             </div>
           </div>
           <button
             type="button"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="compras-icon-action shrink-0"
             onClick={() => onEditarRespostaFornecedor?.(resposta.cotacao_fornecedor_id)}
             disabled={!podeEditarResposta}
             title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
             aria-label="Editar resposta internamente"
           >
-            <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+            <HiOutlinePencilSquare />
           </button>
         </div>
 
-        <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--c-muted)]">
-          <span className="font-semibold text-emerald-700">Disponivel: {formatNumeroCompra(quantidadeDisponivelFornecedor)}</span>
-          <span className={saldoDisponivelFornecedor > 0 ? 'font-semibold text-blue-700' : 'text-slate-500'}>
+        <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--c-muted)' }}>
+          <span className="font-semibold" style={{ color: 'var(--sem-success)' }}>Disponivel: {formatNumeroCompra(quantidadeDisponivelFornecedor)}</span>
+          <span
+            className={saldoDisponivelFornecedor > 0 ? 'font-semibold' : undefined}
+            style={{ color: saldoDisponivelFornecedor > 0 ? 'var(--sem-info)' : 'var(--c-muted)' }}
+          >
             Saldo fornecedor: {formatNumeroCompra(saldoDisponivelFornecedor)}
           </span>
           <span>Prazo entrega: {resposta.prazo_entrega_fornecedor || '-'}</span>
@@ -1943,7 +2345,7 @@ function SecaoComparativo({
           ) : null}
         </div>
 
-        <div className="mt-2 flex items-center gap-2 border-t border-[var(--c-border)] pt-2">
+        <div className="mt-2 flex items-center gap-2 border-t pt-2" style={{ borderColor: 'var(--c-border)' }}>
           <input
             type="checkbox"
             checked={isVencedor}
@@ -1957,9 +2359,10 @@ function SecaoComparativo({
             }}
           />
           <input
-            className="input h-7 w-24 px-2 text-xs"
+            className="input text-xs"
             value={isVencedor ? getQuantidadeAlocadaInput(resposta.resposta_item_id) : ''}
             placeholder="Qtd."
+            aria-label={`Quantidade comprada de ${resposta.fornecedor_nome || fornecedor.nome || 'fornecedor'} para ${item.nome}`}
             disabled={!podeEncerrar || !isVencedor}
             onChange={(event) => onVencedorChange({
               item,
@@ -1968,7 +2371,7 @@ function SecaoComparativo({
             })}
           />
           {excedeuSolicitado ? (
-            <span className="text-[10px] font-semibold text-amber-700">Acima do solicitado</span>
+            <span className="text-xs font-semibold" style={{ color: 'var(--sem-warning)' }}>Acima do solicitado</span>
           ) : null}
         </div>
       </td>
@@ -1977,72 +2380,81 @@ function SecaoComparativo({
 
   if (!comparativo?.itens?.length) {
     return (
-      <div className="card sol-surface-card cotacao-comparativo-panel">
-        <div className="card-header">
-          <h2 className="font-semibold">Comparativo de Cotacoes</h2>
-        </div>
+      <BlocoConteudo
+        titulo="Comparativo de Cotacoes"
+        className="cotacao-comparativo-panel"
+      >
         <div className="app-empty-card">
           O comparativo aparece assim que os fornecedores responderem a cotacao.
         </div>
-      </div>
+      </BlocoConteudo>
     );
   }
 
   return (
     <>
-      <div className="card sol-surface-card">
-        <div className="card-header flex flex-wrap items-center justify-between gap-3 pb-3">
-          <div>
-            <h2 className="font-semibold">Comparativo por item</h2>
-            <p className="mt-0.5 text-xs text-[var(--c-muted)]">Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-[var(--c-border)] bg-slate-50 p-1 text-xs">
-              <button
-                type="button"
-                className={`rounded-md px-3 py-1.5 font-semibold transition ${modoVisualizacao === 'cards' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                onClick={() => setModoVisualizacao('cards')}
-              >
-                Cards
-              </button>
-              <button
-                type="button"
-                className={`rounded-md px-3 py-1.5 font-semibold transition ${modoVisualizacao === 'mapa' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                onClick={() => setModoVisualizacao('mapa')}
-              >
-                Mapa
-              </button>
-            </div>
-            <span className="cotacao-comparativo-count rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-              {comparativo.itens.length} item(ns)
-            </span>
-          </div>
-        </div>
+      {/*
+        B2: este é o bloco PRIMÁRIO da tela — é ele que responde a pergunta
+        central ("de quem eu compro, e quanto?"). Os demais são neutros.
+      */}
+      <BlocoConteudo
+        titulo="Comparativo por item"
+        variante="primario"
+        cor="var(--sem-info)"
+        contagem={`${comparativo.itens.length} item(ns)`}
+        descricao="Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta."
+        acoes={(
+          <span
+            className="inline-flex rounded-lg border p-1 text-xs"
+            style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)' }}
+          >
+            <button
+              type="button"
+              className={`btn btn-sm ${modoVisualizacao === 'cards' ? 'btn-primary' : 'btn-outline'}`}
+              aria-pressed={modoVisualizacao === 'cards'}
+              onClick={() => setModoVisualizacao('cards')}
+            >
+              Cards
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${modoVisualizacao === 'mapa' ? 'btn-primary' : 'btn-outline'}`}
+              aria-pressed={modoVisualizacao === 'mapa'}
+              onClick={() => setModoVisualizacao('mapa')}
+            >
+              Mapa
+            </button>
+          </span>
+        )}
+      >
 
         {modoVisualizacao === 'mapa' && (
-          <div className="mb-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--c-border)] px-3 py-2">
+          <div className="mb-3 rounded-lg border" style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)' }}>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2" style={{ borderColor: 'var(--c-border)' }}>
               <div>
-                <div className="text-sm font-semibold text-[var(--c-text)]">Mapa de comparacao</div>
-                <div className="text-xs text-[var(--c-muted)]">Itens nas linhas e fornecedores respondidos nas colunas.</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Mapa de comparacao</div>
+                <div className="text-xs" style={{ color: 'var(--c-muted)' }}>Itens nas linhas e fornecedores respondidos nas colunas.</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button type="button" className="btn btn-xs btn-outline" onClick={() => setPainelFornecedoresAberto((atual) => !atual)}>
+                <button type="button" className="btn btn-sm btn-outline" onClick={() => setPainelFornecedoresAberto((atual) => !atual)}>
                   Fornecedores ({fornecedoresMapaVisiveis.length}/{fornecedoresMapa.length})
                 </button>
-                <button type="button" className="btn btn-xs btn-outline" onClick={mostrarTodosFornecedoresMapa}>Mostrar todos</button>
-                <button type="button" className="btn btn-xs btn-outline" onClick={ocultarTodosFornecedoresMapa}>Ocultar todos</button>
+                <button type="button" className="btn btn-sm btn-outline" onClick={mostrarTodosFornecedoresMapa}>Mostrar todos</button>
+                <button type="button" className="btn btn-sm btn-outline" onClick={ocultarTodosFornecedoresMapa}>Ocultar todos</button>
               </div>
             </div>
 
             {painelFornecedoresAberto && (
-              <div className="grid gap-2 border-b border-[var(--c-border)] px-3 py-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-2 border-b px-3 py-3 sm:grid-cols-2 lg:grid-cols-3" style={{ borderColor: 'var(--c-border)' }}>
                 {fornecedoresMapa.map((fornecedor) => {
                   const visivel = fornecedoresVisiveis[String(fornecedor.fornecedor_id)] !== false;
                   return (
                     <label
                       key={fornecedor.fornecedor_id}
-                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${visivel ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-[var(--c-border)] bg-white text-slate-600'}`}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                      style={visivel
+                        ? estiloTom('info')
+                        : { borderColor: 'var(--c-border)', background: 'var(--c-surface)', color: 'var(--c-muted)' }}
                     >
                       <input
                         type="checkbox"
@@ -2051,32 +2463,50 @@ function SecaoComparativo({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{fornecedor.nome}</span>
-                        <span className="block text-[10px] text-[var(--c-muted)]">
+                        <span className="block text-xs">
                           DIFAL {fmtMoeda(fornecedor.difal_valor)} · Frete {fornecedor.frete_tipo === 'SEM_FRETE'
                             ? 'sem frete'
                             : `${fornecedor.frete_tipo === 'TERCEIRO' ? 'terceiro' : 'embutido'} ${fmtMoeda(fornecedor.frete_valor)}${fornecedor.frete_modo === 'POR_ITEM' ? ' por item' : ' global'}`}
                         </span>
                       </span>
-                      <span className="text-[10px] uppercase tracking-[0.08em] text-[var(--c-muted)]">{fmtStatus(fornecedor.status)}</span>
+                      <span className="text-xs uppercase">{fmtStatus(fornecedor.status)}</span>
                     </label>
                   );
                 })}
               </div>
             )}
 
+            {/*
+              SEGUNDA TABELA CRUA DECLARADA — mesma exceção de R1/R10, mesmo
+              motivo, e uma restrição a mais: são DUAS colunas fixas à
+              esquerda (Item e Qtd.), e a `TabelaPadrao` gruda apenas a
+              primeira. Aqui a coluna de quantidade é o que dá sentido a cada
+              número lido nas colunas de fornecedor; perdê-la na rolagem
+              horizontal é perder a referência da linha.
+
+              O `.compras-responsive-table` rola na horizontal com
+              `overflow-x: auto` — pela R18 esse é o arranjo CORRETO: é o
+              scrollport ao qual as duas colunas fixas grudam.
+            */}
             {fornecedoresMapaVisiveis.length > 0 ? (
               <div className="compras-responsive-table">
                 <table className="table min-w-[1420px] text-xs">
                   <thead>
                     <tr>
-                      <th className="sticky left-0 z-20 min-w-[260px] bg-slate-100">Item</th>
-                      <th className="sticky left-[260px] z-20 min-w-[110px] bg-slate-100 text-right">Qtd.</th>
+                      <th className="sticky left-0 z-20 min-w-[260px]" style={{ background: 'var(--ui-surface-2)' }}>Item</th>
+                      <th className="sticky left-[260px] z-20 min-w-[110px] text-right" style={{ background: 'var(--ui-surface-2)' }}>Qtd.</th>
                       {fornecedoresMapaVisiveis.map((fornecedor) => (
-                        <th key={fornecedor.fornecedor_id} className="min-w-[240px] border-l border-[var(--c-border)] bg-slate-100">
+                        <th
+                          key={fornecedor.fornecedor_id}
+                          className="min-w-[240px] border-l"
+                          style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)' }}
+                        >
                           <div className="flex items-center justify-between gap-2">
                             <span className="min-w-0">
                               <span className="block truncate" title={fornecedor.nome}>{fornecedor.nome}</span>
-                              <span className="block text-[9px] font-normal text-[var(--c-muted)]">
+                              {/* R10: era `text-[9px]` — abaixo do piso de 12px
+                                  que o cliente fixou em 02/09. */}
+                              <span className="block text-xs font-normal" style={{ color: 'var(--c-muted)' }}>
                                 DIFAL {fmtMoeda(fornecedor.difal_valor)} · {fornecedor.frete_tipo === 'SEM_FRETE'
                                   ? 'sem frete'
                                   : `frete ${fornecedor.frete_tipo === 'TERCEIRO' ? 'terceiro' : 'embutido'} ${fmtMoeda(fornecedor.frete_valor)}${fornecedor.frete_modo === 'POR_ITEM' ? ' por item' : ' global'}`}
@@ -2084,13 +2514,13 @@ function SecaoComparativo({
                             </span>
                             <button
                               type="button"
-                              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="compras-icon-action shrink-0"
                               onClick={() => onEditarRespostaFornecedor?.(fornecedor.id)}
                               disabled={!podeEditarResposta}
                               title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
                               aria-label="Editar resposta internamente"
                             >
-                              <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+                              <HiOutlinePencilSquare />
                             </button>
                           </div>
                         </th>
@@ -2106,19 +2536,22 @@ function SecaoComparativo({
                       const excedeu = totalAlocadoItem > saldoDisponivel + 0.0001;
                       return (
                         <tr key={buildItemKey(item)}>
-                          <td className="sticky left-0 z-10 min-w-[260px] bg-white px-3 py-2 align-top">
-                            <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
-                            <div className="text-[11px] text-[var(--c-muted)]">
+                          <td className="sticky left-0 z-10 min-w-[260px] px-3 py-2 align-top" style={{ background: 'var(--c-surface)' }}>
+                            <div className="font-semibold" style={{ color: 'var(--c-text)' }}>{item.nome}</div>
+                            <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
                               {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
                               {item.especificacao ? ` - ${item.especificacao}` : ''}
                             </div>
                             {podeEncerrar ? (
-                              <div className={`mt-1 text-[11px] ${excedeu ? 'font-semibold text-amber-700' : 'text-[var(--c-muted)]'}`}>
+                              <div
+                                className={`mt-1 text-xs ${excedeu ? 'font-semibold' : ''}`}
+                                style={{ color: excedeu ? 'var(--sem-warning)' : 'var(--c-muted)' }}
+                              >
                                 Rodada: <strong>{formatNumeroCompra(totalAlocadoItem)}</strong> | Fechado: {formatNumeroCompra(quantidadeFechada)} | Saldo: {formatNumeroCompra(saldoDisponivel)} {item.unidade || ''}
                               </div>
                             ) : null}
                           </td>
-                          <td className="sticky left-[260px] z-10 min-w-[110px] bg-white px-3 py-2 text-right align-top font-semibold">
+                          <td className="sticky left-[260px] z-10 min-w-[110px] px-3 py-2 text-right align-top font-semibold" style={{ background: 'var(--c-surface)' }}>
                             {formatNumeroCompra(quantidadeItem)} {item.unidade || ''}
                           </td>
                           {fornecedoresMapaVisiveis.map((fornecedor) => renderCelulaFornecedorMapa(item, fornecedor))}
@@ -2129,7 +2562,7 @@ function SecaoComparativo({
                 </table>
               </div>
             ) : (
-              <div className="px-3 py-8 text-center text-sm text-[var(--c-muted)]">
+              <div className="px-3 py-8 text-center text-sm" style={{ color: 'var(--c-muted)' }}>
                 Selecione ao menos um fornecedor respondido para visualizar o mapa.
               </div>
             )}
@@ -2139,22 +2572,22 @@ function SecaoComparativo({
         {modoVisualizacao === 'cards' && (
         <div className="app-list-stack gap-2">
           {comparativo.itens.map((item) => (
-            <div key={buildItemKey(item)} className="cotacao-comparativo-item app-list-card px-3 py-2.5">
+            <div key={buildItemKey(item)} className="cotacao-comparativo-item app-list-card px-3 py-3">
               <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold">{item.nome}</div>
-                  <div className="text-xs text-[var(--c-muted)]">
+                  <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
                     {formatNumeroCompra(item.quantidade_atual ?? item.quantidade)} {item.unidade} - {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
                     {item.especificacao ? ` - ${item.especificacao}` : ''}
                   </div>
                   {podeEncerrar ? (
-                    <div className="mt-1 text-xs text-[var(--c-muted)]">
+                    <div className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
                       Rodada: <strong>{formatNumeroCompra(getTotalAlocadoItem(item))}</strong> | Fechado: {formatNumeroCompra(item.quantidade_fechada)} | Saldo: {formatNumeroCompra(getSaldoDisponivelItem(item))} {item.unidade || ''}
                     </div>
                   ) : null}
                 </div>
                 {item.melhor_preco && (
-                  <div className="cotacao-menor-preco rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-700">
+                  <div className="cotacao-menor-preco rounded-lg border px-3 py-2 text-xs" style={estiloTom('success')}>
                     Menor: <strong>{item.melhor_preco.fornecedor_nome}</strong> - {fmtMoeda(item.melhor_preco.preco)}/un
                   </div>
                 )}
@@ -2177,8 +2610,8 @@ function SecaoComparativo({
                       tipo: 'numero',
                       render: (resp) => (
                         <span className="block">
-                          <span className="block font-semibold text-emerald-700">{formatNumeroCompra(resp.quantidade_disponivel)}</span>
-                          <span className="block text-[10px] text-blue-700">Saldo: {formatNumeroCompra(getSaldoDisponivelFornecedor(resp))}</span>
+                          <span className="block font-semibold" style={{ color: 'var(--sem-success)' }}>{formatNumeroCompra(resp.quantidade_disponivel)}</span>
+                          <span className="block text-xs" style={{ color: 'var(--sem-info)' }}>Saldo: {formatNumeroCompra(getSaldoDisponivelFornecedor(resp))}</span>
                         </span>
                       )
                     },
@@ -2269,7 +2702,7 @@ function SecaoComparativo({
                           }}
                         />
                         <input
-                          className="input h-8 w-20 px-2 text-xs"
+                          className="input text-xs"
                           value={isVencedor ? getQuantidadeAlocadaInput(resp.resposta_item_id) : ''}
                           placeholder="Qtd."
                           aria-label={`Quantidade comprada de ${resp.fornecedor_nome}`}
@@ -2281,7 +2714,11 @@ function SecaoComparativo({
                           })}
                         />
                         {excedeu ? (
-                          <span className="text-[10px] font-semibold text-amber-700" title="Exige justificativa no fechamento">
+                          <span
+                            className="text-xs font-semibold"
+                            style={{ color: 'var(--sem-warning)' }}
+                            title="Exige justificativa obrigatoria no fechamento"
+                          >
                             Acima do solicitado
                           </span>
                         ) : null}
@@ -2296,11 +2733,13 @@ function SecaoComparativo({
         )}
 
           {(podeEncerrar || podeEncerrarSemPedido) && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
-            <div className="app-page-actions justify-end">
+            /* C5: um primário sólido; a destrutiva fica APARTADA, em vermelho
+               suave (`.btn-perigo-suave`), nunca pintada à mão. */
+            <div className="app-page-actions app-actionbar-apartada justify-end">
               {podeEncerrarSemPedido ? (
                 <button
                   type="button"
-                  className="btn btn-outline border-red-300 text-red-700 hover:border-red-400 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40"
+                  className="btn btn-outline btn-perigo-suave"
                   onClick={onEncerrarSemPedido}
                   disabled={encerrando || encerrandoSemPedido}
                 >
@@ -2318,7 +2757,7 @@ function SecaoComparativo({
               ) : null}
             </div>
           )}
-      </div>
+      </BlocoConteudo>
 
     </>
   );
@@ -2331,6 +2770,8 @@ export default function GerenciarCotacaoSolicitacao() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
+  const { pedirJustificativa, elementoJustificativa } = useJustificativaAuditoria();
   const [solicitacao, setSolicitacao] = useState(null);
   const [erroCarregamento, setErroCarregamento] = useState('');
   const [fornecedores, setFornecedores] = useState([]);
@@ -2461,7 +2902,7 @@ export default function GerenciarCotacaoSolicitacao() {
     } catch (error) {
       if (error?.name === 'AbortError') return;
       console.error(error);
-      alert(error.message || 'Erro ao buscar fornecedores');
+      avisar.erro(error.message || 'Erro ao buscar fornecedores');
     } finally {
       if (fornecedorRequestRef.current.sequencia === sequencia) {
         setBuscandoFornecedores(false);
@@ -2493,7 +2934,7 @@ export default function GerenciarCotacaoSolicitacao() {
           ? 'Solicitacao de compra cancelada ou indisponivel para cotacao.'
           : mensagem
       );
-      alert(mensagem);
+      avisar.erro(mensagem);
     } finally {
       setLoading(false);
     }
@@ -2608,7 +3049,7 @@ export default function GerenciarCotacaoSolicitacao() {
       }));
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao abrir PDF');
+      avisar.erro(error.message || 'Erro ao abrir PDF');
     } finally {
       setBaixando(false);
     }
@@ -2617,7 +3058,7 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleAbrirArquivo(item) {
     try {
       const url = await obterUrlAssinadaCompra(item?.arquivo_url);
-      if (!url) { alert('Arquivo nao encontrado.'); return; }
+      if (!url) { avisar.alerta('Arquivo nao encontrado.'); return; }
       setPreviewArquivo(await criarPreviewCompra({
         title: 'Arquivo do item',
         name: item.arquivo_nome_original || 'Arquivo anexado',
@@ -2625,7 +3066,7 @@ export default function GerenciarCotacaoSolicitacao() {
       }));
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao abrir arquivo do item');
+      avisar.erro(error.message || 'Erro ao abrir arquivo do item');
     }
   }
 
@@ -2664,7 +3105,7 @@ export default function GerenciarCotacaoSolicitacao() {
           itens: itensCombinados.map(itemToCotacaoPayload)
         });
       }
-      if (!payload.length) { alert('Selecione ou cadastre ao menos um fornecedor.'); return; }
+      if (!payload.length) { avisar.alerta('Selecione ou cadastre ao menos um fornecedor.'); return; }
 
       const fornecedorSemItens = payload.find((fornecedor) => !Array.isArray(fornecedor.itens) || fornecedor.itens.length === 0);
       if (fornecedorSemItens) {
@@ -2675,7 +3116,7 @@ export default function GerenciarCotacaoSolicitacao() {
             (fornecedorSemItens.parceiro_id && Number(fornecedorPayload.parceiro_id) === Number(fornecedorSemItens.parceiro_id))
           );
         });
-        alert(`Selecione ao menos um item para ${fornecedorSelecionado?.nome || fornecedorSemItens.nome || 'cada fornecedor'}.`);
+        avisar.alerta(`Selecione ao menos um item para ${fornecedorSelecionado?.nome || fornecedorSemItens.nome || 'cada fornecedor'}.`);
         return;
       }
 
@@ -2686,28 +3127,43 @@ export default function GerenciarCotacaoSolicitacao() {
       setItensSelecionadosEnvio({});
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       await carregarTudo();
-      alert('Links de cotacao gerados. Use os botoes de WhatsApp para enviar a mensagem a cada fornecedor.');
+      avisar.sucesso('Links de cotacao gerados. Use os botoes de WhatsApp para enviar a mensagem a cada fornecedor.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao enviar para fornecedores');
+      avisar.erro(error.message || 'Erro ao enviar para fornecedores');
     } finally {
       setEnviandoFornecedores(false);
     }
   }
 
   async function handleReabrirCotacao(cotacaoFornecedor) {
-    const fornecedorNome = cotacaoFornecedor?.fornecedor?.nome || 'fornecedor';
-    const motivo = window.prompt(`Informe o motivo para reabrir a cotacao de ${fornecedorNome}:`);
-    if (motivo === null) return;
+    /*
+      R26: a cotação-alvo é fixada numa `const` ANTES do `await`. Com
+      `window.prompt` a página ficava congelada e nada podia mudar entre a
+      pergunta e a ação; o modal do sistema NÃO congela — clicar noutra linha
+      com o modal aberto faria a tela perguntar sobre um fornecedor e reabrir
+      a cotação de outro.
+    */
+    const alvo = cotacaoFornecedor;
+    const fornecedorNome = alvo?.fornecedor?.nome || 'fornecedor';
+    // R21: DESESTRUTURADO. `confirmar()` devolve `{ ok, texto }`, e objeto é
+    // sempre truthy — ler `const ok = ...` faria "Cancelar" reabrir a cotação.
+    const { ok, texto } = await confirmar({
+      titulo: 'Reabrir cotacao',
+      mensagem: `A cotacao de ${fornecedorNome} volta a aceitar resposta pelo mesmo link.`,
+      rotuloConfirmar: 'Reabrir',
+      campo: { rotulo: 'Motivo da reabertura', multilinha: true }
+    });
+    if (!ok) return;
 
     try {
-      setReabrindoCotacaoId(cotacaoFornecedor.id);
-      await reabrirCotacaoCompra(cotacaoFornecedor.id, { motivo });
+      setReabrindoCotacaoId(alvo.id);
+      await reabrirCotacaoCompra(alvo.id, { motivo: texto });
       await carregarTudo();
-      alert('Cotacao reaberta. O fornecedor pode responder novamente pelo mesmo link.');
+      avisar.sucesso('Cotacao reaberta. O fornecedor pode responder novamente pelo mesmo link.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao reabrir cotacao');
+      avisar.erro(error.message || 'Erro ao reabrir cotacao');
     } finally {
       setReabrindoCotacaoId(null);
     }
@@ -2716,7 +3172,7 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleCancelarCotacao() {
     const motivo = motivoCancelamentoCotacao.trim();
     if (!motivo) {
-      alert('Informe o motivo do cancelamento da cotacao.');
+      avisar.alerta('Informe o motivo do cancelamento da cotacao.');
       return;
     }
 
@@ -2726,10 +3182,10 @@ export default function GerenciarCotacaoSolicitacao() {
       setModalCancelamentoCotacao(false);
       setMotivoCancelamentoCotacao('');
       await carregarTudo();
-      alert('Cotacao cancelada. Os links foram bloqueados e a solicitacao voltou para liberada para compra.');
+      avisar.sucesso('Cotacao cancelada. Os links foram bloqueados e a solicitacao voltou para liberada para compra.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao cancelar cotacao');
+      avisar.erro(error.message || 'Erro ao cancelar cotacao');
     } finally {
       setCancelandoCotacao(false);
     }
@@ -2757,7 +3213,7 @@ export default function GerenciarCotacaoSolicitacao() {
       (item) => Number(item.id) === Number(cotacaoFornecedorId)
     );
     if (!cotacaoFornecedor) {
-      alert('Cotacao do fornecedor nao encontrada para edicao.');
+      avisar.erro('Cotacao do fornecedor nao encontrada para edicao.');
       return;
     }
     abrirRespostaInterna(cotacaoFornecedor);
@@ -2778,7 +3234,7 @@ export default function GerenciarCotacaoSolicitacao() {
     const selecionados = Array.from(files || []);
     if (!selecionados.length || !cotacaoRespostaInterna) return;
     if (selecionados.length > 10) {
-      alert('Selecione no maximo 10 arquivos por vez.');
+      avisar.alerta('Selecione no maximo 10 arquivos por vez.');
       return;
     }
 
@@ -2787,10 +3243,10 @@ export default function GerenciarCotacaoSolicitacao() {
       const resposta = await uploadArquivosRespostaInternaCotacao(id, cotacaoRespostaInterna.id, selecionados);
       setCotacaoRespostaInterna((atual) => ({ ...atual, ...(resposta?.cotacao || {}) }));
       await carregarTudo();
-      alert(`${selecionados.length} arquivo(s) anexado(s) e registrado(s) na auditoria.`);
+      avisar.sucesso(`${selecionados.length} arquivo(s) anexado(s) e registrado(s) na auditoria.`);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao anexar arquivos na resposta da cotacao');
+      avisar.erro(error.message || 'Erro ao anexar arquivos na resposta da cotacao');
     } finally {
       setEnviandoArquivosRespostaInterna(false);
     }
@@ -2803,7 +3259,7 @@ export default function GerenciarCotacaoSolicitacao() {
         ? caminho
         : await obterUrlAssinadaCompra(caminho);
       if (!url) {
-        alert('Arquivo nao encontrado.');
+        avisar.alerta('Arquivo nao encontrado.');
         return;
       }
       setPreviewArquivo(await criarPreviewCompra({
@@ -2813,7 +3269,7 @@ export default function GerenciarCotacaoSolicitacao() {
       }));
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao abrir arquivo da resposta');
+      avisar.erro(error.message || 'Erro ao abrir arquivo da resposta');
     }
   }
 
@@ -2824,20 +3280,20 @@ export default function GerenciarCotacaoSolicitacao() {
       || !Number.isInteger(Number(formRespostaInterna.prazo_entrega_dias))
       || Number(formRespostaInterna.prazo_entrega_dias) <= 0
     )) {
-      alert('Informe a condicao de pagamento e o prazo de entrega para finalizar a resposta.');
+      avisar.alerta('Informe a condicao de pagamento e o prazo de entrega para finalizar a resposta.');
       return;
     }
     const valorFreteInformado = formRespostaInterna.frete_modo === 'POR_ITEM'
       ? formRespostaInterna.itens.reduce((total, item) => total + parseNumeroCompra(item.frete_valor), 0)
       : parseNumeroCompra(formRespostaInterna.frete_valor);
     if (finalizar && formRespostaInterna.frete_tipo !== 'SEM_FRETE' && valorFreteInformado <= 0) {
-      alert(formRespostaInterna.frete_modo === 'POR_ITEM'
+      avisar.alerta(formRespostaInterna.frete_modo === 'POR_ITEM'
         ? 'Informe o frete de ao menos um item.'
         : 'Informe o valor do frete.');
       return;
     }
     if (finalizar && formRespostaInterna.frete_tipo === 'TERCEIRO' && !formRespostaInterna.frete_data_vencimento) {
-      alert('Informe a data para pagamento do frete pago a terceiro.');
+      avisar.alerta('Informe a data para pagamento do frete pago a terceiro.');
       return;
     }
     const transportadorErro = getCpfCnpjError(formRespostaInterna.frete_transportador_cpf_cnpj, {
@@ -2853,7 +3309,7 @@ export default function GerenciarCotacaoSolicitacao() {
       return !Number.isFinite(quantidade) || quantidade <= 0;
     });
     if (itemQuantidadeInvalida) {
-      alert('Quantidade solicitada do item deve ser maior que zero.');
+      avisar.alerta('Quantidade solicitada do item deve ser maior que zero.');
       return;
     }
 
@@ -2915,10 +3371,10 @@ export default function GerenciarCotacaoSolicitacao() {
       setCotacaoRespostaInterna(null);
       setFormRespostaInterna(null);
       await carregarTudo();
-      alert(finalizar ? 'Resposta atualizada e registrada na auditoria.' : 'Rascunho salvo e registrado na auditoria.');
+      avisar.sucesso(finalizar ? 'Resposta atualizada e registrada na auditoria.' : 'Rascunho salvo e registrado na auditoria.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao editar resposta da cotacao');
+      avisar.erro(error.message || 'Erro ao editar resposta da cotacao');
     } finally {
       setSalvandoRespostaInterna(false);
     }
@@ -2926,14 +3382,14 @@ export default function GerenciarCotacaoSolicitacao() {
 
   async function handleCriarFornecedorRapido() {
     try {
-      if (!String(novoFornecedor.nome || '').trim()) { alert('Informe o nome do fornecedor.'); return; }
-      if (!String(novoFornecedor.cnpj || '').trim()) { alert('Informe o CPF/CNPJ do fornecedor.'); return; }
+      if (!String(novoFornecedor.nome || '').trim()) { avisar.alerta('Informe o nome do fornecedor.'); return; }
+      if (!String(novoFornecedor.cnpj || '').trim()) { avisar.alerta('Informe o CPF/CNPJ do fornecedor.'); return; }
       const documentoErro = getCpfCnpjError(novoFornecedor.cnpj, {
         required: true,
         label: 'CPF/CNPJ do fornecedor'
       });
       if (documentoErro) { avisar.alerta(documentoErro); return; }
-      if (!String(novoFornecedor.whatsapp || '').trim()) { alert('Informe o WhatsApp/telefone do fornecedor.'); return; }
+      if (!String(novoFornecedor.whatsapp || '').trim()) { avisar.alerta('Informe o WhatsApp/telefone do fornecedor.'); return; }
       const fornecedor = await criarFornecedorCompra({ ...novoFornecedor, cnpj: onlyDigits(novoFornecedor.cnpj) });
       const fornecedorFormatado = {
         ...fornecedor,
@@ -2949,10 +3405,10 @@ export default function GerenciarCotacaoSolicitacao() {
       }));
       garantirItensEnvioSelecionados(fornecedorSelectionKey(fornecedorFormatado));
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
-      alert('Fornecedor criado e selecionado.');
+      avisar.sucesso('Fornecedor criado e selecionado.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao criar fornecedor');
+      avisar.erro(error.message || 'Erro ao criar fornecedor');
     }
   }
 
@@ -3022,7 +3478,7 @@ export default function GerenciarCotacaoSolicitacao() {
 
   function abrirEncerramentoSemPedido() {
     if (resumoEncerramentoSemPedido.saldoTotal <= 0.0001) {
-      alert('Nao existe saldo restante para encerrar sem pedido.');
+      avisar.alerta('Nao existe saldo restante para encerrar sem pedido.');
       return;
     }
     setJustificativaEncerrarSemPedido('');
@@ -3041,12 +3497,12 @@ export default function GerenciarCotacaoSolicitacao() {
 
   async function confirmarEncerramentoSemPedido() {
     const justificativa = justificativaEncerrarSemPedido.trim();
-    if (justificativa.length < 10) {
-      alert('Informe uma justificativa com pelo menos 10 caracteres.');
+    if (justificativa.length < MINIMO_JUSTIFICATIVA) {
+      avisar.alerta(`Informe uma justificativa com pelo menos ${MINIMO_JUSTIFICATIVA} caracteres.`);
       return;
     }
     if (!confirmadoEncerrarSemPedido) {
-      alert('Confirme que o saldo restante nao sera comprado.');
+      avisar.alerta('Confirme que o saldo restante nao sera comprado.');
       return;
     }
 
@@ -3067,15 +3523,42 @@ export default function GerenciarCotacaoSolicitacao() {
       setVencedoresSelecionados({});
       await carregarTudo();
       const detalhes = resultado?.encerramento_sem_pedido_resultado || {};
-      alert(`Cotacao encerrada sem gerar novos pedidos. Saldo nao comprado: ${formatNumeroCompra(detalhes.quantidade_nao_comprada)}.`);
+      avisar.sucesso(`Cotacao encerrada sem gerar novos pedidos. Saldo nao comprado: ${formatNumeroCompra(detalhes.quantidade_nao_comprada)}.`);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao encerrar cotacao sem gerar pedido');
+      avisar.erro(error.message || 'Erro ao encerrar cotacao sem gerar pedido');
     } finally {
       setEncerrandoSemPedido(false);
     }
   }
 
+  /*
+    O CAMINHO MAIS CARO DA TELA — a cotação virando PEDIDO DE COMPRA.
+
+    Antes desta migração ele encadeava SEIS caixas do navegador:
+    confirm → prompt → confirm → prompt → confirm (+ alerts de erro). Duas
+    dessas caixas coletavam justificativa OBRIGATÓRIA que vai para a
+    AUDITORIA — comprar acima do solicitado e fechamento parcial — sem
+    nenhuma validação além de `if (!texto)` depois do fato.
+
+    O que mudou, e por quê:
+
+    1. As duas justificativas passaram a usar `pedirJustificativa`, que
+       aplica o MESMO piso do caso menos crítico da tela (10 caracteres +
+       marcação de ciência, botão desabilitado até as duas). O que antes se
+       checava DEPOIS agora se impede ANTES.
+    2. Confirmação e coleta viraram UM passo: o modal já mostra os itens
+       excedentes / o saldo que fica aberto e pede a justificativa na mesma
+       superfície. Seis caixas viraram, no pior caso, dois modais.
+    3. R21 — todo `confirmar()` é DESESTRUTURADO. Este é o handler em que
+       ler o objeto como booleano faria "Cancelar" GERAR OS PEDIDOS.
+    4. R26 — `alocacoes`, `itensExcedentes`, `fechamentoParcial` e as
+       permissões são fixados em `const` ANTES de qualquer `await`, e é
+       exatamente esse conjunto que vai para a API. O modal do sistema não
+       congela a tela: sem essa fixação, mexer numa quantidade enquanto o
+       modal está aberto faria a pessoa autorizar um conjunto e o sistema
+       comprar outro — consentimento válido para uma ação que ninguém deu.
+  */
   async function handleEncerrar() {
     try {
       const itens = comparativo?.itens || [];
@@ -3085,7 +3568,7 @@ export default function GerenciarCotacaoSolicitacao() {
           resposta_item_id: Number(entry.resposta_item_id),
           quantidade_alocada: parseNumeroCompra(entry.quantidade_alocada)
         }));
-      if (!alocacoes.length) { alert('Selecione ao menos um vencedor para encerrar.'); return; }
+      if (!alocacoes.length) { avisar.alerta('Selecione ao menos um vencedor para encerrar.'); return; }
 
       const itensExcedentes = [];
       const errosDisponibilidadeFornecedor = [];
@@ -3120,61 +3603,80 @@ export default function GerenciarCotacaoSolicitacao() {
       });
 
       if (errosDisponibilidadeFornecedor.length) {
-        alert([
-          'A quantidade marcada ultrapassa a disponibilidade informada pelo fornecedor.',
-          '',
-          ...errosDisponibilidadeFornecedor
-        ].join('\n'));
+        avisar.erro(
+          [
+            'A quantidade marcada ultrapassa a disponibilidade informada pelo fornecedor.',
+            ...errosDisponibilidadeFornecedor
+          ].join(' '),
+          'Nao e possivel gerar os pedidos'
+        );
         return;
       }
 
+      // R26: tudo o que a confirmação vai AFIRMAR e o que a ação vai USAR
+      // é fixado aqui, antes do primeiro `await`.
       const fechamentoParcial = saldoTotalDepois > 0.0001;
+      const houveExcedente = itensExcedentes.length > 0;
       let justificativa = '';
       let justificativaExcedente = '';
-      if (itensExcedentes.length) {
-        const confirmadoExcedente = window.confirm([
-          'A compra possui quantidade acima da solicitada.',
-          '',
-          ...itensExcedentes,
-          '',
-          `Excedente total: ${formatNumeroCompra(quantidadeExcedenteTotal)}`,
-          'Deseja continuar e registrar a justificativa para auditoria?'
-        ].join('\n'));
-        if (!confirmadoExcedente) return;
 
-        justificativaExcedente = String(
-          window.prompt('Informe a justificativa obrigatoria para comprar acima da quantidade solicitada:') || ''
-        ).trim();
-        if (!justificativaExcedente) {
-          alert('A justificativa e obrigatoria para comprar acima da quantidade solicitada.');
-          return;
-        }
+      if (houveExcedente) {
+        /*
+          Justificativa de AUDITORIA nº 1 — comprar acima da quantidade
+          solicitada. Um passo só: os itens excedentes ficam à vista
+          enquanto a pessoa escreve o motivo, com o piso de 10 caracteres
+          e a marcação de ciência.
+        */
+        const { ok, texto } = await pedirJustificativa({
+          titulo: 'Comprar acima da quantidade solicitada',
+          mensagem: `A compra desta rodada passa do saldo em ${formatNumeroCompra(quantidadeExcedenteTotal)}. A justificativa abaixo fica registrada na auditoria e nao pode ser desfeita.`,
+          detalhes: itensExcedentes,
+          rotuloCampo: 'Justificativa do excedente',
+          placeholder: 'Explique por que a compra passa da quantidade solicitada.',
+          rotuloCiencia: 'Confirmo a compra acima da quantidade solicitada e que esta justificativa vai para a auditoria.',
+          rotuloConfirmar: 'Registrar e continuar',
+          tom: 'warning'
+        });
+        if (!ok) return;
+        justificativaExcedente = texto;
       }
+
       if (fechamentoParcial) {
         if (!podeFecharParcialCotacao) {
-          alert('Seu usuario nao possui permissao para fechar parcialmente a cotacao.');
+          avisar.alerta('Seu usuario nao possui permissao para fechar parcialmente a cotacao.');
           return;
         }
-        const confirmado = window.confirm([
-          'Nem todo o saldo da cotacao foi selecionado.',
-          '',
-          `Saldo atual: ${formatNumeroCompra(saldoTotalAntes)}`,
-          `Saldo que permanecera aberto: ${formatNumeroCompra(saldoTotalDepois)}`,
-          '',
-          'Deseja gerar os pedidos selecionados e manter o restante aberto para uma proxima rodada?'
-        ].join('\n'));
-        if (!confirmado) return;
-
-        justificativa = String(window.prompt('Informe a justificativa obrigatoria do fechamento parcial:') || '').trim();
-        if (!justificativa) {
-          alert('A justificativa e obrigatoria para o fechamento parcial.');
-          return;
-        }
+        /*
+          Justificativa de AUDITORIA nº 2 — fechamento parcial. Mesmo piso.
+        */
+        const { ok, texto } = await pedirJustificativa({
+          titulo: 'Fechar parcialmente a cotacao',
+          mensagem: 'Nem todo o saldo foi selecionado. Os pedidos marcados sao gerados agora e o restante fica aberto para uma proxima rodada.',
+          detalhes: [
+            `Saldo atual: ${formatNumeroCompra(saldoTotalAntes)}`,
+            `Saldo que permanecera aberto: ${formatNumeroCompra(saldoTotalDepois)}`
+          ],
+          rotuloCampo: 'Justificativa do fechamento parcial',
+          placeholder: 'Explique por que a rodada fecha sem consumir todo o saldo.',
+          rotuloCiencia: 'Confirmo o fechamento parcial e que esta justificativa vai para a auditoria.',
+          rotuloConfirmar: 'Gerar pedidos e manter o saldo',
+          tom: 'warning'
+        });
+        if (!ok) return;
+        justificativa = texto;
       } else if (!podeEncerrarCotacao) {
-        alert('A selecao consome todo o saldo e exige permissao para encerrar definitivamente a cotacao.');
+        avisar.alerta('A selecao consome todo o saldo e exige permissao para encerrar definitivamente a cotacao.');
         return;
-      } else if (!window.confirm('Todo o saldo foi selecionado. Confirmar o encerramento definitivo da cotacao e a geracao dos pedidos finais?')) {
-        return;
+      } else {
+        // R21: DESESTRUTURADO. Com `const ok = await confirmar(...)` o objeto
+        // seria sempre truthy e "Cancelar" geraria os pedidos finais.
+        const { ok } = await confirmar({
+          titulo: 'Encerrar a cotacao definitivamente',
+          mensagem: `Todo o saldo foi selecionado. Os pedidos finais serao gerados para ${alocacoes.length} selecao(oes) e a cotacao sera encerrada. Esta acao nao pode ser desfeita.`,
+          rotuloConfirmar: 'Encerrar e gerar pedidos',
+          destrutiva: true
+        });
+        if (!ok) return;
       }
 
       setEncerrando(true);
@@ -3187,8 +3689,8 @@ export default function GerenciarCotacaoSolicitacao() {
           alocacoes,
           fechamento_parcial_confirmado: fechamentoParcial,
           justificativa: fechamentoParcial ? justificativa : null,
-          fechamento_excedente_confirmado: itensExcedentes.length > 0,
-          justificativa_excedente: itensExcedentes.length ? justificativaExcedente : null
+          fechamento_excedente_confirmado: houveExcedente,
+          justificativa_excedente: houveExcedente ? justificativaExcedente : null
         },
         { idempotencyKey: encerramentoIdempotencyRef.current }
       );
@@ -3196,40 +3698,49 @@ export default function GerenciarCotacaoSolicitacao() {
       await carregarTudo();
       const fechamentoResultado = resultado?.fechamento_resultado || {};
       if (fechamentoResultado.final) {
-        alert('Cotacao encerrada e pedidos finais gerados. Abrindo a tela de pedidos.');
+        avisar.sucesso('Cotacao encerrada e pedidos finais gerados. Abrindo a tela de pedidos.');
         navigate('/pedidos-compra');
       } else {
-        alert(`Rodada parcial concluida. Os pedidos selecionados foram fechados e o saldo ${formatNumeroCompra(fechamentoResultado.saldo_restante)} permanece aberto.`);
+        avisar.sucesso(`Rodada parcial concluida. Os pedidos selecionados foram fechados e o saldo ${formatNumeroCompra(fechamentoResultado.saldo_restante)} permanece aberto.`);
       }
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao encerrar cotacao');
+      avisar.erro(error.message || 'Erro ao encerrar cotacao');
     } finally {
       setEncerrando(false);
     }
   }
 
   async function handleRecusarSolicitacao() {
-    const motivo = window.prompt('Informe o motivo da recusa da solicitacao de compra:');
-    if (motivo === null) return;
-
-    const confirmado = window.confirm('Confirmar recusa desta solicitacao de compra?');
-    if (!confirmado) return;
+    /*
+      Eram DUAS caixas do navegador (prompt do motivo + confirm da recusa)
+      para uma decisão só. Viraram um passo: a confirmação já carrega o
+      campo do motivo (`campo` do useConfirmacao) e diz o que vai acontecer.
+      R21: DESESTRUTURADO — objeto é sempre truthy.
+    */
+    const { ok, texto } = await confirmar({
+      titulo: 'Recusar solicitacao de compra',
+      mensagem: `A solicitacao SC-${String(solicitacao?.id || id).padStart(5, '0')} sai do fluxo de compra. Esta acao nao pode ser desfeita.`,
+      rotuloConfirmar: 'Recusar',
+      destrutiva: true,
+      campo: { rotulo: 'Motivo da recusa', obrigatorio: true, multilinha: true }
+    });
+    if (!ok) return;
 
     try {
-      await recusarSolicitacaoCompra(id, { motivo });
+      await recusarSolicitacaoCompra(id, { motivo: texto });
       await carregarTudo();
-      alert('Solicitacao de compra recusada.');
+      avisar.sucesso('Solicitacao de compra recusada.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao recusar solicitacao de compra');
+      avisar.erro(error.message || 'Erro ao recusar solicitacao de compra');
     }
   }
 
   async function handleRegistrarComentarioCotacao() {
     const comentario = comentarioCotacao.trim();
     if (!comentario) {
-      alert('Digite o comentario da cotacao.');
+      avisar.alerta('Digite o comentario da cotacao.');
       return;
     }
 
@@ -3238,25 +3749,31 @@ export default function GerenciarCotacaoSolicitacao() {
       await comentarSolicitacaoCompra(id, { comentario });
       setComentarioCotacao('');
       await carregarTudo();
+      avisar.sucesso('Comentario registrado no historico da solicitacao.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao registrar comentario da cotacao');
+      avisar.erro(error.message || 'Erro ao registrar comentario da cotacao');
     } finally {
       setRegistrandoComentario(false);
     }
   }
 
   if (loading) {
-    return <div className="page solicitacoes-page"><div className="app-empty-card sol-surface-card">Carregando...</div></div>;
+    return (
+      <Pagina>
+        <div className="app-empty-card">Carregando...</div>
+      </Pagina>
+    );
   }
 
   if (!solicitacao) {
     return (
-      <div className="page solicitacoes-page">
-        <div className="app-empty-card sol-surface-card">
+      <Pagina>
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        <div className="app-empty-card">
           {erroCarregamento || 'Solicitacao de compra nao encontrada.'}
         </div>
-      </div>
+      </Pagina>
     );
   }
 
@@ -3281,107 +3798,93 @@ export default function GerenciarCotacaoSolicitacao() {
   // dentro dele (senao o aviso ficaria atras do fundo escuro); fora dele, no
   // topo da pagina.
   const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+  const codigoSolicitacao = `SC-${String(solicitacao.id).padStart(5, '0')}`;
 
   return (
-    <div className="page solicitacoes-page page-compra-nova cotacao-gestao-page">
+    <Pagina className="page-compra-nova cotacao-gestao-page">
       {!cotacaoRespostaInterna && faixaAvisos}
-      {/* Header */}
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">
-              {isAvulsa ? (solicitacao.titulo || 'Cotacao Avulsa') : 'Gestao da Cotacao'}
-            </h1>
-            <p className="page-subtitle">
-              SC-{String(solicitacao.id).padStart(5, '0')}
-              {isAvulsa ? ' - Cotacao Avulsa' : ' - fornecedores, links, respostas e comparativo'}
-              {solicitacao.obra?.nome ? ` - ${solicitacao.obra.nome}` : ''}
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <button type="button" className="btn btn-outline" onClick={() => navigate(`/solicitacoes-compra/${id}`)}>
-              Voltar ao detalhe
-            </button>
-            <button type="button" className="btn btn-outline" onClick={() => navigate('/cotacoes')}>
-              Lista de cotacoes
-            </button>
-            {podeExibirCancelamentoCotacao && (
+      {/*
+        R13/C4: cabeçalho FIXO, com o NOME do registro em destaque e o código
+        como apoio. R11: a seta de voltar é a affordance primária de retorno
+        de uma tela de REGISTRO e fica sempre. C5: um primário sólido
+        ("Abrir PDF"), secundárias em contorno, e a destrutiva APARTADA em
+        vermelho suave — não mais pintada com `text-red-700` à mão.
+        R11/C6: "Lista de cotacoes" era NAVEGAÇÃO vestida de ação na barra;
+        ela sai daqui — o menu, o breadcrumb e o Ctrl+K resolvem, e a seta de
+        voltar já devolve ao detalhe desta solicitação.
+      */}
+      <PageHeader
+        titulo={isAvulsa ? (solicitacao.titulo || 'Cotacao Avulsa') : 'Gestao da Cotacao'}
+        contagem={codigoSolicitacao}
+        descricao={[
+          isAvulsa ? 'Cotacao Avulsa' : 'fornecedores, links, respostas e comparativo',
+          solicitacao.obra?.nome || null
+        ].filter(Boolean).join(' · ')}
+        voltar={{ onClick: () => navigate(`/solicitacoes-compra/${id}`), title: 'Voltar ao detalhe da solicitacao' }}
+        acaoPrincipal={{
+          rotulo: baixando ? 'Abrindo...' : 'Abrir PDF',
+          onClick: handleAbrirPdf,
+          desabilitada: baixando
+        }}
+        destrutiva={podeOperarFluxo ? { rotulo: 'Recusar', onClick: handleRecusarSolicitacao } : undefined}
+        mais={podeExibirCancelamentoCotacao ? [{
+          rotulo: 'Cancelar cotacao',
+          perigosa: true,
+          onClick: () => setModalCancelamentoCotacao(true)
+        }] : []}
+      />
+
+      {/*
+        C2 × B3: a faixa fica com o TOTAL; estes chips carregam o RECORTE
+        (status do fluxo, quantos fornecedores, quantos itens) — cada número
+        responde a uma pergunta diferente.
+      */}
+      <BlocoConteudo>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <PilulaStatus status={solicitacao.status} />
+          <Etiqueta>{solicitacao.fornecedores?.length || 0} fornecedor(es)</Etiqueta>
+          <Etiqueta>{itensCombinados.length} item(ns)</Etiqueta>
+          {solicitacao.necessario_para && (
+            <Etiqueta>Necessario para {fmt(solicitacao.necessario_para)}</Etiqueta>
+          )}
+        </div>
+      </BlocoConteudo>
+
+      {podeOperarFluxo && (
+        <BlocoConteudo
+          titulo="Comentario da cotacao"
+          variante="secundario"
+          descricao="Registre alinhamentos com compras; o texto tambem alimenta o historico da solicitacao da obra."
+        >
+          <div className="grid gap-3 md:grid-cols-2 md:items-end">
+            <textarea
+              className="input"
+              rows={3}
+              aria-label="Comentario da cotacao"
+              value={comentarioCotacao}
+              onChange={(event) => setComentarioCotacao(event.target.value)}
+              placeholder="Ex.: fornecedor pediu prazo adicional, compra dividida por quantidade, ajuste combinado..."
+            />
+            <div className="app-page-actions justify-end">
               <button
                 type="button"
-                className="btn btn-outline text-red-700 hover:border-red-200 hover:bg-red-50"
-                onClick={() => setModalCancelamentoCotacao(true)}
+                className="btn btn-primary"
+                onClick={handleRegistrarComentarioCotacao}
+                disabled={registrandoComentario || !comentarioCotacao.trim()}
               >
-                Cancelar cotacao
+                {registrandoComentario ? 'Registrando...' : 'Registrar comentario'}
               </button>
-            )}
-            {podeOperarFluxo && (
-              <button type="button" className="btn btn-outline text-red-700 hover:border-red-200 hover:bg-red-50" onClick={handleRecusarSolicitacao}>
-                Recusar
-              </button>
-            )}
-            <button type="button" className="btn btn-primary" onClick={handleAbrirPdf} disabled={baixando}>
-              {baixando ? 'Abrindo...' : 'Abrir PDF'}
-            </button>
+            </div>
           </div>
-        </div>
+        </BlocoConteudo>
+      )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-          <span className={clsStatus(solicitacao.status)}>{fmtStatus(solicitacao.status)}</span>
-          <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
-            {solicitacao.fornecedores?.length || 0} fornecedor(es)
-          </span>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-            {itensCombinados.length} item(ns)
-          </span>
-          {solicitacao.necessario_para && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">
-              Necessario para {fmt(solicitacao.necessario_para)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-4">
-        <div className="grid gap-3">
-          {podeOperarFluxo && (
-            <div className="card sol-surface-card">
-              <div className="card-header">
-                <h2 className="font-semibold">Comentario da cotacao</h2>
-                <p className="mt-1 text-sm text-[var(--c-muted)]">
-                  Registre alinhamentos com compras; o texto tambem alimenta o historico da solicitacao da obra.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-                <textarea
-                  className="input min-h-[92px]"
-                  value={comentarioCotacao}
-                  onChange={(event) => setComentarioCotacao(event.target.value)}
-                  placeholder="Ex.: fornecedor pediu prazo adicional, compra dividida por quantidade, ajuste combinado..."
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleRegistrarComentarioCotacao}
-                  disabled={registrandoComentario || !comentarioCotacao.trim()}
-                >
-                  {registrandoComentario ? 'Registrando...' : 'Registrar comentario'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Fornecedores vinculados + envio */}
-          <div className="card sol-surface-card">
-            <div className="card-header flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">Fornecedores e links de cotacao</h2>
-                <p className="mt-1 text-sm text-[var(--c-muted)]">Pesquise fornecedores cadastrados, faca cadastro rapido e gere os links do portal.</p>
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                {solicitacao.fornecedores?.length || 0} vinculado(s)
-              </span>
-            </div>
-
+      {/* Fornecedores vinculados + envio */}
+      <BlocoConteudo
+        titulo="Fornecedores e links de cotacao"
+        contagem={`${solicitacao.fornecedores?.length || 0} vinculado(s)`}
+        descricao="Pesquise fornecedores cadastrados, faca cadastro rapido e gere os links do portal."
+      >
             {/* Componente de envio para fornecedores */}
             <SecaoEnvioFornecedores
               solicitacao={solicitacao}
@@ -3460,32 +3963,10 @@ export default function GerenciarCotacaoSolicitacao() {
               itensCombinados={itensCombinados}
             />
 
-            {Array.isArray(solicitacao.logs) && solicitacao.logs.some((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS') && (
-              <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-slate-50/70 p-4 dark:bg-slate-950/55">
-                <div className="mb-3">
-                  <h2 className="font-semibold">Auditoria de respostas internas</h2>
-                </div>
-                <div className="app-list-stack">
-                  {solicitacao.logs
-                    .filter((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS')
-                    .map((log) => (
-                      <div key={log.id} className="rounded-lg border border-[var(--c-border)] px-3 py-2 text-sm">
-                        <div className="font-semibold text-[var(--c-text)]">
-                          {log.usuario?.nome || 'Usuario interno'} respondeu pelo fornecedor {log.fornecedor?.nome || '-'}
-                        </div>
-                        <div className="text-xs text-[var(--c-muted)]">
-                          {fmt(log.createdAt)} - {log.descricao}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-
             {/* Lista de fornecedores vinculados */}
             {solicitacao.fornecedores?.length > 0 && (
               <div className="mt-4 min-w-0 max-w-full">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--c-text)]">Cotações enviadas</h3>
+                <h3 className="mb-2 text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Cotações enviadas</h3>
                 <TabelaPadrao
                   colunas={[
                     {
@@ -3504,19 +3985,23 @@ export default function GerenciarCotacaoSolicitacao() {
                         return (
                           <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
-                              <span className="truncate font-semibold text-[var(--c-text)]">
+                              <span className="truncate font-semibold" style={{ color: 'var(--c-text)' }}>
                                 {cf.fornecedor?.nome || '-'}
                               </span>
                               {possuiRespostaArquivo && (
-                                <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
-                                  Arquivo
-                                </span>
+                                <Etiqueta tom="info" className="shrink-0">Arquivo</Etiqueta>
                               )}
                             </div>
+                            {/*
+                              Link para o REGISTRO RELACIONADO fica NO CORPO,
+                              junto do dado que o origina (decisão de 04/09) —
+                              nunca na barra de ações. R10: era `text-[10px]`.
+                            */}
                             {pedidoFornecedor?.id && (
                               <button
                                 type="button"
-                                className="block max-w-full truncate text-left text-[10px] font-semibold text-emerald-700 underline"
+                                className="block max-w-full truncate text-left text-xs font-semibold underline"
+                                style={{ color: 'var(--sem-success)' }}
                                 onClick={() => navigate(`/pedidos-compra/${pedidoFornecedor.id}`)}
                                 title={`PC-${String(pedidoFornecedor.id).padStart(5, '0')} - ${fmtMoeda(pedidoFornecedor.valor_total)}`}
                               >
@@ -3551,11 +4036,7 @@ export default function GerenciarCotacaoSolicitacao() {
                       id: 'status',
                       titulo: 'Status',
                       tipo: 'status',
-                      render: (cf) => (
-                        <span className={`${clsStatus(cf.status)} px-2 py-1 text-[10px]`}>
-                          {fmtStatus(cf.status)}
-                        </span>
-                      )
+                      render: (cf) => <PilulaStatus status={cf.status} />
                     },
                     {
                       id: 'respondido_em',
@@ -3602,11 +4083,15 @@ export default function GerenciarCotacaoSolicitacao() {
                       <>
                         <CotacaoActionButton
                           type="button"
-                          onClick={() => copiarTexto(publicUrl)}
+                          onClick={async () => {
+                            const copiou = await copiarTexto(publicUrl);
+                            if (copiou) avisar.sucesso('Link da cotacao copiado.');
+                            else avisar.erro('Nao foi possivel copiar o link automaticamente.');
+                          }}
                           title="Copiar link"
                           aria-label="Copiar link"
                         >
-                          <HiOutlineClipboardDocument className="h-3.5 w-3.5" />
+                          <HiOutlineClipboardDocument />
                         </CotacaoActionButton>
                         <CotacaoActionButton
                           type="button"
@@ -3614,7 +4099,7 @@ export default function GerenciarCotacaoSolicitacao() {
                           title="Abrir portal"
                           aria-label="Abrir portal"
                         >
-                          <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" />
+                          <HiOutlineArrowTopRightOnSquare />
                         </CotacaoActionButton>
                         <CotacaoActionButton
                           as="a"
@@ -3625,7 +4110,7 @@ export default function GerenciarCotacaoSolicitacao() {
                           title="Baixar PDF"
                           aria-label="Baixar PDF"
                         >
-                          <HiOutlineArrowDownTray className="h-3.5 w-3.5" />
+                          <HiOutlineArrowDownTray />
                         </CotacaoActionButton>
                         {linkWa ? (
                           <CotacaoActionButton
@@ -3636,11 +4121,11 @@ export default function GerenciarCotacaoSolicitacao() {
                             title="Enviar WhatsApp"
                             aria-label="Enviar WhatsApp"
                           >
-                            <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
+                            <HiOutlineChatBubbleLeftRight />
                           </CotacaoActionButton>
                         ) : (
                           <CotacaoActionButton type="button" disabled title="WhatsApp indisponivel" aria-label="WhatsApp indisponivel">
-                            <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
+                            <HiOutlineChatBubbleLeftRight />
                           </CotacaoActionButton>
                         )}
                         <CotacaoActionButton
@@ -3650,7 +4135,7 @@ export default function GerenciarCotacaoSolicitacao() {
                           title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
                           aria-label="Editar resposta internamente"
                         >
-                          <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+                          <HiOutlinePencilSquare />
                         </CotacaoActionButton>
                         <CotacaoActionButton
                           type="button"
@@ -3660,9 +4145,9 @@ export default function GerenciarCotacaoSolicitacao() {
                             ? 'Registrar novo preco e prazo deste fornecedor para o saldo'
                             : 'Nova oferta disponivel apos um fechamento parcial com este fornecedor'}
                           aria-label="Registrar nova oferta para o saldo"
-                          className={podeRegistrarNovaOferta ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}
+                          style={podeRegistrarNovaOferta ? estiloTom('info') : undefined}
                         >
-                          <HiOutlinePlusCircle className="h-4 w-4" />
+                          <HiOutlinePlusCircle />
                         </CotacaoActionButton>
                         <CotacaoActionButton
                           type="button"
@@ -3671,7 +4156,7 @@ export default function GerenciarCotacaoSolicitacao() {
                           title={podeReabrirCotacao ? 'Reabrir cotacao' : 'Reabertura indisponivel'}
                           aria-label="Reabrir cotacao"
                         >
-                          <HiOutlineArrowPath className={`h-3.5 w-3.5 ${reabrindoCotacaoId === cotacaoFornecedor.id ? 'animate-spin' : ''}`} />
+                          <HiOutlineArrowPath className={reabrindoCotacaoId === cotacaoFornecedor.id ? 'animate-spin' : undefined} />
                         </CotacaoActionButton>
                       </>
                     );
@@ -3679,28 +4164,57 @@ export default function GerenciarCotacaoSolicitacao() {
                 />
               </div>
             )}
+      </BlocoConteudo>
+
+      {/*
+        Histórico/auditoria por último e RECOLHIDO (regra 1 de organização):
+        dado que gera ação vem primeiro; registro fica ao alcance, não à
+        frente. O bloco só existe quando há registro.
+      */}
+      {Array.isArray(solicitacao.logs) && solicitacao.logs.some((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS') && (
+        <BlocoConteudo
+          titulo="Auditoria de respostas internas"
+          variante="secundario"
+          recolhivel
+          recolhidoPadrao
+          contagem={`${solicitacao.logs.filter((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS').length} registro(s)`}
+        >
+          <div className="app-list-stack">
+            {solicitacao.logs
+              .filter((log) => log.tipo_acao === 'RESPOSTA_INTERNA_COMPRAS')
+              .map((log) => (
+                <div key={log.id} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--c-border)' }}>
+                  <div className="font-semibold" style={{ color: 'var(--c-text)' }}>
+                    {log.usuario?.nome || 'Usuario interno'} respondeu pelo fornecedor {log.fornecedor?.nome || '-'}
+                  </div>
+                  <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                    {fmt(log.createdAt)} - {log.descricao}
+                  </div>
+                </div>
+              ))}
           </div>
+        </BlocoConteudo>
+      )}
 
-          {/* Comparativo */}
-          <SecaoComparativo
-            comparativo={comparativo}
-            solicitacao={solicitacao}
-            podeComprar={podeOperarFluxo}
-            podeEncerrar={(podeFecharParcialCotacao || podeEncerrarCotacao) && !fluxoTerminal}
-            podeEncerrarSemPedido={podeEncerrarSemPedidoCotacao && !fluxoTerminal && cotacoesAtivas.length > 0 && resumoEncerramentoSemPedido.saldoTotal > 0.0001}
-            podeEditarResposta={podeEditarRespostas}
-            vencedoresSelecionados={vencedoresSelecionados}
-            onVencedorChange={handleVencedorChange}
-            onEditarRespostaFornecedor={abrirRespostaInternaPorId}
-            onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}
-            onEncerrar={handleEncerrar}
-            onEncerrarSemPedido={abrirEncerramentoSemPedido}
-            encerrando={encerrando}
-            encerrandoSemPedido={encerrandoSemPedido}
-          />
-        </div>
-      </div>
+      {/* Comparativo */}
+      <SecaoComparativo
+        comparativo={comparativo}
+        solicitacao={solicitacao}
+        podeComprar={podeOperarFluxo}
+        podeEncerrar={(podeFecharParcialCotacao || podeEncerrarCotacao) && !fluxoTerminal}
+        podeEncerrarSemPedido={podeEncerrarSemPedidoCotacao && !fluxoTerminal && cotacoesAtivas.length > 0 && resumoEncerramentoSemPedido.saldoTotal > 0.0001}
+        podeEditarResposta={podeEditarRespostas}
+        vencedoresSelecionados={vencedoresSelecionados}
+        onVencedorChange={handleVencedorChange}
+        onEditarRespostaFornecedor={abrirRespostaInternaPorId}
+        onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}
+        onEncerrar={handleEncerrar}
+        onEncerrarSemPedido={abrirEncerramentoSemPedido}
+        encerrando={encerrando}
+        encerrandoSemPedido={encerrandoSemPedido}
+      />
 
+      {/* CompraPreviewModal e de outro agente: a chamada fica intacta. */}
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
       <ModalEncerrarSemPedido
         aberto={modalEncerrarSemPedido}
@@ -3735,23 +4249,25 @@ export default function GerenciarCotacaoSolicitacao() {
       {modalCancelamentoCotacao && (
         <ModalPortal onClose={() => setModalCancelamentoCotacao(false)} closeOnEscape={!cancelandoCotacao}>
           <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cancelar-cotacao-titulo">
-            <div className="app-modal-surface app-modal-surface--compact p-5">
-            <h2 id="cancelar-cotacao-titulo" className="text-lg font-semibold text-[var(--c-text)]">Cancelar cotacao</h2>
-            <p className="mt-1 text-sm text-[var(--c-muted)]">
+            <div className="app-modal-surface app-modal-surface--compact p-4">
+            <h2 id="cancelar-cotacao-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Cancelar cotacao</h2>
+            <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
               Os links serao bloqueados, as respostas deixarao de participar do comparativo e a solicitacao voltara para liberada para compra. O historico sera preservado.
             </p>
-            <label className="mt-4 block">
-              <span className="app-filter-label">Motivo do cancelamento *</span>
-              <textarea
-                className="input mt-1 min-h-[96px] w-full"
-                value={motivoCancelamentoCotacao}
-                onChange={(event) => setMotivoCancelamentoCotacao(event.target.value)}
-                placeholder="Explique por que a cotacao esta sendo cancelada."
-              />
-            </label>
-            <div className="mt-5 flex justify-end gap-2">
+            <FormSecao colunas={2}>
+              <CampoForm label="Motivo do cancelamento" obrigatorio tipo="observacao">
+                <textarea
+                  className="input"
+                  rows={4}
+                  value={motivoCancelamentoCotacao}
+                  onChange={(event) => setMotivoCancelamentoCotacao(event.target.value)}
+                  placeholder="Explique por que a cotacao esta sendo cancelada."
+                />
+              </CampoForm>
+            </FormSecao>
+            <div className="app-page-actions justify-end">
               <button type="button" className="btn btn-outline" onClick={() => setModalCancelamentoCotacao(false)} disabled={cancelandoCotacao}>Voltar</button>
-              <button type="button" className="btn btn-primary" onClick={handleCancelarCotacao} disabled={cancelandoCotacao || !motivoCancelamentoCotacao.trim()}>
+              <button type="button" className="btn btn-danger" onClick={handleCancelarCotacao} disabled={cancelandoCotacao || !motivoCancelamentoCotacao.trim()}>
                 {cancelandoCotacao ? 'Cancelando...' : 'Confirmar cancelamento'}
               </button>
             </div>
@@ -3759,6 +4275,10 @@ export default function GerenciarCotacaoSolicitacao() {
           </div>
         </ModalPortal>
       )}
-    </div>
+
+      {/* R21: os dois modais que substituem as caixas do navegador. */}
+      {elementoConfirmacao}
+      {elementoJustificativa}
+    </Pagina>
   );
 }

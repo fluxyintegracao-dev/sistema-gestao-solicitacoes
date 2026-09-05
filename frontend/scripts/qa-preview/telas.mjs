@@ -1577,6 +1577,132 @@ export const TELAS = [
     resolver: 'solicitacaoDetalhe',
     tipo: 'detalhe'
   },
+  // ---- Rodada 7 (final): nucleo de Compras, relatorios restantes e avulsas (05/09) ----
+  {
+    id: 'dashboard',
+    arquivo: 'src/pages/Dashboard.jsx',
+    rota: '/',
+    tipo: 'painel'
+  },
+  {
+    id: 'treinamento',
+    arquivo: 'src/pages/Treinamento.jsx',
+    rota: '/treinamento',
+    tipo: 'listagem'
+  },
+  {
+    id: 'prioridades-diretoria',
+    arquivo: 'src/pages/PrioridadesDiretoria.jsx',
+    rota: '/prioridades-diretoria',
+    tipo: 'listagem'
+  },
+  {
+    id: 'perfil',
+    arquivo: 'src/pages/Perfil.jsx',
+    rota: '/perfil',
+    tipo: 'form'
+  },
+  {
+    id: 'arquivos-modelos',
+    arquivo: 'src/pages/ArquivosModelos.jsx',
+    rota: '/arquivos-modelos',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar arquivo modelo (R9 revista em 04/09)"
+  },
+  {
+    id: 'solicitacoes-rel-operacional',
+    arquivo: 'src/pages/SolicitacoesRelatorioOperacional.jsx',
+    rota: '/solicitacoes/relatorios/operacional',
+    tipo: 'painel'
+  },
+  {
+    id: 'contratos-rel-operacional',
+    arquivo: 'src/pages/ContratosRelatorioOperacional.jsx',
+    rota: '/contratos/relatorios/operacional',
+    tipo: 'painel'
+  },
+  {
+    id: 'comercial-rel-operacional',
+    arquivo: 'src/pages/ComercialRelatorioOperacional.jsx',
+    rota: '/comercial/relatorios/operacional',
+    tipo: 'painel'
+  },
+  {
+    id: 'solicitacoes-compra',
+    arquivo: 'src/modules/solicitacao-compra/pages/SolicitacoesCompra.jsx',
+    rota: '/solicitacoes-compra',
+    tipo: 'listagem'
+  },
+  {
+    id: 'cotacoes',
+    arquivo: 'src/modules/solicitacao-compra/pages/ListaCotacoes.jsx',
+    rota: '/cotacoes',
+    tipo: 'listagem'
+  },
+  {
+    id: 'pedidos-compra',
+    arquivo: 'src/modules/solicitacao-compra/pages/PedidosCompra.jsx',
+    rota: '/pedidos-compra',
+    tipo: 'listagem'
+  },
+  {
+    id: 'compras-delegacao',
+    arquivo: 'src/modules/solicitacao-compra/pages/ComprasDelegacao.jsx',
+    rota: '/compras/delegacao',
+    tipo: 'painel'
+  },
+  {
+    id: 'gestao-fornecedores',
+    arquivo: 'src/modules/solicitacao-compra/pages/GestaoFornecedores.jsx',
+    rota: '/gestao-fornecedores',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar fornecedor (R9 revista em 04/09)"
+  },
+  {
+    id: 'gestao-insumos',
+    arquivo: 'src/modules/solicitacao-compra/pages/GestaoInsumos.jsx',
+    rota: '/gestao-insumos',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar insumo (R9 revista em 04/09)"
+  },
+  {
+    id: 'nova-solicitacao-compra',
+    arquivo: 'src/modules/solicitacao-compra/pages/NovaSolicitacaoCompra.jsx',
+    rota: '/solicitacoes-compra/nova',
+    tipo: 'form',
+    cadastroInline: "a rota existe PARA abrir solicitacao de compra — tirando o formulario nao sobra tela (R9)"
+  },
+  {
+    id: 'nova-compra-direta',
+    arquivo: 'src/modules/solicitacao-compra/pages/NovaCompraDireta.jsx',
+    rota: '/solicitacoes-compra-direta/nova',
+    tipo: 'form',
+    cadastroInline: "mesma tela do pai com a flag modoCompraDireta; a rota existe PARA cadastrar (R9)"
+  },
+  {
+    id: 'revisar-solicitacao-compra',
+    arquivo: 'src/modules/solicitacao-compra/pages/RevisarSolicitacaoCompra.jsx',
+    rota: '/solicitacoes-compra/revisar',
+    tipo: 'detalhe'
+  },
+  {
+    id: 'revisar-compra-direta',
+    arquivo: 'src/modules/solicitacao-compra/pages/RevisarCompraDireta.jsx',
+    rota: '/solicitacoes-compra-direta/revisar',
+    tipo: 'detalhe'
+  },
+  {
+    id: 'solicitacao-compra-detalhe',
+    arquivo: 'src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx',
+    resolver: 'solicitacaoCompraDetalhe',
+    tipo: 'detalhe'
+  },
+  {
+    id: 'gerenciar-cotacao',
+    arquivo: 'src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx',
+    resolver: 'gerenciarCotacao',
+    tipo: 'mista'
+  },
 ];
 
 /** Itens da DoD, na ordem da matriz. */

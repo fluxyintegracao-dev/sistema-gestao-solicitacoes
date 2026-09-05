@@ -3,27 +3,13 @@
   "criado_em": "2026-09-03",
   "porque": "Telas que montam listas de destino à mão, sem passar pelo navigationConfig. Achado da leva das telas compartilhadas: o título ficava fora da D7 porque ninguém sabia que a lista existia, a permissão era reavaliada com regra própria, e destino renomeado na fonte única continuava velho ali. O número aqui SÓ PODE DESCER: arquivo novo ou contagem que sobe REPROVA. Cada leva que passar por um destes zera o seu.",
   "arquivos": {
-    "src/modules/crm/pages/CrmCarteira.jsx": 3,
-    "src/modules/crm/pages/CrmDashboardDistribuicao.jsx": 3,
-    "src/modules/crm/pages/CrmDashboardGerencial.jsx": 4,
-    "src/modules/crm/pages/CrmDashboardSla.jsx": 4,
-    "src/modules/crm/pages/CrmKanban.jsx": 3,
-    "src/modules/crm/pages/CrmLeads.jsx": 3,
-    "src/modules/fiscal/pages/FiscalDashboard.jsx": 3,
-    "src/modules/fiscal/pages/FiscalOperationalReport.jsx": 3,
-    "src/modules/provisionamento-financeiro/pages/ProvisionamentoRelatorioOperacional.jsx": 3,
-    "src/pages/ComercialRelatorioOperacional.jsx": 3,
     "src/pages/ComprasRelatorioComprasDiretas.jsx": 3,
     "src/pages/ComprasRelatorioComprasFornecedor.jsx": 3,
     "src/pages/ComprasRelatorioDemandaPedidos.jsx": 3,
     "src/pages/Configuracoes.jsx": 45,
-    "src/pages/CrmRelatorioExecutivo.jsx": 3,
-    "src/pages/Dashboard.jsx": 3,
-    "src/pages/FinanceiroConciliacao.jsx": 3,
     "src/pages/FinanceiroTituloDetalhe.jsx": 4,
     "src/pages/FinanceiroTitulos.jsx": 3,
-    "src/pages/ModuloRelatorios.jsx": 54,
-    "src/pages/SolicitacoesRelatorioOperacional.jsx": 3
+    "src/pages/ModuloRelatorios.jsx": 54
   },
   "excecao_2026_09_05": "O numero deste arquivo SUBIU de 43 para 45, por decisao do responsavel, e e a unica vez que este trinco subiu. As duas portas novas (usuarios-permissoes-rh-dp e configuracoes-contrato-alertas) foram decisao dele na rodada 1: telas que existiam, tinham rota e guarda de permissao, e nao tinham link em lugar nenhum. Enquanto o hub de Configuracoes renderiza os destinos A MAO, toda porta nova aumenta a divida da fonte unica — ou seja, cada decisao de tornar uma tela alcancavel e punida por uma limitacao de arquitetura. A divida e antiga (43), nao das duas. O conserto de raiz e fazer o hub renderizar a partir do navigationConfig, e isso virou leva propria de componente."
 }

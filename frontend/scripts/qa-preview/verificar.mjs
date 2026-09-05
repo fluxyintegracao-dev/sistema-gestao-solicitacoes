@@ -276,6 +276,16 @@ const RESOLVEDORES = {
   async solicitacaoDetalhe(page) {
     return RESOLVEDORES.abrirPiorRegistro(page, '/solicitacoes', /\/solicitacoes\/\d+/);
   },
+  async solicitacaoCompraDetalhe(page) {
+    return RESOLVEDORES.abrirPiorRegistro(page, '/solicitacoes-compra', /\/solicitacoes-compra\/\d+$/);
+  },
+  /* A cotacao e uma ABA do detalhe da compra: chega-se por /:id/cotacao. */
+  async gerenciarCotacao(page) {
+    const rota = await RESOLVEDORES.abrirPiorRegistro(page, '/solicitacoes-compra', /\/solicitacoes-compra\/\d+$/);
+    const destino = `${rota}/cotacao`;
+    await page.goto(`${BASE}${destino}`, { waitUntil: 'domcontentloaded' });
+    return destino;
+  },
   /**
    * Abre o LEAD com mais texto na linha (pior caso de largura — T6/T7).
    *

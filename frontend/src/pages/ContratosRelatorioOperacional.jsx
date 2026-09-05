@@ -1,8 +1,44 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { TabelaPadrao, CelulaDupla } from '../components/padrao';
+import {
+  BarraFiltros,
+  BlocoConteudo,
+  CelulaDupla,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao
+} from '../components/padrao';
 import { getObras } from '../services/obras';
 import { getContratosRelatorioOperacional } from '../services/contratos';
+
+/*
+  LIMITES REAIS DO SERVIDOR — o backend TRUNCA duas listas deste relatório
+  (backend/src/controllers/ContratoController.js):
+    por_referencia        → 50 primeiras (ordenadas por valor)
+    pendencias_cadastrais → 80 primeiras
+  Antes desta migração os títulos "Contratos por referencia" e "Pendencias
+  cadastrais" prometiam o CONJUNTO e o contador ao lado mostrava só o que
+  tinha chegado. Com 51 referências o rótulo dizia "50 linha(s)" e a pessoa
+  lia isso como "existem 50". Os limites viram texto na tela (`descricao`) e
+  a contagem passa a dizer de que recorte ela fala.
+*/
+const LIMITE_REFERENCIAS = 50;
+const LIMITE_PENDENCIAS = 80;
+
+const FILTROS_VAZIOS = {
+  obra_id: '',
+  ref: '',
+  codigo: '',
+  ativo: '',
+  data_inicio: '',
+  data_fim: ''
+};
+
+const STATUS_CONTRATO = [
+  { valor: 'true', rotulo: 'Ativos' },
+  { valor: 'false', rotulo: 'Inativos' }
+];
 
 function money(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -21,32 +57,18 @@ function monthLabel(value) {
   return `${month}/${year}`;
 }
 
-function Card({ label, value, hint, tone = 'blue' }) {
-  const tones = {
-    blue: 'border-blue-200 bg-blue-50/70 text-blue-900',
-    green: 'border-emerald-200 bg-emerald-50/70 text-emerald-900',
-    amber: 'border-amber-200 bg-amber-50/70 text-amber-900',
-    red: 'border-rose-200 bg-rose-50/70 text-rose-900',
-    slate: 'border-slate-200 bg-slate-50/80 text-slate-950'
-  };
-
+/**
+ * Bloco de agrupamento (empresa / obra / referência / status).
+ * `descricao` e `contagem` moram no BlocoConteudo (R5): o texto de apoio
+ * ancora no bloco a que se refere, não solto em `page-subtitle`.
+ */
+function BlocoGrupo({ titulo, descricao, rows, storageKey, labelHeader = 'Descrição', formatLabel }) {
   return (
-    <div className={`rounded-lg border p-4 shadow-sm ${tones[tone] || tones.blue}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
-    </div>
-  );
-}
-
-function GroupTable({ title, rows, storageKey, labelHeader = 'Descricao', formatLabel }) {
-  return (
-    <section className="card sol-surface-card app-table-shell">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-slate-950">{title}</h2>
-        <span className="text-xs text-slate-500">{number(rows.length)} linha(s)</span>
-      </div>
-
+    <BlocoConteudo
+      titulo={titulo}
+      contagem={`${number(rows.length)} linha(s)`}
+      descricao={descricao}
+    >
       <TabelaPadrao
         colunas={[
           {
@@ -71,22 +93,15 @@ function GroupTable({ title, rows, storageKey, labelHeader = 'Descricao', format
         itens={rows}
         getId={(row) => `${row.label}-${rows.indexOf(row)}`}
         storageKey={storageKey}
-        rotuloRolagem={title}
+        rotuloRolagem={titulo}
         vazio="Nenhum dado encontrado para os filtros."
       />
-    </section>
+    </BlocoConteudo>
   );
 }
 
 export default function ContratosRelatorioOperacional() {
-  const [filtros, setFiltros] = useState({
-    obra_id: '',
-    ref: '',
-    codigo: '',
-    ativo: '',
-    data_inicio: '',
-    data_fim: ''
-  });
+  const [filtros, setFiltros] = useState(FILTROS_VAZIOS);
   const [obras, setObras] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -100,7 +115,7 @@ export default function ContratosRelatorioOperacional() {
       setData(response);
     } catch (error) {
       console.error(error);
-      setErro(error?.message || 'Erro ao carregar relatorio de contratos.');
+      setErro(error?.message || 'Erro ao carregar relatório de contratos.');
     } finally {
       setLoading(false);
     }
@@ -115,216 +130,275 @@ export default function ContratosRelatorioOperacional() {
   }, []);
 
   const resumo = data?.resumo || {};
-  const maxMes = useMemo(() => {
-    return Math.max(...(data?.por_mes_cadastro || []).map((item) => Number(item.total || 0)), 1);
-  }, [data]);
+  const porMes = useMemo(() => (Array.isArray(data?.por_mes_cadastro) ? data.por_mes_cadastro : []), [data]);
+  const maxMes = useMemo(
+    () => Math.max(...porMes.map((item) => Number(item.total || 0)), 0),
+    [porMes]
+  );
+  const pendencias = useMemo(
+    () => (Array.isArray(data?.pendencias_cadastrais) ? data.pendencias_cadastrais : []),
+    [data]
+  );
 
-  function onChange(event) {
-    const { name, value } = event.target;
-    setFiltros((prev) => ({ ...prev, [name]: value }));
+  /*
+    R12 — os recortes ENUMERÁVEIS viram marcação com etiqueta removível.
+    `unico: true` nas duas: o serviço (`getContratosRelatorioOperacional`)
+    manda `obra_id` e `ativo` como UM valor cada; marcar dois com caixa
+    quadrada mostraria duas etiquetas e mandaria uma só — capacidade
+    aparente sem efeito (a família da R15). Marca redonda, marcar outro
+    substitui.
+  */
+  const ativos = useMemo(() => ({
+    obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : []),
+    ativo: new Set(filtros.ativo ? [String(filtros.ativo)] : [])
+  }), [filtros]);
+
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra/Centro',
+      unico: true,
+      opcoes: obras.map((obra) => ({
+        valor: String(obra.id),
+        rotulo: `${obra.codigo ? `${obra.codigo} - ` : ''}${obra.nome}`
+      }))
+    },
+    { id: 'ativo', rotulo: 'Status', unico: true, opcoes: STATUS_CONTRATO }
+  ], [obras]);
+
+  function atualizarCampo(campo, valor) {
+    setFiltros((atual) => ({ ...atual, [campo]: valor }));
   }
 
-  async function onSubmit(event) {
-    event.preventDefault();
+  function alternarFiltro(dimensao, valor) {
+    setFiltros((atual) => ({
+      ...atual,
+      [dimensao]: String(atual[dimensao]) === String(valor) ? '' : String(valor)
+    }));
+  }
+
+  async function aplicarFiltros() {
     await carregar(filtros);
   }
 
   async function limpar() {
-    const limpo = { obra_id: '', ref: '', codigo: '', ativo: '', data_inicio: '', data_fim: '' };
-    setFiltros(limpo);
-    await carregar(limpo);
+    setFiltros(FILTROS_VAZIOS);
+    await carregar(FILTROS_VAZIOS);
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="sol-page-header">
-        <div>
-          <p className="eyebrow">Contratos / Relatorios</p>
-          <h1 className="page-title">Painel operacional de contratos</h1>
-          <p className="page-subtitle">
-            Valores, saldos, anexos e distribuicao dos contratos operacionais por obra, empresa do grupo e referencia.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/contratos/relatorios" className="btn btn-outline">
-            Voltar aos relatorios
-          </Link>
-          <Link to="/gestao-contratos" className="btn btn-primary">
-            Gestao de contratos
-          </Link>
-        </div>
-      </div>
+    <Pagina>
+      {/*
+        R23 — EXCEÇÃO DE CONSULTA CARA, medida nesta tela e não copiada da
+        irmã: são CINCO recortes que a pessoa combina (obra, status, código,
+        referência e o intervalo de datas), acima do gatilho de 4+ da regra.
+        Por isso o recorte fica em RASCUNHO até o clique, o botão diz o que
+        faz ("Atualizar relatório", não "Aplicar filtros") e a descrição
+        avisa — sem o aviso a etiqueta aparece ao marcar e é lida como
+        filtro já aplicado, o que seria mentira (F3).
 
-      <form onSubmit={onSubmit} className="card sol-surface-card rounded-xl p-4 md:p-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <label className="grid gap-1 text-sm">
-            <span>Obra/Centro</span>
-            <select name="obra_id" value={filtros.obra_id} onChange={onChange} className="input">
-              <option value="">Todos</option>
-              {obras.map((obra) => (
-                <option key={obra.id} value={obra.id}>
-                  {obra.codigo ? `${obra.codigo} - ` : ''}{obra.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+        R11: "Voltar aos relatórios" e "Gestão de contratos" saíram — eram
+        navegação para telas irmãs disfarçada de ação; menu, breadcrumb e
+        Ctrl+K resolvem. Sobram as duas AÇÕES de verdade da tela.
+      */}
+      <PageHeader
+        titulo="Painel operacional de contratos"
+        descricao="Marque o recorte e clique em Atualizar relatório: com cinco filtros combináveis, a consulta só roda no clique."
+        acaoPrincipal={{
+          rotulo: loading ? 'Atualizando...' : 'Atualizar relatório',
+          onClick: aplicarFiltros,
+          desabilitada: loading
+        }}
+        secundarias={[{ rotulo: 'Limpar', onClick: limpar, desabilitada: loading }]}
+      />
 
-          <label className="grid gap-1 text-sm">
-            <span>Status</span>
-            <select name="ativo" value={filtros.ativo} onChange={onChange} className="input">
-              <option value="">Todos</option>
-              <option value="true">Ativos</option>
-              <option value="false">Inativos</option>
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span>Codigo</span>
-            <input name="codigo" value={filtros.codigo} onChange={onChange} className="input" />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span>Referencia</span>
-            <input name="ref" value={filtros.ref} onChange={onChange} className="input" />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span>Data inicial</span>
-            <input name="data_inicio" type="date" value={filtros.data_inicio} onChange={onChange} className="input" />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            <span>Data final</span>
-            <input name="data_fim" type="date" value={filtros.data_fim} onChange={onChange} className="input" />
-          </label>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Atualizando...' : 'Atualizar relatorio'}
-          </button>
-          <button type="button" className="btn btn-outline" onClick={limpar} disabled={loading}>
-            Limpar
-          </button>
-        </div>
-      </form>
-
-      {erro && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
-          {erro}
-        </div>
-      )}
-
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Card label="Contratos" value={number(resumo.total_contratos)} hint={`${number(resumo.ativos)} ativo(s)`} />
-        <Card label="Valor contratado" value={money(resumo.valor_total)} hint="Valor cadastrado nos contratos" tone="green" />
-        <Card label="A pagar" value={money(resumo.total_a_pagar)} hint="Solicitado menos pago no modulo" tone="amber" />
-        <Card label="Sem anexo" value={number(resumo.sem_anexo)} hint="Pendencia documental explicita" tone={resumo.sem_anexo > 0 ? 'red' : 'slate'} />
-        <Card label="Total solicitado" value={money(resumo.total_solicitado)} hint="Contrato + ajustes solicitados" />
-        <Card label="Total pago" value={money(resumo.total_pago)} hint="Solicitacoes pagas + ajustes pagos" tone="green" />
-        <Card label="Solicitacoes vinculadas" value={number(resumo.solicitacoes_vinculadas)} hint="Vinculos reais com solicitacoes" tone="slate" />
-        <Card label="Inativos" value={number(resumo.inativos)} hint="Contratos marcados como inativos" tone="slate" />
-      </div>
-
-      <section className="card sol-surface-card rounded-xl p-4">
-        <div className="mb-3">
-          <h2 className="text-base font-semibold text-slate-950">Cadastros por mes</h2>
-          <p className="text-sm text-slate-500">Evolucao baseada na data real de cadastro do contrato.</p>
-        </div>
-        <div className="space-y-3">
-          {(data?.por_mes_cadastro || []).length === 0 && (
-            <p className="text-sm text-slate-500">Nenhum contrato no periodo.</p>
-          )}
-          {(data?.por_mes_cadastro || []).map((item) => (
-            <div key={item.label} className="grid gap-2 md:grid-cols-[96px_minmax(0,1fr)_90px] md:items-center">
-              <span className="text-sm font-semibold text-slate-700">{monthLabel(item.label)}</span>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-blue-600"
-                  style={{ width: `${Math.max((Number(item.total || 0) / maxMes) * 100, 4)}%` }}
-                />
-              </div>
-              <span className="text-right text-sm font-semibold text-slate-900">{number(item.total)}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <GroupTable
-          title="Contratos por empresa do grupo"
-          rows={data?.por_empresa || []}
-          storageKey="tabela:contratos-relatorio-operacional:empresas"
-          labelHeader="Empresa"
-        />
-        <GroupTable
-          title="Contratos por obra/centro"
-          rows={data?.por_obra || []}
-          storageKey="tabela:contratos-relatorio-operacional:obras"
-          labelHeader="Obra/Centro"
-        />
-        <GroupTable
-          title="Contratos por referencia"
-          rows={data?.por_referencia || []}
-          storageKey="tabela:contratos-relatorio-operacional:referencias"
-          labelHeader="Referencia"
-        />
-        <GroupTable
-          title="Contratos por status"
-          rows={data?.por_status || []}
-          storageKey="tabela:contratos-relatorio-operacional:status"
-          labelHeader="Status"
-        />
-      </div>
-
-      <section className="card sol-surface-card app-table-shell">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-slate-950">Pendencias cadastrais</h2>
-            <p className="text-sm text-slate-500">
-              Apenas pendencias explicitas: sem anexo, sem empresa vinculada na obra/centro, sem referencia ou valor zerado.
-            </p>
-          </div>
-          <span className="text-xs text-slate-500">{number(data?.pendencias_cadastrais?.length)} contrato(s)</span>
-        </div>
-
-        <TabelaPadrao
-          colunas={[
+      <BlocoConteudo variante="secundario">
+        {/*
+          R16b: código e referência são texto LIVRE (o backend faz LIKE
+          parcial) e data inicial/final são recorte CONTÍNUO — os quatro vão
+          em `campos`. Obra e status são enumeráveis e vão em `filtros`.
+        */}
+        <BarraFiltros
+          campos={[
             {
-              id: 'contrato',
-              titulo: 'Contrato',
-              // R17: o codigo do contrato nomeia a pendencia listada.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => item.codigo
+              id: 'codigo',
+              rotulo: 'Código',
+              tipo: 'text',
+              placeholder: 'Trecho do código',
+              valor: filtros.codigo,
+              aoMudar: (valor) => atualizarCampo('codigo', valor)
             },
-            { id: 'referencia', titulo: 'Referencia', tipo: 'texto', render: (item) => item.referencia || '-' },
-            { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra || '-' },
-            { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => item.empresa || '-' },
-            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => money(item.valor_total) },
-            { id: 'saldo', titulo: 'A pagar', tipo: 'valor', render: (item) => money(item.total_a_pagar) },
             {
-              id: 'pendencias',
-              titulo: 'Pendencias',
-              tipo: 'texto',
-              render: (item) => (
-                <div className="flex flex-wrap gap-1">
-                  {(item.pendencias || []).map((pendencia) => (
-                    <span key={pendencia} className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
-                      {pendencia}
-                    </span>
-                  ))}
-                </div>
-              )
+              id: 'ref',
+              rotulo: 'Referência',
+              tipo: 'text',
+              placeholder: 'Trecho da referência',
+              valor: filtros.ref,
+              aoMudar: (valor) => atualizarCampo('ref', valor)
+            },
+            {
+              id: 'data_inicio',
+              rotulo: 'Data inicial',
+              tipo: 'date',
+              valor: filtros.data_inicio,
+              aoMudar: (valor) => atualizarCampo('data_inicio', valor)
+            },
+            {
+              id: 'data_fim',
+              rotulo: 'Data final',
+              tipo: 'date',
+              valor: filtros.data_fim,
+              aoMudar: (valor) => atualizarCampo('data_fim', valor)
             }
           ]}
-          itens={data?.pendencias_cadastrais || []}
-          getId={(item) => item.id}
-          storageKey="tabela:contratos-relatorio-operacional:pendencias"
-          rotuloRolagem="Pendencias cadastrais"
-          vazio="Nenhuma pendencia cadastral nos filtros atuais."
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limpar}
         />
-      </section>
-    </div>
+      </BlocoConteudo>
+
+      {erro ? <div className="app-alert app-alert--error">{erro}</div> : null}
+
+      {loading ? (
+        <div className="app-empty-card">Carregando relatório de contratos...</div>
+      ) : (
+        <>
+          {/*
+            O `resumo` é calculado pelo servidor sobre TODOS os contratos do
+            filtro (não sobre uma página), então estes números podem prometer
+            o conjunto sem mentir.
+          */}
+          <StatGrid>
+            <StatTile label="Contratos" valor={number(resumo.total_contratos)} sub={`${number(resumo.ativos)} ativo(s)`} />
+            <StatTile label="Valor contratado" valor={money(resumo.valor_total)} sub="Valor cadastrado nos contratos" tom="success" />
+            <StatTile label="A pagar" valor={money(resumo.total_a_pagar)} sub="Solicitado menos pago no módulo" tom={Number(resumo.total_a_pagar || 0) > 0 ? 'warning' : undefined} />
+            <StatTile label="Sem anexo" valor={number(resumo.sem_anexo)} sub="Pendência documental explícita" tom={Number(resumo.sem_anexo || 0) > 0 ? 'danger' : 'success'} />
+            <StatTile label="Total solicitado" valor={money(resumo.total_solicitado)} sub="Contrato + ajustes solicitados" />
+            <StatTile label="Total pago" valor={money(resumo.total_pago)} sub="Solicitações pagas + ajustes pagos" tom="success" />
+            <StatTile label="Solicitações vinculadas" valor={number(resumo.solicitacoes_vinculadas)} sub="Vínculos reais com solicitações" />
+            <StatTile label="Inativos" valor={number(resumo.inativos)} sub="Contratos marcados como inativos" />
+          </StatGrid>
+
+          <BlocoConteudo
+            titulo="Cadastros por mês"
+            contagem={`${number(porMes.length)} mês(es)`}
+            descricao="Evolução baseada na data real de cadastro do contrato."
+          >
+            <div className="space-y-3">
+              {porMes.length === 0 ? (
+                <div className="app-empty-card">Nenhum contrato no período.</div>
+              ) : porMes.map((item) => {
+                const total = Number(item.total || 0);
+                /*
+                  Largura mínima cravada REMOVIDA: era
+                  `Math.max((total / maxMes) * 100, 4)`, que desenhava uma
+                  barra visível para o mês de ZERO contrato — o gráfico
+                  afirmava volume onde não havia nenhum. Zero agora é
+                  largura zero; o número ao lado continua dizendo quanto é.
+                */
+                const width = maxMes > 0 ? Math.round((total / maxMes) * 100) : 0;
+                return (
+                  <div key={item.label} className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+                    <span className="text-sm font-semibold text-[var(--c-text)]">{monthLabel(item.label)}</span>
+                    {/* A largura em % é DADO (a proporção da barra), não medida
+                        de layout — por isso continua no style. Trilho e
+                        preenchimento vêm de token (R25). */}
+                    <div className="h-3 overflow-hidden rounded-full bg-[var(--ui-border)]">
+                      <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${width}%` }} />
+                    </div>
+                    <span className="text-right text-sm font-semibold tabular-nums text-[var(--c-text)]">{number(total)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </BlocoConteudo>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <BlocoGrupo
+              titulo="Contratos por empresa do grupo"
+              descricao="Todas as empresas do recorte."
+              rows={data?.por_empresa || []}
+              storageKey="tabela:contratos-relatorio-operacional:empresas"
+              labelHeader="Empresa"
+            />
+            <BlocoGrupo
+              titulo="Contratos por obra/centro"
+              descricao="Todas as obras/centros do recorte."
+              rows={data?.por_obra || []}
+              storageKey="tabela:contratos-relatorio-operacional:obras"
+              labelHeader="Obra/Centro"
+            />
+            <BlocoGrupo
+              titulo="Contratos por referência"
+              // O servidor devolve no máximo 50 referências, ordenadas por
+              // valor — o rótulo tem de dizer isso (ver LIMITE_REFERENCIAS).
+              descricao={`As ${LIMITE_REFERENCIAS} referências de maior valor no recorte — o servidor não devolve as demais.`}
+              rows={data?.por_referencia || []}
+              storageKey="tabela:contratos-relatorio-operacional:referencias"
+              labelHeader="Referência"
+            />
+            <BlocoGrupo
+              titulo="Contratos por status"
+              descricao="Todos os status do recorte."
+              rows={data?.por_status || []}
+              storageKey="tabela:contratos-relatorio-operacional:status"
+              labelHeader="Status"
+            />
+          </div>
+
+          <BlocoConteudo
+            titulo="Pendências cadastrais"
+            // Antes: "N contrato(s)" ao lado de um título que prometia TODAS
+            // as pendências. Com mais de 80 o contador parava em 80 e ninguém
+            // ficava sabendo. Agora a contagem diz de que lista ela fala.
+            contagem={`${number(pendencias.length)} contrato(s) nesta lista`}
+            descricao={`Apenas pendências explícitas: sem anexo, sem empresa vinculada na obra/centro, sem referência ou valor zerado. O servidor devolve no máximo ${LIMITE_PENDENCIAS} contratos, dos maiores valores para os menores.`}
+            variante="primario"
+            cor="var(--module-contratos)"
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'contrato',
+                  titulo: 'Contrato',
+                  // R17: o codigo do contrato nomeia a pendencia listada.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.codigo
+                },
+                { id: 'referencia', titulo: 'Referência', tipo: 'texto', render: (item) => item.referencia || '-' },
+                { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra || '-' },
+                { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => item.empresa || '-' },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => money(item.valor_total) },
+                { id: 'saldo', titulo: 'A pagar', tipo: 'valor', render: (item) => money(item.total_a_pagar) },
+                {
+                  id: 'pendencias',
+                  titulo: 'Pendências',
+                  tipo: 'texto',
+                  render: (item) => (
+                    <div className="flex flex-wrap gap-1">
+                      {(item.pendencias || []).map((pendencia) => (
+                        // fx-badge é a pílula do sistema (token + ícone);
+                        // substitui o par bg-amber-50/text-amber-700 escrito
+                        // à mão, que não tem par no tema escuro (R25).
+                        <span key={pendencia} className="fx-badge fx-badge--warning">
+                          {pendencia}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                }
+              ]}
+              itens={pendencias}
+              getId={(item) => item.id}
+              storageKey="tabela:contratos-relatorio-operacional:pendencias"
+              rotuloRolagem="Pendências cadastrais"
+              vazio="Nenhuma pendência cadastral nos filtros atuais."
+            />
+          </BlocoConteudo>
+        </>
+      )}
+    </Pagina>
   );
 }

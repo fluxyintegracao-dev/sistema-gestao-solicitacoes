@@ -14,7 +14,20 @@ import {
 import { buscarParceiros, criarCredorCompraDireta } from '../../../services/parceiros';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
-import { Avisos, useAvisos, TabelaPadrao } from '../../../components/padrao';
+import {
+  Avisos,
+  BlocoConteudo,
+  CampoForm,
+  FormSecao,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  useAvisos,
+  useConfirmacao
+} from '../../../components/padrao';
+import OverlayModal from '../../../components/ui/OverlayModal';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
@@ -39,6 +52,14 @@ import {
 } from '../utils/comprasDraftStorage';
 const ITEM_ATTACHMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.html,.rar';
 const HEADER_ATTACHMENT_ACCEPT = '.pdf,.png,.jpg,.jpeg,.xml';
+
+// A linha de erro de campo (.form-error) também dentro da célula da tabela:
+// a grade de itens não pode usar `CampoForm` (o controle já vive no `render`
+// da coluna), mas a mensagem tem de aparecer NO MESMO lugar do resto.
+function ErroCampo({ mensagem }) {
+  if (!mensagem) return null;
+  return <span className="form-error" role="alert">{mensagem}</span>;
+}
 
 function parseValorMonetario(value) {
   if (value === null || value === undefined || value === '') {
@@ -223,6 +244,26 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [erroBuscaCredor, setErroBuscaCredor] = useState('');
   const [modalCredorAberto, setModalCredorAberto] = useState(false);
   const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
+  /*
+    VALIDAÇÃO CAMPO A CAMPO (R3 da DoD).
+
+    Esta tela reprovava o envio com ~20 caixas do navegador, uma por campo
+    ("Item 3: informe a quantidade"), longe do campo que faltava preencher.
+    Trocar `alert` por `Avisos` moveria a MESMA frase para o topo da página —
+    continuaria longe. O erro passa a morar NO CAMPO (`erro` do `CampoForm`,
+    ou a linha `.form-error` na célula da grade), com a MESMA condição, a
+    MESMA mensagem e a MESMA ordem da cadeia de `return`: nada foi afrouxado
+    nem endurecido.
+
+    Vai para `Avisos` só o que não tem campo nesta tela para receber a frase
+    — resultado de operação (importou, salvou, falhou) e condição que não é
+    de um campo ("Adicione ao menos um item.", "Esse insumo já foi
+    adicionado.").
+  */
+  const [errosCampo, setErrosCampo] = useState({});
+  const [errosItem, setErrosItem] = useState({});
+  const [erroRateiosModal, setErroRateiosModal] = useState('');
   const [novoCredor, setNovoCredor] = useState(criarNovoCredorPadrao);
   const [salvandoCredor, setSalvandoCredor] = useState(false);
   const [buscaInsumo, setBuscaInsumo] = useState('');
@@ -243,13 +284,41 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     especificacao: ''
   });
 
+  // O erro do campo sai assim que a pessoa mexe nele — mensagem de validação
+  // que sobrevive à correção vira ruído e ensina a ignorar a próxima.
+  function limparErroCampo(campo) {
+    setErrosCampo((atual) => (atual[campo] ? { ...atual, [campo]: '' } : atual));
+  }
+
+  function limparErroItem(indice, campo) {
+    setErrosItem((atual) => (atual[indice]?.[campo]
+      ? { ...atual, [indice]: { ...atual[indice], [campo]: '' } }
+      : atual));
+  }
+
+  // Uma reprovação por envio, como sempre foi: a validação é uma cadeia de
+  // `return` e para no primeiro problema. O que muda é ONDE a frase aparece.
+  function reprovarCampo(campo, mensagem) {
+    setErrosItem({});
+    setErrosCampo({ [campo]: mensagem });
+  }
+
+  function reprovarItem(indice, campo, mensagem) {
+    setErrosCampo({});
+    setErrosItem({ [indice]: { [campo]: mensagem } });
+  }
+
+  function erroDoItem(indice, campo) {
+    return errosItem[indice]?.[campo] || '';
+  }
+
   async function carregarObras() {
     try {
       const data = await getMinhasObras({ modo: 'CRIACAO' });
       setObras(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar obras');
+      avisar.erro(error.message || 'Erro ao carregar obras');
     }
   }
 
@@ -259,7 +328,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       setInsumos(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar insumos');
+      avisar.erro(error.message || 'Erro ao carregar insumos');
     }
   }
 
@@ -300,14 +369,35 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       setApropriacoes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar apropriações');
+      avisar.erro(error.message || 'Erro ao carregar apropriações');
     }
   }
 
-  function limparRascunho() {
-    if (!window.confirm('Limpar todos os dados ainda nao enviados desta compra?')) return;
+  /*
+    CONSENTIMENTO (R21 + R26) — "Limpar rascunho" é o botão de maior perda
+    desta tela: ele apaga o rascunho gravado E zera a compra inteira que está
+    na tela (obra, credor, frete, anexos, formas de pagamento e TODOS os
+    itens). A pergunta antiga ("Limpar todos os dados ainda nao enviados
+    desta compra?") não dizia isso.
+
+    O retorno de `confirmar` é `{ ok, texto }` — objeto é SEMPRE verdadeiro, e
+    ler sem desestruturar faz o "Cancelar" prosseguir (R21). E como o modal do
+    sistema NÃO congela a página (ao contrário do `confirm` do navegador), o
+    alvo é fixado numa `const` ANTES do `await` (R26): a chave do rascunho e a
+    contagem de itens que a pessoa leu são as que a ação usa.
+  */
+  async function limparRascunho() {
+    const chaveAlvo = draftKey;
+    const totalItensAlvo = itens.length;
+    const { ok } = await confirmar({
+      titulo: 'Limpar rascunho',
+      mensagem: `Isto apaga o rascunho gravado e zera esta ${modoCompraDireta ? 'compra direta' : 'solicitação de compra'} inteira: obra, credor, formas de pagamento, frete, anexos e ${totalItensAlvo} item(ns) já preenchido(s). Não há como desfazer.`,
+      rotuloConfirmar: 'Limpar rascunho',
+      destrutiva: true
+    });
+    if (!ok) return;
     suspenderAutosaveAteRef.current = Date.now() + 1500;
-    removeComprasDraft(draftKey);
+    removeComprasDraft(chaveAlvo);
     setObraId(obraIdInicial || '');
     setNecessarioPara('');
     setObservacoes('');
@@ -325,6 +415,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     setParceiroId('');
     setParceiroBusca('');
     setItens([]);
+    setErrosCampo({});
+    setErrosItem({});
   }
 
   useEffect(() => {
@@ -700,6 +792,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   function selecionarCredorCompraDireta(parceiro) {
     if (!parceiro) return;
     buscaCredorRequestRef.current += 1;
+    limparErroCampo('credor');
     setParceiroId(String(parceiro.id));
     setParceiroBusca(formatarCredor(parceiro));
     setParceiros((atual) => [
@@ -740,6 +833,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   function selecionarCredorFrete(parceiro) {
     if (!parceiro) return;
     buscaCredorFreteRequestRef.current += 1;
+    limparErroCampo('frete_parceiro');
     setFreteParceiroId(String(parceiro.id));
     setFreteParceiroBusca(formatarCredor(parceiro));
     setFreteParceiros((atual) => [
@@ -779,6 +873,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   function alterarFreteTipo(tipo) {
     setFreteTipo(tipo);
+    limparErroCampo('frete_valor');
     if (tipo === 'SEM_FRETE') {
       setFreteValor('');
     }
@@ -794,7 +889,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   async function cadastrarCredorCompraDireta() {
     if (!novoCredor.nome.trim()) {
-      alert('Informe o nome do credor.');
+      reprovarCampo('credor_nome', 'Informe o nome do credor.');
       return;
     }
     const documentoErro = getCpfCnpjError(novoCredor.cpf_cnpj, {
@@ -802,7 +897,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       label: 'CPF/CNPJ do credor'
     });
     if (documentoErro) {
-      avisar.alerta(documentoErro);
+      reprovarCampo('credor_cpf_cnpj', documentoErro);
       return;
     }
 
@@ -815,10 +910,12 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       });
       selecionarCredorCompraDireta(parceiro);
       setNovoCredor(criarNovoCredorPadrao());
+      setErrosCampo({});
       setModalCredorAberto(false);
+      avisar.sucesso('Credor cadastrado e selecionado nesta compra.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao cadastrar credor');
+      avisar.erro(error.message || 'Erro ao cadastrar credor');
     } finally {
       setSalvandoCredor(false);
     }
@@ -826,7 +923,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   async function baixarModeloItens() {
     if (!modoCompraDireta && !obraId) {
-      alert('Selecione a obra antes de baixar o modelo.');
+      reprovarCampo('obra_id', 'Selecione a obra antes de baixar o modelo.');
       return;
     }
 
@@ -838,7 +935,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       }
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao baixar modelo de itens');
+      avisar.erro(error.message || 'Erro ao baixar modelo de itens');
     }
   }
 
@@ -848,7 +945,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     }
 
     if (!obraId) {
-      alert('Selecione a obra antes de importar os itens.');
+      reprovarCampo('obra_id', 'Selecione a obra antes de importar os itens.');
       return;
     }
 
@@ -867,12 +964,12 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         : [];
 
       if (!itensImportados.length) {
-        alert('Nenhum item valido foi encontrado na planilha.');
+        avisar.alerta('Nenhum item valido foi encontrado na planilha.');
         return;
       }
 
       if (itens.length + itensImportados.length > 300) {
-        alert(`A solicitacao ficaria com ${itens.length + itensImportados.length} itens. O limite e 300 itens.`);
+        avisar.alerta(`A solicitacao ficaria com ${itens.length + itensImportados.length} itens. O limite e 300 itens.`);
         return;
       }
 
@@ -887,19 +984,19 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         );
         if (duplicados.length) {
           const nomes = duplicados.slice(0, 5).map((item) => item.insumo_nome).join(', ');
-          alert(`A importacao contem insumo(s) que ja estao na solicitacao: ${nomes}. Remova as duplicidades e tente novamente.`);
+          avisar.alerta(`A importacao contem insumo(s) que ja estao na solicitacao: ${nomes}. Remova as duplicidades e tente novamente.`);
           return;
         }
       }
 
       setItens((atual) => [...atual, ...itensImportados]);
-      alert(
+      avisar.sucesso(
         `${itensImportados.length} item(ns) importado(s) para ${modoCompraDireta ? 'a compra direta' : 'a solicitacao de compra'}. Revise os dados antes de continuar.`
       );
     } catch (error) {
       console.error(error);
-      const detalhes = Array.isArray(error?.erros) ? `\n${error.erros.join('\n')}` : '';
-      alert(`${error.message || 'Erro ao importar itens'}${detalhes}`);
+      const detalhes = Array.isArray(error?.erros) ? ` ${error.erros.join(' ')}` : '';
+      avisar.erro(`${error.message || 'Erro ao importar itens'}${detalhes}`);
     } finally {
       importacaoEmAndamentoRef.current = false;
       setImportandoItens(false);
@@ -908,13 +1005,13 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   async function adicionarInsumo(insumo) {
     if (!obraId) {
-      alert('Selecione a obra antes de adicionar itens.');
+      reprovarCampo('obra_id', 'Selecione a obra antes de adicionar itens.');
       return;
     }
 
     const existente = itens.find((item) => !item.manual && Number(item.insumo_id) === Number(insumo.id));
     if (existente) {
-      alert('Esse insumo já foi adicionado.');
+      avisar.alerta('Esse insumo já foi adicionado.');
       return;
     }
 
@@ -938,12 +1035,17 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   function adicionarItemManual() {
     if (!obraId) {
-      alert('Selecione a obra antes de adicionar item manual.');
+      /*
+        A obra vive no bloco "Dados gerais", ATRÁS deste modal — não há campo
+        aqui para receber a frase, então ela fica na faixa de avisos, que o
+        modal hospeda enquanto está aberto.
+      */
+      avisar.alerta('Selecione a obra antes de adicionar item manual.');
       return;
     }
 
     if (!itemManual.nome_manual.trim() || !itemManual.unidade_sigla_manual.trim()) {
-      alert('Informe nome e unidade do item manual.');
+      reprovarCampo('item_manual', 'Informe nome e unidade do item manual.');
       return;
     }
 
@@ -958,10 +1060,15 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       )
     ]);
     setItemManual({ nome_manual: '', unidade_id: '', unidade_sigla_manual: '', quantidade: '1', especificacao: '' });
+    setErrosCampo({});
     setModalManualAberto(false);
   }
 
   function atualizarItem(index, campo, valor) {
+    // A coluna do insumo guarda o erro na chave `insumo`, mas o campo editado
+    // chama-se `insumo_nome` — sem o mapeamento a mensagem sobreviveria à
+    // correção, que é exatamente o que ensina a ignorar a próxima.
+    limparErroItem(index, campo === 'insumo_nome' ? 'insumo' : campo);
     setItens((atual) =>
       atual.map((item, itemIndex) => {
         if (itemIndex !== index) {
@@ -1003,6 +1110,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   function atualizarUnidadeItem(index, unidadeIdSelecionada) {
     const unidade = unidades.find((item) => String(item.id) === String(unidadeIdSelecionada));
+    limparErroItem(index, 'unidade');
     atualizarCamposItem(index, {
       unidade_id: unidade?.id || null,
       unidade_sigla: unidade?.sigla || unidade?.nome || '',
@@ -1028,11 +1136,12 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   function abrirModalApropriacao(index) {
     const item = itens[index];
     if (!parseQuantidade(item?.quantidade)) {
-      alert('Informe a quantidade do item antes de distribuir a apropriacao.');
+      reprovarItem(index, 'quantidade', 'Informe a quantidade do item antes de distribuir a apropriacao.');
       return;
     }
 
     const rateiosExistentes = normalizarRateiosEntrada(item);
+    setErroRateiosModal('');
     setModalApropriacaoIndex(index);
     setRateiosModal(
       rateiosExistentes.length
@@ -1044,9 +1153,11 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   function fecharModalApropriacao() {
     setModalApropriacaoIndex(null);
     setRateiosModal([]);
+    setErroRateiosModal('');
   }
 
   function atualizarRateioModal(rateioIndex, campo, valor) {
+    setErroRateiosModal('');
     setRateiosModal((atual) =>
       atual.map((rateio, index) =>
         index === rateioIndex
@@ -1060,10 +1171,12 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   }
 
   function adicionarRateioModal() {
+    setErroRateiosModal('');
     setRateiosModal((atual) => [...atual, criarRateioBase('')]);
   }
 
   function removerRateioModal(rateioIndex) {
+    setErroRateiosModal('');
     setRateiosModal((atual) => atual.filter((_, index) => index !== rateioIndex));
   }
 
@@ -1079,18 +1192,22 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     const validacao = validarRateiosItem(itemComRateios);
 
     if (!validacao.ok) {
-      alert(validacao.mensagem);
+      // A frase fica NO formulário do rateio (linha .form-error junto dos
+      // controles), com a mesma condição e a mesma mensagem de antes.
+      setErroRateiosModal(validacao.mensagem);
       return;
     }
 
     atualizarCamposItem(modalApropriacaoIndex, {
       apropriacoes: rateiosModal
     });
+    limparErroItem(modalApropriacaoIndex, 'apropriacao');
     fecharModalApropriacao();
   }
 
   function removerItem(index) {
     setItens((atual) => atual.filter((_, itemIndex) => itemIndex !== index));
+    setErrosItem({});
     setUploadingArquivos((atual) => {
       const proximo = {};
       Object.entries(atual).forEach(([chave, valor]) => {
@@ -1111,13 +1228,28 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     }
   }
 
-  function limparLista() {
-    if (!window.confirm('Deseja remover todos os itens da lista atual?')) {
+  /*
+    Função SEM chamador na tela (nenhum botão a aciona hoje) — mantida por
+    ser capacidade existente, migrada junto: a pergunta agora é a do sistema,
+    com o retorno desestruturado (R21) e o alvo fixado antes do `await` (R26).
+    A chamada a `setItensSelecionados([])` que existia aqui referenciava um
+    estado que NÃO EXISTE neste arquivo: se algum dia esta função fosse
+    ligada a um botão, ela quebraria com ReferenceError. Está no relatório.
+  */
+  async function limparLista() {
+    const totalItensAlvo = itens.length;
+    const { ok } = await confirmar({
+      titulo: 'Remover todos os itens',
+      mensagem: `Deseja remover todos os itens da lista atual? São ${totalItensAlvo} item(ns), com quantidades, valores e rateios já preenchidos.`,
+      rotuloConfirmar: 'Remover todos',
+      destrutiva: true
+    });
+    if (!ok) {
       return;
     }
 
     setItens([]);
-    setItensSelecionados([]);
+    setErrosItem({});
     setUploadingArquivos({});
     fecharModalApropriacao();
   }
@@ -1137,7 +1269,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       });
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao enviar arquivo do item');
+      avisar.erro(error.message || 'Erro ao enviar arquivo do item');
     } finally {
       setUploadingArquivos((atual) => {
         const proximo = { ...atual };
@@ -1149,6 +1281,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   function alternarFormaPagamento(formaId) {
     const id = String(formaId);
+    limparErroCampo('forma_pagamento');
     setFormaPagamentoIds((atual) =>
       atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]
     );
@@ -1162,6 +1295,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     setUploadingAnexoCabecalho(true);
     try {
       const data = await uploadAnexoTemporarioCompra(file);
+      if (tipoDocumento === 'BOLETO') limparErroCampo('boleto');
       setAnexosCabecalho((atual) => [
         ...atual,
         {
@@ -1172,7 +1306,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       ]);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao enviar anexo da compra direta');
+      avisar.erro(error.message || 'Erro ao enviar anexo da compra direta');
     } finally {
       setUploadingAnexoCabecalho(false);
     }
@@ -1193,7 +1327,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     try {
       const url = await obterUrlAssinadaCompra(item.arquivo_url);
       if (!url) {
-        alert('Arquivo nao encontrado.');
+        avisar.alerta('Arquivo nao encontrado.');
         return;
       }
 
@@ -1204,75 +1338,79 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       }));
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao abrir arquivo do item');
+      avisar.erro(error.message || 'Erro ao abrir arquivo do item');
     }
   }
 
   async function handleSalvar() {
     if (!obraId) {
-      alert('Selecione a obra.');
+      reprovarCampo('obra_id', 'Selecione a obra.');
       return;
     }
 
     if (modoCompraDireta && !necessarioPara) {
-      alert('Informe a data de vencimento.');
+      reprovarCampo('necessario_para', 'Informe a data de vencimento.');
       return;
     }
 
     if (modoCompraDireta && formaPagamentoIds.length === 0) {
-      alert('Selecione ao menos uma forma de pagamento.');
+      reprovarCampo('forma_pagamento', 'Selecione ao menos uma forma de pagamento.');
       return;
     }
 
     if (modoCompraDireta && compraDiretaTemBoleto && anexosBoletoCabecalho.length === 0) {
-      alert('Anexe o boleto para continuar com forma de pagamento Boleto.');
+      reprovarCampo('boleto', 'Anexe o boleto para continuar com forma de pagamento Boleto.');
       return;
     }
 
     if (!itens.length) {
-      alert('Adicione ao menos um item.');
+      // Não existe campo para receber esta frase: a lista está vazia.
+      setErrosCampo({});
+      setErrosItem({});
+      avisar.alerta('Adicione ao menos um item.');
       return;
     }
 
     for (let index = 0; index < itens.length; index += 1) {
       const item = itens[index];
       if (!item.quantidade) {
-        alert(`Item ${index + 1}: informe a quantidade.`);
+        reprovarItem(index, 'quantidade', `Item ${index + 1}: informe a quantidade.`);
         return;
       }
       if (modoCompraDireta && parseValorMonetario(item.valor_unitario) <= 0) {
-        alert(`Item ${index + 1}: informe o valor unitario.`);
+        reprovarItem(index, 'valor_unitario', `Item ${index + 1}: informe o valor unitario.`);
         return;
       }
       if (!modoCompraDireta && !item.necessario_para) {
-        alert(`Item ${index + 1}: o prazo de entrega é obrigatório.`);
+        reprovarItem(index, 'necessario_para', `Item ${index + 1}: o prazo de entrega é obrigatório.`);
         return;
       }
       const validacaoRateios = validarRateiosItem(item);
       if (!validacaoRateios.ok) {
-        alert(`Item ${index + 1}: ${validacaoRateios.mensagem}`);
+        reprovarItem(index, 'apropriacao', `Item ${index + 1}: ${validacaoRateios.mensagem}`);
         return;
       }
       if (item.manual) {
         if (!item.nome_manual || !item.unidade_sigla_manual) {
-          alert(`Item manual ${index + 1}: informe nome e unidade.`);
+          reprovarItem(index, 'insumo', `Item manual ${index + 1}: informe nome e unidade.`);
           return;
         }
       } else {
         if (!item.insumo_id) {
-          alert(`Item ${index + 1}: informe o insumo.`);
+          reprovarItem(index, 'insumo', `Item ${index + 1}: informe o insumo.`);
           return;
         }
       }
     }
 
     if (modoCompraDireta && descontoCompraDireta > valorBrutoCompraDireta) {
-      alert('O desconto concedido nao pode ser maior que o valor bruto dos itens.');
+      reprovarCampo('desconto_total', 'O desconto concedido nao pode ser maior que o valor bruto dos itens.');
       return;
     }
 
     if (modoCompraDireta && freteTipo !== 'SEM_FRETE' && freteValorNumero <= 0) {
-      alert(
+      reprovarCampo(
+        'frete_valor',
         freteTipo === 'EMBUTIDO'
           ? 'Informe um valor maior que zero para o frete embutido.'
           : 'Informe um valor maior que zero para o frete pago a terceiro.'
@@ -1282,18 +1420,21 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
     if (modoCompraDireta && freteTipo === 'TERCEIRO') {
       if (!freteParceiroId) {
-        alert('Selecione o credor responsável pelo frete.');
+        reprovarCampo('frete_parceiro', 'Selecione o credor responsável pelo frete.');
         return;
       }
       if (!freteDataVencimento) {
-        alert('Informe a data para pagamento do frete.');
+        reprovarCampo('frete_data_vencimento', 'Informe a data para pagamento do frete.');
         return;
       }
       if (!String(freteDadosPagamento || '').trim()) {
-        alert('Informe os dados para pagamento do frete.');
+        reprovarCampo('frete_dados_pagamento', 'Informe os dados para pagamento do frete.');
         return;
       }
     }
+
+    setErrosCampo({});
+    setErrosItem({});
 
     try {
       setLoading(true);
@@ -1394,63 +1535,105 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       navigate(modoCompraDireta ? '/solicitacoes-compra-direta/revisar' : '/solicitacoes-compra/revisar');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao preparar revisão da solicitação');
+      avisar.erro(error.message || 'Erro ao preparar revisão da solicitação');
     } finally {
       setLoading(false);
     }
   }
 
-  // A faixa tem um dono so: com o modal de credor aberto ela vive dentro dele
-  // (senao o aviso ficaria atras do fundo escuro); fora dele, no topo da pagina.
+  const modalCredorVisivel = modoCompraDireta && modalCredorAberto;
+  const modalApropriacaoVisivel = modalApropriacaoIndex !== null && Boolean(itemModalAtual);
+
+  // A faixa tem um dono so: com um modal aberto ela vive dentro dele (senao o
+  // aviso ficaria atras do fundo escuro); fora deles, no topo da pagina.
   const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+  const algumModalAberto = modalCredorVisivel || modalManualAberto || modalApropriacaoVisivel;
+
+  const estiloFreteAtivo = {
+    background: 'var(--sem-info-bg)',
+    borderColor: 'var(--sem-info-border)',
+    color: 'var(--sem-info)'
+  };
+
+  function renderOpcaoFrete(tipo, rotulo) {
+    const ativo = freteTipo === tipo;
+    return (
+      <button
+        type="button"
+        className="btn btn-outline"
+        style={ativo ? estiloFreteAtivo : undefined}
+        onClick={() => alterarFreteTipo(ativo ? 'SEM_FRETE' : tipo)}
+        aria-pressed={ativo}
+      >
+        <span
+          className="flex h-4 w-4 items-center justify-center rounded border"
+          style={ativo
+            ? { borderColor: 'var(--c-primary)', background: 'var(--c-primary)', color: 'var(--c-surface)' }
+            : { borderColor: 'var(--c-border)' }}
+          aria-hidden="true"
+        >
+          {ativo ? '✓' : ''}
+        </span>
+        {rotulo}
+      </button>
+    );
+  }
 
   return (
-    <div className="page solicitacoes-page page-compra-nova">
-      {!modalCredorAberto && faixaAvisos}
-      <div>
-        <h1 className="page-title">{modoCompraDireta ? 'Compra Direta' : 'Nova Solicitação de Compra'}</h1>
-        <p className="page-subtitle">
-          {modoCompraDireta
-            ? 'Informe os itens ja comprados, valores, notas fiscais e apropriacoes para abrir a solicitacao de pagamento.'
-            : 'Monte os itens da compra e distribua a apropriacao por item antes de enviar.'}
-        </p>
-      </div>
+    <Pagina className="page-compra-nova">
+      {/* C3: tela de REGISTRO — a seta de voltar à esquerda da faixa é a
+          affordance primária de retorno à listagem, nos dois modos. */}
+      <PageHeader
+        titulo={modoCompraDireta ? 'Compra Direta' : 'Nova Solicitação de Compra'}
+        descricao={modoCompraDireta
+          ? 'Informe os itens ja comprados, valores, notas fiscais e apropriacoes para abrir a solicitacao de pagamento.'
+          : 'Monte os itens da compra e distribua a apropriacao por item antes de enviar.'}
+        voltar={{ to: '/solicitacoes-compra', title: 'Voltar para solicitações de compra' }}
+      />
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="font-semibold">Dados gerais</h2>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="grid gap-2 xl:col-span-2">
-            <label className="text-sm font-medium">Obra *</label>
+      {!algumModalAberto && faixaAvisos}
+
+      {/*
+        R9 (revista em 04/09) — FORMULÁRIO INLINE. Esta tela EXISTE para
+        cadastrar a compra: tirando o formulário não sobra tela nenhuma. Os
+        blocos abaixo são os MESMOS grupos que a tela já tinha, na MESMA
+        ordem; nada foi reagrupado e nada nasce recolhido.
+      */}
+      <BlocoConteudo titulo="Dados gerais" variante="primario" cor="var(--sem-info)">
+        <FormSecao colunas={2}>
+          <CampoForm label="Obra" obrigatorio linha erro={errosCampo.obra_id}>
             <ApropriacaoAutocomplete
               value={obraId}
               options={obras}
-              onChange={setObraId}
+              onChange={(valor) => { limparErroCampo('obra_id'); setObraId(valor); }}
               placeholder="Buscar obra por código ou nome..."
               inputClassName="input w-full"
             />
-          </div>
+          </CampoForm>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">Solicitante</label>
+          <CampoForm label="Solicitante">
             <input className="input" value={user?.nome || ''} disabled />
-          </div>
+          </CampoForm>
 
-          <div className="grid gap-2">
-            <label className="text-sm font-medium">{modoCompraDireta ? 'Data de vencimento *' : 'Necessário para'}</label>
+          <CampoForm
+            label={modoCompraDireta ? 'Data de vencimento' : 'Necessário para'}
+            obrigatorio={modoCompraDireta}
+            erro={errosCampo.necessario_para}
+          >
             <input
               type="date"
               className="input"
               value={necessarioPara}
-              onChange={(event) => setNecessarioPara(event.target.value)}
+              onChange={(event) => { limparErroCampo('necessario_para'); setNecessarioPara(event.target.value); }}
               required={modoCompraDireta}
             />
-          </div>
+          </CampoForm>
 
           {modoCompraDireta && (
-            <div className="grid gap-2 md:col-span-2">
-              <label className="text-sm font-medium">Formas de pagamento *</label>
+            /* Não usa `CampoForm`: o menu de marcação é feito de <label>, e
+               label dentro de label é HTML inválido. Mesmas classes .form-*. */
+            <div className="form-group form-campo--linha">
+              <span className="form-label form-label--required">Formas de pagamento</span>
               <details className="group relative">
                 <summary className="input flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
                   <span className="min-w-0 truncate">{resumoFormasPagamento}</span>
@@ -1458,14 +1641,14 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     <path d="m7 10 5 5 5-5" />
                   </svg>
                 </summary>
-                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[110] max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1.5 shadow-xl">
+                <div className="absolute left-0 right-0 top-full z-[110] mt-1 max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
                   {formasPagamento.map((forma) => {
                     const selecionada = formaPagamentoIds.includes(String(forma.id));
                     const boleto = formaPagamentoEhBoleto(forma);
                     return (
                       <label
                         key={forma.id}
-                        className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--c-text)] hover:bg-[var(--c-surface-hover)]"
+                        className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--c-text)] hover:bg-[var(--ui-surface-2)]"
                       >
                         <input
                           type="checkbox"
@@ -1474,14 +1657,22 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                           onChange={() => alternarFormaPagamento(forma.id)}
                         />
                         <span className="min-w-0 flex-1 truncate font-medium">{formatarFormaPagamento(forma)}</span>
-                        {boleto && <span className="shrink-0 text-xs text-amber-700">Exige anexo</span>}
+                        {boleto && <span className="shrink-0 text-xs text-[var(--sem-warning)]">Exige anexo</span>}
                       </label>
                     );
                   })}
                 </div>
               </details>
+              <ErroCampo mensagem={errosCampo.forma_pagamento} />
               {formasPagamento.length === 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <div
+                  className="mt-2 rounded-xl border px-3 py-2 text-sm"
+                  style={{
+                    borderColor: 'var(--sem-warning-border)',
+                    background: 'var(--sem-warning-bg)',
+                    color: 'var(--sem-warning)'
+                  }}
+                >
                   Nenhuma forma de pagamento ativa foi encontrada. Verifique os cadastros financeiros.
                 </div>
               )}
@@ -1489,15 +1680,15 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           )}
 
           {modoCompraDireta && (
-            <div className="grid gap-2 md:col-span-2">
-              <label className="text-sm font-medium">Credor</label>
+            <CampoForm label="Credor" linha erro={errosCampo.credor}>
               <div className="flex flex-wrap gap-2">
-                <div className="relative min-w-[260px] flex-1">
+                <div className="relative min-w-0 flex-1 app-busca">
                   <input
                     className="input w-full"
                     value={parceiroBusca}
                     onChange={(event) => {
                       buscaCredorRequestRef.current += 1;
+                      limparErroCampo('credor');
                       setParceiroBusca(event.target.value);
                       setParceiroId('');
                       setAutocompleteCredorAberto(true);
@@ -1516,7 +1707,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                   {autocompleteCredorAberto && !parceiroId && String(parceiroBusca || '').trim().length >= 2 && (
                     <div
                       id="compra-direta-credores-opcoes"
-                      className="absolute left-0 right-0 top-[calc(100%+6px)] z-[90] max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+                      className="absolute left-0 right-0 top-full z-[90] mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
                       role="listbox"
                     >
                       {buscandoParceiros && (
@@ -1524,7 +1715,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                       )}
 
                       {!buscandoParceiros && erroBuscaCredor && (
-                        <div className="px-3 py-2 text-sm text-red-600">{erroBuscaCredor}</div>
+                        <div className="px-3 py-2 text-sm text-[var(--sem-danger)]">{erroBuscaCredor}</div>
                       )}
 
                       {!buscandoParceiros && !erroBuscaCredor && parceiros.length === 0 && (
@@ -1535,11 +1726,10 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                         <button
                           key={parceiro.id}
                           type="button"
-                          className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                            index === credorAtivoIndex
-                              ? 'bg-[var(--c-primary)] text-white'
-                              : 'text-[var(--c-text)] hover:bg-[var(--c-surface-hover)]'
-                          }`}
+                          className="w-full rounded-md px-3 py-2 text-left text-sm transition-colors"
+                          style={index === credorAtivoIndex
+                            ? { background: 'var(--c-primary)', color: 'var(--c-surface)' }
+                            : { color: 'var(--c-text)' }}
                           onMouseEnter={() => setCredorAtivoIndex(index)}
                           onMouseDown={(event) => {
                             event.preventDefault();
@@ -1552,7 +1742,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                             {parceiro.nome || parceiro.razao_social || `Credor ${parceiro.id}`}
                           </span>
                           {parceiro.cpf_cnpj && (
-                            <span className={`block truncate text-xs ${index === credorAtivoIndex ? 'text-white/80' : 'text-[var(--c-muted)]'}`}>
+                            <span className="block truncate text-xs" style={{ opacity: 0.8 }}>
                               {parceiro.cpf_cnpj}
                             </span>
                           )}
@@ -1563,7 +1753,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 </div>
                 <button
                   type="button"
-                  className="btn btn-outline h-[42px] w-[42px] shrink-0 px-0"
+                  className="btn btn-outline shrink-0"
                   onClick={() => setModalCredorAberto(true)}
                   title="Cadastrar novo credor"
                   aria-label="Cadastrar novo credor"
@@ -1575,216 +1765,200 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 </button>
               </div>
               {parceiroId && (
-                <div className="text-sm text-emerald-700">
+                <span className="text-sm text-[var(--sem-success)]">
                   Credor selecionado: <strong>{parceiroBusca || formatarCredor(parceiroSelecionado)}</strong>
-                </div>
+                </span>
               )}
-            </div>
+            </CampoForm>
           )}
 
-          <div className="grid gap-2 md:col-span-2">
-            <label className="text-sm font-medium">Observações da compra</label>
-            <textarea className="input min-h-[76px]" value={observacoes} onChange={(event) => setObservacoes(event.target.value)} placeholder="Informações úteis para conferência ou pagamento" />
-          </div>
+          <CampoForm label="Observações da compra" tipo="observacao">
+            <textarea
+              className="input"
+              rows={3}
+              value={observacoes}
+              onChange={(event) => setObservacoes(event.target.value)}
+              placeholder="Informações úteis para conferência ou pagamento"
+            />
+          </CampoForm>
+
           {modoCompraDireta && (
-            <div className="grid gap-2 md:col-span-2">
-              <label className="text-sm font-medium">Dados para pagamento</label>
+            <CampoForm label="Dados para pagamento" tipo="observacao">
               <textarea
-                className="input min-h-[76px]"
+                className="input"
+                rows={3}
                 value={dadosPagamento}
                 onChange={(event) => setDadosPagamento(event.target.value)}
                 placeholder="Informe linha digitavel, PIX, banco/agencia/conta ou orientacoes para o financeiro."
               />
-            </div>
+            </CampoForm>
           )}
-        </div>
-      </div>
+        </FormSecao>
+      </BlocoConteudo>
 
       {modoCompraDireta && (
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="font-semibold">Condições comerciais e comprovantes</h2>
-              <p className="mt-1 text-sm text-[var(--c-muted)]">
-                Registre descontos, tratamento do frete e os documentos que comprovam a despesa.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4">
-            <div className="grid items-start gap-4 lg:grid-cols-[minmax(220px,0.35fr)_minmax(0,1.65fr)]">
-            <div>
-              <label className="text-sm font-semibold text-[var(--c-fg)]">Desconto concedido pelo fornecedor</label>
+        <BlocoConteudo
+          titulo="Condições comerciais e comprovantes"
+          descricao="Registre descontos, tratamento do frete e os documentos que comprovam a despesa."
+        >
+          <FormSecao legenda="Desconto" colunas={2}>
+            <CampoForm label="Desconto concedido pelo fornecedor" erro={errosCampo.desconto_total}>
               <input
-                className="input mt-1"
+                className="input input-moeda"
                 value={descontoTotal}
-                onChange={(event) => setDescontoTotal(event.target.value)}
+                onChange={(event) => { limparErroCampo('desconto_total'); setDescontoTotal(event.target.value); }}
                 placeholder="R$ 0,00"
               />
-            </div>
+            </CampoForm>
+          </FormSecao>
 
-            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-semibold text-[var(--c-text)]">Frete</h3>
-                  <p className="mt-1 text-xs text-[var(--c-muted)]">
-                    Informe se o frete será pago ao credor principal ou separadamente a outro credor.
-                  </p>
-                </div>
+          <FormSecao legenda="Frete" colunas={2}>
+            <div className="form-group form-campo--linha">
+              <span className="form-label">Tratamento do frete</span>
+              <span className="form-hint">
+                Informe se o frete será pago ao credor principal ou separadamente a outro credor.
+              </span>
+              <div className="flex flex-wrap items-center gap-2" aria-label="Tratamento do frete">
+                {renderOpcaoFrete('EMBUTIDO', 'Embutido')}
+                {renderOpcaoFrete('TERCEIRO', 'Pago a terceiro')}
                 {freteTipo === 'TERCEIRO' && (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                    style={{ background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }}
+                  >
                     Gera título separado
                   </span>
                 )}
               </div>
-
-              <div className="mt-3 flex flex-wrap gap-2" aria-label="Tratamento do frete">
-                <button
-                  type="button"
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${freteTipo === 'EMBUTIDO' ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-[var(--c-border)] text-[var(--c-text)] hover:bg-[var(--c-surface-hover)]'}`}
-                  onClick={() => alterarFreteTipo(freteTipo === 'EMBUTIDO' ? 'SEM_FRETE' : 'EMBUTIDO')}
-                  aria-pressed={freteTipo === 'EMBUTIDO'}
-                >
-                  <span className={`flex h-4 w-4 items-center justify-center rounded border ${freteTipo === 'EMBUTIDO' ? 'border-blue-600 bg-blue-600 text-white' : 'border-[var(--c-border)]'}`}>
-                    {freteTipo === 'EMBUTIDO' ? '✓' : ''}
-                  </span>
-                  Embutido
-                </button>
-                <button
-                  type="button"
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${freteTipo === 'TERCEIRO' ? 'border-blue-400 bg-blue-50 text-blue-900' : 'border-[var(--c-border)] text-[var(--c-text)] hover:bg-[var(--c-surface-hover)]'}`}
-                  onClick={() => alterarFreteTipo(freteTipo === 'TERCEIRO' ? 'SEM_FRETE' : 'TERCEIRO')}
-                  aria-pressed={freteTipo === 'TERCEIRO'}
-                >
-                  <span className={`flex h-4 w-4 items-center justify-center rounded border ${freteTipo === 'TERCEIRO' ? 'border-blue-600 bg-blue-600 text-white' : 'border-[var(--c-border)]'}`}>
-                    {freteTipo === 'TERCEIRO' ? '✓' : ''}
-                  </span>
-                  Pago a terceiro
-                </button>
-              </div>
-
-              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {freteTipo === 'TERCEIRO' && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 md:col-span-2 xl:col-span-4">
-                    O frete ficará disponível em Contas a Pagar para geração de título separado.
-                  </div>
-                )}
-
-                {freteTipo !== 'SEM_FRETE' && (
-                  <div className="grid gap-1.5">
-                    <label className="text-sm font-medium">Valor do frete *</label>
-                    <input
-                      className="input"
-                      value={freteValor}
-                      onChange={(event) => setFreteValor(event.target.value)}
-                      placeholder="R$ 0,00"
-                      inputMode="decimal"
-                    />
-                    <span className="text-xs text-[var(--c-muted)]">
-                      {freteTipo === 'EMBUTIDO'
-                        ? 'Será somado à compra e pago ao credor principal no mesmo título.'
-                        : 'Será somado à solicitação e separado do credor principal.'}
-                    </span>
-                  </div>
-                )}
-
-                {freteTipo === 'TERCEIRO' && (
-                  <>
-                    <div className="relative grid gap-1.5 md:col-span-2">
-                      <label className="text-sm font-medium">Credor do frete *</label>
-                      <input
-                        className="input w-full"
-                        value={freteParceiroBusca}
-                        onChange={(event) => {
-                          buscaCredorFreteRequestRef.current += 1;
-                          setFreteParceiroBusca(event.target.value);
-                          setFreteParceiroId('');
-                          setAutocompleteFreteAberto(true);
-                        }}
-                        onFocus={() => setAutocompleteFreteAberto(true)}
-                        onBlur={() => window.setTimeout(() => setAutocompleteFreteAberto(false), 120)}
-                        onKeyDown={tratarTecladoCredorFrete}
-                        placeholder="Digite nome, CPF ou CNPJ"
-                        autoComplete="off"
-                        role="combobox"
-                        aria-autocomplete="list"
-                        aria-expanded={autocompleteFreteAberto}
-                        aria-controls="compra-direta-frete-credores-opcoes"
-                      />
-                      {autocompleteFreteAberto && !freteParceiroId && String(freteParceiroBusca || '').trim().length >= 2 && (
-                        <div
-                          id="compra-direta-frete-credores-opcoes"
-                          className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
-                          role="listbox"
-                        >
-                          {buscandoCredoresFrete && <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Buscando credores...</div>}
-                          {!buscandoCredoresFrete && erroBuscaCredorFrete && <div className="px-3 py-2 text-sm text-red-600">{erroBuscaCredorFrete}</div>}
-                          {!buscandoCredoresFrete && !erroBuscaCredorFrete && freteParceiros.length === 0 && (
-                            <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Nenhum credor encontrado.</div>
-                          )}
-                          {!buscandoCredoresFrete && !erroBuscaCredorFrete && freteParceiros.map((parceiro, index) => (
-                            <button
-                              key={parceiro.id}
-                              type="button"
-                              className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${index === freteCredorAtivoIndex ? 'bg-[var(--c-primary)] text-white' : 'text-[var(--c-text)] hover:bg-[var(--c-surface-hover)]'}`}
-                              onMouseEnter={() => setFreteCredorAtivoIndex(index)}
-                              onMouseDown={(event) => {
-                                event.preventDefault();
-                                selecionarCredorFrete(parceiro);
-                              }}
-                              role="option"
-                              aria-selected={index === freteCredorAtivoIndex}
-                            >
-                              <span className="block truncate font-medium">{parceiro.nome || parceiro.razao_social || `Credor ${parceiro.id}`}</span>
-                              {parceiro.cpf_cnpj && (
-                                <span className={`block truncate text-xs ${index === freteCredorAtivoIndex ? 'text-white/80' : 'text-[var(--c-muted)]'}`}>{parceiro.cpf_cnpj}</span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid gap-1.5">
-                      <label className="text-sm font-medium">Data para pagamento *</label>
-                      <input type="date" className="input" value={freteDataVencimento} onChange={(event) => setFreteDataVencimento(event.target.value)} />
-                    </div>
-
-                    <div className="grid gap-1.5 md:col-span-2 xl:col-span-4">
-                      <label className="text-sm font-medium">Dados para pagamento do frete *</label>
-                      <textarea
-                        className="input min-h-[80px]"
-                        value={freteDadosPagamento}
-                        onChange={(event) => setFreteDadosPagamento(event.target.value)}
-                        placeholder="Informe PIX, banco/agência/conta, linha digitável ou instruções para o financeiro."
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border)] pt-4">
-              <div>
-                <div className="text-sm font-semibold text-[var(--c-text)]">Comprovantes da Despesa</div>
-                <div className="mt-0.5 text-xs text-[var(--c-muted)]">Nota fiscal, guia, boleto ou comprovante relacionado à compra.</div>
+            {freteTipo === 'TERCEIRO' && (
+              <div
+                className="form-campo--linha rounded-lg border px-3 py-2 text-xs"
+                style={{
+                  borderColor: 'var(--sem-warning-border)',
+                  background: 'var(--sem-warning-bg)',
+                  color: 'var(--sem-warning)'
+                }}
+              >
+                O frete ficará disponível em Contas a Pagar para geração de título separado.
               </div>
-              <div className="flex flex-wrap gap-2">
-              <label className={`btn btn-outline w-fit cursor-pointer ${uploadingAnexoCabecalho ? 'pointer-events-none opacity-60' : ''}`}>
+            )}
+
+            {freteTipo !== 'SEM_FRETE' && (
+              <CampoForm
+                label="Valor do frete"
+                obrigatorio
+                erro={errosCampo.frete_valor}
+                hint={freteTipo === 'EMBUTIDO'
+                  ? 'Será somado à compra e pago ao credor principal no mesmo título.'
+                  : 'Será somado à solicitação e separado do credor principal.'}
+              >
                 <input
-                  type="file"
-                  className="hidden"
-                  accept={HEADER_ATTACHMENT_ACCEPT}
-                  onChange={(event) => {
-                    const [file] = Array.from(event.target.files || []);
-                    void handleSelecionarAnexoCabecalho(file, 'NOTA_FISCAL_GUIA');
-                    event.target.value = '';
-                  }}
+                  className="input input-moeda"
+                  value={freteValor}
+                  onChange={(event) => { limparErroCampo('frete_valor'); setFreteValor(event.target.value); }}
+                  placeholder="R$ 0,00"
+                  inputMode="decimal"
                 />
-                {uploadingAnexoCabecalho ? 'Enviando...' : 'Anexar arquivos'}
-              </label>
-              {compraDiretaTemBoleto && (
+              </CampoForm>
+            )}
+
+            {freteTipo === 'TERCEIRO' && (
+              <>
+                <CampoForm label="Credor do frete" obrigatorio linha erro={errosCampo.frete_parceiro}>
+                  <div className="relative">
+                    <input
+                      className="input w-full"
+                      value={freteParceiroBusca}
+                      onChange={(event) => {
+                        buscaCredorFreteRequestRef.current += 1;
+                        limparErroCampo('frete_parceiro');
+                        setFreteParceiroBusca(event.target.value);
+                        setFreteParceiroId('');
+                        setAutocompleteFreteAberto(true);
+                      }}
+                      onFocus={() => setAutocompleteFreteAberto(true)}
+                      onBlur={() => window.setTimeout(() => setAutocompleteFreteAberto(false), 120)}
+                      onKeyDown={tratarTecladoCredorFrete}
+                      placeholder="Digite nome, CPF ou CNPJ"
+                      autoComplete="off"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded={autocompleteFreteAberto}
+                      aria-controls="compra-direta-frete-credores-opcoes"
+                    />
+                    {autocompleteFreteAberto && !freteParceiroId && String(freteParceiroBusca || '').trim().length >= 2 && (
+                      <div
+                        id="compra-direta-frete-credores-opcoes"
+                        className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+                        role="listbox"
+                      >
+                        {buscandoCredoresFrete && <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Buscando credores...</div>}
+                        {!buscandoCredoresFrete && erroBuscaCredorFrete && <div className="px-3 py-2 text-sm text-[var(--sem-danger)]">{erroBuscaCredorFrete}</div>}
+                        {!buscandoCredoresFrete && !erroBuscaCredorFrete && freteParceiros.length === 0 && (
+                          <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Nenhum credor encontrado.</div>
+                        )}
+                        {!buscandoCredoresFrete && !erroBuscaCredorFrete && freteParceiros.map((parceiro, index) => (
+                          <button
+                            key={parceiro.id}
+                            type="button"
+                            className="w-full rounded-md px-3 py-2 text-left text-sm transition-colors"
+                            style={index === freteCredorAtivoIndex
+                              ? { background: 'var(--c-primary)', color: 'var(--c-surface)' }
+                              : { color: 'var(--c-text)' }}
+                            onMouseEnter={() => setFreteCredorAtivoIndex(index)}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              selecionarCredorFrete(parceiro);
+                            }}
+                            role="option"
+                            aria-selected={index === freteCredorAtivoIndex}
+                          >
+                            <span className="block truncate font-medium">{parceiro.nome || parceiro.razao_social || `Credor ${parceiro.id}`}</span>
+                            {parceiro.cpf_cnpj && (
+                              <span className="block truncate text-xs" style={{ opacity: 0.8 }}>{parceiro.cpf_cnpj}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CampoForm>
+
+                <CampoForm label="Data para pagamento" obrigatorio erro={errosCampo.frete_data_vencimento}>
+                  <input
+                    type="date"
+                    className="input"
+                    value={freteDataVencimento}
+                    onChange={(event) => { limparErroCampo('frete_data_vencimento'); setFreteDataVencimento(event.target.value); }}
+                  />
+                </CampoForm>
+
+                <CampoForm
+                  label="Dados para pagamento do frete"
+                  obrigatorio
+                  tipo="observacao"
+                  erro={errosCampo.frete_dados_pagamento}
+                >
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={freteDadosPagamento}
+                    onChange={(event) => { limparErroCampo('frete_dados_pagamento'); setFreteDadosPagamento(event.target.value); }}
+                    placeholder="Informe PIX, banco/agência/conta, linha digitável ou instruções para o financeiro."
+                  />
+                </CampoForm>
+              </>
+            )}
+          </FormSecao>
+
+          {/* Comprovantes: o gatilho do seletor de arquivo JÁ é um <label>,
+              então o campo usa a casca .form-group em vez do CampoForm. */}
+          <FormSecao legenda="Comprovantes da Despesa" colunas={2}>
+            <div className="form-group form-campo--linha">
+              <span className="form-label">Nota fiscal, guia, boleto ou comprovante relacionado à compra</span>
+              <div className="flex flex-wrap gap-2">
                 <label className={`btn btn-outline w-fit cursor-pointer ${uploadingAnexoCabecalho ? 'pointer-events-none opacity-60' : ''}`}>
                   <input
                     type="file"
@@ -1792,64 +1966,93 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     accept={HEADER_ATTACHMENT_ACCEPT}
                     onChange={(event) => {
                       const [file] = Array.from(event.target.files || []);
-                      void handleSelecionarAnexoCabecalho(file, 'BOLETO');
+                      void handleSelecionarAnexoCabecalho(file, 'NOTA_FISCAL_GUIA');
                       event.target.value = '';
                     }}
                   />
-                  {uploadingAnexoCabecalho ? 'Enviando...' : 'Anexar boleto *'}
+                  {uploadingAnexoCabecalho ? 'Enviando...' : 'Anexar arquivos'}
                 </label>
-              )}
+                {compraDiretaTemBoleto && (
+                  <label className={`btn btn-outline w-fit cursor-pointer ${uploadingAnexoCabecalho ? 'pointer-events-none opacity-60' : ''}`}>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept={HEADER_ATTACHMENT_ACCEPT}
+                      onChange={(event) => {
+                        const [file] = Array.from(event.target.files || []);
+                        void handleSelecionarAnexoCabecalho(file, 'BOLETO');
+                        event.target.value = '';
+                      }}
+                    />
+                    {uploadingAnexoCabecalho ? 'Enviando...' : 'Anexar boleto *'}
+                  </label>
+                )}
               </div>
-            </div>
+              <ErroCampo mensagem={errosCampo.boleto} />
 
-            {anexosCabecalho.length > 0 ? (
-              <div className="grid gap-2">
-                {anexosCabecalho.map((anexo, index) => (
-                  <div
-                    key={`${anexo.arquivo_url}-${index}`}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm"
-                  >
-                    <span className="truncate">
-                      {anexo.tipo_documento === 'BOLETO' ? 'Boleto: ' : ''}
-                      {anexo.arquivo_nome_original || 'Anexo da compra direta'}
-                    </span>
-                    <button type="button" className="text-red-600 hover:underline" onClick={() => removerAnexoCabecalho(index)}>
-                      Remover
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-[var(--c-muted)]">Nenhum comprovante da despesa anexado.</div>
-            )}
-          </div>
-        </div>
+              {anexosCabecalho.length > 0 ? (
+                <div className="mt-3 grid gap-2">
+                  {anexosCabecalho.map((anexo, index) => (
+                    <div
+                      key={`${anexo.arquivo_url}-${index}`}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm"
+                    >
+                      <span className="truncate">
+                        {anexo.tipo_documento === 'BOLETO' ? 'Boleto: ' : ''}
+                        {anexo.arquivo_nome_original || 'Anexo da compra direta'}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm btn-perigo-suave"
+                        onClick={() => removerAnexoCabecalho(index)}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="form-hint">Nenhum comprovante da despesa anexado.</span>
+              )}
+            </div>
+          </FormSecao>
+        </BlocoConteudo>
       )}
 
       <div className="compra-nova-layout">
-        <div className="card compra-insumos-card">
-          <div className="card-header flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold">Insumos</h2>
-            <button type="button" className="btn btn-outline" onClick={() => setModalManualAberto(true)}>
+        <BlocoConteudo
+          titulo="Insumos"
+          className="compra-insumos-card"
+          acoes={(
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setModalManualAberto(true)}>
               Item manual
             </button>
-          </div>
-
+          )}
+        >
           <div className="grid gap-3">
-            <input className="input" placeholder="Buscar por nome, código ou categoria" value={buscaInsumo} onChange={(event) => setBuscaInsumo(event.target.value)} />
+            {/* F1: UMA busca no contexto deste bloco, ocupando a faixa dele.
+                Não leva `.app-busca` porque a classe tem piso de 220px e a
+                coluna de insumos do `.compra-nova-layout` mede 248px com
+                recuo — o piso estouraria a largura da página. */}
+            <input
+              className="input w-full"
+              placeholder="Buscar por nome, código ou categoria"
+              value={buscaInsumo}
+              onChange={(event) => setBuscaInsumo(event.target.value)}
+            />
 
-            <div className="grid max-h-[520px] gap-2 overflow-y-auto">
+            <div className="grid max-h-96 gap-2 overflow-y-auto">
               {insumosFiltrados.map((insumo) => (
                 <button
                   key={insumo.id}
                   type="button"
-                  className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-3 text-left transition hover:bg-[var(--c-surface-hover)]"
+                  className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-3 text-left transition hover:bg-[var(--ui-surface-2)]"
                   onClick={() => adicionarInsumo(insumo)}
                 >
                   <div className="font-medium">{insumo.nome}</div>
                   <div className="mt-1 text-xs text-[var(--c-muted)]">
                     {insumo.categoria?.nome || 'Sem categoria'} · {insumo.unidade_manual ? (
-                      <span className="text-red-600 dark:text-red-400 font-semibold">{insumo.unidade_manual}</span>
+                      <span className="font-semibold text-[var(--sem-danger)]">{insumo.unidade_manual}</span>
                     ) : (
                       insumo.unidade?.sigla || '-'
                     )}
@@ -1862,53 +2065,51 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
               )}
             </div>
           </div>
-        </div>
+        </BlocoConteudo>
 
-        <div className="card compra-itens-card">
-          <div className="card-header flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold">Itens da solicitação</h2>
-            <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-[var(--c-muted)]">
-              <>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={baixarModeloItens}
-                  disabled={!modoCompraDireta && !obraId}
-                  title={!modoCompraDireta && !obraId ? 'Selecione a obra para baixar o modelo' : undefined}
-                >
-                  {modoCompraDireta ? 'Baixar modelo Excel' : 'Baixar modelo de itens'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => importacaoItensInputRef.current?.click()}
-                  disabled={importandoItens || !obraId}
-                  title={!obraId ? 'Selecione a obra antes de importar' : undefined}
-                >
-                  {importandoItens
-                    ? 'Importando...'
-                    : (modoCompraDireta ? 'Importar Excel' : 'Importar itens em massa')}
-                </button>
-                <input
-                  ref={importacaoItensInputRef}
-                  type="file"
-                  className="hidden"
-                  accept=".xlsx"
-                  onChange={(event) => {
-                    const [file] = Array.from(event.target.files || []);
-                    void handleImportarItens(file);
-                    event.target.value = '';
-                  }}
-                />
-                <span className="rounded-full border border-[var(--c-border)] px-3 py-1 text-xs">
-                  Limite 300 itens
-                </span>
-              </>
-              <span>{itens.length} item(ns)</span>
-              {itens.length > 0 && <span>{itensPendentesApropriacao} pendente(s) de rateio fechado</span>}
-            </div>
-          </div>
-
+        <BlocoConteudo
+          titulo="Itens da solicitação"
+          className="compra-itens-card"
+          contagem={`${itens.length} item(ns)`}
+          descricao={itens.length > 0
+            ? `${itensPendentesApropriacao} pendente(s) de rateio fechado · limite de 300 itens`
+            : 'Limite de 300 itens'}
+          acoes={(
+            <>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={baixarModeloItens}
+                disabled={!modoCompraDireta && !obraId}
+                title={!modoCompraDireta && !obraId ? 'Selecione a obra para baixar o modelo' : undefined}
+              >
+                {modoCompraDireta ? 'Baixar modelo Excel' : 'Baixar modelo de itens'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => importacaoItensInputRef.current?.click()}
+                disabled={importandoItens || !obraId}
+                title={!obraId ? 'Selecione a obra antes de importar' : undefined}
+              >
+                {importandoItens
+                  ? 'Importando...'
+                  : (modoCompraDireta ? 'Importar Excel' : 'Importar itens em massa')}
+              </button>
+              <input
+                ref={importacaoItensInputRef}
+                type="file"
+                className="hidden"
+                accept=".xlsx"
+                onChange={(event) => {
+                  const [file] = Array.from(event.target.files || []);
+                  void handleImportarItens(file);
+                  event.target.value = '';
+                }}
+              />
+            </>
+          )}
+        >
           {itens.length === 0 ? (
             <div className="compra-itens-empty py-8 text-center text-sm text-[var(--c-muted)]">Adicione itens a partir da lista de insumos ou crie item manual.</div>
           ) : (
@@ -1922,13 +2123,19 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                   noCard: 'titulo',
                   // Entrada de dados: o controle mora no render da coluna.
                   render: (item) => (
-                    <input
-                      className={`input ${item.manual ? 'border-red-300 text-red-700' : ''}`}
-                      aria-label="Nome do insumo"
-                      value={item.insumo_nome}
-                      disabled={!item.manual}
-                      onChange={(event) => atualizarItem(item.__indice, 'insumo_nome', event.target.value)}
-                    />
+                    <>
+                      <input
+                        className="input"
+                        style={item.manual
+                          ? { borderColor: 'var(--sem-danger-border)', color: 'var(--sem-danger)' }
+                          : undefined}
+                        aria-label="Nome do insumo"
+                        value={item.insumo_nome}
+                        disabled={!item.manual}
+                        onChange={(event) => atualizarItem(item.__indice, 'insumo_nome', event.target.value)}
+                      />
+                      <ErroCampo mensagem={erroDoItem(item.__indice, 'insumo')} />
+                    </>
                   )
                 },
                 {
@@ -1953,6 +2160,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                       {!item.unidade_id && item.unidade_sigla ? (
                         <p className="mt-1 text-xs text-[var(--c-muted)]">Atual: {item.unidade_sigla}</p>
                       ) : null}
+                      <ErroCampo mensagem={erroDoItem(item.__indice, 'unidade')} />
                     </>
                   )
                 },
@@ -1961,15 +2169,18 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                   titulo: 'Quantidade *',
                   tipo: 'numero',
                   render: (item) => (
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      className="input"
-                      aria-label="Quantidade do item"
-                      value={item.quantidade}
-                      onChange={(event) => atualizarItem(item.__indice, 'quantidade', event.target.value)}
-                    />
+                    <>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        className="input"
+                        aria-label="Quantidade do item"
+                        value={item.quantidade}
+                        onChange={(event) => atualizarItem(item.__indice, 'quantidade', event.target.value)}
+                      />
+                      <ErroCampo mensagem={erroDoItem(item.__indice, 'quantidade')} />
+                    </>
                   )
                 },
                 ...(modoCompraDireta ? [
@@ -1978,15 +2189,18 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     titulo: 'Valor unitário *',
                     tipo: 'valor',
                     render: (item) => (
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        className="input"
-                        aria-label="Valor unitário do item"
-                        value={item.valor_unitario}
-                        onChange={(event) => atualizarItem(item.__indice, 'valor_unitario', event.target.value)}
-                      />
+                      <>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          className="input"
+                          aria-label="Valor unitário do item"
+                          value={item.valor_unitario}
+                          onChange={(event) => atualizarItem(item.__indice, 'valor_unitario', event.target.value)}
+                        />
+                        <ErroCampo mensagem={erroDoItem(item.__indice, 'valor_unitario')} />
+                      </>
                     )
                   },
                   {
@@ -2019,34 +2233,40 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     const resumoApropriacao = calcularResumoRateios(item);
 
                     return (
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
-                          {linhasApropriacao.length > 0 ? (
-                            <>
-                              <div className="grid gap-1 text-xs text-[var(--c-text)]">
-                                {linhasApropriacao.slice(0, 2).map((linha, linhaIndex) => (
-                                  <div key={`${linha}-${linhaIndex}`} className="truncate">{linha}</div>
-                                ))}
-                                {linhasApropriacao.length > 2 && (
-                                  <div className="text-[var(--c-muted)]">+{linhasApropriacao.length - 2} rateio(s)</div>
-                                )}
-                              </div>
-                              <div className={`text-xs font-semibold ${resumoApropriacao.fechado ? 'text-emerald-700' : 'text-amber-700'}`}>
-                                {resumoApropriacao.fechado ? 'Fechado' : `Saldo ${formatarQuantidade(resumoApropriacao.saldo)}`}
-                              </div>
-                            </>
-                          ) : (
-                            <span className="text-xs text-[var(--c-muted)]">Nenhuma</span>
-                          )}
+                      <>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            {linhasApropriacao.length > 0 ? (
+                              <>
+                                <div className="grid gap-1 text-xs text-[var(--c-text)]">
+                                  {linhasApropriacao.slice(0, 2).map((linha, linhaIndex) => (
+                                    <div key={`${linha}-${linhaIndex}`} className="truncate">{linha}</div>
+                                  ))}
+                                  {linhasApropriacao.length > 2 && (
+                                    <div className="text-[var(--c-muted)]">+{linhasApropriacao.length - 2} rateio(s)</div>
+                                  )}
+                                </div>
+                                <div
+                                  className="text-xs font-semibold"
+                                  style={{ color: resumoApropriacao.fechado ? 'var(--sem-success)' : 'var(--sem-warning)' }}
+                                >
+                                  {resumoApropriacao.fechado ? 'Fechado' : `Saldo ${formatarQuantidade(resumoApropriacao.saldo)}`}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-xs text-[var(--c-muted)]">Nenhuma</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm shrink-0"
+                            onClick={() => abrirModalApropriacao(item.__indice)}
+                          >
+                            {linhasApropriacao.length > 0 ? 'Editar' : 'Apropriar'}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm shrink-0"
-                          onClick={() => abrirModalApropriacao(item.__indice)}
-                        >
-                          {linhasApropriacao.length > 0 ? 'Editar' : 'Apropriar'}
-                        </button>
-                      </div>
+                        <ErroCampo mensagem={erroDoItem(item.__indice, 'apropriacao')} />
+                      </>
                     );
                   }
                 },
@@ -2056,14 +2276,18 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     titulo: 'Necessário para',
                     tipo: 'data',
                     render: (item) => (
-                      <input
-                        type="date"
-                        className={`input ${!item.necessario_para ? 'border-red-400' : ''}`}
-                        aria-label="Data em que o item é necessário"
-                        value={item.necessario_para}
-                        onChange={(event) => atualizarItem(item.__indice, 'necessario_para', event.target.value)}
-                        required
-                      />
+                      <>
+                        <input
+                          type="date"
+                          className="input"
+                          style={!item.necessario_para ? { borderColor: 'var(--sem-danger)' } : undefined}
+                          aria-label="Data em que o item é necessário"
+                          value={item.necessario_para}
+                          onChange={(event) => atualizarItem(item.__indice, 'necessario_para', event.target.value)}
+                          required
+                        />
+                        <ErroCampo mensagem={erroDoItem(item.__indice, 'necessario_para')} />
+                      </>
                     )
                   },
                   {
@@ -2108,11 +2332,11 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                           {item.arquivo_nome_original || 'Sem arquivo anexado'}
                         </div>
                         {item.arquivo_url && (
-                          <div className="flex flex-wrap gap-2 text-xs">
-                            <button type="button" className="text-blue-600 hover:underline" onClick={() => abrirArquivoItem(item)}>
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirArquivoItem(item)}>
                               Abrir
                             </button>
-                            <button type="button" className="text-red-600 hover:underline" onClick={() => removerArquivoItem(item.__indice)}>
+                            <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => removerArquivoItem(item.__indice)}>
                               Remover arquivo
                             </button>
                           </div>
@@ -2131,7 +2355,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
               vazio="Adicione itens a partir da lista de insumos ou crie item manual."
               urgencia={(item) => (calcularResumoRateios(item).fechado ? null : 'warning')}
               acoesLinha={(item) => (
-                <button type="button" className="btn btn-danger btn-sm" onClick={() => removerItem(item.__indice)}>
+                <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => removerItem(item.__indice)}>
                   Remover
                 </button>
               )}
@@ -2139,218 +2363,281 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
             />
           )}
 
-          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div
+            className="mt-4 rounded-lg border px-4 py-3 text-sm"
+            style={{
+              borderColor: 'var(--sem-success-border)',
+              background: 'var(--sem-success-bg)',
+              color: 'var(--sem-success)'
+            }}
+          >
             Use o botao <strong>Apropriar</strong> em cada item para dividir a quantidade entre etapas da obra. O sistema mostra total, distribuido e saldo em tempo real.
           </div>
 
-          <div className="mt-6 flex flex-wrap justify-end gap-2">
-            <button type="button" className="btn btn-outline" onClick={limparRascunho}>Limpar rascunho</button>
-            <button type="button" className="btn btn-outline" onClick={() => navigate('/solicitacoes-compra')}>Cancelar</button>
-            <button type="button" className="btn btn-primary" onClick={handleSalvar} disabled={loading}>{loading ? 'Preparando...' : 'Revisar solicitação'}</button>
+          {/* C5: UM primário sólido, secundário em contorno, destrutiva apartada. */}
+          <div className="app-actionbar mt-6">
+            <button type="button" className="btn btn-outline btn-perigo-suave" onClick={limparRascunho}>
+              Limpar rascunho
+            </button>
+            <span className="app-actionbar-apartada">
+              <button type="button" className="btn btn-outline" onClick={() => navigate('/solicitacoes-compra')}>Cancelar</button>
+              <button type="button" className="btn btn-primary" onClick={handleSalvar} disabled={loading}>{loading ? 'Preparando...' : 'Revisar solicitação'}</button>
+            </span>
           </div>
-        </div>
+        </BlocoConteudo>
       </div>
 
-      {modalManualAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="card w-full max-w-lg">
-            <div className="card-header flex items-center justify-between gap-3">
-              <h2 className="font-semibold">Novo item manual</h2>
-              <button type="button" className="btn btn-outline" onClick={() => setModalManualAberto(false)}>Fechar</button>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="grid gap-2 md:col-span-2">
-                <label className="text-sm font-medium">Nome *</label>
-                <input className="input" value={itemManual.nome_manual} onChange={(event) => setItemManual((atual) => ({ ...atual, nome_manual: event.target.value }))} />
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Unidade *</label>
-                <select
-                  className="input"
-                  value={itemManual.unidade_id}
-                  onChange={(event) => {
-                    const unidade = unidades.find((item) => String(item.id) === String(event.target.value));
-                    setItemManual((atual) => ({
-                      ...atual,
-                      unidade_id: unidade?.id ? String(unidade.id) : '',
-                      unidade_sigla_manual: unidade?.sigla || unidade?.nome || ''
-                    }));
-                  }}
-                >
-                  <option value="">Selecione</option>
-                  {unidades.map((unidade) => (
-                    <option key={unidade.id || unidade.sigla} value={unidade.id}>
-                      {unidade.sigla || unidade.nome} {unidade.nome && unidade.sigla ? `- ${unidade.nome}` : ''}
-                    </option>
-                  ))}
-                </select>
-                {!unidades.length ? (
-                  <span className="text-xs text-[var(--c-muted)]">Nenhuma unidade cadastrada encontrada.</span>
-                ) : null}
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Quantidade *</label>
-                <input type="number" min="0.01" step="0.01" className="input" value={itemManual.quantidade} onChange={(event) => setItemManual((atual) => ({ ...atual, quantidade: event.target.value }))} />
-              </div>
-              {!modoCompraDireta && (
-                <div className="grid gap-2 md:col-span-2">
-                  <label className="text-sm font-medium">Especificação</label>
-                  <textarea className="input min-h-[96px]" value={itemManual.especificacao} onChange={(event) => setItemManual((atual) => ({ ...atual, especificacao: event.target.value }))} />
-                </div>
-              )}
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button type="button" className="btn btn-outline" onClick={() => setModalManualAberto(false)}>Cancelar</button>
-              <button type="button" className="btn btn-primary" onClick={adicionarItemManual}>Adicionar</button>
-            </div>
-          </div>
+      {/*
+        R9/R27 — os três modais abaixo INTERROMPEM o trabalho principal
+        (montar a compra): cadastrar um credor no meio da solicitação é o
+        exemplo literal da regra. O que mudou foi a casca: era `fixed inset-0`
+        à mão, com painel de altura livre e sem rolagem própria. Agora é o
+        `OverlayModal` do sistema, que resolve empilhamento, trava de rolagem,
+        Escape, foco e a rolagem do corpo com cabeçalho e rodapé FIXOS (R27).
+      */}
+      <OverlayModal
+        aberto={modalManualAberto}
+        rotulo="Novo item manual"
+        largura="var(--modal-max-w-md, 680px)"
+        onFechar={() => setModalManualAberto(false)}
+      >
+        <div data-modal="cabecalho" className="app-bloco-head">
+          <h2 className="app-bloco-titulo">Novo item manual</h2>
+          <span className="app-bloco-acoes">
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setModalManualAberto(false)}>Fechar</button>
+          </span>
         </div>
-      )}
 
-      {modoCompraDireta && modalCredorAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="card w-full max-w-xl">
-            <div className="card-header flex items-center justify-between gap-3">
-              <h2 className="font-semibold">Cadastrar Credor</h2>
-              <button type="button" className="btn btn-outline" onClick={() => setModalCredorAberto(false)}>
-                Fechar
-              </button>
-            </div>
-
-            {faixaAvisos}
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="grid gap-2 text-sm">
-                CPF/CNPJ
-                <input
-                  className="input"
-                  value={novoCredor.cpf_cnpj}
-                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, cpf_cnpj: maskCpfCnpj(event.target.value) }))}
-                  inputMode="numeric"
-                  maxLength={18}
-                />
-              </label>
-              <label className="grid gap-2 text-sm">
-                Nome *
-                <input
-                  className="input"
-                  value={novoCredor.nome}
-                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, nome: event.target.value }))}
-                />
-              </label>
-              <label className="grid gap-2 text-sm">
-                Telefone
-                <input
-                  className="input"
-                  value={novoCredor.telefone}
-                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, telefone: event.target.value }))}
-                />
-              </label>
-              <label className="grid gap-2 text-sm">
-                E-mail
-                <input
-                  type="email"
-                  className="input"
-                  value={novoCredor.email}
-                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, email: event.target.value }))}
-                />
-              </label>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button type="button" className="btn btn-outline" onClick={() => setModalCredorAberto(false)}>
-                Cancelar
-              </button>
-              <button type="button" className="btn btn-primary" onClick={cadastrarCredorCompraDireta} disabled={salvandoCredor}>
-                {salvandoCredor ? 'Salvando...' : 'Salvar credor'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modalApropriacaoIndex !== null && itemModalAtual && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="card compras-apropriacao-modal flex max-h-[94vh] w-full flex-col overflow-y-auto">
-            <div className="card-header flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">Apropriar item</h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  {itemModalAtual.insumo_nome} · Quantidade total {formatarQuantidade(itemModalAtual.quantidade)}
-                </p>
-              </div>
-              <button type="button" className="btn btn-outline" onClick={fecharModalApropriacao}>Fechar</button>
-            </div>
-
-            <div className="flex flex-1 flex-col gap-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Total</div>
-                  <div className="mt-2 text-xl font-semibold">{formatarQuantidade(resumoModalApropriacao.total)}</div>
-                </div>
-                <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Distribuído</div>
-                  <div className="mt-2 text-xl font-semibold">{formatarQuantidade(resumoModalApropriacao.distribuido)}</div>
-                </div>
-                <div className={`rounded-xl border px-4 py-3 ${resumoModalApropriacao.fechado ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                  <div className="text-xs uppercase tracking-[0.14em]">Saldo</div>
-                  <div className="mt-2 text-xl font-semibold">{formatarQuantidade(resumoModalApropriacao.saldo)}</div>
-                </div>
-              </div>
-
-              <div className="grid gap-3">
-                {rateiosModal.map((rateio, rateioIndex) => (
-                  <div key={`rateio-${rateioIndex}`} className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 md:grid-cols-[minmax(0,1fr)_170px_96px]">
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Apropriação</label>
-                      <ApropriacaoAutocomplete
-                        value={rateio.apropriacao_id}
-                        options={apropriacoes}
-                        onChange={(id) => atualizarRateioModal(rateioIndex, 'apropriacao_id', id)}
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Quantidade apropriada</label>
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        className="input"
-                        value={rateio.quantidade_apropriada}
-                        onChange={(event) => atualizarRateioModal(rateioIndex, 'quantidade_apropriada', event.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <label className="text-sm font-medium">Ação</label>
-                      <button type="button" className="btn btn-outline justify-center" onClick={() => removerRateioModal(rateioIndex)}>
-                        Remover
-                      </button>
-                    </div>
-                  </div>
+        <div className="p-4">
+          {modalManualAberto && faixaAvisos}
+          <FormSecao colunas={2}>
+            <CampoForm label="Nome" obrigatorio linha erro={errosCampo.item_manual}>
+              <input
+                className="input"
+                value={itemManual.nome_manual}
+                onChange={(event) => {
+                  limparErroCampo('item_manual');
+                  setItemManual((atual) => ({ ...atual, nome_manual: event.target.value }));
+                }}
+              />
+            </CampoForm>
+            <CampoForm label="Unidade" obrigatorio erro={errosCampo.item_manual}>
+              <select
+                className="input"
+                value={itemManual.unidade_id}
+                onChange={(event) => {
+                  limparErroCampo('item_manual');
+                  const unidade = unidades.find((item) => String(item.id) === String(event.target.value));
+                  setItemManual((atual) => ({
+                    ...atual,
+                    unidade_id: unidade?.id ? String(unidade.id) : '',
+                    unidade_sigla_manual: unidade?.sigla || unidade?.nome || ''
+                  }));
+                }}
+              >
+                <option value="">Selecione</option>
+                {unidades.map((unidade) => (
+                  <option key={unidade.id || unidade.sigla} value={unidade.id}>
+                    {unidade.sigla || unidade.nome} {unidade.nome && unidade.sigla ? `- ${unidade.nome}` : ''}
+                  </option>
                 ))}
-              </div>
+              </select>
+              {!unidades.length ? (
+                <span className="form-hint">Nenhuma unidade cadastrada encontrada.</span>
+              ) : null}
+            </CampoForm>
+            <CampoForm label="Quantidade" obrigatorio>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                className="input"
+                value={itemManual.quantidade}
+                onChange={(event) => setItemManual((atual) => ({ ...atual, quantidade: event.target.value }))}
+              />
+            </CampoForm>
+            {!modoCompraDireta && (
+              <CampoForm label="Especificação" tipo="observacao">
+                <textarea
+                  className="input"
+                  rows={4}
+                  value={itemManual.especificacao}
+                  onChange={(event) => setItemManual((atual) => ({ ...atual, especificacao: event.target.value }))}
+                />
+              </CampoForm>
+            )}
+          </FormSecao>
+        </div>
 
-              <div className="mt-auto flex flex-wrap justify-between gap-2 pt-4">
-                <button type="button" className="btn btn-outline" onClick={adicionarRateioModal}>
-                  Adicionar apropriação
-                </button>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" className="btn btn-outline" onClick={fecharModalApropriacao}>
-                    Cancelar
-                  </button>
-                  <button type="button" className="btn btn-primary" onClick={salvarRateiosItem}>
-                    Salvar distribuição
+        <div data-modal="rodape" className="app-actionbar p-4">
+          <span className="app-actionbar-apartada">
+            <button type="button" className="btn btn-outline" onClick={() => setModalManualAberto(false)}>Cancelar</button>
+            <button type="button" className="btn btn-primary" onClick={adicionarItemManual}>Adicionar</button>
+          </span>
+        </div>
+      </OverlayModal>
+
+      <OverlayModal
+        aberto={modalCredorVisivel}
+        rotulo="Cadastrar Credor"
+        largura="var(--modal-max-w-md, 680px)"
+        onFechar={() => setModalCredorAberto(false)}
+      >
+        <div data-modal="cabecalho" className="app-bloco-head">
+          <h2 className="app-bloco-titulo">Cadastrar Credor</h2>
+          <span className="app-bloco-acoes">
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setModalCredorAberto(false)}>
+              Fechar
+            </button>
+          </span>
+        </div>
+
+        <div className="p-4">
+          {modalCredorVisivel && faixaAvisos}
+
+          <FormSecao colunas={2}>
+            <CampoForm label="CPF/CNPJ" erro={errosCampo.credor_cpf_cnpj}>
+              <input
+                className="input"
+                value={novoCredor.cpf_cnpj}
+                onChange={(event) => {
+                  limparErroCampo('credor_cpf_cnpj');
+                  setNovoCredor((atual) => ({ ...atual, cpf_cnpj: maskCpfCnpj(event.target.value) }));
+                }}
+                inputMode="numeric"
+                maxLength={18}
+              />
+            </CampoForm>
+            <CampoForm label="Nome" obrigatorio erro={errosCampo.credor_nome}>
+              <input
+                className="input"
+                value={novoCredor.nome}
+                onChange={(event) => {
+                  limparErroCampo('credor_nome');
+                  setNovoCredor((atual) => ({ ...atual, nome: event.target.value }));
+                }}
+              />
+            </CampoForm>
+            <CampoForm label="Telefone">
+              <input
+                className="input"
+                value={novoCredor.telefone}
+                onChange={(event) => setNovoCredor((atual) => ({ ...atual, telefone: event.target.value }))}
+              />
+            </CampoForm>
+            <CampoForm label="E-mail">
+              <input
+                type="email"
+                className="input"
+                value={novoCredor.email}
+                onChange={(event) => setNovoCredor((atual) => ({ ...atual, email: event.target.value }))}
+              />
+            </CampoForm>
+          </FormSecao>
+        </div>
+
+        <div data-modal="rodape" className="app-actionbar p-4">
+          <span className="app-actionbar-apartada">
+            <button type="button" className="btn btn-outline" onClick={() => setModalCredorAberto(false)}>
+              Cancelar
+            </button>
+            <button type="button" className="btn btn-primary" onClick={cadastrarCredorCompraDireta} disabled={salvandoCredor}>
+              {salvandoCredor ? 'Salvando...' : 'Salvar credor'}
+            </button>
+          </span>
+        </div>
+      </OverlayModal>
+
+      <OverlayModal
+        aberto={modalApropriacaoVisivel}
+        rotulo="Apropriar item"
+        largura="var(--modal-max-w-lg, 860px)"
+        onFechar={fecharModalApropriacao}
+      >
+        <div data-modal="cabecalho" className="app-bloco-head">
+          <div>
+            <h2 className="app-bloco-titulo">Apropriar item</h2>
+            <p className="app-bloco-lead">
+              {itemModalAtual?.insumo_nome} · Quantidade total {formatarQuantidade(itemModalAtual?.quantidade)}
+            </p>
+          </div>
+          <span className="app-bloco-acoes">
+            <button type="button" className="btn btn-outline btn-sm" onClick={fecharModalApropriacao}>Fechar</button>
+          </span>
+        </div>
+
+        <div className="p-4">
+          {modalApropriacaoVisivel && faixaAvisos}
+
+          <StatGrid colunas={3}>
+            <StatTile label="Total" valor={formatarQuantidade(resumoModalApropriacao.total)} />
+            <StatTile label="Distribuído" valor={formatarQuantidade(resumoModalApropriacao.distribuido)} />
+            <StatTile
+              label="Saldo"
+              valor={formatarQuantidade(resumoModalApropriacao.saldo)}
+              tom={resumoModalApropriacao.fechado ? 'success' : 'warning'}
+            />
+          </StatGrid>
+
+          <div className="mt-4 grid gap-3">
+            {rateiosModal.map((rateio, rateioIndex) => (
+              <div key={`rateio-${rateioIndex}`} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+                <FormSecao colunas={3}>
+                  <CampoForm label="Apropriação" span={2}>
+                    <ApropriacaoAutocomplete
+                      value={rateio.apropriacao_id}
+                      options={apropriacoes}
+                      onChange={(id) => atualizarRateioModal(rateioIndex, 'apropriacao_id', id)}
+                    />
+                  </CampoForm>
+
+                  <CampoForm label="Quantidade apropriada">
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      className="input"
+                      value={rateio.quantidade_apropriada}
+                      onChange={(event) => atualizarRateioModal(rateioIndex, 'quantidade_apropriada', event.target.value)}
+                    />
+                  </CampoForm>
+                </FormSecao>
+                <div className="app-actionbar">
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm btn-perigo-suave"
+                    onClick={() => removerRateioModal(rateioIndex)}
+                  >
+                    Remover
                   </button>
                 </div>
               </div>
-            </div>
+            ))}
+          </div>
+
+          <ErroCampo mensagem={erroRateiosModal} />
+
+          <div className="mt-4">
+            <button type="button" className="btn btn-outline" onClick={adicionarRateioModal}>
+              Adicionar apropriação
+            </button>
           </div>
         </div>
-      )}
+
+        <div data-modal="rodape" className="app-actionbar p-4">
+          <span className="app-actionbar-apartada">
+            <button type="button" className="btn btn-outline" onClick={fecharModalApropriacao}>
+              Cancelar
+            </button>
+            <button type="button" className="btn btn-primary" onClick={salvarRateiosItem}>
+              Salvar distribuição
+            </button>
+          </span>
+        </div>
+      </OverlayModal>
 
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
-    </div>
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

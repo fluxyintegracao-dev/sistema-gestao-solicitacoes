@@ -34,10 +34,25 @@
     "src/modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe.jsx",
     "src/modules/provisionamento-financeiro/pages/ProvisionamentoRelatorioOperacional.jsx",
     "src/modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros.jsx",
+    "src/modules/solicitacao-compra/components/CompraPreviewModal.jsx",
+    "src/modules/solicitacao-compra/components/ItemCompraDetalhe.jsx",
+    "src/modules/solicitacao-compra/components/TratamentoItemManual.jsx",
+    "src/modules/solicitacao-compra/pages/ComprasDelegacao.jsx",
     "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx",
+    "src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx",
     "src/modules/solicitacao-compra/pages/GestaoApropriacoes.jsx",
     "src/modules/solicitacao-compra/pages/GestaoCategorias.jsx",
+    "src/modules/solicitacao-compra/pages/GestaoFornecedores.jsx",
+    "src/modules/solicitacao-compra/pages/GestaoInsumos.jsx",
     "src/modules/solicitacao-compra/pages/GestaoUnidades.jsx",
+    "src/modules/solicitacao-compra/pages/ListaCotacoes.jsx",
+    "src/modules/solicitacao-compra/pages/NovaCompraDireta.jsx",
+    "src/modules/solicitacao-compra/pages/NovaSolicitacaoCompra.jsx",
+    "src/modules/solicitacao-compra/pages/PedidosCompra.jsx",
+    "src/modules/solicitacao-compra/pages/RevisarCompraDireta.jsx",
+    "src/modules/solicitacao-compra/pages/RevisarSolicitacaoCompra.jsx",
+    "src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx",
+    "src/modules/solicitacao-compra/pages/SolicitacoesCompra.jsx",
     "src/modules/sst/pages/SstCentroOperacional.jsx",
     "src/modules/sst/pages/SstConfiguracoes.jsx",
     "src/modules/sst/pages/SstCrudPage.jsx",
@@ -52,6 +67,7 @@
     "src/modules/sst/pages/SstTimeline.jsx",
     "src/pages/AreasObra.jsx",
     "src/pages/AreasPorSetorOrigem.jsx",
+    "src/pages/ArquivosModelos.jsx",
     "src/pages/ArquivosModelosConfig.jsx",
     "src/pages/AutomacaoStatusSetor.jsx",
     "src/pages/CartoesRecarga.jsx",
@@ -59,6 +75,7 @@
     "src/pages/ComercialEmpreendimentos.jsx",
     "src/pages/ComercialMapaUnidades.jsx",
     "src/pages/ComercialModelosContrato.jsx",
+    "src/pages/ComercialRelatorioOperacional.jsx",
     "src/pages/ComercialTabelasPreco.jsx",
     "src/pages/ComercialUnidades.jsx",
     "src/pages/ComportamentoRecebimentoSetor.jsx",
@@ -89,8 +106,10 @@
     "src/pages/ConfiguracoesVisibilidadeUi.jsx",
     "src/pages/ContratoFluxoNovo.jsx",
     "src/pages/ContratoObraCategorias.jsx",
+    "src/pages/ContratosRelatorioOperacional.jsx",
     "src/pages/CoresSistema.jsx",
     "src/pages/CrmRelatorioExecutivo.jsx",
+    "src/pages/Dashboard.jsx",
     "src/pages/DefinirSenha.jsx",
     "src/pages/EmpresasGrupo.jsx",
     "src/pages/FinanceiroBaixas.jsx",
@@ -132,9 +151,11 @@
     "src/pages/Obras.jsx",
     "src/pages/ParceiroCategorias.jsx",
     "src/pages/Parceiros.jsx",
+    "src/pages/Perfil.jsx",
     "src/pages/PermissoesAreas.jsx",
     "src/pages/PermissoesAreasPadroes.jsx",
     "src/pages/PermissoesSetor.jsx",
+    "src/pages/PrioridadesDiretoria.jsx",
     "src/pages/RecuperarSenha.jsx",
     "src/pages/RelatoriosAdministrativos.jsx",
     "src/pages/RhDpApuracao.jsx",
@@ -164,6 +185,7 @@
     "src/pages/Solicitacoes/Filtros.jsx",
     "src/pages/Solicitacoes/ModalEnviarSetor.jsx",
     "src/pages/Solicitacoes/index.jsx",
+    "src/pages/SolicitacoesRelatorioOperacional.jsx",
     "src/pages/SolicitacoesSlaSetor.jsx",
     "src/pages/StatusSetor.jsx",
     "src/pages/TimeoutInatividade.jsx",
@@ -171,6 +193,7 @@
     "src/pages/TiposSolicitacao.jsx",
     "src/pages/TiposSolicitacaoPorSetor.jsx",
     "src/pages/TiposSubContrato.jsx",
+    "src/pages/Treinamento.jsx",
     "src/pages/UploadComprovantes.jsx",
     "src/pages/UsuarioNovo.jsx",
     "src/pages/Usuarios.jsx",
@@ -180,10 +203,13 @@
     "src/pages/UsuariosPermissoesRhDp.jsx"
   ],
   "excecoes_medidas": {
-    "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula"
+    "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula",
+    "src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx": "larguras minimas por coluna do comparativo: cada fornecedor e uma coluna nova, e a largura minima e o que impede o preco de quebrar em duas linhas. Medida que pertence ao dado, nao ao layout — mesma familia do pivo da ObraTipoApropriacao."
   },
   "excecoes_tabela_crua": {
-    "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas com painel expansível por célula — arranjo especial registrado"
+    "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas com painel expansível por célula — arranjo especial registrado",
+    "src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx": "comparativo de precos com uma COLUNA POR FORNECEDOR, geradas do dado, mais coluna fixa. O TabelaPadrao nao faz coluna dinamica por dado — forcar ali seria reescrever o componente no meio da rodada. As duas tabelas vivem dentro de contenedores com overflow-x: auto, que e o arranjo que a R18 declara CORRETO. Reavaliar quando/se o componente ganhar colunas dinamicas (R16b).",
+    "src/modules/solicitacao-compra/pages/RevisarSolicitacaoCompra.jsx": "<table> dentro do template HTML do PDF (bloco `conteudoPreviewPdf`): roda em <iframe srcDoc>, que e OUTRO documento — nao herda tema, nao ve styles/escala.css e nao alcanca token nenhum. Falso positivo por natureza."
   },
   "telas_compartilhadas": {
     "porque": "Telas servidas por VARIOS modulos, ou por nenhum. Nao pertencem a leva de modulo nenhuma e por isso escapariam de todas - ponto cego exposto em 03/09, quando a ModuloRelatorios entrou por engano no manifesto do RH/DP. Ver docs/TELAS-COMPARTILHADAS.md.",
@@ -275,7 +301,8 @@
   },
   "excecoes_cor": {
     "src/pages/ConfiguracoesStatusPedidoCompra.jsx": "cor do status é DADO: o hexadecimal é o value do <input type=\"color\"> e o padrão gravado no registro. Token viraria string do token no banco.",
-    "src/modules/crm/pages/CrmKanban.jsx": "cor da etapa e DADO: o hexadecimal e o value do <input type=\"color\"> e o padrao gravado no registro da etapa. Token viraria a string do token no banco — mesmo caso ja registrado da ConfiguracoesStatusPedidoCompra."
+    "src/modules/crm/pages/CrmKanban.jsx": "cor da etapa e DADO: o hexadecimal e o value do <input type=\"color\"> e o padrao gravado no registro da etapa. Token viraria a string do token no banco — mesmo caso ja registrado da ConfiguracoesStatusPedidoCompra.",
+    "src/modules/solicitacao-compra/pages/RevisarSolicitacaoCompra.jsx": "hexadecimais do template HTML do PDF (#111827, #d1d5db, #f3f4f6): documento impresso em <iframe srcDoc>, sem acesso aos tokens do app. Tokenizar ali gravaria a string do token no PDF."
   },
   "componentes_de_tela": {
     "porque": "Arquivo que NAO tem rota propria e so renderiza dentro de outra tela. Ele precisa das regras mecanicas (cor, medida, filtro, overflow) mas nao pode ter entrada no harness — nao ha URL para abrir. Sem esta categoria o check de cobertura reprovava, com razao: manifesto sem entrada no harness significa 'ninguem abre isso no preview'. Aqui a resposta e outra: quem abre e a tela que o renderiza, declarada abaixo e conferida contra a lista do harness.",
@@ -293,7 +320,10 @@
       "src/pages/SolicitacaoDetalhe/RecargaCartaoDetalhe.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
       "src/pages/SolicitacaoDetalhe/RetornoSolicitacaoBar.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
       "src/pages/SolicitacaoDetalhe/Timeline.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
-      "src/pages/Solicitacoes/ModalEnviarSetor.jsx": "src/pages/SolicitacaoDetalhe/index.jsx"
+      "src/pages/Solicitacoes/ModalEnviarSetor.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/modules/solicitacao-compra/components/CompraPreviewModal.jsx": "src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx",
+      "src/modules/solicitacao-compra/components/ItemCompraDetalhe.jsx": "src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx",
+      "src/modules/solicitacao-compra/components/TratamentoItemManual.jsx": "src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx"
     },
     "orfaos_nao_promovidos": {
       "porque": "Migrados nesta rodada, mas NINGUEM os renderiza — conferido por busca em todo o src. Componente sem dono nao entra: se ninguem o abre, ninguem o mede, e po-lo no manifesto seria fingir cobertura. Ficam aqui a espera da decisao do cliente (ligar ou remover), e o registro existe para que a ausencia deles no manifesto seja uma escolha explicita, nao um esquecimento.",

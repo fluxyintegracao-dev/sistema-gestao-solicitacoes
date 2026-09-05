@@ -17,7 +17,25 @@ import {
   isBusinessAdmin
 } from '../../../utils/acessoProduto';
 import { userHasSetorCapability } from '../../../utils/setor';
-import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  CelulaDupla,
+  Pagina,
+  PageHeader,
+  TabelaPadrao,
+  alternarValorFiltro,
+  useAvisos,
+  useConfirmacao
+} from '../../../components/padrao';
+import StatusBadge from '../../../components/StatusBadge';
+import {
+  STATUS_SOLICITACAO_COMPRA,
+  chaveStatusCompra,
+  familiaStatusCompra,
+  rotuloStatusCompra
+} from '../utils/statusCompras';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 
 function formatarData(data) {
@@ -39,69 +57,76 @@ function formatarData(data) {
   return valor.toLocaleDateString('pt-BR');
 }
 
-function formatarStatus(status) {
-  return String(status || '-')
-    .replace(/_/g, ' ')
-    .toUpperCase();
-}
-
-function classNameStatus(status) {
-  const valor = String(status || '').toUpperCase();
-
-  if (valor === 'PENDENTE' || valor === 'ENVIADO' || valor === 'ABERTA') {
-    return 'app-status-pill compra-status-pill compra-status-blue bg-blue-100 text-blue-700';
-  }
-
-  if (valor === 'AGUARDANDO_DIRETORIA') {
-    return 'app-status-pill compra-status-pill compra-status-warning bg-amber-100 text-amber-700';
-  }
-
-  if (valor === 'FECHAMENTO_PARCIAL') {
-    return 'app-status-pill compra-status-pill compra-status-warning bg-amber-100 text-amber-800';
-  }
-
-  if (valor === 'FINALIZADA' || valor === 'ENCERRADO') {
-    return 'app-status-pill compra-status-pill compra-status-muted bg-slate-100 text-slate-700';
-  }
-
-  return 'app-status-pill compra-status-pill compra-status-default bg-indigo-100 text-indigo-700';
-}
-
 function estaAguardandoRevisaoGeo(status) {
-  return ['PENDENTE', 'ENVIADO', 'INTEGRADO_SIENGE'].includes(
-    String(status || '').trim().toUpperCase().replace(/[\s-]+/g, '_')
-  );
+  return ['PENDENTE', 'ENVIADO', 'INTEGRADO_SIENGE'].includes(chaveStatusCompra(status));
+}
+
+function codigoSolicitacao(solicitacao) {
+  return `SC-${String(solicitacao?.id ?? '').padStart(5, '0')}`;
 }
 
 export default function SolicitacoesCompra() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [obras, setObras] = useState([]);
   const [loading, setLoading] = useState(false);
   const [inativando, setInativando] = useState(false);
   const [encaminhando, setEncaminhando] = useState(false);
-  const [obraId, setObraId] = useState('');
-  // ?status= chega do cartão de pendências do Hub: a tela abre já
-  // filtrada no MESMO status que o cartão contou.
-  const [status, setStatus] = useState(() => (
-    String(new URLSearchParams(window.location.search).get('status') || '').trim().toUpperCase()
-  ));
   const [busca, setBusca] = useState('');
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [selecionadas, setSelecionadas] = useState([]);
+
+  /*
+    FILTRO QUE VEIO DA URL PRECISA APARECER (defeito de 05/09).
+
+    `?status=` chega do cartão de pendências do Hub: a tela abre já filtrada
+    no MESMO status que o cartão contou. Na versão anterior o valor ia direto
+    para o `<select>`, e quando ele não estava entre as CINCO opções
+    oferecidas (`AGUARDANDO_DIRETORIA`, por exemplo, não estava) o controle
+    renderizava VAZIO enquanto a lista continuava filtrada: a tela mostrava
+    "Todos" e listava um status só.
+
+    Com a `BarraFiltros` a etiqueta afirma o recorte ativo — mas só se o
+    valor existir entre as opções da dimensão. Por isso as opções são a UNIÃO
+    de: os estados que a tela reconhece, os estados presentes nos dados
+    carregados e o valor que veio da URL (ver `opcoesStatus`). Assim é
+    impossível haver filtro aplicado sem etiqueta.
+  */
+  const [ativos, setAtivos] = useState(() => {
+    const daUrl = chaveStatusCompra(new URLSearchParams(window.location.search).get('status'));
+    return {
+      obra_id: new Set(),
+      status: new Set(daUrl ? [daUrl] : [])
+    };
+  });
+
   const podeInativar = canDeleteCompraSolicitacoes(user);
   const podeEncaminharCompras = (
     canEncaminharCompraSolicitacoes(user)
     && (userHasSetorCapability(user, 'eh_setor_geo') || isBusinessAdmin(user))
   );
   const podeSelecionar = podeInativar || podeEncaminharCompras;
+
+  /*
+    `obra_id` é parâmetro do SERVIÇO (`listarSolicitacoesCompra`), que monta
+    `?obra_id=` com UM valor — daí `unico: true` na dimensão. Marcação
+    múltipla aqui deixaria a pessoa marcar duas obras, ver duas etiquetas e a
+    lista não estreitar (R15: capacidade aparente sem efeito).
+  */
+  const obraId = useMemo(
+    () => [...(ativos.obra_id || [])][0] || '',
+    [ativos.obra_id]
+  );
+
   async function carregarObras() {
     try {
       const data = await getMinhasObras({ modo: 'CRIACAO' });
       setObras(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
+      avisar.erro(error?.message || 'Erro ao carregar obras');
     }
   }
 
@@ -113,7 +138,7 @@ export default function SolicitacoesCompra() {
       setSolicitacoes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar solicitacoes de compra');
+      avisar.erro(error?.message || 'Erro ao carregar solicitacoes de compra');
     } finally {
       setLoading(false);
     }
@@ -123,17 +148,74 @@ export default function SolicitacoesCompra() {
     carregarObras();
   }, []);
 
+  // R23: o recorte de obra aplica ao MARCAR — nada de botão "aplicar".
   useEffect(() => {
     carregarSolicitacoes();
   }, [obraId]);
 
   useComprasRealtimeRefresh(carregarSolicitacoes);
 
+  /*
+    As opções do filtro de status são os estados que a tela DE FATO reconhece
+    (11), não as cinco de antes. Solicitação parada em AGUARDANDO_DIRETORIA
+    aparecia na lista e não podia ser isolada — o estado que mais se quer
+    filtrar era o que faltava.
+  */
+  const opcoesStatus = useMemo(() => {
+    const mapa = new Map(STATUS_SOLICITACAO_COMPRA.map((opcao) => [opcao.valor, opcao.rotulo]));
+    solicitacoes.forEach((solicitacao) => {
+      const chave = chaveStatusCompra(solicitacao.status);
+      if (chave && !mapa.has(chave)) {
+        mapa.set(chave, rotuloStatusCompra(chave));
+      }
+    });
+    (ativos.status || new Set()).forEach((chave) => {
+      if (chave && !mapa.has(chave)) {
+        mapa.set(chave, rotuloStatusCompra(chave));
+      }
+    });
+    return [...mapa.entries()].map(([valor, rotulo]) => ({ valor, rotulo }));
+  }, [solicitacoes, ativos.status]);
+
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra',
+      unico: true,
+      opcoes: obras.map((obra) => ({
+        valor: String(obra.id),
+        rotulo: obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome
+      }))
+    },
+    {
+      // O status é filtrado NA TELA (a lista já vem inteira), então aqui a
+      // marcação múltipla tem efeito de verdade: dois status marcados =
+      // união dos dois. Sem `unico`, porque nada se perde no caminho.
+      id: 'status',
+      rotulo: 'Status',
+      opcoes: opcoesStatus
+    }
+  ], [obras, opcoesStatus]);
+
+  function alternarFiltro(dimensao, valor, opcoes) {
+    setAtivos((atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes));
+  }
+
+  function limparFiltros() {
+    setAtivos({ obra_id: new Set(), status: new Set() });
+    setBusca('');
+  }
+
   const solicitacoesFiltradas = useMemo(() => {
     const termo = String(busca || '').trim().toLowerCase();
+    const statusSelecionados = ativos.status || new Set();
 
     return solicitacoes.filter((solicitacao) => {
-      const statusOk = !status || String(solicitacao.status || '').toUpperCase() === status;
+      // Compara pela CHAVE CANÔNICA: o banco grava CANCELADO e CANCELADA
+      // (RECUSADO e RECUSADA) para o mesmo estado, e filtrar por igualdade
+      // crua deixava metade dos registros de fora do próprio filtro.
+      const statusOk = statusSelecionados.size === 0
+        || statusSelecionados.has(chaveStatusCompra(solicitacao.status));
 
       if (!statusOk) {
         return false;
@@ -146,7 +228,7 @@ export default function SolicitacoesCompra() {
       const obraNome = String(solicitacao.obra?.nome || '').toLowerCase();
       const obraCodigo = String(solicitacao.obra?.codigo || '').toLowerCase();
       const solicitante = String(solicitacao.solicitante?.nome || '').toLowerCase();
-      const codigo = `sc-${String(solicitacao.id || '').padStart(5, '0')}`.toLowerCase();
+      const codigo = codigoSolicitacao(solicitacao).toLowerCase();
 
       return (
         obraNome.includes(termo) ||
@@ -155,7 +237,7 @@ export default function SolicitacoesCompra() {
         codigo.includes(termo)
       );
     });
-  }, [busca, solicitacoes, status]);
+  }, [busca, solicitacoes, ativos.status]);
 
   const idsFiltrados = useMemo(
     () => solicitacoesFiltradas.map((solicitacao) => Number(solicitacao.id)).filter(Boolean),
@@ -168,11 +250,6 @@ export default function SolicitacoesCompra() {
       .map((solicitacao) => Number(solicitacao.id));
   }, [selecionadas, solicitacoesFiltradas]);
 
-  const todasSelecionadas = useMemo(
-    () => idsFiltrados.length > 0 && idsFiltrados.every((id) => selecionadas.includes(id)),
-    [idsFiltrados, selecionadas]
-  );
-
   useEffect(() => {
     setSelecionadas((atuais) => atuais.filter((id) => idsFiltrados.includes(id)));
   }, [idsFiltrados]);
@@ -184,8 +261,8 @@ export default function SolicitacoesCompra() {
     );
   }
 
-  function toggleTodasSelecionadas() {
-    setSelecionadas(todasSelecionadas ? [] : idsFiltrados);
+  function toggleTodasSelecionadas(marcar, ids) {
+    setSelecionadas(marcar ? ids.map((id) => Number(id)).filter(Boolean) : []);
   }
 
   async function handleBaixarPdf(id) {
@@ -198,317 +275,282 @@ export default function SolicitacoesCompra() {
       }, 10000);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao gerar PDF');
+      avisar.erro(error?.message || 'Erro ao gerar PDF');
     }
   }
 
   async function handleInativar(ids) {
-    const idsValidos = [...new Set(
+    /*
+      R26: o alvo é FIXADO numa `const` ANTES do `await` da confirmação. O
+      modal do sistema NÃO congela a página (o `window.confirm` congelava):
+      entre a pergunta e a ação a pessoa pode marcar outra linha, e reler
+      `selecionadas` depois do `await` faria a tela perguntar sobre um lote e
+      inativar outro — com a auditoria registrando um consentimento válido
+      para o lote errado.
+    */
+    const alvo = [...new Set(
       (Array.isArray(ids) ? ids : [ids])
         .map((id) => Number(id))
         .filter(Boolean)
     )];
 
-    if (!idsValidos.length) {
-      alert('Selecione ao menos uma solicitacao de compra.');
+    if (!alvo.length) {
+      avisar.alerta('Selecione ao menos uma solicitacao de compra.');
       return;
     }
 
-    if (!window.confirm(`Inativar ${idsValidos.length} solicitacao(oes) de compra selecionada(s)?`)) {
+    // R21: `confirmar` devolve `{ ok, texto }` — objeto é SEMPRE truthy.
+    // Sem desestruturar, o "Cancelar" seguiria com a inativação.
+    const { ok } = await confirmar({
+      titulo: 'Inativar solicitacoes de compra',
+      mensagem: `Inativar ${alvo.length} solicitacao(oes) de compra selecionada(s)? As solicitacoes saem da fila operacional.`,
+      rotuloConfirmar: 'Inativar',
+      rotuloCancelar: 'Manter',
+      destrutiva: true
+    });
+    if (!ok) {
       return;
     }
 
     try {
       setInativando(true);
-      if (idsValidos.length === 1) {
-        await inativarSolicitacaoCompra(idsValidos[0]);
+      if (alvo.length === 1) {
+        await inativarSolicitacaoCompra(alvo[0]);
       } else {
-        await inativarSolicitacoesCompra(idsValidos);
+        await inativarSolicitacoesCompra(alvo);
       }
       setSelecionadas([]);
       await carregarSolicitacoes();
-      alert('Solicitacao(oes) de compra inativada(s) com sucesso.');
+      avisar.sucesso('Solicitacao(oes) de compra inativada(s) com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao inativar solicitacao de compra');
+      avisar.erro(error?.message || 'Erro ao inativar solicitacao de compra');
     } finally {
       setInativando(false);
     }
   }
 
   async function handleEncaminharCompras(ids) {
-    const idsValidos = [...new Set(
+    // R26: mesma disciplina do `handleInativar` — alvo fixado antes do await.
+    const alvo = [...new Set(
       (Array.isArray(ids) ? ids : [ids])
         .map((id) => Number(id))
         .filter(Boolean)
     )];
 
-    if (!idsValidos.length) {
-      alert('Selecione ao menos uma solicitacao de compra.');
+    if (!alvo.length) {
+      avisar.alerta('Selecione ao menos uma solicitacao de compra.');
       return;
     }
 
-    if (!window.confirm(`Enviar ${idsValidos.length} solicitacao(oes) para a fila do setor de Compras?`)) {
+    const { ok } = await confirmar({
+      titulo: 'Enviar para a fila de Compras',
+      mensagem: `Enviar ${alvo.length} solicitacao(oes) para a fila do setor de Compras?`,
+      rotuloConfirmar: 'Enviar'
+    });
+    if (!ok) {
       return;
     }
 
     try {
       setEncaminhando(true);
-      if (idsValidos.length === 1) {
-        await encaminharSolicitacaoCompraParaCompras(idsValidos[0]);
+      if (alvo.length === 1) {
+        await encaminharSolicitacaoCompraParaCompras(alvo[0]);
       } else {
-        await encaminharSolicitacoesCompraParaCompras(idsValidos);
+        await encaminharSolicitacoesCompraParaCompras(alvo);
       }
       setSelecionadas([]);
       await carregarSolicitacoes();
-      alert('Solicitacao(oes) enviada(s) para a fila do setor de Compras.');
+      avisar.sucesso('Solicitacao(oes) enviada(s) para a fila do setor de Compras.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao enviar solicitacao para Compras');
+      avisar.erro(error?.message || 'Erro ao enviar solicitacao para Compras');
     } finally {
       setEncaminhando(false);
     }
   }
 
+  const colunas = [
+    {
+      id: 'codigo',
+      titulo: 'Codigo',
+      tipo: 'codigo',
+      render: (solicitacao) => codigoSolicitacao(solicitacao)
+    },
+    {
+      id: 'obra',
+      titulo: 'Obra',
+      tipo: 'identidade',
+      noCard: 'titulo',
+      render: (solicitacao) => (
+        <CelulaDupla
+          principal={solicitacao.obra?.nome || '-'}
+          sub={solicitacao.obra?.codigo || '-'}
+        />
+      )
+    },
+    {
+      id: 'solicitante',
+      titulo: 'Solicitante',
+      tipo: 'texto',
+      render: (solicitacao) => solicitacao.solicitante?.nome || '-'
+    },
+    {
+      id: 'itens',
+      titulo: 'Itens',
+      tipo: 'numero',
+      render: (solicitacao) => (
+        solicitacao.itens_count
+          ?? ((solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0))
+      )
+    },
+    {
+      id: 'fornecedores',
+      titulo: 'Fornecedores',
+      tipo: 'numero',
+      render: (solicitacao) => solicitacao.fornecedores_count ?? (solicitacao.fornecedores?.length || 0)
+    },
+    {
+      id: 'necessario_para',
+      titulo: 'Necessario para',
+      tipo: 'data',
+      render: (solicitacao) => formatarData(solicitacao.necessario_para)
+    },
+    {
+      id: 'criada_em',
+      titulo: 'Criada em',
+      tipo: 'data',
+      render: (solicitacao) => formatarData(solicitacao.createdAt)
+    },
+    {
+      /*
+        A etiqueta de status era montada com um mapa de paleta crua que NÃO
+        tratava CANCELADO/RECUSADO: os dois caíam no `return` final, índigo —
+        a mesma cor reservada ao status que a tela não conhece. Quem opera a
+        fila não distinguia "morreu" de "não sei", e as telas irmãs pintavam o
+        mesmo valor de outras duas cores.
+
+        Agora: `StatusBadge` + mapa semântico explícito
+        (`utils/statusCompras.js`), com cancelada/recusada em família própria
+        (`danger`). Quando o estado NÃO está no mapa, `familiaStatusCompra`
+        devolve `null` e o classificador do sistema decide — desconhecido
+        continua sendo desconhecido, em vez de virar uma cor com significado.
+      */
+      id: 'status',
+      titulo: 'Status',
+      tipo: 'status',
+      render: (solicitacao) => (
+        <StatusBadge
+          status={rotuloStatusCompra(solicitacao.status)}
+          kind={familiaStatusCompra(solicitacao.status) || undefined}
+        />
+      )
+    }
+  ];
+
   return (
-    <div className="page solicitacoes-page compras-solicitacoes-page">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Solicitacoes de Compra</h1>
-            <p className="page-subtitle">
-              Acompanhe as solicitacoes de compra criadas no modulo e gere o PDF quando necessario.
-            </p>
-          </div>
-        </div>
-      </div>
+    <Pagina className="compras-solicitacoes-page">
+      <PageHeader
+        titulo="Solicitacoes de Compra"
+        contagem={loading ? null : `${solicitacoesFiltradas.length} solicitacao(oes)`}
+        descricao="Acompanhe as solicitacoes de compra criadas no modulo e gere o PDF quando necessario."
+        acaoPrincipal={{
+          rotulo: 'Nova solicitacao',
+          onClick: () => navigate('/solicitacoes-compra/nova')
+        }}
+        secundarias={[
+          {
+            rotulo: loading ? 'Atualizando...' : 'Atualizar',
+            onClick: carregarSolicitacoes,
+            desabilitada: loading
+          },
+          podeEncaminharCompras && idsSelecionadosEncaminhaveis.length > 0 && {
+            rotulo: encaminhando
+              ? 'Enviando...'
+              : `Enviar para Compras (${idsSelecionadosEncaminhaveis.length})`,
+            onClick: () => handleEncaminharCompras(idsSelecionadosEncaminhaveis),
+            desabilitada: encaminhando
+          }
+        ]}
+        destrutiva={podeInativar && selecionadas.length > 0 ? {
+          rotulo: inativando ? 'Inativando...' : `Inativar selecionadas (${selecionadas.length})`,
+          onClick: () => handleInativar(selecionadas),
+          desabilitada: inativando
+        } : null}
+      />
 
-      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4">
-        <div className="text-sm text-gray-600 dark:text-slate-300">
-          Registros disponiveis: <strong>{solicitacoesFiltradas.length}</strong>
-          {podeSelecionar && selecionadas.length > 0 ? (
-            <span className="ml-2 text-[var(--c-muted)]">Selecionadas: {selecionadas.length}</span>
-          ) : null}
-        </div>
-        <div className="app-page-actions">
-          {podeSelecionar && solicitacoesFiltradas.length > 0 ? (
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={toggleTodasSelecionadas}
-              aria-label="Selecionar solicitacoes listadas"
-            >
-              {todasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
-            </button>
-          ) : null}
-          {podeEncaminharCompras && idsSelecionadosEncaminhaveis.length > 0 ? (
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => handleEncaminharCompras(idsSelecionadosEncaminhaveis)}
-              disabled={encaminhando}
-            >
-              {encaminhando ? 'Enviando...' : `Enviar para Compras (${idsSelecionadosEncaminhaveis.length})`}
-            </button>
-          ) : null}
-          {podeInativar && selecionadas.length > 0 ? (
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => handleInativar(selecionadas)}
-              disabled={inativando}
-            >
-              {inativando ? 'Inativando...' : 'Inativar selecionadas'}
-            </button>
-          ) : null}
-          <button type="button" className="btn btn-outline" onClick={carregarSolicitacoes} disabled={loading}>
-            {loading ? 'Atualizando...' : 'Atualizar'}
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => navigate('/solicitacoes-compra/nova')}>
-            Nova solicitacao
-          </button>
-        </div>
-      </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <div className="sol-surface-card solicitacoes-filtros app-filters-card rounded-xl p-4 md:p-5">
-        <div className="sol-filtros-head">
-          <div>
-            <p className="sol-filtros-title">Filtros</p>
-            <p className="sol-filtros-subtitle">
-              Refine por obra, status e busca textual para localizar a solicitacao certa mais rapido.
-            </p>
-          </div>
+      {/* R12: o par de `<select>` de obra e status virou marcação. O botão
+          "Exibir/Ocultar filtros" que existia só para encolher a grade no
+          celular virou o recolher do próprio bloco — mesma capacidade, pelo
+          componente padrão. */}
+      <BlocoConteudo titulo="Filtros" variante="secundario" recolhivel>
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: setBusca,
+            placeholder: 'Codigo, obra ou solicitante'
+          }}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+      </BlocoConteudo>
 
-          <div className="sol-filtros-meta">
-            <div className="sol-filtros-soma">
-              <span className="sol-filtros-soma-label">Total listado</span>
-              <strong className="sol-filtros-soma-value">{solicitacoesFiltradas.length}</strong>
-            </div>
-            <button
-              type="button"
-              className="btn btn-outline compras-mobile-filter-toggle"
-              aria-expanded={filtrosVisiveis}
-              onClick={() => setFiltrosVisiveis((atual) => !atual)}
-            >
-              {filtrosVisiveis ? 'Ocultar filtros' : 'Exibir filtros'}
-            </button>
-          </div>
-        </div>
-
-        <div className={`compras-filter-content ${filtrosVisiveis ? 'is-open' : ''}`}>
-          <div className="sol-filtros-grid">
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Obra</span>
-              <select className="input" value={obraId} onChange={(event) => setObraId(event.target.value)}>
-                <option value="">Todas</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.codigo ? `${obra.codigo} - ` : ''}
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Status</span>
-              <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
-                <option value="">Todos</option>
-                <option value="PENDENTE">Pendente</option>
-                <option value="ENVIADO">Enviado</option>
-                <option value="LIBERADO_PARA_COMPRA">Liberado para compra</option>
-                <option value="FECHAMENTO_PARCIAL">Fechamento parcial</option>
-                <option value="ENCERRADO">Encerrado</option>
-              </select>
-            </label>
-
-            <label className="sol-filter-field md:col-span-2">
-              <span className="sol-filter-label">Busca</span>
-              <input
-                className="input"
-                placeholder="Codigo, obra ou solicitante"
-                value={busca}
-                onChange={(event) => setBusca(event.target.value)}
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className="card sol-surface-card compras-table-card compras-adaptive-list">
+      <BlocoConteudo
+        variante="primario"
+        cor="var(--sem-info)"
+        descricao={podeSelecionar && selecionadas.length > 0
+          ? `${selecionadas.length} selecionada(s) para acao em lote`
+          : undefined}
+      >
         <TabelaPadrao
-          colunas={[
-            ...(podeSelecionar ? [{
-              id: 'selecao',
-              titulo: 'Sel.',
-              tipo: 'status',
-              render: (solicitacao) => (
-                <input
-                  type="checkbox"
-                  checked={selecionadas.includes(Number(solicitacao.id))}
-                  onChange={() => toggleSelecionada(solicitacao.id)}
-                  aria-label={`Selecionar solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
-                />
-              )
-            }] : []),
-            {
-              id: 'codigo',
-              titulo: 'Codigo',
-              tipo: 'codigo',
-              render: (solicitacao) => (
-                <span className="font-mono text-sm font-semibold">
-                  SC-{String(solicitacao.id).padStart(5, '0')}
-                </span>
-              )
-            },
-            {
-              id: 'obra',
-              titulo: 'Obra',
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (solicitacao) => (
-                <CelulaDupla
-                  principal={solicitacao.obra?.nome || '-'}
-                  sub={solicitacao.obra?.codigo || '-'}
-                />
-              )
-            },
-            {
-              id: 'solicitante',
-              titulo: 'Solicitante',
-              tipo: 'texto',
-              render: (solicitacao) => solicitacao.solicitante?.nome || '-'
-            },
-            {
-              id: 'itens',
-              titulo: 'Itens',
-              tipo: 'numero',
-              render: (solicitacao) => (
-                solicitacao.itens_count
-                  ?? ((solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0))
-              )
-            },
-            {
-              id: 'fornecedores',
-              titulo: 'Fornecedores',
-              tipo: 'numero',
-              render: (solicitacao) => solicitacao.fornecedores_count ?? (solicitacao.fornecedores?.length || 0)
-            },
-            {
-              id: 'necessario_para',
-              titulo: 'Necessario para',
-              tipo: 'data',
-              render: (solicitacao) => formatarData(solicitacao.necessario_para)
-            },
-            {
-              id: 'criada_em',
-              titulo: 'Criada em',
-              tipo: 'data',
-              render: (solicitacao) => formatarData(solicitacao.createdAt)
-            },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (solicitacao) => (
-                <span className={classNameStatus(solicitacao.status)}>
-                  {formatarStatus(solicitacao.status)}
-                </span>
-              )
-            }
-          ]}
+          colunas={colunas}
           itens={solicitacoesFiltradas}
           carregando={loading}
           vazio="Nenhuma solicitacao de compra encontrada."
           storageKey="tabela:solicitacoes-compra"
           rotuloRolagem="Solicitacoes de compra"
+          /*
+            A marcação em lote (com o "todos" no cabeçalho e o estado
+            indeterminado) é capacidade do próprio TabelaPadrao — a coluna de
+            checkbox montada à mão e o botão "Selecionar todas" faziam o mesmo
+            trabalho por fora. R16: uma responsabilidade, um dono.
+          */
+          selecao={podeSelecionar ? {
+            selecionados: selecionadas,
+            aoAlternar: (id) => toggleSelecionada(id),
+            aoAlternarTodos: toggleTodasSelecionadas
+          } : undefined}
           acoesLinha={(solicitacao) => (
             <>
               <button
                 type="button"
-                className="compras-icon-action"
+                className="btn btn-outline btn-sm"
                 onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}
                 title="Abrir detalhes"
-                aria-label={`Abrir detalhes da solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+                aria-label={`Abrir detalhes da solicitacao ${codigoSolicitacao(solicitacao)}`}
               >
                 <HiOutlineEye />
               </button>
               <button
                 type="button"
-                className="compras-icon-action"
+                className="btn btn-outline btn-sm"
                 onClick={() => handleBaixarPdf(solicitacao.id)}
                 title="Baixar PDF"
-                aria-label={`Baixar PDF da solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+                aria-label={`Baixar PDF da solicitacao ${codigoSolicitacao(solicitacao)}`}
               >
                 <HiOutlineArrowDownTray />
               </button>
               {podeEncaminharCompras && estaAguardandoRevisaoGeo(solicitacao.status) ? (
                 <button
                   type="button"
-                  className="compras-icon-action"
+                  className="btn btn-outline btn-sm"
                   onClick={() => handleEncaminharCompras([solicitacao.id])}
                   title="Enviar para fila de Compras"
-                  aria-label={`Enviar solicitacao SC-${String(solicitacao.id).padStart(5, '0')} para Compras`}
+                  aria-label={`Enviar solicitacao ${codigoSolicitacao(solicitacao)} para Compras`}
                   disabled={encaminhando}
                 >
                   <HiOutlinePaperAirplane />
@@ -517,10 +559,10 @@ export default function SolicitacoesCompra() {
               {podeInativar ? (
                 <button
                   type="button"
-                  className="compras-icon-action text-red-600 hover:text-red-700"
+                  className="btn btn-outline btn-sm btn-perigo-suave"
                   onClick={() => handleInativar([solicitacao.id])}
                   title="Inativar solicitacao"
-                  aria-label={`Inativar solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+                  aria-label={`Inativar solicitacao ${codigoSolicitacao(solicitacao)}`}
                   disabled={inativando}
                 >
                   <HiOutlineTrash />
@@ -530,7 +572,9 @@ export default function SolicitacoesCompra() {
           )}
           larguraAcoes={220}
         />
-      </div>
-    </div>
+      </BlocoConteudo>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

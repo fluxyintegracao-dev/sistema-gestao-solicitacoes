@@ -1,18 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { HiOutlineArrowTopRightOnSquare, HiOutlinePencilSquare } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
-import { TabelaPadrao } from '../../../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  alternarValorFiltro,
+  useAvisos
+} from '../../../components/padrao';
+import StatusBadge from '../../../components/StatusBadge';
 import { listarCotacoes } from '../../../services/compras';
 import { getObras } from '../../../services/obras';
+import { chaveStatusCompra, familiaStatusCompra } from '../utils/statusCompras';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 
-const STATUS_COTACAO = {
-  ENVIADO:    { label: 'Enviado',    cls: 'app-status-pill bg-blue-100 text-blue-700' },
-  VISUALIZADO:{ label: 'Visualizado',cls: 'app-status-pill bg-yellow-100 text-yellow-700' },
-  RESPONDIDO: { label: 'Respondido', cls: 'app-status-pill bg-emerald-100 text-emerald-700' },
-  FINALIZADA: { label: 'Finalizada', cls: 'app-status-pill bg-slate-100 text-slate-700' },
-  CANCELADO:  { label: 'Cancelado',  cls: 'app-status-pill bg-slate-100 text-slate-600' },
-};
+/*
+  Os estados que ESTA tela reconhece, com o rótulo que ela já exibia. A mesma
+  lista alimenta a etiqueta e as opções do filtro — antes eram duas listas
+  escritas à mão em lugares diferentes, e nada garantia que continuassem
+  iguais.
+
+  A COR não mora mais aqui: as classes `bg-blue-100 text-blue-700` eram
+  paleta crua (R25 — sem par no tema escuro, fora do piso de contraste) e,
+  pior, punham CANCELADO no MESMO cinza de FINALIZADA. A família semântica
+  vem do mapa do módulo (`utils/statusCompras.js`), onde cancelado é `danger`.
+*/
+const STATUS_COTACAO = [
+  { valor: 'ENVIADO', rotulo: 'Enviado' },
+  { valor: 'VISUALIZADO', rotulo: 'Visualizado' },
+  { valor: 'RESPONDIDO', rotulo: 'Respondido' },
+  { valor: 'FINALIZADA', rotulo: 'Finalizada' },
+  { valor: 'CANCELADO', rotulo: 'Cancelado' }
+];
+
+const ROTULO_STATUS = new Map(STATUS_COTACAO.map((item) => [item.valor, item.rotulo]));
+
+function rotuloDoStatus(status) {
+  const chave = chaveStatusCompra(status);
+  return ROTULO_STATUS.get(chave) || String(status || '-');
+}
 
 function formatDate(value) {
   if (!value) return '-';
@@ -24,30 +55,41 @@ function formatMoney(value) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function StatusBadge({ status }) {
-  const s = STATUS_COTACAO[String(status || '').toUpperCase()] || {
-    label: status || '-',
-    cls: 'app-status-pill bg-slate-100 text-slate-600',
-  };
-  return <span className={s.cls}>{s.label}</span>;
-}
-
 export default function ListaCotacoes() {
   const navigate = useNavigate();
+  const { avisos, avisar, fechar } = useAvisos();
   const [cotacoes, setCotacoes] = useState([]);
   const [obras, setObras] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
-  const [filtros, setFiltros] = useState({ q: '', status: '', obra_id: '' });
+  const [busca, setBusca] = useState('');
+
+  /*
+    `unico: true` nas duas dimensões, verificado NO SERVIÇO: o
+    `CotacaoFornecedorController.index` faz `where.status = String(status)`
+    e `solicitacaoWhere.obra_id = obra_id` — UM valor cada. Com marcação
+    múltipla a pessoa marcaria dois status, veria duas etiquetas e a lista
+    não estreitaria (o `URLSearchParams` mandaria um valor só). Marca
+    redonda: a forma diz que só cabe uma.
+  */
+  const [ativos, setAtivos] = useState({ status: new Set(), obra_id: new Set() });
+
+  const status = useMemo(() => [...(ativos.status || [])][0] || '', [ativos.status]);
+  const obraId = useMemo(() => [...(ativos.obra_id || [])][0] || '', [ativos.obra_id]);
+
+  // O recorte corrente fica numa ref para o refresh em tempo real (e o botão
+  // "Atualizar") reconsultarem o MESMO recorte que está na tela.
+  const recorteRef = useRef({ q: '', status: '', obra_id: '' });
+  recorteRef.current = { q: busca, status, obra_id: obraId };
 
   async function carregar() {
+    const recorte = recorteRef.current;
     try {
       setLoading(true);
       const [dataCotacoes, dataObras] = await Promise.all([
         listarCotacoes({
-          q: filtros.q || undefined,
-          status: filtros.status || undefined,
-          obra_id: filtros.obra_id || undefined,
+          q: recorte.q || undefined,
+          status: recorte.status || undefined,
+          obra_id: recorte.obra_id || undefined,
         }),
         getObras(),
       ]);
@@ -55,210 +97,187 @@ export default function ListaCotacoes() {
       setObras(Array.isArray(dataObras) ? dataObras : []);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar cotacoes');
+      avisar.erro(error?.message || 'Erro ao carregar cotacoes');
     } finally {
       setLoading(false);
     }
   }
 
+  /*
+    R23: são 3 dimensões e uma consulta simples — longe do critério de
+    "consulta cara" (4+ dimensões ou 2s+). Então marcar APLICA na hora, e a
+    etiqueta nunca afirma um recorte que ainda não vale. A busca textual tem
+    a espera de digitação de 350ms que a própria regra prevê — e é por isso
+    que o "Buscar" deixou de ser um botão obrigatório: ele virou "Atualizar",
+    que é o que sempre foi (recarregar o recorte atual).
+  */
   useEffect(() => {
-    carregar();
-  }, []);
+    const timer = window.setTimeout(() => {
+      carregar();
+    }, busca ? 350 : 0);
+    return () => window.clearTimeout(timer);
+  }, [busca, status, obraId]);
 
   useComprasRealtimeRefresh(carregar);
 
+  const dimensoes = useMemo(() => [
+    {
+      id: 'status',
+      rotulo: 'Status',
+      unico: true,
+      opcoes: STATUS_COTACAO
+    },
+    {
+      id: 'obra_id',
+      rotulo: 'Obra',
+      unico: true,
+      opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
+    }
+  ], [obras]);
+
+  function alternarFiltro(dimensao, valor, opcoes) {
+    setAtivos((atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes));
+  }
+
+  function limparFiltros() {
+    setAtivos({ status: new Set(), obra_id: new Set() });
+    setBusca('');
+  }
+
   const respondidas = cotacoes.filter(
-    (c) => ['RESPONDIDO', 'FINALIZADA'].includes(String(c.status || '').toUpperCase())
+    (c) => ['RESPONDIDO', 'FINALIZADA'].includes(chaveStatusCompra(c.status))
   ).length;
   const pendentes = cotacoes.filter(
-    (c) => ['ENVIADO', 'VISUALIZADO'].includes(String(c.status || '').toUpperCase())
+    (c) => ['ENVIADO', 'VISUALIZADO'].includes(chaveStatusCompra(c.status))
   ).length;
 
+  const colunas = [
+    {
+      id: 'codigo',
+      titulo: '#',
+      tipo: 'codigo',
+      render: (cotacao) => (
+        <span className="text-muted tabular-nums">
+          {String(cotacao.id).padStart(5, '0')}
+        </span>
+      )
+    },
+    {
+      id: 'fornecedor',
+      titulo: 'Fornecedor',
+      tipo: 'identidade',
+      noCard: 'titulo',
+      render: (cotacao) => cotacao.fornecedor?.nome || '-'
+    },
+    {
+      id: 'obra',
+      titulo: 'Obra',
+      tipo: 'texto',
+      render: (cotacao) => cotacao.solicitacao?.obra?.nome || '-'
+    },
+    {
+      id: 'solicitacao',
+      titulo: 'Solicitacao',
+      tipo: 'texto',
+      render: (cotacao) => (
+        <span className="text-muted">
+          {cotacao.solicitacao
+            ? `SC-${String(cotacao.solicitacao.id).padStart(5, '0')}${cotacao.solicitacao.titulo ? ` - ${cotacao.solicitacao.titulo}` : ''}`
+            : '-'}
+        </span>
+      )
+    },
+    {
+      id: 'status',
+      titulo: 'Status',
+      tipo: 'status',
+      render: (cotacao) => (
+        <StatusBadge
+          status={rotuloDoStatus(cotacao.status)}
+          kind={familiaStatusCompra(cotacao.status) || undefined}
+        />
+      )
+    },
+    {
+      id: 'enviado_em',
+      titulo: 'Enviado em',
+      tipo: 'data',
+      render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.enviado_em)}</span>
+    },
+    {
+      id: 'respondido_em',
+      titulo: 'Respondido em',
+      tipo: 'data',
+      render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.respondido_em)}</span>
+    },
+    {
+      id: 'prazo_resposta',
+      titulo: 'Prazo resposta',
+      tipo: 'data',
+      render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.prazo_resposta)}</span>
+    },
+    {
+      id: 'valor_minimo',
+      titulo: 'Val. min. pedido',
+      tipo: 'valor',
+      render: (cotacao) => formatMoney(cotacao.valor_minimo_pedido)
+    },
+    {
+      id: 'condicao_pagamento',
+      titulo: 'Cond. pagamento',
+      tipo: 'texto',
+      render: (cotacao) => cotacao.condicao_pagamento || '-'
+    }
+  ];
+
   return (
-    <div className="page solicitacoes-page compras-cotacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">Cotacoes</h1>
-            <p className="page-subtitle">
-              Acompanhe todas as cotacoes enviadas a fornecedores, seus status de resposta e dados registrados.
-            </p>
-          </div>
-        </div>
-      </div>
+    <Pagina className="compras-cotacoes-page">
+      <PageHeader
+        titulo="Cotacoes"
+        contagem={loading ? null : `${cotacoes.length} cotacao(oes)`}
+        descricao="Acompanhe todas as cotacoes enviadas a fornecedores, seus status de resposta e dados registrados."
+        secundarias={[
+          {
+            rotulo: loading ? 'Buscando...' : 'Atualizar',
+            onClick: carregar,
+            desabilitada: loading
+          }
+        ]}
+      />
 
-      <div className="mt-4 card sol-surface-card solicitacoes-filtros app-filters-card">
-        <div className="sol-filtros-head">
-          <div>
-            <h2 className="font-semibold text-[var(--c-text)]">Filtros</h2>
-            <p className="text-sm text-[var(--c-muted)]">Filtre por fornecedor, obra ou status da cotacao.</p>
-          </div>
-          <button
-            type="button"
-            className="btn btn-outline compras-mobile-filter-toggle"
-            aria-expanded={filtrosVisiveis}
-            onClick={() => setFiltrosVisiveis((atual) => !atual)}
-          >
-            {filtrosVisiveis ? 'Ocultar filtros' : 'Exibir filtros'}
-          </button>
-        </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-        <div className={`compras-filter-content ${filtrosVisiveis ? 'is-open' : ''}`}>
-          <div className="app-filters-grid">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Busca</span>
-              <input
-                className="input"
-                placeholder="Fornecedor ou titulo da solicitacao"
-                value={filtros.q}
-                onChange={(e) => setFiltros((prev) => ({ ...prev, q: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && carregar()}
-              />
-            </label>
+      {/* R12: os dois `<select>` (status e obra) viram marcação; o botão
+          "Exibir/Ocultar filtros", que só encolhia a grade no celular, virou
+          o recolher do bloco. */}
+      <BlocoConteudo titulo="Filtros" variante="secundario" recolhivel>
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: setBusca,
+            placeholder: 'Fornecedor ou titulo da solicitacao'
+          }}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+      </BlocoConteudo>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Status</span>
-              <select
-                className="input"
-                value={filtros.status}
-                onChange={(e) => setFiltros((prev) => ({ ...prev, status: e.target.value }))}
-              >
-                <option value="">Todos</option>
-                <option value="ENVIADO">Enviado</option>
-                <option value="VISUALIZADO">Visualizado</option>
-                <option value="RESPONDIDO">Respondido</option>
-                <option value="FINALIZADA">Finalizada</option>
-                <option value="CANCELADO">Cancelado</option>
-              </select>
-            </label>
+      <StatGrid colunas={3}>
+        <StatTile label="Total listado" valor={cotacoes.length} />
+        <StatTile label="Respondidas" valor={respondidas} tom="success" />
+        <StatTile label="Aguardando resposta" valor={pendentes} tom="warning" />
+      </StatGrid>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Obra</span>
-              <select
-                className="input"
-                value={filtros.obra_id}
-                onChange={(e) => setFiltros((prev) => ({ ...prev, obra_id: e.target.value }))}
-              >
-                <option value="">Todas as obras</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="app-page-actions justify-end">
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setFiltros({ q: '', status: '', obra_id: '' })}
-            >
-              Limpar
-            </button>
-            <button type="button" className="btn btn-primary" onClick={carregar} disabled={loading}>
-              {loading ? 'Buscando...' : 'Buscar'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 app-summary-grid">
-        <div className="app-summary-card">
-          <div className="app-summary-label">Total listado</div>
-          <div className="app-summary-value">{cotacoes.length}</div>
-        </div>
-        <div className="app-summary-card">
-          <div className="app-summary-label">Respondidas</div>
-          <div className="app-summary-value">{respondidas}</div>
-        </div>
-        <div className="app-summary-card">
-          <div className="app-summary-label">Aguardando resposta</div>
-          <div className="app-summary-value">{pendentes}</div>
-        </div>
-      </div>
-
-      <div className="mt-4 card sol-surface-card compras-table-card compras-adaptive-list">
-        <div className="card-header flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">Lista de cotacoes</h2>
-          <span className="text-sm text-[var(--c-muted)]">{cotacoes.length} registro(s)</span>
-        </div>
-
+      <BlocoConteudo
+        titulo="Lista de cotacoes"
+        variante="primario"
+        cor="var(--sem-info)"
+        contagem={`${cotacoes.length} registro(s)`}
+      >
         <TabelaPadrao
-          colunas={[
-            {
-              id: 'codigo',
-              titulo: '#',
-              tipo: 'codigo',
-              render: (cotacao) => (
-                <span className="text-[var(--c-muted)] tabular-nums">
-                  {String(cotacao.id).padStart(5, '0')}
-                </span>
-              )
-            },
-            {
-              id: 'fornecedor',
-              titulo: 'Fornecedor',
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (cotacao) => cotacao.fornecedor?.nome || '-'
-            },
-            {
-              id: 'obra',
-              titulo: 'Obra',
-              tipo: 'texto',
-              render: (cotacao) => cotacao.solicitacao?.obra?.nome || '-'
-            },
-            {
-              id: 'solicitacao',
-              titulo: 'Solicitacao',
-              tipo: 'texto',
-              render: (cotacao) => (
-                <span className="text-[var(--c-muted)]">
-                  {cotacao.solicitacao
-                    ? `SC-${String(cotacao.solicitacao.id).padStart(5, '0')}${cotacao.solicitacao.titulo ? ` - ${cotacao.solicitacao.titulo}` : ''}`
-                    : '-'}
-                </span>
-              )
-            },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (cotacao) => <StatusBadge status={cotacao.status} />
-            },
-            {
-              id: 'enviado_em',
-              titulo: 'Enviado em',
-              tipo: 'data',
-              render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.enviado_em)}</span>
-            },
-            {
-              id: 'respondido_em',
-              titulo: 'Respondido em',
-              tipo: 'data',
-              render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.respondido_em)}</span>
-            },
-            {
-              id: 'prazo_resposta',
-              titulo: 'Prazo resposta',
-              tipo: 'data',
-              render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.prazo_resposta)}</span>
-            },
-            {
-              id: 'valor_minimo',
-              titulo: 'Val. min. pedido',
-              tipo: 'valor',
-              render: (cotacao) => formatMoney(cotacao.valor_minimo_pedido)
-            },
-            {
-              id: 'condicao_pagamento',
-              titulo: 'Cond. pagamento',
-              tipo: 'texto',
-              render: (cotacao) => cotacao.condicao_pagamento || '-'
-            }
-          ]}
+          colunas={colunas}
           itens={cotacoes}
           carregando={loading}
           vazio="Nenhuma cotacao encontrada. Envie uma solicitacao de compra para fornecedores."
@@ -269,7 +288,7 @@ export default function ListaCotacoes() {
               {cotacao.solicitacao?.id && (
                 <button
                   type="button"
-                  className="compras-icon-action compras-icon-action-primary"
+                  className="btn btn-outline btn-sm"
                   onClick={() => navigate(`/solicitacoes-compra/${cotacao.solicitacao.id}/cotacao`)}
                   title="Editar cotacao"
                   aria-label={`Editar cotacao ${String(cotacao.id).padStart(5, '0')}`}
@@ -281,7 +300,7 @@ export default function ListaCotacoes() {
                 href={`/cotacao/${cotacao.token}`}
                 target="_blank"
                 rel="noreferrer"
-                className="compras-icon-action"
+                className="btn btn-outline btn-sm"
                 title="Abrir portal do fornecedor"
                 aria-label={`Abrir portal do fornecedor da cotacao ${String(cotacao.id).padStart(5, '0')}`}
               >
@@ -291,7 +310,7 @@ export default function ListaCotacoes() {
           )}
           larguraAcoes={160}
         />
-      </div>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

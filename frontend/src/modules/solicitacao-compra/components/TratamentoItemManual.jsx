@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { HiOutlineCheck, HiOutlineMagnifyingGlass, HiOutlineXMark } from 'react-icons/hi2';
+import Alert from '../../../components/ui/Alert';
 import {
   catalogarItemManualSolicitacaoCompra,
   listarCategorias,
@@ -441,8 +442,22 @@ export default function TratamentoItemManual({ item, solicitacaoId, onCatalogado
         </button>
       </div>
 
-      {erro ? <div className="compra-item-feedback is-error" role="alert">{erro}</div> : null}
-      {mensagem ? <div className="compra-item-feedback is-success" role="status">{mensagem}</div> : null}
+      {/*
+        O retorno da catalogação passou a usar o `Alert` do sistema.
+
+        As duas faixas eram `.compra-item-feedback.is-error/.is-success`, e
+        o CSS do módulo pinta as duas com hexadecimal cru (#fff0ef/#9d2821 e
+        #e7f7ed/#17633b). Cor à mão não tem par no tema escuro e não passa
+        pelo piso de contraste que o `ThemeContext` aplica (R24/R25): no
+        escuro o texto vinha quase da mesma família do fundo do bloco.
+
+        Continua sendo FEEDBACK DO FORMULÁRIO, ancorado ao botão que o
+        produziu — não `useAvisos`, que é faixa de evento no topo da página.
+        Este componente é montado dentro da linha expandida de um item, e o
+        resultado precisa aparecer ali, no lugar onde a pessoa está olhando.
+      */}
+      {erro ? <Alert type="error" message={erro} /> : null}
+      {mensagem ? <Alert type="success" message={mensagem} /> : null}
     </form>
   );
 }

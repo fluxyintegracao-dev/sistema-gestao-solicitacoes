@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { HiOutlineEye } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
 import { listarPedidosCompra } from '../../../services/compras';
@@ -6,7 +6,19 @@ import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { getObras } from '../../../services/obras';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 import StatusBadge from '../../../components/StatusBadge';
-import { TabelaPadrao } from '../../../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  alternarValorFiltro,
+  useAvisos
+} from '../../../components/padrao';
+import { chaveStatusCompra, familiaStatusCompra } from '../utils/statusCompras';
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -16,16 +28,27 @@ function formatMoney(value) {
 }
 
 function formatStatusLabel(value, statusMap) {
-  return statusMap[String(value || '').toUpperCase()]?.nome || String(value || '-').replace(/_/g, ' ').toUpperCase();
+  return statusMap[chaveStatusCompra(value)]?.nome || String(value || '-').replace(/_/g, ' ').toUpperCase();
 }
 
-// Família semântica da etiqueta: status que bloqueia edição = neutro
-// (encerrado), ABERTO = em andamento (info), demais = concluído.
+/*
+  Família semântica da etiqueta do pedido, em três degraus e NESTA ordem:
+
+  1. o mapa semântico do módulo (`utils/statusCompras.js`), que conhece
+     CANCELADO — antes ele não era tratado aqui e um pedido cancelado cujo
+     status configurado NÃO bloqueia edição caía no `return 'success'` final:
+     saía VERDE. "Morreu" com a cor de "deu certo";
+  2. `bloqueia_edicao` da configuração, que continua valendo para status
+     criados pelo administrador (o ciclo terminou, ninguém mexe mais):
+     neutro;
+  3. sem nenhum dos dois, `undefined` — o classificador do StatusBadge
+     decide, em vez de a tela inventar uma cor para o que não conhece.
+*/
 function statusKind(status, statusMap) {
-  const config = statusMap[String(status || '').toUpperCase()];
-  if (config?.bloqueia_edicao) return 'neutral';
-  if (String(status || '').toUpperCase() === 'ABERTO') return 'info';
-  return 'success';
+  const familia = familiaStatusCompra(status);
+  if (familia) return familia;
+  if (statusMap[chaveStatusCompra(status)]?.bloqueia_edicao) return 'neutral';
+  return undefined;
 }
 
 const STATUS_PEDIDOS_FALLBACK = [
@@ -50,25 +73,39 @@ async function carregarStatusPedidosComFallback() {
 
 export default function PedidosCompra() {
   const navigate = useNavigate();
+  const { avisos, avisar, fechar } = useAvisos();
   const [pedidos, setPedidos] = useState([]);
   const [obras, setObras] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
-  const [filtros, setFiltros] = useState({
-    q: '',
-    status: '',
-    obra_id: ''
-  });
+  const [busca, setBusca] = useState('');
+
+  /*
+    `unico: true` nas duas dimensões, verificado NO SERVIÇO: o
+    `listarPedidos` (backend/src/services/pedidoCompraService.js) faz
+    `where.status = String(status)` e `where.obra_id = Number(obraId)` — UM
+    valor cada. Marcação múltipla mostraria duas etiquetas e mandaria um
+    valor só: a lista não estreitaria e a etiqueta mentiria (R15).
+  */
+  const [ativos, setAtivos] = useState({ status: new Set(), obra_id: new Set() });
+
+  const status = useMemo(() => [...(ativos.status || [])][0] || '', [ativos.status]);
+  const obraId = useMemo(() => [...(ativos.obra_id || [])][0] || '', [ativos.obra_id]);
+
+  // O recorte corrente numa ref: o refresh em tempo real e o botão
+  // "Atualizar" reconsultam o MESMO recorte que está na tela.
+  const recorteRef = useRef({ q: '', status: '', obra_id: '' });
+  recorteRef.current = { q: busca, status, obra_id: obraId };
 
   async function carregar() {
+    const recorte = recorteRef.current;
     try {
       setLoading(true);
       const [dataPedidos, dataObras, dataStatus] = await Promise.all([
         listarPedidosCompra({
-          q: filtros.q || undefined,
-          status: filtros.status || undefined,
-          obra_id: filtros.obra_id || undefined,
+          q: recorte.q || undefined,
+          status: recorte.status || undefined,
+          obra_id: recorte.obra_id || undefined,
           visao: 'resumo'
         }),
         getObras(),
@@ -80,199 +117,180 @@ export default function PedidosCompra() {
       setStatusOptions(Array.isArray(dataStatus) ? dataStatus : []);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar pedidos de compra');
+      avisar.erro(error?.message || 'Erro ao carregar pedidos de compra');
     } finally {
       setLoading(false);
     }
   }
 
+  /*
+    R23: 3 dimensões e consulta simples — o recorte aplica AO MARCAR, sem
+    botão de "aplicar", e a etiqueta nunca afirma um filtro que ainda não
+    vale. A busca textual tem a espera de digitação de 350ms prevista pela
+    própria regra.
+  */
   useEffect(() => {
-    carregar();
-  }, []);
+    const timer = window.setTimeout(() => {
+      carregar();
+    }, busca ? 350 : 0);
+    return () => window.clearTimeout(timer);
+  }, [busca, status, obraId]);
 
   useComprasRealtimeRefresh(carregar);
 
   const statusMap = useMemo(
-    () => Object.fromEntries((statusOptions || []).map((item) => [String(item.codigo || '').toUpperCase(), item])),
+    () => Object.fromEntries((statusOptions || []).map((item) => [chaveStatusCompra(item.codigo), item])),
     [statusOptions]
   );
+
+  const dimensoes = useMemo(() => [
+    {
+      id: 'status',
+      rotulo: 'Status',
+      unico: true,
+      opcoes: statusOptions
+        .filter((item) => item?.ativo !== false)
+        .map((item) => ({ valor: String(item.codigo), rotulo: item.nome }))
+    },
+    {
+      id: 'obra_id',
+      rotulo: 'Obra',
+      unico: true,
+      opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
+    }
+  ], [statusOptions, obras]);
+
+  function alternarFiltro(dimensao, valor, opcoes) {
+    setAtivos((atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes));
+  }
+
+  function limparFiltros() {
+    setAtivos({ status: new Set(), obra_id: new Set() });
+    setBusca('');
+  }
+
   const totalPedidos = pedidos.length;
   const totalValor = pedidos.reduce((acc, pedido) => acc + Number(pedido.valor_total || 0), 0);
 
+  const colunas = [
+    {
+      id: 'pedido',
+      titulo: 'Pedido',
+      tipo: 'codigo',
+      render: (pedido) => `PC-${String(pedido.id).padStart(5, '0')}`
+    },
+    {
+      id: 'fornecedor',
+      titulo: 'Fornecedor',
+      tipo: 'identidade',
+      noCard: 'titulo',
+      render: (pedido) => pedido.fornecedor?.nome || '-'
+    },
+    {
+      id: 'obra',
+      titulo: 'Obra',
+      tipo: 'texto',
+      render: (pedido) => pedido.obra?.nome || '-'
+    },
+    {
+      id: 'solicitacao',
+      titulo: 'Solicitacao',
+      tipo: 'codigo',
+      render: (pedido) => `SC-${String(pedido.solicitacao_compra_id || pedido.solicitacao?.id || '').padStart(5, '0')}`
+    },
+    {
+      id: 'itens_ativos',
+      titulo: 'Itens ativos',
+      tipo: 'numero',
+      render: (pedido) => (
+        pedido.itens_ativos_count
+          ?? (pedido.itens || []).filter((item) => !item.removido).length
+      )
+    },
+    {
+      id: 'valor_total',
+      titulo: 'Valor total',
+      tipo: 'valor',
+      render: (pedido) => formatMoney(pedido.valor_total)
+    },
+    {
+      id: 'pedido_minimo',
+      titulo: 'Pedido minimo',
+      tipo: 'valor',
+      render: (pedido) => (
+        <>
+          {pedido.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-'}
+          {!pedido.atingiu_pedido_minimo ? (
+            // R25: `text-amber-700` era paleta crua (sem par no tema escuro,
+            // fora do piso de contraste). O aviso continua âmbar, agora pelo
+            // token semântico.
+            <div className="text-xs font-medium" style={{ color: 'var(--sem-warning)' }}>
+              Nao atingido
+            </div>
+          ) : null}
+        </>
+      )
+    },
+    {
+      id: 'status',
+      titulo: 'Status',
+      tipo: 'status',
+      render: (pedido) => (
+        <StatusBadge
+          status={formatStatusLabel(pedido.status, statusMap)}
+          kind={statusKind(pedido.status, statusMap)}
+        />
+      )
+    }
+  ];
+
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">Pedidos de Compra</h1>
-            <p className="page-subtitle">
-              Consulta dos pedidos gerados a partir das cotacoes encerradas, com gestao restrita ao setor de compras.
-            </p>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      <PageHeader
+        titulo="Pedidos de Compra"
+        contagem={loading ? null : `${totalPedidos} pedido(s)`}
+        descricao="Consulta dos pedidos gerados a partir das cotacoes encerradas, com gestao restrita ao setor de compras."
+        secundarias={[
+          {
+            rotulo: loading ? 'Buscando...' : 'Atualizar',
+            onClick: carregar,
+            desabilitada: loading
+          }
+        ]}
+      />
 
-      <div className="mt-4 card sol-surface-card solicitacoes-filtros app-filters-card">
-        <div className="sol-filtros-head">
-          <div>
-            <h2 className="font-semibold text-[var(--c-text)]">Filtros</h2>
-            <p className="text-sm text-[var(--c-muted)]">
-              Busque por fornecedor, obra, numero do pedido ou status da negociacao.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn btn-outline compras-mobile-filter-toggle"
-            aria-expanded={filtrosVisiveis}
-            onClick={() => setFiltrosVisiveis((atual) => !atual)}
-          >
-            {filtrosVisiveis ? 'Ocultar filtros' : 'Exibir filtros'}
-          </button>
-        </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-        <div className={`compras-filter-content ${filtrosVisiveis ? 'is-open' : ''}`}>
-          <div className="app-filters-grid">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Busca geral</span>
-              <input
-                className="input"
-                placeholder="Fornecedor, obra ou pedido"
-                value={filtros.q}
-                onChange={(event) => setFiltros((atual) => ({ ...atual, q: event.target.value }))}
-              />
-            </label>
+      {/* R12: os dois `<select>` (status e obra) viram marcação; o botão
+          "Exibir/Ocultar filtros", que só encolhia a grade no celular, virou
+          o recolher do bloco. */}
+      <BlocoConteudo titulo="Filtros" variante="secundario" recolhivel>
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: setBusca,
+            placeholder: 'Fornecedor, obra ou pedido'
+          }}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+      </BlocoConteudo>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Status</span>
-              <select
-                className="input"
-                value={filtros.status}
-                onChange={(event) => setFiltros((atual) => ({ ...atual, status: event.target.value }))}
-              >
-                <option value="">Todos os status</option>
-                {statusOptions
-                  .filter((item) => item?.ativo !== false)
-                  .map((status) => (
-                    <option key={status.codigo} value={status.codigo}>
-                      {status.nome}
-                    </option>
-                  ))}
-              </select>
-            </label>
+      <StatGrid colunas={2}>
+        <StatTile label="Pedidos listados" valor={totalPedidos} />
+        <StatTile label="Valor total em pedidos" valor={formatMoney(totalValor)} />
+      </StatGrid>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Obra</span>
-              <select
-                className="input"
-                value={filtros.obra_id}
-                onChange={(event) => setFiltros((atual) => ({ ...atual, obra_id: event.target.value }))}
-              >
-                <option value="">Todas as obras</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="app-page-actions justify-end">
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setFiltros({ q: '', status: '', obra_id: '' })}
-            >
-              Limpar filtros
-            </button>
-            <button type="button" className="btn btn-primary" onClick={carregar} disabled={loading}>
-              {loading ? 'Buscando...' : 'Buscar'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 app-summary-grid">
-        <div className="app-summary-card">
-          <div className="app-summary-label">Pedidos listados</div>
-          <div className="app-summary-value">{totalPedidos}</div>
-        </div>
-        <div className="app-summary-card">
-          <div className="app-summary-label">Valor total em pedidos</div>
-          <div className="app-summary-value">{formatMoney(totalValor)}</div>
-        </div>
-      </div>
-
-      <div className="mt-4 card sol-surface-card compras-table-card compras-adaptive-list">
-        <div className="card-header flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">Lista de pedidos</h2>
-          <span className="text-sm text-[var(--c-muted)]">{pedidos.length} registro(s)</span>
-        </div>
-
+      <BlocoConteudo
+        titulo="Lista de pedidos"
+        variante="primario"
+        cor="var(--sem-info)"
+        contagem={`${pedidos.length} registro(s)`}
+      >
         <TabelaPadrao
-          colunas={[
-            {
-              id: 'pedido',
-              titulo: 'Pedido',
-              tipo: 'codigo',
-              render: (pedido) => `PC-${String(pedido.id).padStart(5, '0')}`
-            },
-            {
-              id: 'fornecedor',
-              titulo: 'Fornecedor',
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (pedido) => pedido.fornecedor?.nome || '-'
-            },
-            {
-              id: 'obra',
-              titulo: 'Obra',
-              tipo: 'texto',
-              render: (pedido) => pedido.obra?.nome || '-'
-            },
-            {
-              id: 'solicitacao',
-              titulo: 'Solicitacao',
-              tipo: 'codigo',
-              render: (pedido) => `SC-${String(pedido.solicitacao_compra_id || pedido.solicitacao?.id || '').padStart(5, '0')}`
-            },
-            {
-              id: 'itens_ativos',
-              titulo: 'Itens ativos',
-              tipo: 'numero',
-              render: (pedido) => (
-                pedido.itens_ativos_count
-                  ?? (pedido.itens || []).filter((item) => !item.removido).length
-              )
-            },
-            {
-              id: 'valor_total',
-              titulo: 'Valor total',
-              tipo: 'valor',
-              render: (pedido) => formatMoney(pedido.valor_total)
-            },
-            {
-              id: 'pedido_minimo',
-              titulo: 'Pedido minimo',
-              tipo: 'valor',
-              render: (pedido) => (
-                <>
-                  {pedido.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-'}
-                  {!pedido.atingiu_pedido_minimo ? (
-                    <div className="text-xs font-medium text-amber-700">Nao atingido</div>
-                  ) : null}
-                </>
-              )
-            },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (pedido) => (
-                <StatusBadge status={formatStatusLabel(pedido.status, statusMap)} kind={statusKind(pedido.status, statusMap)} />
-              )
-            }
-          ]}
+          colunas={colunas}
           itens={pedidos}
           carregando={loading}
           vazio="Nenhum pedido de compra encontrado para os filtros informados."
@@ -281,7 +299,7 @@ export default function PedidosCompra() {
           acoesLinha={(pedido) => (
             <button
               type="button"
-              className="compras-icon-action"
+              className="btn btn-outline btn-sm"
               onClick={() => navigate(`/pedidos-compra/${pedido.id}`)}
               title="Abrir pedido"
               aria-label={`Abrir pedido PC-${String(pedido.id).padStart(5, '0')}`}
@@ -291,7 +309,7 @@ export default function PedidosCompra() {
           )}
           larguraAcoes={120}
         />
-      </div>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }
