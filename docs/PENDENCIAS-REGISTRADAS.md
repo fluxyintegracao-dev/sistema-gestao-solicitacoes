@@ -1729,3 +1729,46 @@ Com agente em voo, **commit é por caminho explícito**, nunca `git add -A`. O
 Não reescrevi o histórico: `d6b081d` já estava empurrado, e reescrever branch
 publicada troca um registro impreciso por um registro quebrado. Fica esta
 anotação, que é o que o commit deveria ter dito.
+
+## O MESMO DEFEITO DE REGISTRO, DUAS VEZES EM DUAS HORAS — e a regra que eu tinha escrito não pegou (05/09)
+
+O commit `ac71f68` diz *"Rodada 3: as 7 telas de Comercial e Contratos
+migradas"* e carrega também, sem mencionar: o conserto do `index.css`, o
+check R1 do harness realinhado com a R9, o contra-sinal estrutural da R12, as
+três declarações de `cadastroInline` e a matriz regravada.
+
+**É o mesmo defeito de `d6b081d`, registrado duas horas antes, com a regra
+"com agente em voo, commit é por caminho explícito" escrita logo abaixo.**
+
+### E eu usei caminho explícito. A regra não bastou.
+
+O que aconteceu foi outro mecanismo:
+
+```
+git add <7 caminhos de infra> && git commit ...    ← o add ERROU num arquivo ignorado
+                                                     e o && cancelou o commit
+                                                     MAS os outros 6 ficaram STAGED
+git add <7 telas> && git commit ...                ← este commit levou os 13
+```
+
+O `git add` **falha e mesmo assim estaga o que conseguiu**. O `&&` protege
+contra o commit errado acontecer, não contra o índice ficar sujo — e o commit
+seguinte varre o índice inteiro, não os caminhos que eu escrevi nele.
+
+### A lição, que é maior que git
+
+**Eu tratei "usei caminho explícito" como garantia, quando era só intenção.**
+A intenção estava no comando; a garantia teria que estar na CONFERÊNCIA do
+que ficou de fato no índice. É exatamente a distância entre o que o número
+mede e o que a frase promete, que este projeto já registrou três vezes em
+outras roupas — e desta vez o número era o meu próprio `git add`.
+
+### A regra, agora mecânica
+
+Antes de todo `git commit`: **`git diff --cached --name-only`, e comparar com
+a lista que eu pretendia**. Se divergir, `git reset` e recomeçar. Verificar o
+índice, não confiar no comando que o montou.
+
+Não reescrevi o histórico: `ac71f68` já estava empurrado, e reescrever branch
+publicada troca um registro impreciso por um registro quebrado. Fica esta
+anotação, que é o que os dois commits deveriam ter dito.
