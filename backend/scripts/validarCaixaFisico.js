@@ -91,15 +91,41 @@ function validateFrontendContracts() {
   const page = readRepository('frontend/src/pages/FinanceiroCaixas.jsx');
   const api = readRepository('frontend/src/services/financeiro.js');
 
+  /*
+    DOIS CONTRATOS ENVELHECERAM, E O CONSERTO E OLHAR A CAPACIDADE (05/09).
+
+    Este validador ficou vermelho depois da reforma do frontend, e a razao NAO
+    era regra de negocio quebrada: as 9 ancoras de regra (trava de OFX, lock em
+    transacao, bloqueio de fechamento retroativo, rotas, controller) passam
+    inteiras. Quebraram duas assercoes que conferiam LITERAL de markup:
+
+      'Caixas e Contas' — o <h1> virou <PageHeader titulo="Caixas e contas" />,
+                          com "contas" minusculo;
+      'overflow-x-auto' — a tabela crua virou o componente compartilhado, que
+                          da a rolagem horizontal por dentro.
+
+    Trocar o literal por outro literal so adiaria o problema para a proxima
+    reforma. Teste de contrato de interface tem de perguntar pela CAPACIDADE:
+    a tela se chama assim (sem depender de caixa) e a tabela e a compartilhada
+    (que garante a rolagem). Assim ele sobrevive ao layout e continua mordendo
+    se alguem TIRAR a capacidade.
+  */
   [
-    'Caixas e Contas',
     'Abrir caixa',
     'Registrar entrada ou saída',
     'Livro do caixa',
     'Conferir e fechar caixa',
-    'Divergências ficam registradas com justificativa',
-    'overflow-x-auto'
+    'Divergências ficam registradas com justificativa'
   ].forEach((contract) => assert(page.includes(contract), `Contrato de interface ausente: ${contract}`));
+
+  assert(
+    /caixas e contas/i.test(page),
+    'Contrato de interface ausente: a tela precisa se identificar como "Caixas e contas".'
+  );
+  assert(
+    page.includes('TabelaPadrao') || page.includes('overflow-x-auto'),
+    'Contrato de interface ausente: a tabela precisa rolar na horizontal — TabelaPadrao (que ja rola) ou overflow-x-auto na tabela crua.'
+  );
 
   assert(page.includes("tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO'"), 'Interface deve distinguir caixa fisico de conta bancaria.');
   assert(page.includes('min={dataMinimaFechamento}'), 'Interface deve impedir a selecao de data de fechamento retroativa.');
