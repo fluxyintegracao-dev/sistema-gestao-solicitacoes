@@ -698,16 +698,30 @@
   Duas caixas de linha diferentes: 7px de desvio medidos aqui, 9,5px no
   componente real, na mesma fileira de títulos.
 
-  `display: grid` + `align-content: center` dá a mesma centralização às
-  DUAS, sem depender da tag.
+  O conserto é a ALTURA DA LINHA: com `line-height: var(--alvo-clique)`, a
+  caixa de linha de cada título já nasce com a altura do alvo mínimo, e o
+  texto se assenta no meio dela — igual no botão e no span, porque agora
+  quem manda é a linha, não a tag.
 
-  Por que grid e não flex — MEDIDO, não escolhido por hábito: com `flex`,
-  o texto vira item de flex e o `text-align` herdado deixa de posicioná-lo;
-  a coluna alinhada à direita ficou 217px fora do lugar no teste. Com
-  `grid`, o texto vira item anônimo que estica na coluna e o `text-align`
-  continua valendo — 0px de desvio nos dois alinhamentos. Eu teria
-  escolhido o flex pelo hábito e desalinhado toda coluna monetária do
-  sistema.
+  DUAS TENTATIVAS ANTES DESTA, as duas medidas e as duas descartadas — e
+  nenhuma delas eu teria descartado por intuição:
+
+  1. `flex` + `align-items: center` zerava a linha de base E QUEBRAVA o
+     `text-align` herdado: o texto vira item de flex e para de obedecer ao
+     alinhamento. A coluna alinhada à direita ficou 217px fora do lugar.
+     Era a que eu escolheria por hábito, e teria desalinhado toda coluna
+     monetária do sistema.
+  2. `grid` + `align-content: center` preservava o alinhamento e zerava a
+     diferença entre botão e span — mas EMPILHAVA o ícone de ordenação
+     ABAIXO do título, porque num contêiner de grid o texto e o `<svg>`
+     viram itens separados. Eu cheguei a aplicar essa, e o defeito só
+     apareceu quando a prova de comportamento mediu o componente REAL:
+     7px de desvio de novo, agora por um terceiro caminho.
+
+  A medição final, com o ícone de ordenação presente e nos dois
+  alinhamentos: desvio 0,0px, texto alinhado à direita encostado na borda,
+  e o ícone AO LADO do título — os três ao mesmo tempo, que é o que
+  nenhuma das outras duas entregava.
 */
 .app-th-botao {
   appearance: none;
@@ -719,10 +733,10 @@
   letter-spacing: inherit;
   text-transform: inherit;
   color: inherit;
-  display: grid;
-  align-content: center;
+  display: block;
   width: 100%;
   min-height: var(--alvo-clique);
+  line-height: var(--alvo-clique);
   text-align: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
