@@ -3098,3 +3098,46 @@ destino do desvio nomeado. Com o modo desligado elas passam a abrir, e a
 declaração vira **porta para falso negativo**: se um dia um bloqueio de
 acesso REAL mandasse essas telas para `/sst/pgr`, a declaração o
 desculparia. Removidas. As duas de fluxo (revisão de compra) continuam.
+
+---
+
+## 05/09 — Duas frentes identificadas e NÃO abertas, por decisão do cliente
+
+Registradas para depois do teste dele. Nenhuma das duas foi tocada.
+
+### 1. `ModuloRelatorios.jsx` monta 54 destinos à mão
+
+É o maior item que sobrou no trinco de navegação, e virou o maior depois que
+o hub de Configurações foi resolvido (45 → 0). O problema é o mesmo, com o
+mesmo custo: **toda porta nova que o responsável mandar abrir aumenta a
+dívida**, porque a lista de destinos não passa pela fonte única. Foi
+exatamente isso que aconteceu na rodada 1 — abrir duas portas subiu o trinco
+e deixou um portão vermelho por dois dias.
+
+O conserto tem molde pronto: o hub de Configurações recebeu `SECOES_*` na
+fonte única mais dois campos declarados no próprio destino (`secaoConfig`,
+`ordemConfig`) e um helper único de leitura. O `ModuloRelatorios` tem a
+mesma moldura, então o mesmo desenho deve servir quase igual.
+
+**Custo estimado:** meio dia, mais regressão própria — muda a fonte da
+navegação de uma tela que 54 destinos atravessam.
+
+**Achado que veio junto e ainda não foi tratado:** no hub de Configurações,
+a lista à mão divergia da rota em **7 permissões**, e num dos casos o card
+aparecia para quem a rota redirecionava. Uma lista de 54 escrita à mão tem a
+mesma chance de ter divergido — só se sabe medindo.
+
+### 2. Os dois valores do contrato, explícitos na tela
+
+O cliente confirmou que a alçada do Jurídico usa o **valor original** e o
+cabeçalho mostra o **total com aditivos**, e que isso é regra correta (N40).
+Pediu a proposta de deixar a diferença legível para quem olha os dois
+números e pode achar que o sistema errou.
+
+Três opções levantadas, com o custo de cada uma, estão na seção "PROPOSTA
+AGUARDANDO DECISÃO" deste documento. A recomendação é rotular os dois
+números no cabeçalho ("Valor original R$ X · Com aditivos R$ Y") somada à
+explicação na frase de apoio — custo baixo, sem componente novo, e funciona
+no mouse, no toque e no leitor de tela.
+
+**Não é urgente e não foi feita.** Espera a decisão dele.
