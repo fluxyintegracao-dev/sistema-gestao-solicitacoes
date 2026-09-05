@@ -618,10 +618,28 @@ export function getAllDestinations() {
       to: child.to
     }))
   ));
-  const sstVariante = (SST_SIMPLIFIED_MODE ? sstChildrenFull() : sstChildrenSimplified())
+  /*
+    O CATALOGO OFERECIA JUSTAMENTE O QUE O MODO ESCONDE (05/09).
+
+    Isto aqui somava a variante OPOSTA a que o menu mostra: com o modo
+    simplificado ligado, ele acrescentava `sstChildrenFull()` — as 12 telas
+    que o proprio modo redireciona. O menu (linha ~487) sempre esteve certo;
+    quem vazava era o catalogo, e e dele que saem os atalhos fixaveis e o
+    Ctrl+K. Resultado: a pessoa via o destino, clicava, e nao acontecia
+    nada — sem saber se era permissao, erro ou defeito.
+
+    Decisao do cliente (05/09): "menu que mostra porta que nao abre e pior
+    que ausencia". O catalogo passa a usar A MESMA VARIANTE do menu, pela
+    MESMA constante que decide o redirecionamento — os dois nao tem como
+    divergir de novo, porque agora e uma leitura so.
+
+    Atalho salvo apontando para destino escondido simplesmente deixa de
+    aparecer, que e o mesmo tratamento ja dado a destino sem permissao.
+  */
+  const sstDoModo = (SST_SIMPLIFIED_MODE ? sstChildrenSimplified() : sstChildrenFull())
     .map((child) => ({ id: child.id, moduleId: 'sst', label: child.label, to: child.to }));
   const vistos = new Set(base.map((d) => d.to));
-  return [...base, ...sstVariante.filter((d) => !vistos.has(d.to))];
+  return [...base, ...sstDoModo.filter((d) => !vistos.has(d.to))];
 }
 
 // ---------------------------------------------------------------------

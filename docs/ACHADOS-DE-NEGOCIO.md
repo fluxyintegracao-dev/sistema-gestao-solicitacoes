@@ -14,6 +14,46 @@ marcado como *mitigação* — e mitigação não é conserto.
 
 ---
 
+## ⚠ ACHADO EM PRODUÇÃO AGORA — LEIA ANTES DOS DEMAIS
+
+*Este é o único achado deste documento que pode estar, neste momento, deixando
+contrato passar sem análise jurídica. Está aqui em cima, separado, por decisão
+do cliente em 05/09.*
+
+### N40. O valor que decide o caminho do contrato não é o valor que a tela mostra
+
+Quando um contrato é aprovado, o sistema escolhe entre dois caminhos:
+
+- **abaixo do limite do Jurídico** → o contrato vira ATIVO e os títulos
+  financeiros são criados na hora;
+- **acima do limite** → o contrato vai para o Jurídico e **nenhum título é
+  criado** até a conferência.
+
+O cabeçalho da tela mostra `valor_total + valor_aditivos`. O código que decide
+o caminho compara **apenas `valor_total`** — sem os aditivos.
+
+**O que isso significa na prática:** um contrato que só ultrapassa o limite do
+Jurídico **por causa dos aditivos** é aprovado pelo caminho de baixo. Os
+títulos nascem, o dinheiro entra na fila de pagamento, e o Jurídico nunca vê.
+
+Quem aprova está olhando um número maior que o número que decide.
+
+**O que já foi feito:** nada no comportamento. A confirmação que a reforma
+acrescentou passou a declarar **os dois** desfechos possíveis, em vez de
+escolher um e arriscar afirmar o errado — porque a tela hoje não sabe em qual
+ramo o contrato vai cair.
+
+**A decisão que falta:** o critério de roteamento é regra de negócio, não
+layout. Ou o roteamento passa a somar os aditivos, ou fica registrado que a
+intenção é decidir pelo valor original. Enquanto não se decide, o contrato
+aditivado continua tendo dois números — um exibido, outro decisório.
+
+**Onde conferir:** o serviço de aprovação de contrato compara
+`paraCentavos(contrato.valor_total)` com o limite; o cabeçalho da tela soma
+`valor_total + valor_aditivos`.
+
+---
+
 ## PARTE 1 — DINHEIRO QUE SAI
 
 ### N1. Uma falha de internet muda o caminho de envio de um lote de pagamento, sem avisar
@@ -478,30 +518,7 @@ por um critério que não estava mais em lugar nenhum da tela — filtro ativo
 invisível. Esse defeito, sim, sumiu com a migração: agora todo filtro ativo é
 etiqueta visível e removível.
 
-## PARTE 9 — O CONTROLE DO JURÍDICO PODE SER CONTORNADO PELOS ADITIVOS
-
-### N40. O valor que decide o caminho do contrato não é o valor que a tela mostra
-
-**Este é o achado mais relevante do dia.**
-
-Quando um contrato é aprovado, o sistema escolhe entre dois caminhos:
-
-- **abaixo do limite do Jurídico** → o contrato vira ATIVO e os títulos
-  financeiros são criados na hora;
-- **acima do limite** → o contrato vai para o Jurídico e **nenhum título é
-  criado** até a conferência.
-
-O cabeçalho da tela mostra `valor_total + valor_aditivos`. O código que decide
-o caminho compara **apenas `valor_total`** — sem os aditivos.
-
-**Consequência:** um contrato que só ultrapassa o limite do Jurídico por causa
-dos aditivos é aprovado pelo caminho de baixo. Os títulos nascem, o dinheiro
-entra na fila de pagamento, e o Jurídico nunca vê.
-
-Quem aprova está olhando um número maior que o número que decide.
-
-Não alterei nada: é regra de backend, e mudar o critério de roteamento é
-decisão sua, não de layout.
+## PARTE 9 — APROVAÇÃO DE CONTRATO E BAIXA DE TÍTULOS
 
 ### N41. A tela nunca diz qual dos dois caminhos vai acontecer
 

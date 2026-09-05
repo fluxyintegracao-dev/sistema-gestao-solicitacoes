@@ -2332,3 +2332,129 @@ roda de dentro do próprio validador.
 
 Passivo congelado em `scripts/trinco-fonte-minima.json`, por arquivo, em 196.
 Só desce. Declaração nova abaixo do piso reprova na hora.
+
+---
+
+# 05/09 — Quatro decisões do cliente, executadas
+
+## 1. SST: as 12 telas saem do menu enquanto o modo simplificado estiver ligado
+
+**Decisão do cliente, palavras dele:** *"Menu que mostra porta que não abre é
+pior que ausência: a pessoa clica, não acontece nada, e ela não sabe se é
+permissão, erro ou bug. Ligue a visibilidade do item de menu à mesma constante
+que decide o redirecionamento — assim os dois nunca divergem de novo."*
+
+### Onde estava o vazamento — e não era onde eu disse
+
+O **menu** sempre esteve certo: `navigationConfig.jsx:487` já monta os filhos
+do SST com `SST_SIMPLIFIED_MODE ? sstChildrenSimplified() : sstChildrenFull()`,
+e as 12 telas não estão entre os 9 recursos do modo simplificado.
+
+Quem vazava era o **catálogo de destinos** (`getAllDestinations`), que somava
+deliberadamente a variante **OPOSTA**:
+
+```js
+const sstVariante = (SST_SIMPLIFIED_MODE ? sstChildrenFull() : sstChildrenSimplified())
+```
+
+Com o modo ligado, ele acrescentava exatamente as 12 telas que o próprio modo
+redireciona. E é desse catálogo que saem os **atalhos fixáveis** e o **Ctrl+K**
+— ou seja, a porta que não abre estava nos dois lugares onde a pessoa procura
+quando não acha pelo menu.
+
+**Corrigido**: o catálogo passa a usar a MESMA variante do menu, pela MESMA
+constante. Não é possível divergirem de novo, porque agora é uma leitura só.
+Atalho salvo apontando para destino escondido simplesmente deixa de aparecer —
+o mesmo tratamento já dado a destino sem permissão.
+
+### O que continua imperfeito, e é honesto dizer
+
+A varredura de alcance é **estática**: ela lê as formas de link no código-fonte
+e não sabe qual ramo do ternário executa. Por isso `sstChildrenFull()` continua
+fazendo as 12 contarem como "nível 1 (destino do menu)" na varredura, embora em
+runtime elas não apareçam. Quem cobre isso é o check de **porta que não abre**,
+que roda pelo trinco e nomeia as 13 rotas uma a uma.
+
+### A pergunta de fundo, para o responsável
+
+**O modo simplificado deve continuar ligado por padrão?** Hoje ele é
+`import.meta.env.VITE_SST_SIMPLIFIED_MODE !== 'false'` — verdadeiro salvo se a
+variável valer exatamente a string `'false'` — e **não existe `.env` no
+repositório**. Ou seja: ligado em todo ambiente, por omissão, e não por
+escolha registrada. Doze telas migradas e funcionais estão desligadas por um
+padrão que ninguém decidiu explicitamente.
+
+## 2. Painel "quais filtros aparecem" do provisionamento: REPOSTO
+
+**Decisão do cliente:** *"Capacidade não sai sem minha palavra, e o argumento
+do agente pode estar certo sem que eu tenha visto o efeito."*
+
+Reposto como bloco secundário recolhível, com as 8 caixas de marcação
+originais. **Uma única diferença**: esconder um filtro agora **limpa** o valor
+dele.
+
+Isso não é capricho. Na `BarraFiltros`, a etiqueta de filtro ativo nasce da
+lista `filtros` — esconder a dimensão esconde a etiqueta junto. Sem a limpeza,
+o defeito original voltaria idêntico: desmarcar "Credor" com um credor digitado
+deixaria a lista recortada por um critério que não está em lugar nenhum da
+tela.
+
+**O argumento do agente, registrado para o cliente decidir vendo a tela:** o
+painel existia para administrar espaço numa grade de oito campos e inputs; com
+a marcação da `BarraFiltros`, os controles são compactos e as etiquetas já
+mostram o estado do recorte, então a razão de ser dele teria desaparecido.
+
+## 3. Os cinco componentes que ninguém renderiza
+
+`Comprovantes.jsx` **removido** (0 bytes desde um commit anterior a esta
+sessão — arquivo vazio não é capacidade; autorizado pelo cliente).
+
+Os outros quatro, com o que cada um faz:
+
+### `Pedido.jsx` (108 linhas) — **este é o único que carrega capacidade perdida**
+
+Formulário de um campo, "Número do pedido", com o botão "Gravar número". Grava
+em `PATCH /solicitacoes/:id/pedido`.
+
+**O endpoint existe, é validado e é AUDITADO** (`routes.js:1565`, evento
+`SOLICITACAO_PEDIDO_UPDATED`, com resolvedor de recurso). E **nada no sistema
+o alcança** — o campo `numero_pedido` é lido na busca e na ordenação da
+listagem, mas não há tela que o escreva.
+
+Ou seja: existe um caminho de gravação com trilha de auditoria montada, e
+ninguém consegue usá-lo. **Recomendo repor**, e é o único dos quatro em que
+recomendo.
+
+### `InfoCard.jsx` (64 linhas) — superseded
+
+Bloco "Dados da Solicitação" com 9 campos: Obra, Setor, Tipo, Parceiro,
+Apropriação, Contrato, Ref. do Contrato, Valor, Descrição.
+
+Todos os 9 estão no `Header.jsx` que a tela renderiza hoje, que mostra 20
+campos pelo `CamposComVazios`. É subconjunto — não há dado a recuperar.
+
+### `StatusArea.jsx` (37 linhas) — superseded
+
+Dois campos: Status e Área responsável. Os dois estão no `StatGrid` do topo do
+detalhe, junto de Data Resposta/Pagamento e Atualizado em. Subconjunto.
+
+### `Pagamentos.jsx` (577 linhas) — superseded, e o maior dos quatro
+
+Bloco "Pagamentos" completo: lista de títulos, resumo (total/pago/saldo),
+modal de baixa com conta bancária, data e forma de pagamento.
+
+O `index.jsx` registra em comentário que *"o card Pagamentos saiu do detalhe (a
+função vive no card Financeiro)"*, e o atalho `informar_pagamento` rola até o
+`FinanceiroCard`. Foi migrado nesta rodada mesmo assim (estava na lista de um
+agente) e **teve dois defeitos de significado corrigidos** no caminho — o
+resumo que somava 8 títulos sobre uma lista de 4, e o que trocava de fonte em
+silêncio quando a consulta falhava. Se ele voltar um dia, volta consertado.
+
+## 4. O achado do Jurídico subiu para o topo do ACHADOS-DE-NEGÓCIO
+
+**Decisão do cliente:** não tocar (é regra do responsável), mas destacar
+separado dos demais — *"é o único que pode estar deixando contrato passar sem
+análise jurídica em produção agora"*.
+
+Feito: seção própria antes da Parte 1, com o aviso de que é o único do
+documento nessa condição.

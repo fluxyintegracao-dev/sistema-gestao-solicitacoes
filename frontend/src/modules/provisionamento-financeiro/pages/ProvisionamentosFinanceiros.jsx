@@ -32,6 +32,34 @@ const DEFAULT_FILTERS = {
   data_final: ''
 };
 
+/*
+  PAINEL "QUAIS FILTROS APARECEM" — REPOSTO POR DECISAO DO CLIENTE (05/09).
+
+  A migracao tinha removido esta capacidade com o argumento de que ela
+  existia para administrar espaco numa grade de oito campos, e que a
+  marcacao nova e compacta. O cliente decidiu: "capacidade nao sai sem a
+  minha palavra, e o argumento do agente pode estar certo sem que eu tenha
+  visto o efeito". Reposto, e a proposta de remocao fica registrada em
+  docs/ACHADOS-DE-NEGOCIO.md com o argumento dele, para decidir vendo a tela.
+
+  A UNICA diferenca em relacao ao painel original: esconder um filtro agora
+  LIMPA o valor dele. Antes escondia o campo e mantinha o filtro aplicado —
+  desmarcar "Credor" com um credor digitado deixava a lista recortada por um
+  criterio que nao estava em lugar nenhum da tela. Nao e capricho: sem isso a
+  etiqueta some junto com o campo (ela nasce de `filtros`), e o filtro
+  invisivel volta exatamente como era.
+*/
+const FILTROS_ESCONDIVEIS = [
+  { id: 'obra_id', rotulo: 'Obra' },
+  { id: 'categoria_macro_id', rotulo: 'Item macro' },
+  { id: 'status', rotulo: 'Status' },
+  { id: 'prioridade', rotulo: 'Prioridade' },
+  { id: 'fornecedor', rotulo: 'Credor' },
+  { id: 'usuario_criacao_id', rotulo: 'Criador' },
+  { id: 'data_inicial', rotulo: 'Data inicial' },
+  { id: 'data_final', rotulo: 'Data final' }
+];
+
 const STATUS_OPCOES = [
   { valor: 'previsto', rotulo: 'Previsto' },
   { valor: 'em_analise', rotulo: 'Em analise' },
@@ -136,6 +164,19 @@ export default function ProvisionamentosFinanceiros() {
   const [loadingBase, setLoadingBase] = useState(true);
   const [loadingLista, setLoadingLista] = useState(false);
   const [filtros, setFiltros] = useState(DEFAULT_FILTERS);
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => FILTROS_ESCONDIVEIS.map((f) => f.id));
+
+  /*
+    Esconder LIMPA. Se o valor ficasse, ele continuaria recortando a lista
+    sem campo e sem etiqueta — o defeito que a propria migracao apontou.
+  */
+  function alternarVisibilidadeFiltro(id) {
+    setFiltrosVisiveis((atuais) => {
+      const escondendo = atuais.includes(id);
+      if (escondendo) atualizarFiltro(id, DEFAULT_FILTERS[id] ?? '');
+      return escondendo ? atuais.filter((x) => x !== id) : [...atuais, id];
+    });
+  }
   const [ordenacao, setOrdenacao] = useState(ORDENACAO_PADRAO);
 
   useEffect(() => {
@@ -381,12 +422,38 @@ export default function ProvisionamentosFinanceiros() {
               valor: filtros.data_final,
               aoMudar: (valor) => atualizarFiltro('data_final', valor)
             }
-          ]}
-          filtros={dimensoes}
+          ].filter((campo) => filtrosVisiveis.includes(campo.id))}
+          filtros={dimensoes.filter((dim) => filtrosVisiveis.includes(dim.id))}
           ativos={ativos}
           aoAlternar={alternarFiltro}
           aoLimpar={limparFiltros}
         />
+
+        {/*
+          O painel volta como bloco proprio, recolhido: e configuracao de
+          quem opera a tela, nao recorte — misturado a faixa de filtros ele
+          competiria com o que a pessoa veio fazer.
+        */}
+        <BlocoConteudo
+          titulo="Quais filtros aparecem"
+          descricao="Esconder um filtro tambem LIMPA o valor dele — filtro escondido nao continua recortando a lista."
+          variante="secundario"
+          recolhivel
+          recolhidoPadrao
+        >
+          <div className="app-filtros-campos">
+            {FILTROS_ESCONDIVEIS.map((item) => (
+              <label key={item.id} className="app-filtros-campo-rotulo" style={{ display: 'flex', alignItems: 'center', gap: 'var(--esp-2)' }}>
+                <input
+                  type="checkbox"
+                  checked={filtrosVisiveis.includes(item.id)}
+                  onChange={() => alternarVisibilidadeFiltro(item.id)}
+                />
+                <span>{item.rotulo}</span>
+              </label>
+            ))}
+          </div>
+        </BlocoConteudo>
 
         <TabelaPadrao
           colunas={[
