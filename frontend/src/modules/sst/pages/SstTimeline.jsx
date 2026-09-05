@@ -38,10 +38,37 @@ export default function SstTimeline() {
   const { avisos, avisar, fechar } = useAvisos();
   const { confirmar, elementoConfirmacao } = useConfirmacao();
 
+  /*
+    HTTP 400 medido no preview (05/09): a chamada saía como
+    `GET /api/rh/colaboradores?status=ATIVO&limit=500` e o backend recusava
+    a REQUISIÇÃO INTEIRA — nenhum colaborador chegava e a tela ficava em
+    "0 evento(s)" sem dizer por quê.
+
+    A rota não tem paginação: `validateRhColaboradorQuery`
+    (backend/src/validators/rhValidators.js:334) roda `ensureAllowedKeys` com
+    o conjunto FECHADO ['q','empresa_grupo_id','obra_id','setor_id',
+    'tipo_vinculo','status'] — `limit` não é um teto pequeno demais, é uma
+    chave que a rota não conhece, e chave desconhecida é 400
+    ("Consulta de colaboradores RH/DP contem campos nao permitidos: limit.").
+    `status=ATIVO` estava correto (RH_STATUS_COLABORADOR aceita
+    ATIVO/INATIVO/AFASTADO).
+
+    Tirar `limit` não corta capacidade: `listarColaboradoresRh`
+    (backend/src/services/rhService.js:930) faz `findAll` sem limite e devolve
+    o array completo — a tela passa a receber MAIS gente, não menos. É como a
+    SstCrudPage já chama (`{ status: 'ATIVO' }`).
+
+    E a falha deixa de ser silenciosa: engolir o erro era o que fazia a tela
+    parecer vazia em vez de avariada.
+  */
   useEffect(() => {
-    getRhColaboradores({ status: 'ATIVO', limit: 500 })
+    getRhColaboradores({ status: 'ATIVO' })
       .then((rows) => setColaboradores(Array.isArray(rows) ? rows : []))
-      .catch(() => setColaboradores([]));
+      .catch((err) => {
+        setColaboradores([]);
+        avisar.erro(err?.message || 'Erro ao carregar a lista de colaboradores ativos');
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function load(colaboradorId = selected) {

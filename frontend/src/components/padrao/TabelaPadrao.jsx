@@ -843,6 +843,46 @@ export default function TabelaPadrao({
       + (linhaExpansivel ? LARGURA_EXPANDIR : 0)
   ));
 
+  /*
+    Estes cinco hooks ficam ACIMA das saídas antecipadas de propósito.
+    Eu os escrevi em 18f9253 logo abaixo delas, junto da rolagem infinita,
+    e isso quebrou toda tabela que renderiza vazia e depois recebe linha:
+    a primeira renderização parava no EmptyState com 23 hooks, a segunda ia
+    até o fim com 28, e o React derruba a tela (erro #310). O mesmo vale
+    para carregando -> pronto e para a travessia do corte de tela móvel.
+    Regra sem exceção: hook nenhum depois de um return condicional.
+  */
+  /* ---- Rolagem infinita LOCAL, com a escolha salva por lista ---------- */
+  /*
+    A fatia corta DEPOIS da ordenação e ANTES do agrupamento: cortar antes
+    de ordenar mostraria as 50 primeiras da ordem antiga, e cortar depois de
+    agrupar deixaria um grupo pela metade sem dizer.
+  */
+  const chaveModoLista = storageKey ? `${storageKey}:modo-lista` : null;
+  const [paginacaoNumerada, setPaginacaoNumerada] = useState(
+    () => Boolean(lerJson(chaveModoLista, { numerada: false }).numerada)
+  );
+  const rolagemLocalPossivel = paginaLocal > 0 && itensOrdenados.length > paginaLocal;
+  const [fatia, setFatia] = useState(paginaLocal);
+  // Lista nova (filtro, busca, outra consulta) volta ao começo: continuar
+  // com a fatia esticada mostraria 300 linhas de um resultado de 300 e
+  // esconderia que a lista mudou.
+  useEffect(() => { setFatia(paginaLocal); }, [itensOrdenados.length, paginaLocal]);
+  const sentinelaRef = useRef(null);
+  useEffect(() => {
+    if (paginacaoNumerada || !rolagemLocalPossivel) return undefined;
+    if (fatia >= itensOrdenados.length) return undefined;
+    const el = sentinelaRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const observador = new IntersectionObserver((entradas) => {
+      if (entradas.some((e) => e.isIntersecting)) {
+        setFatia((atual) => Math.min(atual + paginaLocal, itensOrdenados.length));
+      }
+    }, { rootMargin: '400px' });
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [paginacaoNumerada, rolagemLocalPossivel, fatia, itensOrdenados.length, paginaLocal]);
+
   if (carregando) {
     return (
       <div className="empty-state" role="status">
@@ -938,37 +978,6 @@ export default function TabelaPadrao({
   const temTotalConhecido = Number.isFinite(Number(total)) && Number(total) >= itens.length;
 
   /* ---- Agrupamento: linhas de grupo intercaladas ---------------------- */
-  /* ---- Rolagem infinita LOCAL, com a escolha salva por lista ---------- */
-  /*
-    A fatia corta DEPOIS da ordenação e ANTES do agrupamento: cortar antes
-    de ordenar mostraria as 50 primeiras da ordem antiga, e cortar depois de
-    agrupar deixaria um grupo pela metade sem dizer.
-  */
-  const chaveModoLista = storageKey ? `${storageKey}:modo-lista` : null;
-  const [paginacaoNumerada, setPaginacaoNumerada] = useState(
-    () => Boolean(lerJson(chaveModoLista, { numerada: false }).numerada)
-  );
-  const rolagemLocalPossivel = paginaLocal > 0 && itensOrdenados.length > paginaLocal;
-  const [fatia, setFatia] = useState(paginaLocal);
-  // Lista nova (filtro, busca, outra consulta) volta ao começo: continuar
-  // com a fatia esticada mostraria 300 linhas de um resultado de 300 e
-  // esconderia que a lista mudou.
-  useEffect(() => { setFatia(paginaLocal); }, [itensOrdenados.length, paginaLocal]);
-  const sentinelaRef = useRef(null);
-  useEffect(() => {
-    if (paginacaoNumerada || !rolagemLocalPossivel) return undefined;
-    if (fatia >= itensOrdenados.length) return undefined;
-    const el = sentinelaRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
-    const observador = new IntersectionObserver((entradas) => {
-      if (entradas.some((e) => e.isIntersecting)) {
-        setFatia((atual) => Math.min(atual + paginaLocal, itensOrdenados.length));
-      }
-    }, { rootMargin: '400px' });
-    observador.observe(el);
-    return () => observador.disconnect();
-  }, [paginacaoNumerada, rolagemLocalPossivel, fatia, itensOrdenados.length, paginaLocal]);
-
   const itensAVista = (!rolagemLocalPossivel || paginacaoNumerada)
     ? itensOrdenados
     : itensOrdenados.slice(0, fatia);

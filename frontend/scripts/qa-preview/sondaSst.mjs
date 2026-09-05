@@ -108,7 +108,30 @@ try {
   for (const [id, rota] of ROTAS) {
     const erros = [];
     const aoErro = (e) => erros.push(`pageerror: ${String(e.message || e).slice(0, 160)}`);
-    const aoConsole = (m) => { if (m.type() === 'error') erros.push(`console: ${m.text().slice(0, 160)}`); };
+    /*
+      "Failed to fetch" no console NÃO é defeito da tela (05/09).
+
+      Eu reportei ao cliente que a /sst/relatorios/operacional tinha uma
+      falha de REDE, e não tinha. Medido depois: 9 das 12 telas emitem
+      `TypeError: Failed to fetch` no console — e SEIS delas renderizam
+      perfeitamente, com ladrilhos preenchidos e ações respondendo. A
+      mensagem vem das duas chamadas que a navegação aborta ao trocar de
+      tela (`live-updates` e `configuracoes/tema`), as mesmas que o
+      `requestfailed` abaixo já descarta como ruído.
+
+      Ou seja: o filtro existia num canal e faltava no outro, e o canal sem
+      filtro é que eu levei ao cliente. Uma mensagem que aparece igual na
+      tela sã e na tela quebrada não separa as duas — é o indicador no lugar
+      da coisa outra vez. As três telas realmente quebradas se distinguem
+      pelo React #310, que nenhuma tela sã emite.
+    */
+    const RUIDO_DE_NAVEGACAO = /Failed to fetch|net::ERR_ABORTED|The user aborted a request|signal is aborted/i;
+    const aoConsole = (m) => {
+      if (m.type() !== 'error') return;
+      const texto = m.text();
+      if (RUIDO_DE_NAVEGACAO.test(texto)) return;
+      erros.push(`console: ${texto.slice(0, 160)}`);
+    };
     /*
       QUAL requisição falhou — sem isso a sonda não serve (05/09).
 

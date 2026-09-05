@@ -739,6 +739,37 @@ sem ninguém saber dizer por quê.
   a rolagem nunca acontece. É o mesmo motivo das trilhas `minmax(0, 1fr)`
   que a ComunicacaoInterna precisou.
 
+## R29 — Nenhum hook DEPOIS de um `return` condicional (05/09)
+
+- **A regra**: dentro de um componente, todo hook (`useState`, `useEffect`,
+  `useMemo`, `useRef`, …) é chamado **antes** de qualquer `return` que
+  dependa de condição. Sem exceção, e o gate reprova (`R29` em
+  `validarLayout.mjs`).
+- **O defeito que ela fecha, e ele foi meu, de hoje**: ao acrescentar a
+  rolagem infinita local à `TabelaPadrao` (commit `18f9253`) eu escrevi
+  cinco hooks **abaixo** das três saídas antecipadas que o componente já
+  tinha (`carregando`, lista vazia, tela móvel).
+- **O que isso provoca**: a tabela monta com a lista vazia — o dado ainda
+  não chegou —, para no `EmptyState` e roda **23 hooks**. O dado chega, o
+  corpo segue até o fim e roda **28**. O React exige a mesma sequência de
+  hooks em toda renderização e, ao ver a diferença, **derruba a árvore
+  inteira**: erro #310, `Rendered more hooks than during the previous
+  render`. A tela não degrada, **some** — vira "Não foi possível abrir esta
+  tela".
+- **O alcance**: a `TabelaPadrao` é usada por **124 telas**. O gatilho é a
+  transição mais comum do sistema (vazio → com dado), e há duas variantes
+  latentes do mesmo defeito: `carregando → pronto`, e atravessar o corte de
+  tela móvel com a tabela cheia.
+- **Por que nada pegou**: o build compila (é JavaScript válido); a tela abre
+  normalmente enquanto a lista está vazia; e a matriz mede tela por tela.
+  Nenhum dos três olha para a **ordem** em que os hooks são chamados. O
+  `react-hooks/rules-of-hooks` do ESLint pegaria — o projeto não tem ESLint.
+  Enquanto não tiver, R29 é a rede.
+- **A lição, que é a mesma de sempre**: eu tinha atribuído as três telas do
+  SST quebradas a elas terem sido migradas sem medição. A causa era uma
+  linha minha, de hoje, num componente compartilhado. **Antes de acusar o
+  código herdado, medir o que eu mesmo mexi por último.**
+
 ## Exceção registrada precisa PROVAR que cobre algo (04/09)
 
 Não é regra nova de layout: é regra do **mecanismo de exceção** das regras

@@ -635,3 +635,79 @@ vence a leitura. Aplicar isso muda o arranjo da tela, e é o esperado.
 **As três primeiras têm a mesma natureza e por isso vêm juntas no topo:** o
 sistema grava no banco algo que ninguém digitou. Erro de tela a pessoa vê;
 dado inventado ela confere, acredita e usa.
+
+---
+
+## PARTE 11 — SST: O QUE APARECEU QUANDO AS TELAS VOLTARAM (05/09)
+
+As 12 telas do SST passaram a refatoração inteira redirecionando, por causa
+de um modo simplificado ligado por padrão. Ninguém as abriu. Quando o
+cliente mandou desligar o modo e elas voltaram ao menu, foram abertas uma a
+uma pela primeira vez — e é daí que vêm os achados abaixo.
+
+### N50. "Compliance" é calculado de DOIS jeitos, e as duas telas ficam a um clique uma da outra
+
+**O que acontece.** O painel do SST mostra **"Compliance score: 0%"**. O
+relatório executivo do SST, um clique adiante, mostra **"Compliance geral:
+75% — CONTROLADO"**. Mesma base, mesmo dia, mesma palavra.
+
+**Por quê.** São duas fórmulas diferentes com o mesmo nome:
+
+- O painel usa `backend/src/modules/sst/compliance/sstComplianceEngine.js`,
+  linha 288: desconta **2 pontos por pendência crítica** sobre uma base que
+  soma colaboradores + ASOs + treinamentos + EPIs + documentos + exposições.
+  Com 99 colaboradores e 99 pendências críticas, o desconto (198) passa da
+  base (99), o resultado fica negativo e o `Math.max(0, …)` o transforma em
+  **0%**.
+- O relatório executivo usa
+  `backend/src/modules/sst/analytics/sstExecutiveAnalyticsService.js`, linha
+  180: a **média dos scores por colaborador**, e cada colaborador vale
+  `100 − 25 por pendência crítica` = 75. Média: **75%**.
+
+**Efeito prático.** Um número de conformidade que muda de 0% para 75%
+conforme a tela que a pessoa abriu. Quem olha o painel conclui que o SST
+está em colapso; quem olha o relatório conclui que está controlado. As duas
+telas se dizem a mesma coisa.
+
+**O que decidir.** Qual das duas fórmulas é a alçada de conformidade do SST?
+A escolhida vira a única, e a outra sai ou muda de nome — "média de score
+por colaborador" e "índice de conformidade da base" são coisas diferentes e
+podem coexistir, desde que não se chamem igual.
+
+**É da mesma família do N25**, já registrado: número de diretoria e número de
+operação com o mesmo nome e janelas diferentes.
+
+### N51. A tela do eSocial mostra `SENHA_AUSENTE` no lugar de uma frase
+
+**O que acontece.** No painel do eSocial do SST, o indicador do certificado
+digital exibe literalmente **`SENHA_AUSENTE`** e **`ESOCIAL_CERT_…`** —
+códigos internos do sistema, em letra maiúscula com sublinhado, no lugar de
+uma frase em português.
+
+**Efeito prático.** Quem opera não sabe o que fazer. "Senha ausente" é uma
+informação acionável — falta cadastrar a senha do certificado A1 — mas
+`SENHA_AUSENTE` parece defeito do sistema, e a pessoa liga para o suporte em
+vez de resolver.
+
+**Onde está.** Painel do eSocial em `/sst/esocial`, indicador "Certificado
+A1".
+
+**O que decidir.** Traduzir os códigos de estado do certificado para frases,
+e decidir o que a tela deve dizer em cada um. É a mesma família do N47
+("Usuário #12" onde deveria estar um nome).
+
+### Uma suspeita minha que a medição DERRUBOU, registrada para não voltar
+
+Ao abrir as telas, o número **99** aparecia repetido em indicadores
+diferentes — "colaboradores avaliados 99", "pendências 99", "pendências
+críticas 99" — e eu levantei a hipótese de que fosse um **limite de consulta
+virando número na tela**, o que faria o painel mentir para quem decide.
+
+**Não é.** Conferido no código: os limites de consulta são 1.000, não 99
+(`sstExecutiveAnalyticsService.js:63` e `:116`). O 99 é o número real de
+colaboradores ativos na base do preview, e os três indicadores coincidem
+porque cada colaborador tem exatamente uma pendência crítica.
+
+Fica registrado porque a suspeita era razoável e a resposta é verificável —
+se alguém a levantar de novo, o caminho já está andado.
+

@@ -588,6 +588,11 @@ export function validarLayout() {
   const r22 = validarImportesDeHooks();
   falhas.push(...r22.falhas);
 
+  // R29 — hook depois de return condicional: o build PASSA e a tela SOME
+  // (React #310) quando a condição vira. Meu defeito de 05/09 na TabelaPadrao.
+  const r29 = validarHooksDepoisDeRetorno();
+  falhas.push(...r29.falhas);
+
   // R25 — cor fora do sistema de tokens (decisão do cliente, 03/09).
   const r25 = validarCoresForaDoToken();
   falhas.push(...r25.falhas);
@@ -943,6 +948,79 @@ function validarImportesDeHooks() {
         if (!chamada.test(codigo)) continue;
         const linha = codigo.split('\n').findIndex((l) => chamada.test(l)) + 1;
         falhas.push(`${rel}:${linha} [R22] "${hook}" é usado e NÃO está importado — o build passa e a tela quebra em execução (ReferenceError).`);
+      }
+    }
+  };
+  varrer(path.join(frontendRoot, 'src'));
+  return { falhas };
+}
+
+/**
+ * R29 — HOOK DEPOIS DE `return` CONDICIONAL (05/09).
+ *
+ * Custou as três telas do SST que o cliente encontrou "quebradas ao abrir",
+ * e eu tinha atribuído isso a elas terem sido migradas sem medição. Não era:
+ * o defeito era meu, de hoje, na `TabelaPadrao` — componente que 124 telas
+ * usam. Ao acrescentar a rolagem infinita local (18f9253) eu escrevi cinco
+ * hooks ABAIXO das três saídas antecipadas que o componente já tinha.
+ *
+ * O que isso faz: a tabela monta vazia (dado não chegou), para no
+ * `EmptyState` e roda 23 hooks. O dado chega, o corpo segue até o fim e roda
+ * 28. O React exige a MESMA sequência de hooks em toda renderização e
+ * derruba a árvore inteira — erro #310, "Rendered more hooks than during the
+ * previous render". A tela não degrada: some.
+ *
+ * Por que nada pegou: o build compila (é JavaScript válido), a tela abre
+ * enquanto a lista fica vazia, e a matriz mede tela por tela — nenhum dos
+ * três olha para a ORDEM em que os hooks são chamados. O ESLint com
+ * `react-hooks/rules-of-hooks` pegaria; o projeto não tem ESLint. Enquanto
+ * não tiver, esta é a rede.
+ *
+ * A heurística é de linha e deliberadamente estreita: corpo de função no
+ * nível de indentação 2, que é como todo componente daqui é escrito. Ela
+ * ACUSA a versão quebrada (5 achados em TabelaPadrao.jsx) e LIBERA a
+ * corrigida — medido antes de entrar, não suposto.
+ */
+function validarHooksDepoisDeRetorno() {
+  const falhas = [];
+  const HOOK = /^\s{2}(?:const|let|var)?\s*.*\buse(?:State|Effect|Memo|Callback|Ref|Context|LayoutEffect|Reducer|ImperativeHandle|Id|Transition|DeferredValue|SyncExternalStore)\s*\(/;
+
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        if (item.name === 'node_modules' || item.name === 'dist') continue;
+        varrer(caminho);
+        continue;
+      }
+      if (!/\.(jsx?|tsx?)$/.test(item.name)) continue;
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      const linhas = fs.readFileSync(caminho, 'utf8').split('\n');
+
+      let fimDoRetornoCondicional = 0;
+      let dentroDeIf = false;
+      let temReturn = false;
+      for (let i = 0; i < linhas.length; i += 1) {
+        const linha = linhas[i];
+        // Função de topo nova: o estado anterior não vale mais.
+        if (/^(?:export\s+)?(?:default\s+)?function\s/.test(linha)
+          || /^const\s+\w+\s*=\s*(?:\(|function|forwardRef|memo)/.test(linha)) {
+          fimDoRetornoCondicional = 0; dentroDeIf = false; temReturn = false;
+        }
+        if (/^\s{2}if\s*\(/.test(linha)) { dentroDeIf = true; temReturn = false; }
+        if (dentroDeIf && /^\s{4}return\b/.test(linha)) temReturn = true;
+        if (dentroDeIf && /^\s{2}\}/.test(linha)) {
+          if (temReturn) fimDoRetornoCondicional = i + 1;
+          dentroDeIf = false; temReturn = false;
+        }
+        if (fimDoRetornoCondicional && HOOK.test(linha) && !linha.trim().startsWith('//')) {
+          falhas.push(
+            `${rel}:${i + 1} [R29] hook chamado DEPOIS do return condicional da linha `
+            + `${fimDoRetornoCondicional} — a tela some com React #310 assim que a `
+            + `condição mudar (vazio→com dado, carregando→pronto). Mova o hook para ANTES do return.`
+          );
+        }
       }
     }
   };
