@@ -1904,3 +1904,190 @@ zero opções. Aí:
 junto da R28 e do `TabelaPadrao`. **Até lá a célula fica FALHOU** — e é
 melhor assim: célula vermelha que eu sei explicar é mais honesta que verde
 que eu não consigo defender.
+
+---
+
+# 05/09 — Rodada 4 (CRM) e três portões que mediam menos do que prometiam
+
+## A F3 me mordeu DUAS vezes, e a segunda foi mais sutil que a primeira
+
+O registro acima termina dizendo que o conserto certo era o **componente**
+declarar a ausência. Fiz isso: a `BarraFiltros` passou a renderizar
+`data-vazio="sem-opcoes"` com um texto que nomeia a dimensão, e ensinei a F3
+a ler essa marca como SEM DADO.
+
+**A prova reprovou de novo.** E o motivo é humilhante de tão simples: o
+componente emite a marca SOZINHO. A tela plantada usa o mesmo componente,
+então ganhou a declaração de graça. Eu tinha trocado um sinal que não
+discrimina por outro sinal que não discrimina.
+
+O que distingue de verdade é o formato que a **R1 já usa e o cliente já
+aprovou**: DECLARAÇÃO DO AUTOR no manifesto (`filtroSemOpcoesNaBase`) MAIS
+verificação de que a tela diz isso à pessoa. As duas condições, nunca uma:
+
+| Manifesto declara | Tela diz à pessoa | Veredito |
+|---|---|---|
+| — | — | FALHOU |
+| — | sim | FALHOU (a marca é do componente, não é declaração) |
+| sim | não | FALHOU (declarou e deixou a pessoa no vazio) |
+| sim | sim | SEM DADO |
+
+Prova rodada depois: 20 defeitos plantados, 7 controles negativos, 0
+não-prováveis.
+
+**A lição que vale além da F3**: marca emitida por componente compartilhado
+NUNCA serve como declaração de intenção da tela. Ela prova que o componente
+foi usado, não que alguém decidiu alguma coisa. Declaração precisa de autor.
+
+## O portão da R18 conhecia UM módulo
+
+A varredura de `overflow: hidden` em CSS olhava `src/index.css`,
+`componentes-padrao.css` e módulo com **"governanca" no caminho** — o módulo
+onde a regra nasceu. Todo o resto de `src/modules/**` e de `src/styles/**`
+passava batido.
+
+O custo apareceu inteiro num levantamento de Compras:
+`solicitacao-compra/compras-responsive.css` sobrescreve `.app-table-shell`
+— que o `index.css` declara `overflow: clip` **justamente como defesa escrita
+da R18** — com `overflow: hidden` e especificidade maior (0,2,0 contra
+0,1,0), em 13 rotas. **O CSS de um módulo desfazia a defesa criada para
+impedir esse defeito, e o verificador não olhava o arquivo.**
+
+Varredura alargada para todo CSS de `modules/`, `styles/` e `components/`:
+**26 falhas expostas de uma vez**, em quatro arquivos que nunca tinham sido
+medidos. Todas corrigidas para `clip`.
+
+É a pergunta permanente outra vez, agora aplicada ao próprio verificador:
+não "quantos casos existem?", e sim "de quantos jeitos isso é feito aqui?".
+
+## O meu próprio comando de verificação estava na ordem errada
+
+`npm run verificar` rodava `test:responsive` **antes** do `build`. O
+`validarResponsividadeFrontend.mjs` compara as classes do FONTE com as do
+`dist/` — então ele comparava o fonte novo com um bundle velho.
+
+Isso não é só alarme falso. É pior na outra direção: **uma classe removida do
+fonte continua no bundle antigo e o portão passa verde.** O check existe
+exatamente para pegar regra que some entre o fonte e o bundle, e a ordem
+errada o cegava para o caso que ele foi feito para achar.
+
+Ordem corrigida: `build` antes de `test:responsive`.
+
+## O token de fonte declarado numa página e lido por onze telas — consertado
+
+Registrado em 04/09, executado agora. O tamanho real era maior do que eu
+tinha medido: **não eram só as fontes**. Nove seletores compartilhados
+(`.app-table-shell`, `.app-list-card`, `.app-filter-field`,
+`.app-summary-card`, `.app-empty-card`, três `.finance-*` e quatro de
+`.solicitacao-nova-page`) liam `--sol-border-color`, que só existe dentro de
+`.solicitacoes-page`.
+
+E propriedade customizada indefinida **invalida a declaração inteira**, não
+só a cor. Ou seja: `border-bottom: 1px solid var(--sol-border-color)` numa
+tela fora da página não ficava com borda de outra cor — ficava **sem borda
+nenhuma**. Linha de tabela sem separador, em silêncio, em toda tela que usa
+a casca padrão fora do módulo de Solicitações.
+
+Corrigido: os seletores compartilhados passam a ler os tokens do sistema
+(`--ui-border`, `--fonte-corpo`, `--fonte-detalhe`). As classes `.sol-*`
+entraram junto porque também são usadas fora da página (o CRM usava
+`sol-surface-card`) — apontá-las para o token do sistema faz a classe
+funcionar onde quer que seja montada, que era o defeito de origem.
+
+Efeito visível e deliberado, dentro da ordem do cliente de 04/09: corpo da
+tabela vai de 13px para o degrau `--fonte-corpo` (14px) e o cabeçalho de 11px
+para `--fonte-detalhe` (12px), respeitando o piso de 12px.
+
+## R28 executada: aviso de sucesso é persistente por padrão
+
+Decidida em 04/09, executada agora, na leva do componente. Sucesso deixa de
+sumir em 6s e passa a esperar a pessoa fechar. `opcoes.efemero` devolve o
+sumiço automático para o caso raro em que o sucesso é ruído.
+
+Duas verificações feitas ANTES de inverter, porque aviso persistente sem
+botão de fechar seria armadilha e não melhoria:
+1. Os **117** arquivos que renderizam `<Avisos>` passam `aoFechar` — o "x"
+   sempre existe.
+2. O "x" só virou alvo clicável de verdade nesta mesma leva. Ver M1 abaixo.
+
+## M1: o "x" do Alert tinha 16px porque nunca teve medida própria
+
+A célula que sobrou da matriz das 103. O botão de fechar do `Alert` não tinha
+nenhuma regra de tamanho — encolhia até o tamanho do ícone. Como o `Alert` é
+componente compartilhado, o defeito valia para **toda tela em que um aviso
+aparecesse**; só apareceu na matriz numa célula porque só ali um aviso
+renderizou durante a medição.
+
+O mecanismo (`--alvo-clique`, 32px desktop / 44px toque) já existia desde a
+leva 0. Faltava aplicar. Corrigido também no login, que estava em 24,8px.
+
+**Defeito de componente compartilhado aparece na matriz como uma célula e é
+lido como problema de uma tela.** Vale desconfiar de célula solitária.
+
+## Duas confirmações que os agentes acrescentaram e eu tirei
+
+Os briefings pediram para revisar o consentimento das ações que mudam estado,
+e dois agentes leram isso como "acrescente confirmação": arrastar cartão no
+Kanban e concluir tarefa passaram a abrir modal.
+
+Tirei as duas. Arrastar é o gesto principal do quadro e se desfaz pelo gesto
+inverso; concluir tarefa é a ação de rotina pela qual a tela existe.
+Confirmação existe para o que **não se desfaz** — pergunta que vira ruído
+deixa de ser lida, e "Sim" no automático é o contrário de consentir. Ficou a
+de cancelar tarefa, que é a destrutiva.
+
+O que NÃO saiu foi a outra metade da R26 — alvo fixado em `const` antes do
+`await` — porque ali era **conserto, não zelo**: o `onDrop` do Kanban movia o
+lead vindo do `dataTransfer` e conferia a etapa do `draggedLead`. Divergindo
+os dois, movia um lead cuja etapa nunca foi conferida.
+
+## Os 11 validadores de regra de negócio do backend: medidos
+
+A premissa que eu tinha levado ao cliente ("6 de 26 ligados, provadores entre
+os desligados") estava errada e já foi corrigida. O número real: **todos os 7
+provadores ESTÃO ligados**; os desligados eram 11 validadores de regra de
+negócio do backend.
+
+Medidos agora, um a um. E a razão de estarem desligados é mais simples do que
+parecia: **não existe diretório `.github/` no repositório** — não há workflow
+nenhum, para esses 11 nem para os outros 50.
+
+| Resultado | Quantos |
+|---|---|
+| Passam | 8 |
+| Falham | 1 |
+| Não executáveis (falta MySQL) | 2 |
+
+Os 8 ligados em `npm run verificar:regras` no `backend/package.json`.
+
+O único vermelho **não é defeito de regra de negócio**: o
+`validarCaixaFisico` procura a string `Caixas e Contas` num `<h1>` que a
+reforma trocou por `<PageHeader titulo="Caixas e contas" />` (com "contas"
+minúsculo), e procura `overflow-x-auto` numa tabela crua que virou o
+componente compartilhado. **O teste envelheceu, a funcionalidade está lá.**
+As 9 âncoras de regra de verdade (trava de OFX, lock em transação, bloqueio
+de fechamento retroativo, rotas, controller) passam inteiras.
+
+Fica pendente: 2 linhas em `backend/scripts/validarCaixaFisico.js` para ele
+entrar no `verificar:regras` e virar 9 ligados.
+
+## Pergunta em aberto para o cliente — CrmLeads: ListaAvancada ou TabelaPadrao?
+
+A regra registrada manda a listagem PRINCIPAL de um módulo usar
+`ListaAvancada`. A `CrmLeads` ficou em `TabelaPadrao`, e o motivo é um
+conflito entre duas regras registradas, não preferência:
+
+A `ListaAvancada` **deliberadamente não tem ação por linha**. A `CrmLeads`
+tem "Arquivar" por linha — que não é navegação (essa é o clique na linha),
+é ação de ciclo de vida sobre um registro só. Migrar a obrigaria a sumir, ou
+a virar ação de lote, **que só aparece com 2+ selecionados** — arquivar um
+lead sozinho deixaria de existir. E remover capacidade exige a sua palavra.
+
+As duas saídas:
+- **(a)** `CrmLeads` fica em `TabelaPadrao`, e a regra do módulo principal
+  ganha escopo declarado: *"salvo quando a listagem tem ação de ciclo de vida
+  por linha"*.
+- **(b)** O "Arquivar" por linha sai (com sua aprovação) e a tela migra para
+  `ListaAvancada`, ganhando visões e filtros salvos.
+
+Está em (a) hoje, que é a opção que não remove nada.

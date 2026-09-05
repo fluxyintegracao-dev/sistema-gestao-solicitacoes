@@ -201,6 +201,182 @@ ela ocupa espaço fingindo existir.
 
 ---
 
+## PARTE 5 — COMPRAS: O CAMINHO MAIS CARO TEM O CONTROLE MAIS FRACO
+
+*Achados de 05/09, do levantamento do módulo de Compras. Nada aqui foi
+alterado — são decisões suas.*
+
+### N11. A justificativa que vai para a auditoria é digitada numa caixa do navegador
+
+No encerramento de uma cotação, duas justificativas **obrigatórias** são
+pedidas: a de comprar acima da quantidade solicitada e a de fechamento
+parcial. As duas são gravadas no registro de auditoria. As duas são digitadas
+numa caixinha do Chrome — sem validação, sem tamanho mínimo, sem rastro de
+quem escreveu o quê antes de confirmar.
+
+Na mesma tela existe um caso **menos** crítico — encerrar sem gerar pedido —
+que tem tela própria, exige justificativa de pelo menos 10 caracteres e pede
+uma marcação de ciência.
+
+O controle mais forte está no caminho mais barato. O caminho que decide
+dinheiro tem o mais fraco.
+
+**A decidir:** as duas justificativas passam a ter a mesma exigência do
+"encerrar sem pedido"?
+
+### N12. Exclusão em lote apaga metade e diz que não apagou nada
+
+Em três cadastros de Compras (categorias, unidades e apropriações), a exclusão
+em lote apaga um registro de cada vez. Se o terceiro de dez falhar, **os dois
+primeiros já foram apagados** — e a mensagem que aparece é "Erro ao excluir",
+que afirma que nada aconteceu.
+
+A pessoa autorizou dez, aconteceram dois, e o sistema informou zero.
+
+O mesmo vale para a importação em massa, que anuncia sucesso com o número de
+linhas **pedidas**, não gravadas.
+
+**Corrigido nesta leva**: o aviso passa a dizer quantos foram e quantos
+falharam. Fica registrado porque houve um período em que o número exibido não
+correspondia ao que aconteceu.
+
+### N13. Três cadastros compartilhados sem controle de acesso no cliente
+
+Categorias e unidades de compra não têm nenhuma checagem de permissão na
+tela. Apropriações usa a checagem de superadministrador apenas para **esconder
+um bloco da tela** — salvar e excluir não são barrados por ela.
+
+Apropriações, pelo próprio subtítulo da tela, é usada por solicitações,
+financeiro **e** compras. Duas telas vizinhas do mesmo módulo (fornecedores e
+delegação) barram de verdade.
+
+**Não medi** se o backend revalida. Se revalidar, o risco é de experiência
+(a pessoa tenta e leva erro); se não revalidar, é de controle.
+
+### N14. Um relatório de diretoria ordena pelo oposto do que promete
+
+O relatório de economia em cotações tem o subtítulo "Cotações com maior
+impacto financeiro" e ordena por **sobrepreço**. Uma cotação que economizou
+R$ 500 mil fica atrás de qualquer uma com um centavo de sobrepreço.
+
+Ele também corta a lista nos 8 primeiros sem dizer em lugar nenhum que
+cortou — enquanto dois relatórios vizinhos declaram "Top 10" e "Top 100".
+
+**Ajustado nesta leva pelo rótulo**, que é o caminho que não muda o número
+que a diretoria já lê. Se a intenção original era ordenar por impacto
+absoluto, é inverter — e aí o número muda.
+
+### N15. Barra de gráfico que desenha o zero
+
+Em cinco relatórios de Compras a barra tem largura mínima cravada. Economia
+de zero desenha uma barra verde visível. Quem lê o gráfico de relance vê
+resultado onde não houve nenhum.
+
+**Corrigido nesta leva.**
+
+### N16. Dois nomes para o mesmo estado, e uma tela que esqueceu de se defender
+
+Solicitações de compra usam `CANCELADO` e `CANCELADA` (e `RECUSADO`/
+`RECUSADA`) para o mesmo estado. Cinco arquivos se defendem aceitando as duas
+formas. A listagem principal **não** se defende — e por isso pinta cancelada
+e recusada com a mesma cor de "estado desconhecido". Quem opera a fila não
+distingue "morreu" de "não sei".
+
+O dado não fecha na origem; o front remenda em cinco lugares e esquece no
+sexto.
+
+**A decidir:** o certo é padronizar no banco, não no front. Fica registrado.
+
+### N17. Quatro estados existem, são pintados, e não podem ser filtrados
+
+A listagem de solicitações de compra oferece 5 opções de filtro por situação,
+mas o sistema reconhece pelo menos 9 estados — entre eles
+`AGUARDANDO_DIRETORIA`, que é justamente o que mais se quer filtrar. Uma
+solicitação parada ali aparece na lista e não pode ser isolada.
+
+### N18. A conferência antes de gravar é um clique, não uma leitura
+
+Na revisão de solicitação de compra, o sistema exige que a pessoa "visualize
+o PDF" antes de confirmar. O código marca o PDF como visualizado **no mesmo
+instante em que o abre** — abrir e fechar satisfaz a exigência.
+
+Não é inversão de lógica: é um controle que promete conferência e mede
+clique.
+
+## PARTE 6 — CRM
+
+### N19. Lead arquivado desaparece, e o filtro "Arquivado" nunca devolve nada
+
+Toda listagem de leads exclui os arquivados na consulta ao banco.
+Consequências: o filtro por situação **"Arquivado"** devolve sempre zero — é
+uma opção morta em duas telas — e o botão "Arquivar" que se esconde para
+leads já arquivados é código que nunca roda.
+
+**A decidir:** ou existe uma visão de arquivados, ou a opção sai do filtro.
+
+### N20. Dois cadastros paralelos do mesmo número de telefone
+
+A tela de canais guarda quatro papéis de telefone (principal, operacional,
+rastreio, destino) como **texto livre dentro do canal**. A tela de números
+guarda os mesmos quatro papéis como **registro próprio**, com risco, provedor
+e capacidades. Nada liga os dois: um número pode existir num e não no outro,
+ou divergir, sem que nenhuma tela acuse.
+
+### N21. O formulário de automação nasce com uma condição de exemplo que é gravável
+
+O campo de condições da regra de automação vem preenchido com um exemplo. Não
+é texto de placeholder — é valor de verdade. Quem preencher nome e gatilho e
+salvar sem tocar no campo cria uma **regra ativa** cuja condição testa um
+campo que não existe. Não há validação do formato antes de enviar.
+
+### N22. "Executar ciclo" dispara sobre leads reais sem perguntar nada
+
+O botão de executar o ciclo de automações age imediatamente, e as ações
+possíveis incluem redistribuir e arquivar lead. Não há confirmação — e não
+havia antes. **Não alterei**, porque acrescentar seria mudar comportamento
+fora de reorganização.
+
+### N23. O verify token do Meta volta do servidor e aparece em campo de texto comum
+
+Das quatro credenciais da tela de integrações, três nunca voltam do servidor
+(o campo fica vazio e o sistema só informa "configurado"). A quarta volta em
+claro e é exibida num campo de texto normal.
+
+**Nenhum valor foi copiado para arquivo, log ou documento.** O conserto é de
+contrato de API, não de layout: ou ela passa a seguir o mesmo padrão das
+outras três, ou no mínimo vira campo de senha.
+
+### N24. "Vencida" é calculado de dois jeitos na mesma tela
+
+Na lista de tarefas do CRM, a coluna marca vencida pelo relógio do navegador;
+o filtro "apenas vencidas" é decidido no servidor. Fuso ou relógio fora de
+hora fazem os dois discordarem na mesma tela.
+
+### N25. Números da diretoria e da operação com o mesmo nome e janelas diferentes
+
+O relatório executivo do CRM usa janela de 24h e primeiro contato de 60min
+**cravados no código**; o painel de SLA deixa a pessoa ajustar os mesmos
+parâmetros. Diretoria e operação podem ler números diferentes com o mesmo
+nome.
+
+### N26. Página 2 era inalcançável na lista de leads
+
+A tela contava o total de leads no cabeçalho, carregava 50 e não tinha como
+avançar — o restante existia e ninguém abria. **Corrigido nesta leva** (é
+defeito, não capacidade nova: o total já prometia registros que a tela não
+entregava).
+
+E, na mesma tela, dois indicadores da faixa ("convertidos" e "quentes")
+contavam **só a página**, lado a lado com um "total" que vinha do servidor.
+Três números na mesma faixa, dois medindo outra coisa. Agora dizem "nesta
+página".
+
+### N27. "Minha carteira" podia listar a base inteira
+
+Enquanto o usuário ainda não estava resolvido, o filtro por responsável saía
+vazio, o servidor não aplicava recorte nenhum e a tela mostrava os leads de
+todo mundo como se fossem da pessoa. **Corrigido nesta leva.**
+
 ## RESUMO PARA DECIDIR
 
 | # | Achado | Classe | Urgência |

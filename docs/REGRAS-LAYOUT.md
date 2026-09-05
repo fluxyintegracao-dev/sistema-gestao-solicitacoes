@@ -155,10 +155,14 @@ outro trabalho) em vez da causa (a interrupção)**. Regra escrita pelo
 sintoma acerta os casos comuns e erra os casos em que sintoma e causa se
 separam — e erra com a autoridade de estar escrita.
 
-## R28 — Confirmação de gravação FICA na tela (decidida em 04/09, aplicar na leva do componente)
+## R28 — Confirmação de gravação FICA na tela (decidida em 04/09, EXECUTADA em 05/09)
 
-**Decisão tomada, implementação agendada.** Está escrita aqui para não se
-perder entre a decisão e a leva que a executa.
+**Em vigor.** `avisar.sucesso(...)` é persistente por padrão;
+`opcoes.efemero` devolve o sumiço automático de 6s para o caso raro em que o
+sucesso é ruído. Duas coisas foram verificadas ANTES de inverter, porque
+aviso persistente sem botão de fechar seria armadilha e não melhoria: os 117
+arquivos que renderizam `<Avisos>` passam `aoFechar`, e o "x" do `Alert` só
+virou alvo clicável de verdade na mesma leva (tinha 16px — ver M1).
 
 ### A regra
 
@@ -825,3 +829,46 @@ dos endereços antigos que só sobreviviam por redirecionamento.
 não são duas regras, são uma pergunta em aberto — e enquanto ela fica em
 aberto, cada tela resolve do seu jeito. Foi o que aconteceu aqui por dois
 dias.
+
+
+---
+
+## Regra permanente (05/09) — marca de componente NÃO é declaração de intenção
+
+Nasceu de a prova de mordida me pegar duas vezes no mesmo item (F3).
+
+Quando um verificador precisa distinguir "a tela decidiu isso" de "a tela
+está quebrada", **o sinal não pode ser algo que o componente compartilhado
+emite sozinho**. Um atributo, uma classe ou um estado vazio renderizado pelo
+componente prova apenas que o componente foi usado — qualquer tela que o
+importe ganha a marca de graça, inclusive a tela plantada que a prova usa
+para testar o verificador.
+
+Declaração precisa de **autor**. O formato que funciona, e que já vinha sendo
+usado na R1, é:
+
+> **declaração no manifesto** (alguém escreveu, com motivo)
+> **E** verificação no DOM de que a tela cumpre o que declarou.
+
+As duas condições, nunca uma. Quem não declarou reprova. Quem declarou e não
+cumpriu reprova também.
+
+E o corolário, que vale para qualquer check novo: se um sinal aparece
+igualzinho no caso certo e no caso errado, **nenhum raciocínio conserta um
+sinal que não discrimina**. Argumento bom não é prova; a fixture é.
+
+---
+
+## Regra permanente (05/09) — a ordem do portão faz parte do portão
+
+`npm run verificar` rodava `test:responsive` antes do `build`, e o
+`validarResponsividadeFrontend.mjs` compara o FONTE com o `dist/`. Comparava
+fonte novo com bundle velho.
+
+O alarme falso é o problema menor. O grave é a outra direção: **classe
+removida do fonte continua no bundle antigo e o portão passa verde** — que é
+exatamente o defeito que esse check existe para achar.
+
+Todo check que compara duas representações do mesmo código (fonte × bundle,
+manifesto × DOM, declaração × execução) tem de rodar DEPOIS da etapa que
+produz a segunda. A ordem não é conveniência, é parte da correção.
