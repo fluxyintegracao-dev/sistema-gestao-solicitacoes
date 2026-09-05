@@ -999,20 +999,44 @@ function validarHooksDepoisDeRetorno() {
       const linhas = fs.readFileSync(caminho, 'utf8').split('\n');
 
       let fimDoRetornoCondicional = 0;
-      let dentroDeIf = false;
+      let dentroDeBloco = false;   // `if (...) {` com chave, ainda aberto
+      let esperandoCorpo = false;  // `if (...)` SEM chave: o corpo é a próxima linha
       let temReturn = false;
       for (let i = 0; i < linhas.length; i += 1) {
         const linha = linhas[i];
         // Função de topo nova: o estado anterior não vale mais.
         if (/^(?:export\s+)?(?:default\s+)?function\s/.test(linha)
           || /^const\s+\w+\s*=\s*(?:\(|function|forwardRef|memo)/.test(linha)) {
-          fimDoRetornoCondicional = 0; dentroDeIf = false; temReturn = false;
+          fimDoRetornoCondicional = 0; dentroDeBloco = false; esperandoCorpo = false; temReturn = false;
         }
-        if (/^\s{2}if\s*\(/.test(linha)) { dentroDeIf = true; temReturn = false; }
-        if (dentroDeIf && /^\s{4}return\b/.test(linha)) temReturn = true;
-        if (dentroDeIf && /^\s{2}\}/.test(linha)) {
+
+        /*
+          As TRÊS formas de escrever a saída antecipada, e todas contam.
+
+          A primeira versão desta regra só conhecia a de chaves — a que a
+          TabelaPadrao usa — e deixava passar justamente a mais comum em
+          React, `if (carregando) return <p/>;` numa linha só. Regra que
+          cobre a forma que eu acabei de consertar e não cobre a vizinha é
+          rede com buraco no meio: medido num arquivo de teste com as três,
+          a primeira versão pegava uma.
+        */
+        if (esperandoCorpo) {
+          // Corpo de `if` sem chave: é a linha seguinte, e só ela.
+          if (/^\s{4}return\b/.test(linha)) fimDoRetornoCondicional = i + 1;
+          esperandoCorpo = false;
+        } else if (/^\s{2}if\s*\(/.test(linha)) {
+          if (/\)\s*return\b/.test(linha)) {
+            fimDoRetornoCondicional = i + 1;          // uma linha só
+          } else if (/\{\s*$/.test(linha)) {
+            dentroDeBloco = true; temReturn = false;  // bloco com chave
+          } else {
+            esperandoCorpo = true;                    // corpo na próxima linha
+          }
+        }
+        if (dentroDeBloco && /^\s{4}return\b/.test(linha)) temReturn = true;
+        if (dentroDeBloco && /^\s{2}\}/.test(linha)) {
           if (temReturn) fimDoRetornoCondicional = i + 1;
-          dentroDeIf = false; temReturn = false;
+          dentroDeBloco = false; temReturn = false;
         }
         if (fimDoRetornoCondicional && HOOK.test(linha) && !linha.trim().startsWith('//')) {
           falhas.push(

@@ -94,6 +94,42 @@ const CASOS_ARQUIVO_INTEIRO = [
     porque: 'retorno de confirmar() lido como booleano',
     arquivo: `import { Pagina, useConfirmacao } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  const { confirmar } = useConfirmacao();\n  async function agir() {\n    if (!await confirmar({ titulo: 'x' })) return;\n  }\n  return <Pagina><button type="button" onClick={agir}>Ir</button></Pagina>;\n}\n`
   },
+  /*
+    R29 nas TRÊS formas de escrever a saída antecipada.
+
+    Um caso só não bastaria, e isso não é zelo — é o que aconteceu hoje: a
+    primeira versão da R29 conhecia só a forma de chaves, que é a que a
+    TabelaPadrao usa, e deixava passar `if (carregando) return <p/>;` numa
+    linha só, que é a forma MAIS comum em React. Regra que cobre o caso que
+    acabei de consertar e não cobre o vizinho é rede com buraco no meio.
+  */
+  {
+    regra: 'R29',
+    porque: 'hook depois de return condicional COM CHAVES',
+    arquivo: `import { useState } from 'react';\nimport { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra({ carregando }) {\n  const total = 1;\n  if (carregando) {\n    return <Pagina>Carregando</Pagina>;\n  }\n  const [n] = useState(total);\n  return <Pagina>{n}</Pagina>;\n}\n`
+  },
+  {
+    regra: 'R29',
+    porque: 'hook depois de return condicional em UMA LINHA',
+    arquivo: `import { useState } from 'react';\nimport { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra({ carregando }) {\n  const total = 1;\n  if (carregando) return <Pagina>Carregando</Pagina>;\n  const [n] = useState(total);\n  return <Pagina>{n}</Pagina>;\n}\n`
+  },
+  {
+    regra: 'R29',
+    porque: 'hook depois de return condicional SEM CHAVES, corpo na linha seguinte',
+    arquivo: `import { useState } from 'react';\nimport { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra({ carregando }) {\n  const total = 1;\n  if (carregando)\n    return <Pagina>Carregando</Pagina>;\n  const [n] = useState(total);\n  return <Pagina>{n}</Pagina>;\n}\n`
+  },
+  /*
+    E o sentido inverso, específico da R29: as MESMAS três saídas
+    antecipadas, com os hooks no lugar certo, NÃO podem reprovar. Sem este
+    caso a regra passaria acusando todo componente que tem saída antecipada
+    — que é quase todos — e o custo apareceria como ruído, não como defeito.
+  */
+  {
+    regra: 'R29',
+    porque: 'NEGATIVO: hooks ANTES das três saídas — não pode reprovar',
+    naoPodeReprovar: true,
+    arquivo: `import { useState } from 'react';\nimport { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra({ carregando, itens }) {\n  const [n] = useState(0);\n  if (carregando) return <Pagina>Carregando</Pagina>;\n  if (!itens.length)\n    return <Pagina>Vazio</Pagina>;\n  if (n > 9) {\n    return <Pagina>Muito</Pagina>;\n  }\n  return <Pagina>{n}</Pagina>;\n}\n`
+  },
   {
     regra: 'R22',
     porque: 'hook usado sem import',
@@ -165,10 +201,40 @@ function provar(regra, porque, conteudo) {
   console.log(`  FALHA ${regra} NÃO reprovou ${porque} — ${diagnostico}`);
 }
 
+/*
+  O SENTIDO INVERSO, POR REGRA (05/09).
+
+  A prova da "tela limpa" no fim já cobre o falso positivo em geral, mas ela
+  usa uma tela vazia — que não exercita nada. Uma regra pode passar nela e
+  ainda assim acusar todo código CORRETO da sua própria classe. A R29 é o
+  caso: quase todo componente do sistema tem saída antecipada, e uma
+  heurística grosseira acusaria todos eles.
+
+  Por isso a regra que tem forma própria ganha aqui o caso negativo dela:
+  código que exercita exatamente o que a regra olha, escrito do jeito certo,
+  e que NÃO pode ser reprovado.
+*/
+function provarQueNaoReprova(regra, porque, conteudo) {
+  fs.writeFileSync(ALVO, conteudo);
+  const saida = rodarValidador();
+  const linhasDaRegra = saida.split('\n')
+    .filter((l) => l.includes(`[${regra}]`) && l.includes(ALVO_REL));
+  if (!linhasDaRegra.length) {
+    console.log(`  ok    ${regra} NÃO reprova ${porque}`);
+    return;
+  }
+  falhas += 1;
+  console.log(`  FALHA ${regra} reprovou ${porque} — falso positivo:`);
+  linhasDaRegra.slice(0, 3).forEach((l) => console.log(`          ${l.trim()}`));
+}
+
 try {
   // O manifesto NÃO é mais tocado: a fixture entra pela bandeira `--extra`.
   for (const caso of CASOS) provar(caso.regra, caso.porque, CABECA + caso.corpo + RABO);
-  for (const caso of CASOS_ARQUIVO_INTEIRO) provar(caso.regra, caso.porque, caso.arquivo);
+  for (const caso of CASOS_ARQUIVO_INTEIRO) {
+    if (caso.naoPodeReprovar) provarQueNaoReprova(caso.regra, caso.porque, caso.arquivo);
+    else provar(caso.regra, caso.porque, caso.arquivo);
+  }
 
   // E o sentido inverso: tela limpa NÃO pode reprovar.
   fs.writeFileSync(ALVO, CABECA + RABO);
