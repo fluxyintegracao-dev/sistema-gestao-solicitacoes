@@ -16,6 +16,24 @@
     "src/modules/crm/pages/CrmLeads.jsx",
     "src/modules/crm/pages/CrmNovoLead.jsx",
     "src/modules/crm/pages/CrmTarefas.jsx",
+    "src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx",
+    "src/modules/fiscal/pages/FiscalAccountingBatches.jsx",
+    "src/modules/fiscal/pages/FiscalCompanies.jsx",
+    "src/modules/fiscal/pages/FiscalDashboard.jsx",
+    "src/modules/fiscal/pages/FiscalDiagnostics.jsx",
+    "src/modules/fiscal/pages/FiscalDivergences.jsx",
+    "src/modules/fiscal/pages/FiscalDocumentDetail.jsx",
+    "src/modules/fiscal/pages/FiscalDocuments.jsx",
+    "src/modules/fiscal/pages/FiscalLogs.jsx",
+    "src/modules/fiscal/pages/FiscalOperationalReport.jsx",
+    "src/modules/governanca/pages/AuditoriaOperacional.jsx",
+    "src/modules/governanca/pages/GovernancaSistema.jsx",
+    "src/modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro.jsx",
+    "src/modules/provisionamento-financeiro/pages/GestaoCategoriasMacro.jsx",
+    "src/modules/provisionamento-financeiro/pages/NovaProvisaoFinanceira.jsx",
+    "src/modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe.jsx",
+    "src/modules/provisionamento-financeiro/pages/ProvisionamentoRelatorioOperacional.jsx",
+    "src/modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros.jsx",
     "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx",
     "src/modules/solicitacao-compra/pages/GestaoApropriacoes.jsx",
     "src/modules/solicitacao-compra/pages/GestaoCategorias.jsx",
@@ -132,7 +150,19 @@
     "src/pages/SetoresAcessoTodasObras.jsx",
     "src/pages/SetoresCriacaoTodasObras.jsx",
     "src/pages/SetoresVisiveisUsuario.jsx",
+    "src/pages/SolicitacaoDetalhe/AcoesContrato.jsx",
+    "src/pages/SolicitacaoDetalhe/AditivosDoContrato.jsx",
+    "src/pages/SolicitacaoDetalhe/ApropriacoesDoContrato.jsx",
+    "src/pages/SolicitacaoDetalhe/Conversa.jsx",
+    "src/pages/SolicitacaoDetalhe/FinanceiroCard.jsx",
+    "src/pages/SolicitacaoDetalhe/Header.jsx",
+    "src/pages/SolicitacaoDetalhe/ModalAlterarStatus.jsx",
+    "src/pages/SolicitacaoDetalhe/RecargaCartaoDetalhe.jsx",
+    "src/pages/SolicitacaoDetalhe/RetornoSolicitacaoBar.jsx",
+    "src/pages/SolicitacaoDetalhe/Timeline.jsx",
+    "src/pages/SolicitacaoDetalhe/index.jsx",
     "src/pages/Solicitacoes/Filtros.jsx",
+    "src/pages/Solicitacoes/ModalEnviarSetor.jsx",
     "src/pages/Solicitacoes/index.jsx",
     "src/pages/SolicitacoesSlaSetor.jsx",
     "src/pages/StatusSetor.jsx",
@@ -252,10 +282,29 @@
     "criado_em": "2026-09-05",
     "regra": "Declarar dono NAO isenta de medicao — ele so diz ONDE a medicao acontece. Componente cujo dono nao esteja no harness continua reprovando. E componente que ninguem renderiza NAO entra aqui: se nao ha dono, nao ha medicao, e o certo e que isso apareca.",
     "componentes": {
-      "src/pages/Solicitacoes/Filtros.jsx": "src/pages/Solicitacoes/index.jsx"
+      "src/pages/Solicitacoes/Filtros.jsx": "src/pages/Solicitacoes/index.jsx",
+      "src/pages/SolicitacaoDetalhe/AcoesContrato.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/AditivosDoContrato.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/ApropriacoesDoContrato.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/Conversa.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/FinanceiroCard.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/Header.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/ModalAlterarStatus.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/RecargaCartaoDetalhe.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/RetornoSolicitacaoBar.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/SolicitacaoDetalhe/Timeline.jsx": "src/pages/SolicitacaoDetalhe/index.jsx",
+      "src/pages/Solicitacoes/ModalEnviarSetor.jsx": "src/pages/SolicitacaoDetalhe/index.jsx"
     },
-    "fora_por_ora": {
-      "src/pages/Solicitacoes/ModalEnviarSetor.jsx": "Migrado em 05/09, mas o dono que o renderiza (src/pages/SolicitacaoDetalhe/index.jsx) ainda nao esta na lista do harness. Migrado e nao medido nao e PRONTO — entra no manifesto junto com o dono, na rodada do detalhe de Solicitacoes. Este bloco existe porque o check achou isso na PRIMEIRA execucao dele."
+    "orfaos_nao_promovidos": {
+      "porque": "Migrados nesta rodada, mas NINGUEM os renderiza — conferido por busca em todo o src. Componente sem dono nao entra: se ninguem o abre, ninguem o mede, e po-lo no manifesto seria fingir cobertura. Ficam aqui a espera da decisao do cliente (ligar ou remover), e o registro existe para que a ausencia deles no manifesto seja uma escolha explicita, nao um esquecimento.",
+      "arquivos": [
+        "src/pages/SolicitacaoDetalhe/InfoCard.jsx",
+        "src/pages/SolicitacaoDetalhe/StatusArea.jsx",
+        "src/pages/SolicitacaoDetalhe/Pedido.jsx",
+        "src/pages/SolicitacaoDetalhe/Pagamentos.jsx",
+        "src/pages/SolicitacaoDetalhe/Comprovantes.jsx"
+      ],
+      "nota_comprovantes": "Comprovantes.jsx tem 0 BYTES desde um commit anterior a esta sessao."
     }
   }
 }

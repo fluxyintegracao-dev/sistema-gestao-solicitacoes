@@ -8,6 +8,7 @@ import {
   extrairFilesAnexosPendentes,
   montarMensagemArquivosAcimaDoLimite
 } from '../../utils/pendingAttachments';
+import { Avisos, BlocoConteudo, useAvisos } from '../../components/padrao';
 
 /**
  * CONVERSA — comentar e anexar viram UM ato so (item 19, 23/08; card unico
@@ -24,6 +25,22 @@ import {
  * 3. NAO SE INVENTA VINCULO entre o comentario e o anexo. Os dois vao para a mesma solicitacao,
  *    como ja iam. Amarrar o arquivo AQUELE comentario exigiria `anexos.historico_id` — mudanca de
  *    esquema que ninguem pediu. A medicao tem esse vinculo (`medicao_id`) porque LA foi pedido.
+ *
+ * ## O que a rodada de 05/09 mudou (reorganizacao pura — nenhum campo, botao ou endpoint saiu)
+ *
+ * - **Regra de organizacao do cliente**: conversa e historico ficam POR ULTIMO e RECOLHIDOS por
+ *   padrao (`BlocoConteudo recolhivel recolhidoPadrao`). Recolher e livre; remover nao seria — o
+ *   titulo do bloco continua sempre a vista e um clique devolve tudo.
+ * - **R19**: os tres `alert()` (limite de tamanho, sucesso do envio, erro do envio) viraram
+ *   `Avisos`/`useAvisos`, dentro da propria pagina e com tom semantico.
+ * - **R25**: `bg-blue-50`, `bg-blue-100`, `bg-blue-900`, `bg-blue-950`, `bg-gray-900`,
+ *   `text-red-600/800` e `text-blue-600` eram paleta crua — sem par no tema escuro e sem o piso de
+ *   contraste do ThemeContext. Trocados por tokens (`--ui-surface*`, `--sem-info*`, `--c-danger`).
+ * - **R18**: a lista de usuarios para mencionar rola com `overflow-y: auto` (nunca `hidden`, que
+ *   criaria scrollport e mataria qualquer sticky da pagina em silencio).
+ *
+ * O `id` e o `data-testid` ficam no BLOCO, nao no corpo: o bloco nasce recolhido, e ancora/seletor
+ * que so existe depois de a pessoa abrir seria uma porta que funciona metade do tempo.
  */
 export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = true, motivoBloqueio = '' }) {
   const [texto, setTexto] = useState('');
@@ -34,6 +51,7 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
   const [mostrarLista, setMostrarLista] = useState(false);
   const [buscaUsuario, setBuscaUsuario] = useState('');
   const inputRef = useRef(null);
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     if (!podeInteragir) return undefined;
@@ -98,7 +116,7 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
     });
     setArquivos(proximoEstado);
     if (rejeitados.length > 0) {
-      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+      avisar.alerta(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
     }
   }
 
@@ -162,13 +180,13 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
       setBuscaUsuario('');
       setMostrarLista(false);
       onSucesso?.();
-      alert(temTexto && temArquivo
+      avisar.sucesso(temTexto && temArquivo
         ? 'Comentario e arquivos enviados com sucesso.'
         : temTexto
           ? 'Comentario enviado com sucesso.'
           : 'Arquivos enviados com sucesso.');
     } catch (error) {
-      alert(error?.message || 'Erro ao enviar comentario');
+      avisar.erro(error?.message || 'Erro ao enviar comentario');
     } finally {
       setLoading(false);
     }
@@ -176,18 +194,32 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
 
   if (!podeInteragir) {
     return (
-      <div className="sol-detail-card" data-testid="comentarios-somente-leitura">
-        <h2 className="sol-detail-card-title">Conversa</h2>
-        <p className="text-sm leading-6 text-[var(--c-muted)]">
-          {motivoBloqueio || 'As interacoes ficam disponiveis quando a solicitacao estiver no seu setor.'}
-        </p>
-      </div>
+      <BlocoConteudo
+        titulo="Conversa"
+        recolhivel
+        recolhidoPadrao
+        data-testid="comentarios-somente-leitura"
+      >
+        <div>
+          <p className="text-sm leading-6 text-[var(--c-muted)]">
+            {motivoBloqueio || 'As interacoes ficam disponiveis quando a solicitacao estiver no seu setor.'}
+          </p>
+        </div>
+      </BlocoConteudo>
     );
   }
 
   return (
-    <div className="sol-detail-card" id="sol-detail-conversa" data-testid="card-comentario">
-      <h2 className="sol-detail-card-title">Conversa</h2>
+    <BlocoConteudo
+      titulo="Conversa"
+      descricao="Comentar e anexar sao um ato so: um dos dois basta."
+      recolhivel
+      recolhidoPadrao
+      id="sol-detail-conversa"
+      data-testid="card-comentario"
+    >
+      <div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <textarea
         value={texto}
@@ -233,7 +265,7 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
       </div>
 
       {mostrarLista && (
-        <div className="mb-3 border rounded p-3 bg-white dark:bg-gray-900">
+        <div className="mb-3 rounded border border-[var(--c-border)] bg-[var(--ui-surface)] p-3">
           <input
             type="text"
             value={buscaUsuario}
@@ -254,7 +286,7 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
                 key={usuario.id}
                 type="button"
                 onClick={() => adicionarMencao(usuario)}
-                className="block w-full text-left px-3 py-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm"
+                className="block w-full text-left px-3 py-2 rounded hover:bg-[var(--ui-surface-2)] text-sm"
               >
                 <div className="font-medium">{usuario.nome}</div>
                 <div className="text-xs text-[var(--c-muted)]">{usuario.email}</div>
@@ -265,19 +297,19 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
       )}
 
       {usuariosSelecionados.length > 0 && (
-        <div className="mb-3 p-3 rounded bg-blue-50 dark:bg-blue-950/30">
+        <div className="mb-3 p-3 rounded border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)]">
           <p className="text-sm font-semibold mb-2">Mencionados</p>
           <div className="flex flex-wrap gap-2">
             {usuariosSelecionados.map(usuario => (
               <span
                 key={usuario.id}
-                className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/40 px-3 py-1 rounded-full text-sm"
+                className="inline-flex items-center gap-2 border border-[var(--sem-info-border)] bg-[var(--ui-surface)] px-3 py-1 rounded-full text-sm"
               >
                 {usuario.nome}
                 <button
                   type="button"
                   onClick={() => removerMencao(usuario.id)}
-                  className="text-red-600 hover:text-red-800 font-bold"
+                  className="font-bold text-[var(--c-danger)]"
                 >
                   x
                 </button>
@@ -292,7 +324,7 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
         onRemove={(index) => removerArquivo(index)}
         className="space-y-1 mb-3"
         itemClassName="flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
-        removeButtonClassName="text-blue-600 font-semibold px-2"
+        removeButtonClassName="text-[var(--c-primary)] font-semibold px-2"
       />
 
       <div className="flex justify-end">
@@ -306,6 +338,7 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
           {loading ? 'Enviando...' : 'Enviar'}
         </button>
       </div>
-    </div>
+      </div>
+    </BlocoConteudo>
   );
 }

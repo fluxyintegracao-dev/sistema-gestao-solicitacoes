@@ -785,8 +785,17 @@ textarea {
   transform: translateY(-1px);
 }
 
+/*
+  M1 (05/09): estas duas regras encolhiam o botao do SISTEMA abaixo do minimo
+  de clique — 30px e 24px, contra os 32px de `--alvo-clique`. E a mesma familia
+  do CSS de Compras que sobrescrevia `.app-table-shell`: folha de modulo
+  desfazendo, por especificidade, uma garantia do sistema de design.
+
+  O token respeita o toque sozinho (44px em `pointer: coarse`); numero fixo
+  aqui nao respeitava.
+*/
 .fiscal-page .btn-sm {
-  min-height: 30px;
+  min-height: var(--alvo-clique);
   border-radius: 6px;
   padding: 0.25rem 0.58rem;
   font-size: 0.75rem;
@@ -796,7 +805,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 24px;
+  min-height: var(--alvo-clique);
   border-radius: 5px;
   padding: 0.16rem 0.42rem;
   font-size: 0.68rem;
@@ -5041,6 +5050,26 @@ input[type="file"]:disabled {
   border-color: var(--sem-danger-border);
   background: var(--sem-danger-bg);
   color: var(--sem-danger);
+}
+
+/*
+  `--warning` era classe FANTASMA e funcionava por acidente (05/09).
+
+  Cinco pontos escrevem `app-alert app-alert--warning`, entre eles telas ja
+  reformadas e aprovadas — e o modificador nunca existiu no CSS. Nao quebrava
+  nada porque a BASE ja e ambar: a intencao acertava por coincidencia de o
+  padrao ser o mesmo tom.
+
+  Isso e fragil de um jeito especifico: no dia em que a base virar neutra ou
+  informativa — que e o arranjo mais provavel, ja que ela e a alerta generica
+  —, cinco avisos de atencao passam a nao parecer avisos de atencao, sem que
+  nada acuse. Declarar o modificador prende a intencao no CSS em vez de
+  deixa-la na sorte, e tira mais um fantasma da conta.
+*/
+.app-alert--warning {
+  border-color: var(--sem-warning-border);
+  background: var(--sem-warning-bg);
+  color: var(--sem-warning);
 }
 
 .app-toolbar-card {

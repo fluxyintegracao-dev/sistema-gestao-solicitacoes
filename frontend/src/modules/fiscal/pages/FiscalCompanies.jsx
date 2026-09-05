@@ -1,5 +1,16 @@
-import { useEffect, useState } from 'react';
-import { TabelaPadrao } from '../../../components/padrao';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  CelulaDupla,
+  FormSecao,
+  CampoForm,
+  Avisos,
+  useAvisos
+} from '../../../components/padrao';
+import StatusBadge from '../../../components/StatusBadge';
 import {
   createFiscalCertificate,
   createFiscalCompany,
@@ -37,13 +48,11 @@ const EMPTY_CERTIFICATE_FORM = {
   is_active: true
 };
 
-function StatusPill({ active, children }) {
-  return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${active ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-      {children}
-    </span>
-  );
-}
+const ARMAZENAMENTO_LABEL = {
+  local_secure_path: 'Caminho local seguro',
+  s3_private: 'S3 privado',
+  secrets_manager: 'Secrets Manager futuro'
+};
 
 function formatDateOnly(value) {
   if (!value) return 'nao informada';
@@ -64,12 +73,16 @@ export default function FiscalCompanies() {
   const [savingCertificate, setSavingCertificate] = useState(false);
   const [validatingCertificateId, setValidatingCertificateId] = useState(null);
   const [certificateValidation, setCertificateValidation] = useState(null);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  // R22: hook usado é hook importado. A referência leva o foco ao formulário
+  // (que fica ACIMA da lista) — sem ela, clicar em "Editar" no fim de uma
+  // lista longa não muda nada no que a pessoa está vendo (R15).
+  const campoRazaoSocialRef = useRef(null);
+  // R3/R19: as duas faixas pintadas à mão (red-50 / emerald-50) viram o
+  // aviso do sistema, com tom semântico e um dono só (R16).
+  const { avisos, avisar, fechar } = useAvisos();
 
   const load = async () => {
     setLoading(true);
-    setError('');
     try {
       const [companiesResult, certificatesResult] = await Promise.all([
         getFiscalCompanies(),
@@ -78,7 +91,7 @@ export default function FiscalCompanies() {
       setCompanies(companiesResult?.data || []);
       setCertificates(certificatesResult?.data || []);
     } catch (err) {
-      setError(err.message || 'Erro ao buscar empresas fiscais');
+      avisar.erro(err.message || 'Erro ao buscar empresas fiscais');
     } finally {
       setLoading(false);
     }
@@ -86,6 +99,7 @@ export default function FiscalCompanies() {
 
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateField = (field, value) => {
@@ -95,6 +109,12 @@ export default function FiscalCompanies() {
   const updateCertificateField = (field, value) => {
     setCertificateForm((current) => ({ ...current, [field]: value }));
   };
+
+  function focarFormulario() {
+    campoRazaoSocialRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // preventScroll: quem rola é o scrollIntoView suave.
+    campoRazaoSocialRef.current?.focus({ preventScroll: true });
+  }
 
   const editCompany = (company) => {
     setEditingId(company.id);
@@ -109,6 +129,7 @@ export default function FiscalCompanies() {
       modulo_fiscal_habilitado: Boolean(company.modulo_fiscal_habilitado),
       observacoes: company.observacoes || ''
     });
+    focarFormulario();
   };
 
   const resetForm = () => {
@@ -116,28 +137,31 @@ export default function FiscalCompanies() {
     setForm(EMPTY_FORM);
   };
 
+  const novaEmpresa = () => {
+    resetForm();
+    focarFormulario();
+  };
+
   const submit = async (event) => {
     event.preventDefault();
     const documentoErro = getCpfCnpjError(form.cnpj, { required: true, type: 'cnpj' });
     if (documentoErro) {
-      setError(documentoErro);
+      avisar.erro(documentoErro);
       return;
     }
     setSaving(true);
-    setError('');
-    setMessage('');
     try {
       if (editingId) {
         await updateFiscalCompany(editingId, { ...form, cnpj: onlyDigits(form.cnpj) });
-        setMessage('Empresa fiscal atualizada.');
+        avisar.sucesso('Empresa fiscal atualizada.');
       } else {
         await createFiscalCompany({ ...form, cnpj: onlyDigits(form.cnpj) });
-        setMessage('Empresa fiscal cadastrada.');
+        avisar.sucesso('Empresa fiscal cadastrada.');
       }
       resetForm();
       await load();
     } catch (err) {
-      setError(err.message || 'Erro ao salvar empresa fiscal');
+      avisar.erro(err.message || 'Erro ao salvar empresa fiscal');
     } finally {
       setSaving(false);
     }
@@ -146,110 +170,207 @@ export default function FiscalCompanies() {
   const submitCertificate = async (event) => {
     event.preventDefault();
     setSavingCertificate(true);
-    setError('');
-    setMessage('');
     try {
       await createFiscalCertificate(certificateForm);
-      setMessage('Certificado fiscal cadastrado sem expor segredo no frontend.');
+      avisar.sucesso('Certificado fiscal cadastrado sem expor segredo no frontend.');
       setCertificateForm(EMPTY_CERTIFICATE_FORM);
       await load();
     } catch (err) {
-      setError(err.message || 'Erro ao salvar certificado fiscal');
+      avisar.erro(err.message || 'Erro ao salvar certificado fiscal');
     } finally {
       setSavingCertificate(false);
     }
   };
 
   const validateCertificate = async (certificate) => {
-    setValidatingCertificateId(certificate.id);
+    // R26: o certificado é fixado numa const ANTES do await — a lista pode
+    // recarregar no meio (o `load()` abaixo troca o array inteiro) e ler o
+    // estado depois faria a validação relatar outro alias.
+    const alvo = certificate;
+    setValidatingCertificateId(alvo.id);
     setCertificateValidation(null);
-    setError('');
-    setMessage('');
     try {
-      const result = await validateFiscalCertificate(certificate.id);
+      const result = await validateFiscalCertificate(alvo.id);
       const hasError = (result?.checks || []).some((check) => check.status === 'ERROR');
       setCertificateValidation({
-        certificateId: certificate.id,
-        alias: certificate.certificate_alias,
+        certificateId: alvo.id,
+        alias: alvo.certificate_alias,
         checks: result?.checks || []
       });
-      setMessage(hasError ? 'Validacao concluida com pendencias. Revise os checks.' : 'Certificado validado administrativamente.');
+      // Validação com pendência não é sucesso: o tom acompanha o resultado.
+      if (hasError) avisar.alerta('Validacao concluida com pendencias. Revise os checks.');
+      else avisar.sucesso('Certificado validado administrativamente.');
       await load();
     } catch (err) {
-      setError(err.message || 'Erro ao validar certificado fiscal');
+      avisar.erro(err.message || 'Erro ao validar certificado fiscal');
     } finally {
       setValidatingCertificateId(null);
     }
   };
 
   return (
-    <div className="fiscal-page space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Fiscal</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">Empresas fiscais</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Cadastro inicial dos CNPJs que serao monitorados pelo modulo fiscal.</p>
-      </div>
+    <Pagina>
+      {/*
+        R13/C1/C2 — cabeçalho na faixa fixa, com a contagem TOTAL de empresas
+        cadastradas (o número que responde "quanto existe"); os recortes
+        ficam nos blocos.
+      */}
+      <PageHeader
+        titulo="Empresas fiscais"
+        contagem={loading ? null : `${companies.length} empresa(s)`}
+        descricao="Cadastro inicial dos CNPJs que serao monitorados pelo modulo fiscal."
+        acaoPrincipal={{ rotulo: 'Nova empresa', onClick: novaEmpresa }}
+      />
 
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
-      {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{message}</div> : null}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <form onSubmit={submit} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-4">
-        <label className="md:col-span-2">
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Razao social</span>
-          <input className="input mt-1" value={form.razao_social} onChange={(e) => updateField('razao_social', e.target.value)} required />
-        </label>
-        <label>
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">CNPJ</span>
-          <input className="input mt-1" value={form.cnpj} onChange={(e) => updateField('cnpj', maskCpfCnpj(e.target.value))} inputMode="numeric" maxLength={18} required />
-        </label>
-        <label>
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">UF</span>
-          <input className="input mt-1 uppercase" value={form.uf} onChange={(e) => updateField('uf', e.target.value.toUpperCase())} maxLength={2} required />
-        </label>
-        <label>
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Nome fantasia</span>
-          <input className="input mt-1" value={form.nome_fantasia} onChange={(e) => updateField('nome_fantasia', e.target.value)} />
-        </label>
-        <label>
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Inscricao estadual</span>
-          <input className="input mt-1" value={form.inscricao_estadual} onChange={(e) => updateField('inscricao_estadual', e.target.value)} />
-        </label>
-        <label>
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Ambiente SEFAZ</span>
-          <select className="input mt-1" value={form.ambiente_sefaz} onChange={(e) => updateField('ambiente_sefaz', e.target.value)}>
-            <option value="homologacao">Homologacao</option>
-            <option value="producao">Producao</option>
-          </select>
-        </label>
-        <div className="flex items-center gap-4 pt-6">
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input type="checkbox" checked={form.ativo} onChange={(e) => updateField('ativo', e.target.checked)} />
-            Ativa
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input type="checkbox" checked={form.modulo_fiscal_habilitado} onChange={(e) => updateField('modulo_fiscal_habilitado', e.target.checked)} />
-            Monitorar
-          </label>
-        </div>
-        <label className="md:col-span-4">
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Observacoes</span>
-          <textarea className="input mt-1 min-h-[80px]" value={form.observacoes} onChange={(e) => updateField('observacoes', e.target.value)} />
-        </label>
-        <div className="flex gap-2 md:col-span-4">
-          <button className="btn-primary" type="submit" disabled={saving}>{saving ? 'Salvando...' : editingId ? 'Atualizar' : 'Cadastrar'}</button>
-          {editingId ? <button className="btn-secondary" type="button" onClick={resetForm}>Cancelar edicao</button> : null}
-        </div>
-      </form>
+      {/*
+        R9 (revista em 04/09) — FORMULÁRIO INLINE, E NÃO EM MODAL.
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        Esta tela existe PARA cadastrar as empresas monitoradas: pelo teste
+        da regra, tirando o formulário sobra uma lista que ninguém abriria
+        por si só. Modal aqui obrigaria a abrir e fechar para fazer
+        exatamente aquilo que a pessoa veio fazer. Molde: ComercialUnidades
+        (painel de formulário ACIMA da lista, mesma rota, mesmos handlers).
+      */}
+      <BlocoConteudo titulo={editingId ? 'Editar empresa fiscal' : 'Nova empresa fiscal'}>
+        <form onSubmit={submit}>
+          <FormSecao legenda="Identificacao" colunas={2}>
+            <CampoForm label="Razao social" obrigatorio span={2}>
+              <input
+                ref={campoRazaoSocialRef}
+                className="input w-full"
+                value={form.razao_social}
+                onChange={(e) => updateField('razao_social', e.target.value)}
+                required
+              />
+            </CampoForm>
+
+            <CampoForm label="CNPJ" obrigatorio>
+              <input
+                className="input w-full"
+                value={form.cnpj}
+                onChange={(e) => updateField('cnpj', maskCpfCnpj(e.target.value))}
+                inputMode="numeric"
+                maxLength={18}
+                required
+              />
+            </CampoForm>
+
+            <CampoForm label="UF" obrigatorio>
+              <input
+                className="input w-full uppercase"
+                value={form.uf}
+                onChange={(e) => updateField('uf', e.target.value.toUpperCase())}
+                maxLength={2}
+                required
+              />
+            </CampoForm>
+
+            <CampoForm label="Nome fantasia">
+              <input
+                className="input w-full"
+                value={form.nome_fantasia}
+                onChange={(e) => updateField('nome_fantasia', e.target.value)}
+              />
+            </CampoForm>
+
+            <CampoForm label="Inscricao estadual">
+              <input
+                className="input w-full"
+                value={form.inscricao_estadual}
+                onChange={(e) => updateField('inscricao_estadual', e.target.value)}
+              />
+            </CampoForm>
+          </FormSecao>
+
+          <FormSecao legenda="Monitoramento" colunas={2}>
+            <CampoForm label="Ambiente SEFAZ">
+              {/* Select de FORMULÁRIO (entrada de dado do registro) —
+                  legítimo pela própria R12; o que ela proíbe é select de
+                  recorte de lista. */}
+              <select
+                className="input w-full"
+                value={form.ambiente_sefaz}
+                onChange={(e) => updateField('ambiente_sefaz', e.target.value)}
+              >
+                <option value="homologacao">Homologacao</option>
+                <option value="producao">Producao</option>
+              </select>
+            </CampoForm>
+
+            <div className="form-group">
+              <span className="form-label">Situacao</span>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.ativo}
+                    onChange={(e) => updateField('ativo', e.target.checked)}
+                  />
+                  Ativa
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.modulo_fiscal_habilitado}
+                    onChange={(e) => updateField('modulo_fiscal_habilitado', e.target.checked)}
+                  />
+                  Monitorar
+                </label>
+              </div>
+            </div>
+
+            <CampoForm label="Observacoes" tipo="texto-longo" span={2}>
+              {/* R10: a altura do textarea vem da folha do sistema
+                  (textarea.input), não do `min-h-[80px]` que estava aqui. */}
+              <textarea
+                className="input w-full"
+                value={form.observacoes}
+                onChange={(e) => updateField('observacoes', e.target.value)}
+              />
+            </CampoForm>
+          </FormSecao>
+
+          <div className="app-actionbar">
+            <button className="btn btn-primary" type="submit" disabled={saving}>
+              {saving ? 'Salvando...' : editingId ? 'Atualizar' : 'Cadastrar'}
+            </button>
+            {editingId ? (
+              <button className="btn btn-outline" type="button" onClick={resetForm}>
+                Cancelar edicao
+              </button>
+            ) : null}
+          </div>
+        </form>
+      </BlocoConteudo>
+
+      {/*
+        R18 — o card que embrulhava a tabela tinha `overflow-hidden`, que
+        cria scrollport e mata o sticky do cabeçalho e da coluna fixa em
+        silêncio. O BlocoConteudo não recorta.
+      */}
+      <BlocoConteudo
+        titulo="Empresas cadastradas"
+        variante="primario"
+        cor="var(--module-fiscal)"
+        descricao="Base para captura de DFe, certificados e sincronizacao com a SEFAZ."
+      >
         <TabelaPadrao
           colunas={[
             {
               id: 'empresa',
               titulo: 'Empresa',
+              // R17/T5: identidade é o nome próprio do registro — razão
+              // social (com o fantasia como sub da mesma célula).
               tipo: 'identidade',
               noCard: 'titulo',
-              render: (company) => company.razao_social
+              render: (company) => (
+                <CelulaDupla
+                  principal={company.razao_social}
+                  sub={company.nome_fantasia || null}
+                />
+              )
             },
             {
               id: 'cnpj',
@@ -264,6 +385,12 @@ export default function FiscalCompanies() {
               render: (company) => company.uf
             },
             {
+              id: 'inscricao_estadual',
+              titulo: 'Inscricao estadual',
+              tipo: 'codigo',
+              render: (company) => company.inscricao_estadual || '-'
+            },
+            {
               id: 'ambiente',
               titulo: 'Ambiente',
               tipo: 'texto',
@@ -273,8 +400,11 @@ export default function FiscalCompanies() {
               id: 'status',
               titulo: 'Status',
               tipo: 'status',
+              // R25: o StatusPill local pintava emerald/amber crus — sem par
+              // no tema escuro e fora do piso de contraste do ThemeContext.
+              // O StatusBadge resolve cor, ícone e contraste por token.
               render: (company) => (
-                <StatusPill active={company.ativo}>{company.ativo ? 'Ativa' : 'Inativa'}</StatusPill>
+                <StatusBadge status={company.ativo ? 'Ativa' : 'Inativa'} kind={company.ativo ? 'success' : 'neutral'} />
               )
             },
             {
@@ -282,9 +412,19 @@ export default function FiscalCompanies() {
               titulo: 'Fiscal',
               tipo: 'status',
               render: (company) => (
-                <StatusPill active={company.modulo_fiscal_habilitado}>
-                  {company.modulo_fiscal_habilitado ? 'Monitorando' : 'Desligado'}
-                </StatusPill>
+                <StatusBadge
+                  status={company.modulo_fiscal_habilitado ? 'Monitorando' : 'Desligado'}
+                  kind={company.modulo_fiscal_habilitado ? 'success' : 'warning'}
+                />
+              )
+            },
+            {
+              id: 'observacoes',
+              titulo: 'Observacoes',
+              tipo: 'texto',
+              // T6: texto longo trunca com o conteúdo completo no tooltip.
+              render: (company) => (
+                <span title={company.observacoes || undefined}>{company.observacoes || '-'}</span>
               )
             }
           ]}
@@ -293,136 +433,294 @@ export default function FiscalCompanies() {
           vazio="Nenhuma empresa fiscal cadastrada."
           storageKey="tabela:empresas-fiscais"
           rotuloRolagem="Empresas fiscais"
+          larguraAcoes={110}
+          colunasConfiguraveis
+          // A1: a linha inteira é acionável por teclado (o TabelaPadrao dá
+          // tabIndex + Enter/Espaço) e a ação também é um <button> focável.
+          aoClicarLinha={editCompany}
           acoesLinha={(company) => (
-            <button className="btn-secondary" type="button" onClick={() => editCompany(company)}>Editar</button>
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => editCompany(company)}>
+              Editar
+            </button>
           )}
-        />      </div>
+        />
+      </BlocoConteudo>
 
-      <section id="certificados" className="grid gap-5 scroll-mt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <form onSubmit={submitCertificate} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <h2 className="text-base font-semibold text-slate-950 dark:text-white">Certificado A1</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Cadastro seguro de metadados. O arquivo e a senha nao sao exibidos depois de salvar.
-            </p>
-          </div>
-          <label className="md:col-span-2">
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Empresa fiscal</span>
-            <select className="input mt-1" value={certificateForm.fiscal_company_id} onChange={(e) => updateCertificateField('fiscal_company_id', e.target.value)} required>
-              <option value="">Selecione</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>{company.razao_social} - {company.cnpj}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Alias</span>
-            <input className="input mt-1" value={certificateForm.certificate_alias} onChange={(e) => updateCertificateField('certificate_alias', e.target.value)} required />
-          </label>
-          <label>
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Armazenamento</span>
-            <select className="input mt-1" value={certificateForm.storage_type} onChange={(e) => updateCertificateField('storage_type', e.target.value)}>
-              <option value="local_secure_path">Caminho local seguro</option>
-              <option value="s3_private">S3 privado</option>
-              <option value="secrets_manager">Secrets Manager futuro</option>
-            </select>
-          </label>
-          {certificateForm.storage_type === 'local_secure_path' ? (
-            <label className="md:col-span-2">
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Caminho local na EC2</span>
-              <input className="input mt-1" placeholder="/opt/fluxy/certs/fiscal/certificado.pfx" value={certificateForm.certificate_path} onChange={(e) => updateCertificateField('certificate_path', e.target.value)} required />
-            </label>
-          ) : null}
-          {certificateForm.storage_type === 's3_private' ? (
-            <label className="md:col-span-2">
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Chave S3 privada</span>
-              <input className="input mt-1" value={certificateForm.certificate_s3_key} onChange={(e) => updateCertificateField('certificate_s3_key', e.target.value)} required />
-            </label>
-          ) : null}
-          <label>
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Senha A1</span>
-            <input className="input mt-1" type="password" value={certificateForm.password} onChange={(e) => updateCertificateField('password', e.target.value)} />
-          </label>
-          <label>
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Valido ate</span>
-            <input className="input mt-1" type="date" value={certificateForm.valid_until} onChange={(e) => updateCertificateField('valid_until', e.target.value)} />
-          </label>
-          <label>
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Valido desde</span>
-            <input className="input mt-1" type="date" value={certificateForm.valid_from} onChange={(e) => updateCertificateField('valid_from', e.target.value)} />
-          </label>
-          <label>
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Numero de serie</span>
-            <input className="input mt-1" value={certificateForm.serial_number} onChange={(e) => updateCertificateField('serial_number', e.target.value)} />
-          </label>
-          <label className="md:col-span-2">
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Emissor</span>
-            <input className="input mt-1" value={certificateForm.issuer} onChange={(e) => updateCertificateField('issuer', e.target.value)} />
-          </label>
-          <label className="md:col-span-2">
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Titular</span>
-            <input className="input mt-1" value={certificateForm.subject} onChange={(e) => updateCertificateField('subject', e.target.value)} />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            <input type="checkbox" checked={certificateForm.is_active} onChange={(e) => updateCertificateField('is_active', e.target.checked)} />
-            Definir como ativo
-          </label>
-          <div className="md:col-span-2">
-            <button className="btn-primary" type="submit" disabled={savingCertificate}>{savingCertificate ? 'Salvando...' : 'Cadastrar certificado'}</button>
+      {/*
+        `id="certificados"`: o menu do módulo aponta para
+        `/fiscal/empresas#certificados` (entrada "Certificados" do
+        navigationConfig) — a âncora tem de continuar existindo, senão o
+        item do menu leva ao topo da tela.
+      */}
+      <BlocoConteudo
+        id="certificados"
+        titulo="Certificado A1"
+        descricao="Cadastro seguro de metadados. O arquivo e a senha nao sao exibidos depois de salvar."
+      >
+        <form onSubmit={submitCertificate}>
+          <FormSecao legenda="Vinculo e armazenamento" colunas={2}>
+            <CampoForm label="Empresa fiscal" obrigatorio span={2}>
+              {/* Seletor de CONTEXTO/entrada de dado: define a QUAL empresa o
+                  certificado pertence. Legítimo pela R12. */}
+              <select
+                className="input w-full"
+                value={certificateForm.fiscal_company_id}
+                onChange={(e) => updateCertificateField('fiscal_company_id', e.target.value)}
+                required
+              >
+                <option value="">Selecione</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>{company.razao_social} - {company.cnpj}</option>
+                ))}
+              </select>
+            </CampoForm>
+
+            <CampoForm label="Alias" obrigatorio>
+              <input
+                className="input w-full"
+                value={certificateForm.certificate_alias}
+                onChange={(e) => updateCertificateField('certificate_alias', e.target.value)}
+                required
+              />
+            </CampoForm>
+
+            <CampoForm label="Armazenamento">
+              <select
+                className="input w-full"
+                value={certificateForm.storage_type}
+                onChange={(e) => updateCertificateField('storage_type', e.target.value)}
+              >
+                <option value="local_secure_path">Caminho local seguro</option>
+                <option value="s3_private">S3 privado</option>
+                <option value="secrets_manager">Secrets Manager futuro</option>
+              </select>
+            </CampoForm>
+
+            {certificateForm.storage_type === 'local_secure_path' ? (
+              <CampoForm label="Caminho local na EC2" obrigatorio span={2}>
+                <input
+                  className="input w-full"
+                  placeholder="/opt/fluxy/certs/fiscal/certificado.pfx"
+                  value={certificateForm.certificate_path}
+                  onChange={(e) => updateCertificateField('certificate_path', e.target.value)}
+                  required
+                />
+              </CampoForm>
+            ) : null}
+
+            {certificateForm.storage_type === 's3_private' ? (
+              <CampoForm label="Chave S3 privada" obrigatorio span={2}>
+                <input
+                  className="input w-full"
+                  value={certificateForm.certificate_s3_key}
+                  onChange={(e) => updateCertificateField('certificate_s3_key', e.target.value)}
+                  required
+                />
+              </CampoForm>
+            ) : null}
+
+            <CampoForm label="Senha A1" hint="Gravada criptografada; nao retorna pela API.">
+              <input
+                className="input w-full"
+                type="password"
+                value={certificateForm.password}
+                onChange={(e) => updateCertificateField('password', e.target.value)}
+              />
+            </CampoForm>
+          </FormSecao>
+
+          <FormSecao legenda="Dados do certificado" colunas={2}>
+            <CampoForm label="Valido desde">
+              <input
+                className="input w-full"
+                type="date"
+                value={certificateForm.valid_from}
+                onChange={(e) => updateCertificateField('valid_from', e.target.value)}
+              />
+            </CampoForm>
+
+            <CampoForm label="Valido ate">
+              <input
+                className="input w-full"
+                type="date"
+                value={certificateForm.valid_until}
+                onChange={(e) => updateCertificateField('valid_until', e.target.value)}
+              />
+            </CampoForm>
+
+            <CampoForm label="Numero de serie">
+              <input
+                className="input w-full"
+                value={certificateForm.serial_number}
+                onChange={(e) => updateCertificateField('serial_number', e.target.value)}
+              />
+            </CampoForm>
+
+            <CampoForm label="Emissor">
+              <input
+                className="input w-full"
+                value={certificateForm.issuer}
+                onChange={(e) => updateCertificateField('issuer', e.target.value)}
+              />
+            </CampoForm>
+
+            <CampoForm label="Titular" span={2}>
+              <input
+                className="input w-full"
+                value={certificateForm.subject}
+                onChange={(e) => updateCertificateField('subject', e.target.value)}
+              />
+            </CampoForm>
+
+            <div className="form-group">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={certificateForm.is_active}
+                  onChange={(e) => updateCertificateField('is_active', e.target.checked)}
+                />
+                Definir como ativo
+              </label>
+            </div>
+          </FormSecao>
+
+          <div className="app-actionbar">
+            <button className="btn btn-primary" type="submit" disabled={savingCertificate}>
+              {savingCertificate ? 'Salvando...' : 'Cadastrar certificado'}
+            </button>
           </div>
         </form>
+      </BlocoConteudo>
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="border-b border-slate-200 p-5 dark:border-slate-800">
-            <h2 className="text-base font-semibold text-slate-950 dark:text-white">Certificados cadastrados</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Segredos criptografados nao retornam pela API.</p>
-          </div>
-          {certificateValidation ? (
-            <div className="border-b border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/40">
-              <p className="text-sm font-semibold text-slate-950 dark:text-white">
-                Validacao: {certificateValidation.alias}
-              </p>
-              <div className="mt-3 space-y-2">
-                {certificateValidation.checks.map((check) => (
-                  <div key={check.name} className="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-medium text-slate-900 dark:text-white">{check.name}</span>
-                      <StatusPill active={check.status === 'OK'}>{check.status}</StatusPill>
-                    </div>
-                    <p className="mt-1 text-slate-600 dark:text-slate-300">{check.message}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {certificates.length ? certificates.map((certificate) => (
-              <div key={certificate.id} className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-950 dark:text-white">{certificate.certificate_alias}</p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{certificate.company?.razao_social || 'Empresa nao vinculada'}</p>
-                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{certificate.storage_type} - {certificate.validation_status || 'pending'}</p>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${certificate.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {certificate.is_active ? 'Ativo' : 'Inativo'}
-                  </span>
-                </div>
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <span className="text-xs text-slate-500">
-                    Validade: {formatDateOnly(certificate.valid_until)}
-                  </span>
-                  <button className="btn-secondary" type="button" onClick={() => validateCertificate(certificate)} disabled={validatingCertificateId === certificate.id}>
-                    {validatingCertificateId === certificate.id ? 'Validando...' : 'Validar'}
-                  </button>
-                </div>
-              </div>
-            )) : (
-              <div className="p-5 text-sm text-slate-500">Nenhum certificado cadastrado.</div>
-            )}
-          </div>
-        </div>
-      </section>
-    </div>
+      {certificateValidation ? (
+        <BlocoConteudo
+          variante="secundario"
+          titulo={`Validacao: ${certificateValidation.alias}`}
+          descricao="Resultado da ultima validacao administrativa deste certificado."
+          acoes={(
+            <button className="btn btn-outline btn-sm" type="button" onClick={() => setCertificateValidation(null)}>
+              Fechar
+            </button>
+          )}
+        >
+          <TabelaPadrao
+            semIdentidade
+            colunas={[
+              {
+                id: 'check',
+                titulo: 'Verificacao',
+                tipo: 'texto',
+                noCard: 'titulo',
+                render: (check) => check.name
+              },
+              {
+                id: 'status',
+                titulo: 'Resultado',
+                tipo: 'status',
+                /*
+                  O StatusPill antigo só tinha dois estados (verde para OK,
+                  âmbar para todo o resto) e apagava a diferença entre
+                  "pendência" e "erro" — que é justamente o que o próprio
+                  handler distingue para decidir o tom do aviso.
+                */
+                render: (check) => (
+                  <StatusBadge
+                    status={check.status}
+                    kind={check.status === 'OK' ? 'success' : check.status === 'ERROR' ? 'danger' : 'warning'}
+                  />
+                )
+              },
+              {
+                id: 'mensagem',
+                titulo: 'Mensagem',
+                tipo: 'texto',
+                render: (check) => (
+                  <span title={check.message || undefined}>{check.message || '-'}</span>
+                )
+              }
+            ]}
+            itens={certificateValidation.checks}
+            getId={(check) => check.name}
+            storageKey="tabela:certificados-fiscais:validacao"
+            rotuloRolagem="Checks da validacao"
+            vazio="Nenhum check retornado."
+          />
+        </BlocoConteudo>
+      ) : null}
+
+      <BlocoConteudo
+        titulo="Certificados cadastrados"
+        descricao="Segredos criptografados nao retornam pela API."
+      >
+        {/*
+          R1/R17 — a lista era um <div> por certificado com seis campos
+          soltos: sem coluna declarada, sem redimensionamento e sem largura
+          salva por usuário. Nenhum dado saiu — alias, empresa, tipo de
+          armazenamento, situação da validação, ativo/inativo e validade
+          continuam, agora cada um com o papel declarado.
+        */}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'alias',
+              titulo: 'Alias',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (certificate) => (
+                <CelulaDupla
+                  principal={certificate.certificate_alias}
+                  sub={certificate.company?.razao_social || 'Empresa nao vinculada'}
+                />
+              )
+            },
+            {
+              id: 'armazenamento',
+              titulo: 'Armazenamento',
+              tipo: 'texto',
+              render: (certificate) => ARMAZENAMENTO_LABEL[certificate.storage_type] || certificate.storage_type
+            },
+            {
+              id: 'validacao',
+              titulo: 'Validacao',
+              tipo: 'status',
+              render: (certificate) => <StatusBadge status={certificate.validation_status || 'pending'} />
+            },
+            {
+              id: 'ativo',
+              titulo: 'Situacao',
+              tipo: 'status',
+              render: (certificate) => (
+                <StatusBadge
+                  status={certificate.is_active ? 'Ativo' : 'Inativo'}
+                  kind={certificate.is_active ? 'success' : 'neutral'}
+                />
+              )
+            },
+            {
+              id: 'validade',
+              titulo: 'Validade',
+              tipo: 'data',
+              render: (certificate) => formatDateOnly(certificate.valid_until)
+            }
+          ]}
+          itens={certificates}
+          carregando={loading}
+          vazio="Nenhum certificado cadastrado."
+          storageKey="tabela:certificados-fiscais"
+          rotuloRolagem="Certificados fiscais"
+          larguraAcoes={120}
+          acoesLinha={(certificate) => (
+            <button
+              className="btn btn-outline btn-sm"
+              type="button"
+              onClick={() => validateCertificate(certificate)}
+              disabled={validatingCertificateId === certificate.id}
+            >
+              {validatingCertificateId === certificate.id ? 'Validando...' : 'Validar'}
+            </button>
+          )}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

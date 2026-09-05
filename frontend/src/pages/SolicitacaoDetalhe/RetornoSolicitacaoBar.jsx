@@ -10,7 +10,29 @@ import {
   decidirRetornoSolicitacao,
   solicitarRetornoSolicitacao
 } from '../../services/solicitacoes';
+import { Avisos, CampoForm, useAvisos } from '../../components/padrao';
 
+/**
+ * BARRA DE RETORNO DA SOLICITACAO — condicao do fluxo, nao card de conteudo.
+ *
+ * Ela existe em dois estados, e os dois continuam iguais em capacidade:
+ *   1. a solicitacao esta em OUTRO setor: so acompanhamento, com o pedido de retorno;
+ *   2. ha pedidos de retorno esperando decisao NESTE setor: aprovar/rejeitar cada um.
+ *
+ * O que a rodada de 05/09 mudou:
+ * - **R25**: as duas faixas eram paleta crua do Tailwind (`bg-amber-50`, `text-amber-950`,
+ *   `border-blue-600`, `bg-gray-950`…). Paleta crua nao tem par no tema escuro e nao passa pelo
+ *   piso de contraste do ThemeContext — trocada pelos tokens semanticos (`--sem-warning*`,
+ *   `--sem-info*`) e pelo utilitario `.tarja`, que ja e a barra lateral de 4px do sistema.
+ * - **R19**: o `alert()` do erro virou `Avisos`/`useAvisos` — faixa dentro da propria barra, com o
+ *   tom semantico e fechavel.
+ * - **R10**: `mt-0.5`, `gap-1.5`, `px-2.5` e `h-5/w-5` estavam fora dos degraus da escala.
+ *
+ * A faixa NAO virou `BlocoConteudo` de proposito: ela nao e um bloco de conteudo do detalhe (nao
+ * entra no catalogo de blocos, nao e reordenavel nem recolhivel). E uma condicao do fluxo, ancorada
+ * logo abaixo do cabecalho — a mesma leitura do `useAvisos` sobre condicao derivada do conteudo:
+ * fechar nao resolve o problema, entao ela nao pode ser fechavel.
+ */
 export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
   const contexto = solicitacao?.contexto_interacao;
   const [formAberto, setFormAberto] = useState(false);
@@ -18,6 +40,7 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
   const [rejeitandoId, setRejeitandoId] = useState(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
   const [processando, setProcessando] = useState('');
+  const { avisos, avisar, fechar } = useAvisos();
 
   if (!contexto) return null;
 
@@ -38,7 +61,7 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
       setMotivoRejeicao('');
       await onMudou?.();
     } catch (error) {
-      alert(error?.message || 'Nao foi possivel concluir a operacao.');
+      avisar.erro(error?.message || 'Nao foi possivel concluir a operacao.');
     } finally {
       setProcessando('');
     }
@@ -61,29 +84,36 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
   }
 
   function decidir(pedido, aprovar) {
+    // O pedido alvo chega por parametro e e usado inteiro aqui dentro — a
+    // decisao nunca relê a lista depois do await (R26).
+    const alvo = pedido;
     if (!aprovar && !motivoRejeicao.trim()) return;
+    const justificativa = motivoRejeicao.trim();
     return atualizar(
-      () => decidirRetornoSolicitacao(pedido.id, {
+      () => decidirRetornoSolicitacao(alvo.id, {
         aprovar,
-        motivo_decisao: aprovar ? '' : motivoRejeicao.trim()
+        motivo_decisao: aprovar ? '' : justificativa
       }),
-      `${aprovar ? 'aprovar' : 'rejeitar'}-${pedido.id}`
+      `${aprovar ? 'aprovar' : 'rejeitar'}-${alvo.id}`
     );
   }
 
   if (!contexto.pode_interagir) {
     return (
       <section
-        className="border-l-4 border-amber-500 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/25 dark:text-amber-100"
+        className="tarja tarja--warning rounded-xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] px-4 py-3 text-sm text-[var(--sem-warning)]"
+
         aria-label="Interacoes bloqueadas pelo setor atual"
         data-testid="barra-retorno-solicitacao"
       >
+        <Avisos avisos={avisos} aoFechar={fechar} />
+
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
-            <HiOutlineArrowUturnLeft className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+            <HiOutlineArrowUturnLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
             <div>
               <p className="font-semibold">Somente acompanhamento · setor atual: {contexto.setor_atual}</p>
-              <p className="mt-0.5 text-xs leading-5 text-amber-800 dark:text-amber-200">
+              <p className="mt-1 text-xs leading-5">
                 Comentarios, anexos, medicoes e aditivos ficam liberados quando a solicitacao voltar para {contexto.setor_usuario || 'seu setor'}.
               </p>
             </div>
@@ -91,7 +121,9 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
 
           {pedidoPendente ? (
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold dark:bg-transparent">
+              <span
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--sem-warning-border)] bg-[var(--ui-surface)] px-2 py-1 text-xs font-semibold"
+              >
                 <HiOutlineClock className="h-4 w-4" /> Retorno solicitado
               </span>
               <button
@@ -115,24 +147,25 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
         </div>
 
         {pedidoPendente && (
-          <p className="mt-2 border-t border-amber-200 pt-2 text-xs">
+          <p className="mt-2 border-t border-[var(--sem-warning-border)] pt-2 text-xs">
             <span className="font-semibold">Motivo enviado:</span> {pedidoPendente.motivo}
           </p>
         )}
 
         {formAberto && !pedidoPendente && (
-          <div className="mt-3 grid gap-2 border-t border-amber-200 pt-3 md:grid-cols-[1fr_auto]">
-            <label className="min-w-0">
-              <span className="mb-1 block text-xs font-semibold">Por que precisa do retorno? *</span>
+          <div
+            className="mt-3 grid gap-2 border-t border-[var(--sem-warning-border)] pt-3 md:grid-cols-[1fr_auto]"
+          >
+            <CampoForm label="Por que precisa do retorno?" obrigatorio>
               <textarea
-                className="input min-h-20 w-full resize-y bg-white dark:bg-gray-950"
+                className="input w-full resize-y"
                 value={motivo}
                 onChange={(event) => setMotivo(event.target.value)}
                 placeholder="Ex.: preciso registrar a medicao deste periodo e anexar os documentos."
                 maxLength={2000}
                 autoFocus
               />
-            </label>
+            </CampoForm>
             <div className="flex items-end justify-end gap-2">
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFormAberto(false)} disabled={Boolean(processando)}>
                 Fechar
@@ -149,28 +182,34 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
 
   return (
     <section
-      className="border-l-4 border-blue-600 bg-blue-50/80 px-4 py-3 text-sm text-blue-950 dark:bg-blue-950/25 dark:text-blue-100"
+      className="tarja tarja--info rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] px-4 py-3 text-sm text-[var(--sem-info)]"
+
       aria-label="Pedidos de retorno aguardando decisao"
       data-testid="pedidos-retorno-decisao"
     >
+      <Avisos avisos={avisos} aoFechar={fechar} />
+
       <div className="flex items-center gap-2">
-        <HiOutlineClock className="h-5 w-5" aria-hidden="true" />
+        <HiOutlineClock className="h-4 w-4" aria-hidden="true" />
         <p className="font-semibold">
           {pedidos.length} pedido(s) de retorno aguardando decisao neste setor
         </p>
       </div>
 
-      <div className="mt-3 divide-y divide-blue-200 border-y border-blue-200">
+      <div className="mt-3 border-y border-[var(--sem-info-border)]">
         {pedidos.map((pedido) => {
           const rejeitando = rejeitandoId === pedido.id;
           return (
-            <div key={pedido.id} className="py-3 first:pt-2 last:pb-2">
+            <div
+              key={pedido.id}
+              className="border-t border-[var(--sem-info-border)] py-3 first:border-t-0 first:pt-2 last:pb-2"
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold">
                     {pedido.solicitante?.nome || `Usuario #${pedido.solicitado_por}`} · retorno para {pedido.setor_solicitante}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-blue-800 dark:text-blue-200">{pedido.motivo}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-xs leading-5">{pedido.motivo}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button
@@ -198,17 +237,16 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
 
               {rejeitando && (
                 <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto]">
-                  <label>
-                    <span className="mb-1 block text-xs font-semibold">Motivo da rejeicao *</span>
+                  <CampoForm label="Motivo da rejeicao" obrigatorio>
                     <textarea
-                      className="input min-h-16 w-full resize-y bg-white dark:bg-gray-950"
+                      className="input w-full resize-y"
                       value={motivoRejeicao}
                       onChange={(event) => setMotivoRejeicao(event.target.value)}
                       placeholder="Explique o que precisa ser concluido antes da devolucao."
                       maxLength={2000}
                       autoFocus
                     />
-                  </label>
+                  </CampoForm>
                   <div className="flex items-end justify-end">
                     <button
                       type="button"

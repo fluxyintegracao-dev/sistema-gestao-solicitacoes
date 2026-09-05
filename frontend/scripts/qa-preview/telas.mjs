@@ -1458,6 +1458,125 @@ export const TELAS = [
     tipo: 'form',
     cadastroInline: "a rota existe PARA abrir solicitacao — tirando o formulario nao sobra tela (R9 revista em 04/09)"
   },
+  // ---- Rodada 6: Fiscal, Provisionamento, Governanca e Custos&Recebiveis (05/09) ----
+  {
+    id: 'fiscal-dashboard',
+    arquivo: 'src/modules/fiscal/pages/FiscalDashboard.jsx',
+    rota: '/fiscal',
+    tipo: 'painel'
+  },
+  {
+    id: 'fiscal-documentos',
+    arquivo: 'src/modules/fiscal/pages/FiscalDocuments.jsx',
+    rota: '/fiscal/documentos',
+    tipo: 'listagem'
+  },
+  {
+    id: 'fiscal-documento-detalhe',
+    arquivo: 'src/modules/fiscal/pages/FiscalDocumentDetail.jsx',
+    resolver: 'fiscalDocumentoDetalhe',
+    tipo: 'detalhe'
+  },
+  {
+    id: 'fiscal-divergencias',
+    arquivo: 'src/modules/fiscal/pages/FiscalDivergences.jsx',
+    rota: '/fiscal/divergencias',
+    tipo: 'listagem'
+  },
+  {
+    id: 'fiscal-empresas',
+    arquivo: 'src/modules/fiscal/pages/FiscalCompanies.jsx',
+    rota: '/fiscal/empresas',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar empresa e certificado (R9 revista em 04/09)"
+  },
+  {
+    id: 'fiscal-rel-operacional',
+    arquivo: 'src/modules/fiscal/pages/FiscalOperationalReport.jsx',
+    rota: '/fiscal/relatorios/operacional',
+    tipo: 'painel'
+  },
+  {
+    id: 'fiscal-logs',
+    arquivo: 'src/modules/fiscal/pages/FiscalLogs.jsx',
+    rota: '/fiscal/logs',
+    tipo: 'listagem'
+  },
+  {
+    id: 'fiscal-diagnostico',
+    arquivo: 'src/modules/fiscal/pages/FiscalDiagnostics.jsx',
+    rota: '/fiscal/diagnostico',
+    tipo: 'painel'
+  },
+  {
+    id: 'fiscal-exportacao-contabil',
+    arquivo: 'src/modules/fiscal/pages/FiscalAccountingBatches.jsx',
+    rota: '/fiscal/exportacao-contabil',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA montar o lote contabil (R9 revista em 04/09)"
+  },
+  {
+    id: 'provisoes',
+    arquivo: 'src/modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros.jsx',
+    rota: '/provisoes-financeiras',
+    tipo: 'listagem'
+  },
+  {
+    id: 'provisoes-dashboard',
+    arquivo: 'src/modules/provisionamento-financeiro/pages/DashboardProvisionamentoFinanceiro.jsx',
+    rota: '/provisoes-financeiras/dashboard',
+    tipo: 'painel'
+  },
+  {
+    id: 'provisoes-rel-operacional',
+    arquivo: 'src/modules/provisionamento-financeiro/pages/ProvisionamentoRelatorioOperacional.jsx',
+    rota: '/provisoes-financeiras/relatorios/operacional',
+    tipo: 'painel'
+  },
+  {
+    id: 'provisao-detalhe',
+    arquivo: 'src/modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe.jsx',
+    resolver: 'provisaoDetalhe',
+    tipo: 'detalhe'
+  },
+  {
+    id: 'provisao-nova',
+    arquivo: 'src/modules/provisionamento-financeiro/pages/NovaProvisaoFinanceira.jsx',
+    rota: '/provisoes-financeiras/nova',
+    tipo: 'form',
+    cadastroInline: "a rota existe PARA cadastrar provisao (R9 revista em 04/09)"
+  },
+  {
+    id: 'provisoes-categorias-macro',
+    arquivo: 'src/modules/provisionamento-financeiro/pages/GestaoCategoriasMacro.jsx',
+    rota: '/provisoes-financeiras/categorias',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar categoria macro (R9 revista em 04/09)"
+  },
+  {
+    id: 'governanca-sistema',
+    arquivo: 'src/modules/governanca/pages/GovernancaSistema.jsx',
+    rota: '/governanca',
+    tipo: 'painel'
+  },
+  {
+    id: 'governanca-auditoria',
+    arquivo: 'src/modules/governanca/pages/AuditoriaOperacional.jsx',
+    rota: '/governanca/auditoria-operacional',
+    tipo: 'listagem'
+  },
+  {
+    id: 'custos-recebiveis',
+    arquivo: 'src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx',
+    rota: '/custos-recebiveis',
+    tipo: 'mista'
+  },
+  {
+    id: 'solicitacao-detalhe',
+    arquivo: 'src/pages/SolicitacaoDetalhe/index.jsx',
+    resolver: 'solicitacaoDetalhe',
+    tipo: 'detalhe'
+  },
 ];
 
 /** Itens da DoD, na ordem da matriz. */

@@ -4,7 +4,7 @@ import { listarApropriacoes } from '../../services/apropriacoes';
 import OverlayModal from '../../components/ui/OverlayModal';
 import { nomeApropriacao, percentualApropriacao } from '../../utils/apropriacao';
 import RateioApropriacoesContrato, { numeroDoCampo } from '../../components/contratos/RateioApropriacoesContrato';
-import { TabelaPadrao } from '../../components/padrao';
+import { BlocoConteudo, TabelaPadrao } from '../../components/padrao';
 
 /**
  * O rateio de apropriacoes DO CONTRATO, dentro da solicitacao que e dona dele (PI-16).
@@ -21,6 +21,11 @@ import { TabelaPadrao } from '../../components/padrao';
  * Reusa `RateioApropriacoesContrato`, o mesmo componente da Nova Solicitacao: as colunas % e R$ que
  * se recalculam, a soma que precisa fechar em 100% e a busca com autocomplete ja estao ali. Uma
  * segunda implementacao da mesma tabela divergiria da primeira na primeira correcao.
+ *
+ * Rodada de 05/09: o `div.card` com `h2 text-base` virou `BlocoConteudo` (titulo e apoio ancorados
+ * no bloco, `text-base` esta fora da escala da R10) e o modal de edicao passou a declarar
+ * `data-modal="cabecalho"`/`"rodape"` — a R27 poe a rolagem no CORPO e mantem o botao Salvar sempre
+ * visivel, no lugar do `overflow-y-auto` escrito a mao no meio do painel.
  */
 
 const moeda = (v) => Number(v || 0).toLocaleString('pt-BR', {
@@ -96,21 +101,16 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
   }
 
   return (
-    <div className="card space-y-3" data-testid="apropriacoes-do-contrato">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-[var(--c-text)]">Apropriacoes do contrato</h2>
-          <p className="text-sm text-[var(--c-muted)]">
-            Rateio aplicado a todas as parcelas. E daqui que sai a divisao de cada titulo na aprovacao.
-          </p>
-        </div>
-        {podeEditar && (
-          <button type="button" className="btn btn-outline btn-sm" onClick={abrir} data-testid="editar-apropriacoes-contrato">
-            Editar apropriacoes
-          </button>
-        )}
-      </div>
-
+    <BlocoConteudo
+      titulo="Apropriacoes do contrato"
+      descricao="Rateio aplicado a todas as parcelas. E daqui que sai a divisao de cada titulo na aprovacao."
+      acoes={podeEditar ? (
+        <button type="button" className="btn btn-outline btn-sm" onClick={abrir} data-testid="editar-apropriacoes-contrato">
+          Editar apropriacoes
+        </button>
+      ) : null}
+    >
+      <div data-testid="apropriacoes-do-contrato">
       <TabelaPadrao
         colunas={[
           {
@@ -139,16 +139,21 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
         storageKey="tabela:solicitacao-detalhe-apropriacoes-contrato"
         rotuloRolagem="Apropriacoes do contrato"
       />
+      </div>
 
-      <OverlayModal aberto={aberto} rotulo="Editar apropriacoes do contrato">
-        <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
-          <h3 className="text-base font-semibold text-[var(--c-text)]">Apropriacoes do contrato {contrato?.codigo}</h3>
+      <OverlayModal
+        aberto={aberto}
+        rotulo="Editar apropriacoes do contrato"
+        onFechar={salvando ? undefined : () => setAberto(false)}
+      >
+        <div data-modal="cabecalho" className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+          <h3 className="text-lg font-semibold text-[var(--c-text)]">Apropriacoes do contrato {contrato?.codigo}</h3>
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setAberto(false)} disabled={salvando}>
             Fechar
           </button>
         </div>
 
-        <div className="space-y-3 overflow-y-auto px-4 py-3">
+        <div className="space-y-3 px-4 py-3">
           {erro && <div className="app-alert app-alert--error">{erro}</div>}
 
           <RateioApropriacoesContrato
@@ -175,7 +180,7 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
           </label>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[var(--c-border)] px-4 py-3">
+        <div data-modal="rodape" className="flex justify-end gap-2 border-t border-[var(--c-border)] px-4 py-3">
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setAberto(false)} disabled={salvando}>
             Cancelar
           </button>
@@ -185,6 +190,6 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
           </button>
         </div>
       </OverlayModal>
-    </div>
+    </BlocoConteudo>
   );
 }

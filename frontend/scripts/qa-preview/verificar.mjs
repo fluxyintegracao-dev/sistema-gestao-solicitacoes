@@ -220,6 +220,49 @@ const RESOLVEDORES = {
     await page.goto(`${BASE}${destino}`, { waitUntil: 'domcontentloaded' });
     return destino;
   },
+  /*
+    ABRIR O PIOR REGISTRO DA LISTA — um jeito, não três (05/09).
+
+    O resolvedor do lead nasceu sozinho; ao chegarem o documento fiscal e a
+    provisão, ia virar a mesma função copiada três vezes, e copiar resolvedor
+    é como o projeto ganhou detector que conhece uma forma só.
+
+    "Pior caso" aqui é a linha com MAIS texto: é ela que estoura largura de
+    coluna (T6/T7) e quebra no cartão do mobile (X3). Escolher a primeira
+    linha às cegas mede o caso fácil e chama isso de prova.
+  */
+  async abrirPiorRegistro(page, rotaLista, padraoDetalhe) {
+    await page.goto(`${BASE}${rotaLista}`, { waitUntil: 'domcontentloaded' });
+    await esperarCarregar(page);
+    const linhas = page.locator('.app-tabela tbody tr');
+    await linhas.first().waitFor({ timeout: 30000 });
+    const total = await linhas.count();
+    let alvo = 0; let maior = -1;
+    for (let i = 0; i < total; i += 1) {
+      const tamanho = (await linhas.nth(i).innerText()).length;
+      if (tamanho > maior) { maior = tamanho; alvo = i; }
+    }
+    /*
+      Clicar na linha OU no primeiro link dela: as duas formas existem no
+      repositório (`aoClicarLinha` e âncora por linha). Se nenhuma navegar, o
+      resolvedor falha alto — medir a listagem achando que é o detalhe é o
+      pior resultado possível.
+    */
+    const link = linhas.nth(alvo).locator('a[href]').first();
+    if (await link.count()) await link.click();
+    else await linhas.nth(alvo).click();
+    await page.waitForURL(padraoDetalhe, { timeout: 30000 });
+    return new URL(page.url()).pathname;
+  },
+  async fiscalDocumentoDetalhe(page) {
+    return RESOLVEDORES.abrirPiorRegistro(page, '/fiscal/documentos', /\/fiscal\/documentos\/\d+/);
+  },
+  async provisaoDetalhe(page) {
+    return RESOLVEDORES.abrirPiorRegistro(page, '/provisoes-financeiras', /\/provisoes-financeiras\/\d+/);
+  },
+  async solicitacaoDetalhe(page) {
+    return RESOLVEDORES.abrirPiorRegistro(page, '/solicitacoes', /\/solicitacoes\/\d+/);
+  },
   /**
    * Abre o LEAD com mais texto na linha (pior caso de largura — T6/T7).
    *

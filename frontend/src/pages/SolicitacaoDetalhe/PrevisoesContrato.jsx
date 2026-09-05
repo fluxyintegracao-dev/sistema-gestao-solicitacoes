@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HiEye } from 'react-icons/hi2';
 import { getContratoParcelas } from '../../services/contratos';
-import { TabelaPadrao } from '../../components/padrao';
+import { BlocoConteudo, StatGrid, StatTile, TabelaPadrao } from '../../components/padrao';
 
 /**
  * As PREVISOES do contrato dentro do card do Financeiro (PI-16).
@@ -18,6 +18,12 @@ import { TabelaPadrao } from '../../components/padrao';
  *
  * Le a MESMA rota que a barra de acoes (`/contratos/:id/parcelas`): dois pedacos da tela lendo
  * fontes diferentes acabariam mostrando saldos diferentes para o mesmo contrato.
+ *
+ * Migrada para os componentes padrao em 05/09: `BlocoConteudo` (superficie e apoio ancorado ao
+ * titulo, R5), `StatGrid`/`StatTile` (saldo e comprometido) e as classes de COMPARACAO da R8 —
+ * `texto-previsto` (azul) x `texto-realizado` (vermelho) — onde a medicao muda o valor da parcela.
+ * A distincao ali e de SIGNIFICADO, nao de intensidade: sem cor de serie, "previsto 12.000" e
+ * "12.400" sao dois numeros cinzentos e a pessoa tem de adivinhar qual e qual.
  */
 
 const moeda = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -66,6 +72,10 @@ export default function PrevisoesContrato({
   // Erro primeiro: o `return null` abaixo tambem engolia a falha de carregamento, e o card do
   // Financeiro ficava sem as previsoes e sem dizer por que. Um 403 de escopo de obra e a causa
   // mais comum — precisa estar escrito na tela.
+  //
+  // Isto NAO passa pelo `useAvisos`: nao e evento, e CONDICAO derivada do conteudo (fecha e o
+  // problema continua — as parcelas seguem sem carregar). A fronteira esta escrita no proprio
+  // `Avisos.jsx`.
   if (erro) {
     return (
       <div className="app-alert app-alert--warning" data-testid="previsoes-contrato-erro">{erro}</div>
@@ -83,27 +93,24 @@ export default function PrevisoesContrato({
   const aindaPrevisao = parcelas.length > 0
     && parcelas.every((p) => String(p.situacao || p.status).toUpperCase() === 'PREVISAO');
 
+  // A contagem fala do conjunto INTEIRO devolvido pela rota — esta tabela nao pagina, entao o
+  // rotulo e a lista descrevem o mesmo conjunto. Se um dia a rota paginar, este rotulo passa a
+  // mentir e tem de mudar junto.
+  const contagem = `${parcelas.length} parcela(s) · ${moeda(totais.valor_contrato)}`;
+  const apoio = aindaPrevisao
+    ? (temTitulos
+      ? `${contrato.codigo} · os titulos permanecem em previsao e passam a Aberto somente quando a medicao correspondente for aprovada.`
+      : `${contrato.codigo} · nenhum titulo existe antes da aprovacao do contrato.`)
+    : contrato.codigo;
+
   return (
-    <div className="space-y-2 rounded-xl border border-[var(--c-border)] p-3" data-testid="previsoes-contrato">
-      {erro && <div className="app-alert app-alert--error">{erro}</div>}
-
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[var(--c-text)]">
-          {aindaPrevisao ? 'Previsao de parcelas do contrato' : 'Parcelas do contrato'}
-        </h3>
-        <span className="text-xs text-[var(--c-muted)]">
-          {contrato.codigo} · {parcelas.length} parcela(s) · {moeda(totais.valor_contrato)}
-        </span>
-      </div>
-
-      {aindaPrevisao && (
-        <p className="text-xs text-[var(--c-muted)]">
-          {temTitulos
-            ? 'Os titulos permanecem em previsao e passam a Aberto somente quando a medicao correspondente for aprovada.'
-            : 'Nenhum titulo existe antes da aprovacao do contrato.'}
-        </p>
-      )}
-
+    <BlocoConteudo
+      variante="secundario"
+      titulo={aindaPrevisao ? 'Previsao de parcelas do contrato' : 'Parcelas do contrato'}
+      contagem={contagem}
+      descricao={apoio}
+      data-testid="previsoes-contrato"
+    >
       <TabelaPadrao
         colunas={[
           {
@@ -126,16 +133,27 @@ export default function PrevisoesContrato({
             id: 'valor',
             titulo: 'Valor',
             tipo: 'valor',
-            render: (p) => (
-              <>
-                {moeda(p.valor)}
-                {/* Previsto x atual: a medicao reduz a parcela e joga a diferenca na ultima.
-                    Mostrar os dois evita a pergunta "por que mudou?" (PI-5). */}
-                {p.valor_previsto !== null && Number(p.valor_previsto) !== Number(p.valor) && (
-                  <span className="block text-xs text-[var(--c-muted)]">previsto {moeda(p.valor_previsto)}</span>
-                )}
-              </>
-            )
+            render: (p) => {
+              // Previsto x atual: a medicao reduz a parcela e joga a diferenca na ultima.
+              // Mostrar os dois evita a pergunta "por que mudou?" (PI-5).
+              //
+              // R8: quando os dois numeros aparecem juntos eles sao uma COMPARACAO, e a cor e da
+              // SERIE — previsto azul (`texto-previsto`), realizado/medido vermelho
+              // (`texto-realizado`). Sem divergencia nao ha comparacao nenhuma: o valor fica na
+              // cor de texto normal, porque pintar de vermelho toda parcela do sistema esvaziaria
+              // o sinal justamente onde ele importa.
+              const divergente = p.valor_previsto !== null
+                && Number(p.valor_previsto) !== Number(p.valor);
+              if (!divergente) return moeda(p.valor);
+              return (
+                <>
+                  <span className="texto-realizado" title="Valor medido">{moeda(p.valor)}</span>
+                  <span className="block text-xs texto-previsto" title="Valor previsto no contrato">
+                    previsto {moeda(p.valor_previsto)}
+                  </span>
+                </>
+              );
+            }
           },
           {
             id: 'situacao',
@@ -208,21 +226,26 @@ export default function PrevisoesContrato({
 
           O nivel e a cor vem RESOLVIDOS do backend (`saldo.alerta`). A tela nao refaz a conta: duas
           versoes da mesma regra divergem no dia em que uma das duas muda. `title` guarda o nome do
-          nivel, para quem nao distingue as cores. */}
-      <div className="flex flex-wrap gap-4 text-xs text-[var(--c-muted)]">
-        <span>
-          Saldo do contrato:{' '}
-          <strong
-            data-testid="saldo-do-contrato"
-            data-nivel={dados?.saldo?.alerta?.nivel || ''}
-            title={dados?.saldo?.alerta ? `Saldo ${dados.saldo.alerta.rotulo.toLowerCase()}` : undefined}
-            style={dados?.saldo?.alerta?.cor ? { color: dados.saldo.alerta.cor } : undefined}
-          >
-            {moeda(dados?.saldo?.saldo)}
-          </strong>
-        </span>
-        <span>Ja comprometido: <strong>{moeda(dados?.saldo?.comprometido)}</strong></span>
-      </div>
-    </div>
+          nivel, para quem nao distingue as cores.
+
+          Esta cor NAO e cor de comparacao (R8) nem cor escrita a mao (R25): e um DADO que chega
+          resolvido da rota, como o hexadecimal da etapa do CRM ja registrado no manifesto. */}
+      <StatGrid colunas={2}>
+        <StatTile
+          label="Saldo do contrato"
+          title={dados?.saldo?.alerta ? `Saldo ${dados.saldo.alerta.rotulo.toLowerCase()}` : undefined}
+          valor={(
+            <strong
+              data-testid="saldo-do-contrato"
+              data-nivel={dados?.saldo?.alerta?.nivel || ''}
+              style={dados?.saldo?.alerta?.cor ? { color: dados.saldo.alerta.cor } : undefined}
+            >
+              {moeda(dados?.saldo?.saldo)}
+            </strong>
+          )}
+        />
+        <StatTile label="Ja comprometido" valor={moeda(dados?.saldo?.comprometido)} />
+      </StatGrid>
+    </BlocoConteudo>
   );
 }

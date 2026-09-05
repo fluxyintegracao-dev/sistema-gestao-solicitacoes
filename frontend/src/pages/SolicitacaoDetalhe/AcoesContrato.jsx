@@ -14,6 +14,14 @@ import PendingAttachmentsList from '../../components/attachments/PendingAttachme
 import { uploadArquivos } from '../../services/uploads';
 import { API_URL, authHeaders, fileUrl } from '../../services/api';
 import {
+  Avisos,
+  BlocoConteudo,
+  CampoForm,
+  FormSecao,
+  useAvisos,
+  useConfirmacao
+} from '../../components/padrao';
+import {
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
   concatenarAnexosPendentes,
   extrairFilesAnexosPendentes,
@@ -35,6 +43,32 @@ import {
  * acima do limite do Juridico. Quem abre o contrato e o usuario da obra, que nao conhece o plano
  * financeiro — a decisao e de quem aprova. O backend recusa sem ela de qualquer forma; o campo
  * aqui existe para a pessoa nao descobrir isso depois de clicar.
+ *
+ * ---
+ *
+ * ## Migracao para os componentes padrao (05/09) — o que mudou e por que
+ *
+ * Este arquivo concentra as decisoes de contrato: aprovar, devolver, cancelar, encaminhar ao
+ * Juridico e aprovar em definitivo. Tres coisas foram acertadas na migracao, e as tres sao da
+ * familia CONSENTIMENTO da DoD, nao de forma:
+ *
+ * 1. **Toda acao que muda o estado do contrato passa por `useConfirmacao`**, e o retorno e sempre
+ *    DESESTRUTURADO (`const { ok } = await confirmar(...)`, R21). O objeto e sempre truthy: ler
+ *    `const ok = await confirmar(...)` faz o "Cancelar" PROSSEGUIR — foi assim que o estorno de
+ *    fechamento do RH/DP passou a estornar no botao de cancelar.
+ * 2. **O alvo e fixado numa `const` ANTES do `await`** (R26). O modal do sistema nao congela a
+ *    pagina: esta tela recarrega por evento (`onMudou`) e a prop `contrato` pode trocar entre a
+ *    pergunta e a acao. Perguntar sobre o contrato A e aprovar o B deixa uma trilha de auditoria
+ *    com consentimento VALIDO para uma acao que ninguem autorizou.
+ * 3. **A mensagem cita o contrato e a consequencia**, nunca "este contrato": quem le a caixa tem
+ *    de conseguir conferir o codigo e o valor sem olhar para tras.
+ *
+ * A JUSTIFICATIVA (motivo da devolucao / do cancelamento) continua em CAMPO DE VERDADE na tela,
+ * com validacao visivel — nao em `window.prompt` e nem no `campo` do `useConfirmacao`. Ela vai
+ * para a auditoria e para quem recebe a devolucao; um textarea de 3 linhas dentro de uma caixa
+ * modal e o lugar errado para escrever o que outra pessoa vai ter de ler para corrigir.
+ * A confirmacao vem DEPOIS do campo preenchido e repete o motivo digitado, para a pessoa ver o
+ * que esta prestes a gravar.
  */
 
 const moeda = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -83,10 +117,28 @@ export default function AcoesContrato({ contrato, onMudou }) {
   const [anexosReenvioIds, setAnexosReenvioIds] = useState([]);
   const [modo, setModo] = useState(null); // 'rejeitar' | 'cancelar' | 'aprovar-juridico'
   const [confirmacaoJuridica, setConfirmacaoJuridica] = useState('');
-  const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  /*
+    ERRO DE CAMPO x AVISO DE EVENTO — a fronteira que o `Avisos.jsx` declara.
+
+    O `erro` unico de antes misturava duas coisas: "a rota recusou a aprovacao" (evento, some
+    quando a pessoa fecha) e "falta a categoria financeira" (CONDICAO do formulario — fecha e o
+    problema continua, porque o campo segue vazio). Condicao virada em faixa dispensavel some com
+    um clique e deixa a pessoa enviar de novo sem ver o que a impedia.
+
+    Entao: falha de rota vai para `useAvisos`; validacao de campo mora AO LADO DO CAMPO, no `erro`
+    do `CampoForm`, que e onde a pessoa esta olhando quando o botao recusa.
+  */
+  const [erroCategoria, setErroCategoria] = useState('');
+  const [erroMotivo, setErroMotivo] = useState('');
+  const [erroConfirmacaoJuridica, setErroConfirmacaoJuridica] = useState('');
+  const [erroReenvio, setErroReenvio] = useState('');
+  const [erroMinuta, setErroMinuta] = useState('');
+  const [erroAssinado, setErroAssinado] = useState('');
   const acaoEmAndamentoRef = useRef(false);
   const inputReenvioRef = useRef(null);
+  const { avisos, avisar, fechar, limpar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   const status = contrato?.status_contrato || null;
   const linkAssinaturaSeguro = (() => {
@@ -142,6 +194,7 @@ export default function AcoesContrato({ contrato, onMudou }) {
   if (!contrato?.fluxo_novo || !status) return null;
 
   const info = ESTADOS[status] || { titulo: status, ajuda: '' };
+  const valorComAditivos = Number(contrato.valor_total) + Number(contrato.valor_aditivos || 0);
 
   /**
    * O que ESTE usuario pode fazer, respondido pelo backend (`contrato.permissoes`).
@@ -185,14 +238,14 @@ export default function AcoesContrato({ contrato, onMudou }) {
     if (acaoEmAndamentoRef.current) return;
     acaoEmAndamentoRef.current = true;
     setOcupado(true);
-    setErro('');
+    limpar();
     try {
       await acao();
       setModo(null);
       setMotivo('');
       onMudou?.();
     } catch (e) {
-      setErro(e.message || 'Nao foi possivel concluir a acao.');
+      avisar.erro(e.message || 'Nao foi possivel concluir a acao.');
     } finally {
       acaoEmAndamentoRef.current = false;
       setOcupado(false);
@@ -201,20 +254,22 @@ export default function AcoesContrato({ contrato, onMudou }) {
 
   function adicionarArquivosReenvio(files) {
     if (anexosReenvioIds.length > 0) {
-      setErro('Os arquivos desta tentativa ja foram enviados. Reenvie o contrato ou atualize a pagina para trocar os anexos.');
+      setErroReenvio('Os arquivos desta tentativa ja foram enviados. Reenvie o contrato ou atualize a pagina para trocar os anexos.');
       return;
     }
     const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivosReenvio, files, {
       maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
     });
     if (proximoEstado.length > 20) {
-      setErro('Envie no maximo 20 arquivos por reenvio.');
+      setErroReenvio('Envie no maximo 20 arquivos por reenvio.');
       return;
     }
     setArquivosReenvio(proximoEstado);
-    setErro('');
+    setErroReenvio('');
     if (rejeitados.length > 0) {
-      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+      // R19: era `alert()` do navegador. A lista de arquivos recusados por tamanho e um EVENTO
+      // (aconteceu agora, some quando a pessoa fecha) — faixa do sistema, dentro da pagina.
+      avisar.alerta(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
     }
   }
 
@@ -223,34 +278,47 @@ export default function AcoesContrato({ contrato, onMudou }) {
     setArquivosReenvio((atual) => atual.filter((_, i) => i !== index));
   }
 
-  function reenviarAjuste() {
+  async function reenviarAjuste() {
+    // R26: alvo fixado ANTES de qualquer `await`. Daqui para baixo so `alvo` e lido.
+    const alvo = contrato;
     const comentario = String(comentarioReenvio || '').trim();
-    const temArquivo = arquivosReenvio.length > 0 || anexosReenvioIds.length > 0;
+    const arquivosDaVez = arquivosReenvio;
+    const idsJaEnviados = anexosReenvioIds;
+    const temArquivo = arquivosDaVez.length > 0 || idsJaEnviados.length > 0;
     if (!comentario && !temArquivo) {
-      setErro('Informe um comentario e/ou anexe um arquivo antes de reenviar.');
+      setErroReenvio('Informe um comentario e/ou anexe um arquivo antes de reenviar.');
       return;
     }
-    if (!contrato.solicitacao_id) {
-      setErro('A solicitacao vinculada ao contrato nao foi identificada. Atualize a pagina e tente novamente.');
+    if (!alvo.solicitacao_id) {
+      setErroReenvio('A solicitacao vinculada ao contrato nao foi identificada. Atualize a pagina e tente novamente.');
       return;
     }
+    setErroReenvio('');
+
+    const quantosAnexos = arquivosDaVez.length || idsJaEnviados.length;
+    const { ok } = await confirmar({
+      titulo: `Reenviar o contrato ${alvo.codigo} para aprovacao`,
+      mensagem: `O contrato ${alvo.codigo} (${moeda(valorComAditivos)}) volta para a fila de quem o devolveu, com ${quantosAnexos ? `${quantosAnexos} arquivo(s) e ` : ''}${comentario ? 'o comentario do ajuste' : 'sem comentario'}. Enquanto ele estiver na fila voce nao consegue editar o ajuste por aqui.`,
+      rotuloConfirmar: 'Reenviar para aprovacao'
+    });
+    if (!ok) return;
 
     return executar(async () => {
-      let ids = anexosReenvioIds;
-      if (arquivosReenvio.length > 0 && ids.length === 0) {
+      let ids = idsJaEnviados;
+      if (arquivosDaVez.length > 0 && ids.length === 0) {
         const anexos = await uploadArquivos({
-          files: extrairFilesAnexosPendentes(arquivosReenvio),
+          files: extrairFilesAnexosPendentes(arquivosDaVez),
           tipo: 'ANEXO',
-          solicitacao_id: contrato.solicitacao_id
+          solicitacao_id: alvo.solicitacao_id
         });
         ids = (Array.isArray(anexos) ? anexos : []).map((anexo) => Number(anexo?.id)).filter(Boolean);
-        if (ids.length !== arquivosReenvio.length) {
+        if (ids.length !== arquivosDaVez.length) {
           throw new Error('O upload nao confirmou todos os arquivos. Atualize a pagina antes de tentar novamente.');
         }
         setAnexosReenvioIds(ids);
       }
 
-      await reenviarContratoParaAprovacao(contrato.id, {
+      await reenviarContratoParaAprovacao(alvo.id, {
         comentario: comentario || null,
         anexo_ids: ids
       });
@@ -261,64 +329,141 @@ export default function AcoesContrato({ contrato, onMudou }) {
     });
   }
 
-  const aprovar = () => {
-    if (!categoriaId) {
-      setErro('Informe a categoria financeira: ela e aplicada a todos os titulos deste contrato.');
+  /**
+   * APROVAR — a acao mais cara desta tela, e a que precisava de consentimento e nao tinha.
+   *
+   * A consequencia depende do VALOR: ate o limite do Juridico o contrato ja fica ATIVO e os
+   * titulos financeiros nascem na hora; acima do limite ele segue para o Juridico e nenhum titulo
+   * e criado ainda (`contratoFluxoNovoService.aprovarContrato`). A mensagem diz as duas, porque a
+   * tela nao conhece o limite — afirmar so uma delas seria prometer o que pode nao acontecer.
+   */
+  async function aprovar() {
+    const alvo = contrato;                                   // R26: fixado ANTES do await
+    const categoriaEscolhida = categoriaId;
+    if (!categoriaEscolhida) {
+      setErroCategoria('Informe a categoria financeira: ela e aplicada a todos os titulos deste contrato.');
       return;
     }
-    return executar(() => aprovarContratoFluxoNovo(contrato.id, { categoria_financeira_id: Number(categoriaId) }));
-  };
+    setErroCategoria('');
+    const categoria = categorias.find((c) => String(c.id) === String(categoriaEscolhida));
+    const nomeCategoria = [categoria?.codigo, categoria?.nome].filter(Boolean).join(' — ')
+      || `categoria #${categoriaEscolhida}`;
+
+    const { ok } = await confirmar({
+      titulo: `Aprovar o contrato ${alvo.codigo}`,
+      mensagem: `Aprovar o contrato ${alvo.codigo}, de ${moeda(valorComAditivos)}, com a categoria financeira ${nomeCategoria} aplicada a TODOS os titulos dele. Ate o limite do Juridico o contrato ja fica ativo e os titulos financeiros sao criados agora; acima do limite ele segue para o Juridico e nenhum titulo nasce ainda. A aprovacao nao pode ser repetida: para desfazer, e preciso encerrar o contrato.`,
+      rotuloConfirmar: 'Aprovar contrato'
+    });
+    if (!ok) return;
+    return executar(() => aprovarContratoFluxoNovo(alvo.id, {
+      categoria_financeira_id: Number(categoriaEscolhida)
+    }));
+  }
 
   /**
    * O arquivo sobe ANTES de trocar a etapa: o backend so aceita `minuta` quando ja existe o anexo
    * ou o link. Na ordem inversa, o documento chegaria depois da validacao e a etapa seria recusada.
    */
-  const enviarMinuta = () => {
+  async function enviarMinuta() {
+    const alvo = contrato;                                   // R26: fixado ANTES do await
+    const arquivo = arquivoMinuta;
     const link = String(linkAssinatura || '').trim();
-    if (!arquivoMinuta && !link) {
-      setErro('Anexe a minuta ou informe o link de assinatura antes de enviar.');
+    if (!arquivo && !link) {
+      setErroMinuta('Anexe a minuta ou informe o link de assinatura antes de enviar.');
       return;
     }
+    setErroMinuta('');
+
+    const entregue = [arquivo ? `o documento "${arquivo.name}"` : null, link ? 'o link de assinatura' : null]
+      .filter(Boolean).join(' e ');
+    const { ok } = await confirmar({
+      titulo: `Enviar a minuta do contrato ${alvo.codigo} para assinatura`,
+      mensagem: `O contrato ${alvo.codigo} (${moeda(valorComAditivos)}) sai do Juridico com ${entregue} e a solicitacao volta ao setor de origem para colher a assinatura. Enquanto estiver la, o Juridico nao consegue trocar a minuta por aqui.`,
+      rotuloConfirmar: 'Enviar para assinatura'
+    });
+    if (!ok) return;
+
     return executar(async () => {
-      if (arquivoMinuta) await uploadMinutaContrato(contrato.id, arquivoMinuta);
-      await tramitarContratoNoJuridico(contrato.id, 'minuta', link ? { link_assinatura: link } : {});
+      if (arquivo) await uploadMinutaContrato(alvo.id, arquivo);
+      await tramitarContratoNoJuridico(alvo.id, 'minuta', link ? { link_assinatura: link } : {});
       setArquivoMinuta(null);
       setLinkAssinatura('');
     });
-  };
+  }
 
-  const confirmarMotivo = () => {
-    if (!String(motivo || '').trim()) {
-      setErro('Informe o motivo.');
+  /**
+   * DEVOLVER / CANCELAR — a justificativa e campo de verdade (acima), e a confirmacao repete o
+   * que foi digitado. Cancelar e IRREVERSIVEL e o texto diz isso, como a DoD exige de toda
+   * confirmacao destrutiva.
+   */
+  async function confirmarMotivo() {
+    const alvo = contrato;                                   // R26: fixado ANTES do await
+    const acao = modo;                                       // idem: 'rejeitar' ou 'cancelar'
+    const texto = String(motivo || '').trim();
+    if (!texto) {
+      setErroMotivo(acao === 'cancelar'
+        ? 'Informe o motivo do cancelamento: ele vai para a auditoria e para quem acompanha a solicitacao.'
+        : 'Informe o motivo da devolucao: e por ele que a pessoa sabe o que corrigir.');
       return;
     }
-    return executar(() => (modo === 'cancelar'
-      ? cancelarSolicitacaoDoContrato(contrato.id, motivo.trim())
-      : rejeitarContratoFluxoNovo(contrato.id, motivo.trim())));
-  };
+    setErroMotivo('');
 
-  const confirmarAprovacaoJuridica = () => {
-    const codigoEsperado = String(contrato?.codigo || '').trim();
-    if (!codigoEsperado || String(confirmacaoJuridica || '').trim().toUpperCase() !== codigoEsperado.toUpperCase()) {
-      setErro(`Digite ${codigoEsperado || 'o codigo do contrato'} para confirmar a aprovacao juridica final.`);
+    const { ok } = await confirmar({
+      titulo: acao === 'cancelar'
+        ? `Cancelar o contrato ${alvo.codigo}`
+        : `Devolver o contrato ${alvo.codigo} para ajuste`,
+      mensagem: acao === 'cancelar'
+        ? `Cancelar o contrato ${alvo.codigo}, de ${moeda(valorComAditivos)}, encerra o pedido: a solicitacao NAO volta e esta acao nao pode ser desfeita. Motivo registrado: "${texto}".`
+        : `Devolver o contrato ${alvo.codigo}, de ${moeda(valorComAditivos)}, ao responsavel para ajuste e reenvio. Motivo registrado: "${texto}".`,
+      rotuloConfirmar: acao === 'cancelar' ? 'Cancelar contrato' : 'Devolver para ajuste',
+      destrutiva: true
+    });
+    if (!ok) return;
+
+    return executar(() => (acao === 'cancelar'
+      ? cancelarSolicitacaoDoContrato(alvo.id, texto)
+      : rejeitarContratoFluxoNovo(alvo.id, texto)));
+  }
+
+  /**
+   * A APROVACAO FINAL do Juridico e onde o compromisso financeiro nasce (PI-18). Ela ja exigia
+   * digitar o codigo do contrato — consentimento mais forte que um clique, e por isso o campo
+   * FICA. A confirmacao vem por cima porque e ela que nomeia a consequencia (titulos criados,
+   * solicitacao devolvida a obra) no momento do clique.
+   */
+  async function confirmarAprovacaoJuridica() {
+    const alvo = contrato;                                   // R26: fixado ANTES do await
+    const codigoEsperado = String(alvo?.codigo || '').trim();
+    const digitado = String(confirmacaoJuridica || '').trim();
+    if (!codigoEsperado || digitado.toUpperCase() !== codigoEsperado.toUpperCase()) {
+      setErroConfirmacaoJuridica(`Digite ${codigoEsperado || 'o codigo do contrato'} para confirmar a aprovacao juridica final.`);
       return;
     }
+    setErroConfirmacaoJuridica('');
+
+    const { ok } = await confirmar({
+      titulo: `Aprovacao final do contrato ${alvo.codigo}`,
+      mensagem: `Aprovar em definitivo o contrato ${alvo.codigo}, de ${moeda(valorComAditivos)}: ele passa a ATIVO, os titulos financeiros das parcelas sao criados e a solicitacao volta para a obra. Esta acao nao pode ser desfeita por aqui — desfazer exige encerrar o contrato, que trata os titulos ja criados.`,
+      rotuloConfirmar: 'Aprovar em definitivo'
+    });
+    if (!ok) return;
+
     return executar(async () => {
-      await tramitarContratoNoJuridico(contrato.id, 'conferido');
+      await tramitarContratoNoJuridico(alvo.id, 'conferido');
       setConfirmacaoJuridica('');
     });
-  };
+  }
 
   async function baixarMinuta() {
     const minuta = contrato?.minuta;
     const caminho = String(minuta?.caminho_arquivo || '').trim();
     if (!caminho) {
-      setErro('A minuta nao possui um endereco de arquivo valido.');
+      avisar.erro('A minuta nao possui um endereco de arquivo valido.');
       return;
     }
 
     setBaixandoMinuta(true);
-    setErro('');
+    limpar();
     try {
       let url = fileUrl(caminho);
       if (caminho.startsWith('http')) {
@@ -346,29 +491,44 @@ export default function AcoesContrato({ contrato, onMudou }) {
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
     } catch (e) {
-      setErro(e.message || 'Nao foi possivel baixar a minuta.');
+      avisar.erro(e.message || 'Nao foi possivel baixar a minuta.');
     } finally {
       setBaixandoMinuta(false);
     }
   }
 
-  const solicitarRevisaoDoAssinado = () => {
-    if (!arquivoAssinado && !anexoAssinadoId && !assinadoPeloLink) {
-      setErro('Anexe o contrato assinado ou confirme que ele foi assinado pelo link informado.');
+  async function solicitarRevisaoDoAssinado() {
+    const alvo = contrato;                                   // R26: fixado ANTES do await
+    const arquivo = arquivoAssinado;
+    const idJaEnviado = anexoAssinadoId;
+    const peloLink = assinadoPeloLink;
+    if (!arquivo && !idJaEnviado && !peloLink) {
+      setErroAssinado('Anexe o contrato assinado ou confirme que ele foi assinado pelo link informado.');
       return;
     }
-    if (arquivoAssinado && !contrato.solicitacao_id) {
-      setErro('A solicitacao vinculada ao contrato nao foi identificada. Atualize a pagina e tente novamente.');
+    if (arquivo && !alvo.solicitacao_id) {
+      setErroAssinado('A solicitacao vinculada ao contrato nao foi identificada. Atualize a pagina e tente novamente.');
       return;
     }
+    setErroAssinado('');
+
+    const prova = arquivo
+      ? `o documento assinado "${arquivo.name}"`
+      : (idJaEnviado ? 'o documento assinado ja enviado' : 'a confirmacao de assinatura pelo link');
+    const { ok } = await confirmar({
+      titulo: `Solicitar a revisao final do contrato ${alvo.codigo}`,
+      mensagem: `O contrato ${alvo.codigo} (${moeda(valorComAditivos)}) volta ao Juridico com ${prova} para a conferencia final. Esta acao NAO cria titulo: e a conferencia do Juridico que ativa o contrato e cria os titulos financeiros.`,
+      rotuloConfirmar: 'Solicitar revisao'
+    });
+    if (!ok) return;
 
     return executar(async () => {
-      let idAnexo = anexoAssinadoId;
-      if (arquivoAssinado && !idAnexo) {
+      let idAnexo = idJaEnviado;
+      if (arquivo && !idAnexo) {
         const anexos = await uploadArquivos({
-          files: [arquivoAssinado],
+          files: [arquivo],
           tipo: 'CONTRATO',
-          solicitacao_id: contrato.solicitacao_id
+          solicitacao_id: alvo.solicitacao_id
         });
         idAnexo = Number(anexos?.[0]?.id) || null;
         if (!idAnexo) {
@@ -378,429 +538,433 @@ export default function AcoesContrato({ contrato, onMudou }) {
         // arquivo no banco/S3.
         setAnexoAssinadoId(idAnexo);
       }
-      await tramitarContratoNoJuridico(contrato.id, 'assinado', assinadoPeloLink
+      await tramitarContratoNoJuridico(alvo.id, 'assinado', peloLink
         ? { assinado_pelo_link: true }
         : {});
       setArquivoAssinado(null);
       setAnexoAssinadoId(null);
       setAssinadoPeloLink(false);
     });
-  };
+  }
 
   return (
-    <div className="card space-y-3" data-testid="acoes-contrato">
-      <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-[var(--c-text)]">
-            Contrato {contrato.codigo} — {info.titulo}
-          </h2>
-          <p className="text-sm text-[var(--c-muted)]">{info.ajuda}</p>
-        </div>
-        <span className="text-sm text-[var(--c-muted)]">
-          Valor {moeda(Number(contrato.valor_total) + Number(contrato.valor_aditivos || 0))}
-        </span>
-      </div>
-
-      {erro && <div className="app-alert app-alert--error">{erro}</div>}
-      {/* Nem toda pessoa que ENXERGA a solicitacao age nela. Sem esta linha o card ficaria com o
-          titulo e nenhum botao, e quem olhasse nao saberia se esta esperando alguem ou se a tela
-          falhou ao carregar. */}
-      {!modo && semAcaoNesteEstado && (
-        <p className="text-sm text-[var(--c-muted)]" data-testid="sem-acao-contrato">
-          Nesta etapa a acao e {DONO_DA_VEZ[status] || 'de outro setor'}. Voce acompanha o contrato,
-          mas nao tem permissao para agir aqui.
-        </p>
-      )}
-      {status === 'REJEITADO' && contrato.motivo_rejeicao && (
-        <div className="app-alert app-alert--warning">Motivo: {contrato.motivo_rejeicao}</div>
-      )}
-
-      {status === 'AGUARDANDO_ASSINATURA' && (linkAssinaturaSeguro || contrato.minuta) && (
-        <section className="border-y border-[var(--c-border)] py-2" aria-label="Material para assinatura">
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">
-            Material para assinatura
-          </h3>
-          <div className="divide-y divide-[var(--c-border)]">
-            {linkAssinaturaSeguro && (
-              <div className="flex items-center justify-between gap-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--c-text)]">Link de assinatura</p>
-                  <p className="truncate text-xs text-[var(--c-muted)]">{linkAssinaturaSeguro}</p>
-                </div>
-                <a className="btn btn-outline btn-sm shrink-0" href={linkAssinaturaSeguro}
-                  target="_blank" rel="noreferrer" title="Abrir link de assinatura">
-                  <HiArrowTopRightOnSquare className="h-4 w-4" />
-                  <span className="ml-1">Abrir</span>
-                </a>
-              </div>
-            )}
-            {contrato.minuta && (
-              <div className="flex items-center justify-between gap-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-[var(--c-text)]">Minuta do contrato</p>
-                  <p className="truncate text-xs text-[var(--c-muted)]">{contrato.minuta.nome_original}</p>
-                </div>
-                <button type="button" className="btn btn-outline btn-sm shrink-0"
-                  onClick={baixarMinuta} disabled={baixandoMinuta} title="Baixar minuta">
-                  <HiArrowDownTray className="h-4 w-4" />
-                  <span className="ml-1">{baixandoMinuta ? 'Baixando...' : 'Baixar'}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Confirmacao de motivo, compartilhada por rejeitar e cancelar. As duas exigem motivo:
-          quem recebe a devolucao precisa saber o que corrigir, e cancelamento sem motivo vira
-          discussao depois. */}
-      {modo && modo !== 'aprovar-juridico' && (
-        <div className="space-y-2">
-          <label className="grid gap-1 text-sm">
-            {modo === 'cancelar' ? 'Motivo do cancelamento *' : 'Motivo da devolucao *'}
-            <textarea
-              className="input"
-              rows={2}
-              name="motivo_acao_contrato"
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-            />
-          </label>
-          <p className="text-xs text-[var(--c-muted)]">
-            {modo === 'cancelar'
-              ? 'Cancelar encerra o pedido: a solicitacao NAO volta.'
-              : 'Rejeitar devolve ao responsavel para ajuste e reenvio.'}
+    <BlocoConteudo
+      titulo={`Contrato ${contrato.codigo} — ${info.titulo}`}
+      contagem={`Valor ${moeda(valorComAditivos)}`}
+      descricao={info.ajuda}
+      data-testid="acoes-contrato"
+    >
+      <div className="space-y-3">
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        {/* Nem toda pessoa que ENXERGA a solicitacao age nela. Sem esta linha o card ficaria com o
+            titulo e nenhum botao, e quem olhasse nao saberia se esta esperando alguem ou se a tela
+            falhou ao carregar. */}
+        {!modo && semAcaoNesteEstado && (
+          <p className="text-sm text-[var(--c-muted)]" data-testid="sem-acao-contrato">
+            Nesta etapa a acao e {DONO_DA_VEZ[status] || 'de outro setor'}. Voce acompanha o contrato,
+            mas nao tem permissao para agir aqui.
           </p>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => { setModo(null); setErro(''); }} disabled={ocupado}>
-              Voltar
-            </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={confirmarMotivo} disabled={ocupado}
-              data-testid="confirmar-motivo-contrato">
-              {ocupado ? 'Enviando...' : 'Confirmar'}
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+        {status === 'REJEITADO' && contrato.motivo_rejeicao && (
+          <div className="app-alert app-alert--warning">Motivo: {contrato.motivo_rejeicao}</div>
+        )}
 
-      {modo === 'aprovar-juridico' && (
-        <div className="space-y-3" data-testid="confirmacao-aprovacao-juridica">
-          <div className="app-alert app-alert--warning">
-            Esta acao ativa o contrato, cria os titulos financeiros e devolve a solicitacao para a
-            obra. Confira o documento assinado antes de continuar.
-          </div>
-          <label className="grid gap-1 text-sm md:max-w-lg">
-            Digite <strong>{contrato.codigo}</strong> para confirmar *
-            <input
-              className="input input-sm"
-              value={confirmacaoJuridica}
-              onChange={(e) => { setConfirmacaoJuridica(e.target.value); setErro(''); }}
-              autoComplete="off"
-              aria-label={`Digite ${contrato.codigo} para confirmar`}
-              data-testid="codigo-confirmacao-aprovacao-juridica"
-            />
-          </label>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className="btn btn-outline btn-sm"
-              onClick={() => { setModo(null); setConfirmacaoJuridica(''); setErro(''); }} disabled={ocupado}>
-              Voltar
-            </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={confirmarAprovacaoJuridica}
-              disabled={ocupado || String(confirmacaoJuridica || '').trim().toUpperCase() !== String(contrato.codigo || '').trim().toUpperCase()}
-              data-testid="confirmar-aprovacao-juridica">
-              {ocupado ? 'Aprovando...' : 'Confirmar aprovacao final'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Ate 20/08 este estado nao tinha saida nenhuma: o responsavel corrigia o que foi apontado e
-          nao havia botao que devolvesse o contrato para a fila. */}
-      {!modo && status === 'REJEITADO' && podeReenviar && (
-        <div className="space-y-3 border-t border-[var(--c-border)] pt-3" data-testid="ajuste-contrato-rejeitado">
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--c-text)]">Resposta ao ajuste</h3>
-            <p className="text-xs text-[var(--c-muted)]">
-              Informe o que foi corrigido, anexe o documento atualizado, ou use as duas opcoes.
-            </p>
-          </div>
-
-          <label className="grid gap-1 text-sm">
-            Comentario do ajuste
-            <textarea
-              className="input"
-              rows={3}
-              maxLength={4000}
-              value={comentarioReenvio}
-              onChange={(e) => { setComentarioReenvio(e.target.value); setErro(''); }}
-              placeholder="Descreva objetivamente o que foi corrigido..."
-              data-testid="comentario-reenvio-contrato"
-            />
-          </label>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="btn btn-outline btn-sm" style={{ cursor: ocupado ? 'not-allowed' : 'pointer' }}>
-              <HiPaperClip className="h-4 w-4" />
-              <span className="ml-1">Anexar arquivo</span>
-              <input
-                ref={inputReenvioRef}
-                type="file"
-                multiple
-                disabled={ocupado || anexosReenvioIds.length > 0}
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  adicionarArquivosReenvio(e.target.files);
-                  e.target.value = '';
-                }}
-                data-testid="anexos-reenvio-contrato"
-              />
-            </label>
-            <span className="text-xs text-[var(--c-muted)]">Comentario ou arquivo: ao menos um e obrigatorio.</span>
-          </div>
-
-          <PendingAttachmentsList
-            items={arquivosReenvio}
-            onRemove={anexosReenvioIds.length > 0 ? undefined : removerArquivoReenvio}
-            className="space-y-1"
-            itemClassName="flex items-center justify-between gap-3 border-b border-[var(--c-border)] px-1 py-2 text-sm last:border-b-0"
-          />
-
-          {anexosReenvioIds.length > 0 && (
-            <p className="text-xs text-[var(--c-muted)]">Arquivo(s) enviado(s); aguardando concluir o reenvio.</p>
-          )}
-
-          <div className="flex justify-end">
-            <button type="button" className="btn btn-primary btn-sm" disabled={ocupado}
-              data-testid="reenviar-contrato" onClick={reenviarAjuste}>
-              {ocupado ? 'Reenviando...' : 'Registrar ajuste e reenviar'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!modo && status === 'AGUARDANDO_APROVACAO' && (podeAprovar || podeRejeitar || podeCancelar) && (
-        <div className="space-y-3">
-          {/* A categoria e condicao para APROVAR — quem so devolve ou cancela nao precisa dela, e
-              mostrar um campo obrigatorio que a pessoa nao usa faz parecer que falta preencher. */}
-          {podeAprovar && (
-          <label className="grid gap-1 text-sm md:max-w-lg">
-            Categoria financeira *
-            {/* Autocomplete, e nao `select`: sao 160 categorias de contas a pagar, e rolar uma
-                lista desse tamanho para achar "2.01.01.05" e pior do que digitar. O mesmo campo
-                da apropriacao — busca por codigo ou nome, lista em portal. */}
-            <ApropriacaoAutocomplete
-              value={categoriaId}
-              options={categorias}
-              onChange={(id) => setCategoriaId(id ? String(id) : '')}
-              inputClassName="input input-sm w-full"
-              placeholder="Buscar por codigo ou nome do plano de contas..."
-            />
-            <input type="hidden" name="categoria_financeira_id" value={categoriaId} />
-            {erroCategorias
-              ? <span className="text-xs text-[var(--c-danger,#b91c1c)]">{erroCategorias}</span>
-              : (
-                <span className="text-xs text-[var(--c-muted)]">
-                  Plano de contas a pagar. Vale para todos os titulos deste contrato e e obrigatoria
-                  para aprovar.
-                </span>
+        {status === 'AGUARDANDO_ASSINATURA' && (linkAssinaturaSeguro || contrato.minuta) && (
+          <section className="border-y border-[var(--c-border)] py-2" aria-label="Material para assinatura">
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">
+              Material para assinatura
+            </h3>
+            <div className="divide-y divide-[var(--c-border)]">
+              {linkAssinaturaSeguro && (
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--c-text)]">Link de assinatura</p>
+                    <p className="truncate text-xs text-[var(--c-muted)]">{linkAssinaturaSeguro}</p>
+                  </div>
+                  <a className="btn btn-outline btn-sm shrink-0" href={linkAssinaturaSeguro}
+                    target="_blank" rel="noreferrer" title="Abrir link de assinatura">
+                    <HiArrowTopRightOnSquare className="h-4 w-4" />
+                    <span className="ml-1">Abrir</span>
+                  </a>
+                </div>
               )}
-          </label>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {podeAprovar && (
-            <button type="button" className="btn btn-primary btn-sm" onClick={aprovar} disabled={ocupado}
-              data-testid="aprovar-contrato">
-              {ocupado ? 'Aprovando...' : 'Aprovar'}
-            </button>
-            )}
-            {podeRejeitar && (
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setModo('rejeitar')} disabled={ocupado}
-              data-testid="rejeitar-contrato">
-              Rejeitar
-            </button>
-            )}
-            {podeCancelar && (
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setModo('cancelar')} disabled={ocupado}
-              data-testid="cancelar-contrato">
-              Cancelar
-            </button>
-            )}
-          </div>
-        </div>
-      )}
+              {contrato.minuta && (
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[var(--c-text)]">Minuta do contrato</p>
+                    <p className="truncate text-xs text-[var(--c-muted)]">{contrato.minuta.nome_original}</p>
+                  </div>
+                  <button type="button" className="btn btn-outline btn-sm shrink-0"
+                    onClick={baixarMinuta} disabled={baixandoMinuta} title="Baixar minuta">
+                    <HiArrowDownTray className="h-4 w-4" />
+                    <span className="ml-1">{baixandoMinuta ? 'Baixando...' : 'Baixar'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
-      {!modo && status === 'EM_ANALISE_JURIDICA' && (podeTramitarJuridico || podeRejeitar || podeCancelar) && (
-        <div className="space-y-3">
-          {podeTramitarJuridico && (
-          <>
-          {/* Concluir a minuta exige ENTREGAR alguma coisa: o documento, o link da plataforma de
-              assinatura, ou os dois. Antes era so um botao que trocava o status, e o responsavel
-              recebia "colete a assinatura" sem receber de que. Exigir os dois travaria metade dos
-              casos — parte dos contratos circula em papel, parte por plataforma. */}
-          <div className="grid gap-2 md:grid-cols-2">
-            <div className="text-sm">
-              <span className="block">Minuta (documento)</span>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }} title="Anexar .docx ou .pdf">
+        {/* Confirmacao de motivo, compartilhada por rejeitar e cancelar. As duas exigem motivo:
+            quem recebe a devolucao precisa saber o que corrigir, e cancelamento sem motivo vira
+            discussao depois. O motivo e CAMPO DE TELA com validacao visivel — justificativa que
+            vai para a auditoria nao se digita em caixa do navegador. */}
+        {modo && modo !== 'aprovar-juridico' && (
+          <div className="space-y-2">
+            <FormSecao colunas={2}>
+              <CampoForm
+                label={modo === 'cancelar' ? 'Motivo do cancelamento' : 'Motivo da devolucao'}
+                obrigatorio
+                tipo="texto-longo"
+                erro={erroMotivo}
+                hint={modo === 'cancelar'
+                  ? 'Cancelar encerra o pedido: a solicitacao NAO volta.'
+                  : 'Rejeitar devolve ao responsavel para ajuste e reenvio.'}
+              >
+                <textarea
+                  className="input"
+                  rows={2}
+                  name="motivo_acao_contrato"
+                  value={motivo}
+                  onChange={(e) => { setMotivo(e.target.value); setErroMotivo(''); }}
+                />
+              </CampoForm>
+            </FormSecao>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" className="btn btn-outline btn-sm"
+                onClick={() => { setModo(null); setErroMotivo(''); limpar(); }} disabled={ocupado}>
+                Voltar
+              </button>
+              <button type="button" className="btn btn-outline btn-perigo-suave btn-sm" onClick={confirmarMotivo} disabled={ocupado}
+                data-testid="confirmar-motivo-contrato">
+                {ocupado ? 'Enviando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {modo === 'aprovar-juridico' && (
+          <div className="space-y-3" data-testid="confirmacao-aprovacao-juridica">
+            <div className="app-alert app-alert--warning">
+              Esta acao ativa o contrato, cria os titulos financeiros e devolve a solicitacao para a
+              obra. Confira o documento assinado antes de continuar.
+            </div>
+            <FormSecao colunas={2}>
+              <CampoForm
+                label={`Digite ${contrato.codigo} para confirmar`}
+                obrigatorio
+                erro={erroConfirmacaoJuridica}
+              >
+                <input
+                  className="input input-sm"
+                  value={confirmacaoJuridica}
+                  onChange={(e) => { setConfirmacaoJuridica(e.target.value); setErroConfirmacaoJuridica(''); limpar(); }}
+                  autoComplete="off"
+                  aria-label={`Digite ${contrato.codigo} para confirmar`}
+                  data-testid="codigo-confirmacao-aprovacao-juridica"
+                />
+              </CampoForm>
+            </FormSecao>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" className="btn btn-outline btn-sm"
+                onClick={() => { setModo(null); setConfirmacaoJuridica(''); setErroConfirmacaoJuridica(''); limpar(); }} disabled={ocupado}>
+                Voltar
+              </button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={confirmarAprovacaoJuridica}
+                disabled={ocupado || String(confirmacaoJuridica || '').trim().toUpperCase() !== String(contrato.codigo || '').trim().toUpperCase()}
+                data-testid="confirmar-aprovacao-juridica">
+                {ocupado ? 'Aprovando...' : 'Confirmar aprovacao final'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Ate 20/08 este estado nao tinha saida nenhuma: o responsavel corrigia o que foi apontado e
+            nao havia botao que devolvesse o contrato para a fila. */}
+        {!modo && status === 'REJEITADO' && podeReenviar && (
+          <div className="space-y-3 border-t border-[var(--c-border)] pt-3" data-testid="ajuste-contrato-rejeitado">
+            <FormSecao legenda="Resposta ao ajuste" colunas={2}>
+              <CampoForm
+                label="Comentario do ajuste"
+                tipo="texto-longo"
+                erro={erroReenvio}
+                hint="Informe o que foi corrigido, anexe o documento atualizado, ou use as duas opcoes. Comentario ou arquivo: ao menos um e obrigatorio."
+              >
+                <textarea
+                  className="input"
+                  rows={3}
+                  maxLength={4000}
+                  value={comentarioReenvio}
+                  onChange={(e) => { setComentarioReenvio(e.target.value); setErroReenvio(''); }}
+                  placeholder="Descreva objetivamente o que foi corrigido..."
+                  data-testid="comentario-reenvio-contrato"
+                />
+              </CampoForm>
+            </FormSecao>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="btn btn-outline btn-sm" style={{ cursor: ocupado ? 'not-allowed' : 'pointer' }}>
+                <HiPaperClip className="h-4 w-4" />
+                <span className="ml-1">Anexar arquivo</span>
+                <input
+                  ref={inputReenvioRef}
+                  type="file"
+                  multiple
+                  disabled={ocupado || anexosReenvioIds.length > 0}
+                  className="sr-only"
+                  onChange={(e) => {
+                    adicionarArquivosReenvio(e.target.files);
+                    e.target.value = '';
+                  }}
+                  data-testid="anexos-reenvio-contrato"
+                />
+              </label>
+            </div>
+
+            <PendingAttachmentsList
+              items={arquivosReenvio}
+              onRemove={anexosReenvioIds.length > 0 ? undefined : removerArquivoReenvio}
+              className="space-y-1"
+              itemClassName="flex items-center justify-between gap-3 border-b border-[var(--c-border)] px-1 py-2 text-sm last:border-b-0"
+            />
+
+            {anexosReenvioIds.length > 0 && (
+              <p className="text-xs text-[var(--c-muted)]">Arquivo(s) enviado(s); aguardando concluir o reenvio.</p>
+            )}
+
+            <div className="flex justify-end">
+              <button type="button" className="btn btn-primary btn-sm" disabled={ocupado}
+                data-testid="reenviar-contrato" onClick={reenviarAjuste}>
+                {ocupado ? 'Reenviando...' : 'Registrar ajuste e reenviar'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!modo && status === 'AGUARDANDO_APROVACAO' && (podeAprovar || podeRejeitar || podeCancelar) && (
+          <div className="space-y-3">
+            {/* A categoria e condicao para APROVAR — quem so devolve ou cancela nao precisa dela, e
+                mostrar um campo obrigatorio que a pessoa nao usa faz parecer que falta preencher. */}
+            {podeAprovar && (
+            <FormSecao colunas={2}>
+              <CampoForm
+                label="Categoria financeira"
+                obrigatorio
+                span={2}
+                erro={erroCategorias || erroCategoria}
+                hint="Plano de contas a pagar. Vale para todos os titulos deste contrato e e obrigatoria para aprovar."
+              >
+                {/* Autocomplete, e nao `select`: sao 160 categorias de contas a pagar, e rolar uma
+                    lista desse tamanho para achar "2.01.01.05" e pior do que digitar. O mesmo campo
+                    da apropriacao — busca por codigo ou nome, lista em portal. */}
+                <ApropriacaoAutocomplete
+                  value={categoriaId}
+                  options={categorias}
+                  onChange={(id) => { setCategoriaId(id ? String(id) : ''); setErroCategoria(''); }}
+                  inputClassName="input input-sm w-full"
+                  placeholder="Buscar por codigo ou nome do plano de contas..."
+                />
+                <input type="hidden" name="categoria_financeira_id" value={categoriaId} />
+              </CampoForm>
+            </FormSecao>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {podeAprovar && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={aprovar} disabled={ocupado}
+                data-testid="aprovar-contrato">
+                {ocupado ? 'Aprovando...' : 'Aprovar'}
+              </button>
+              )}
+              {podeRejeitar && (
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => { setModo('rejeitar'); setErroMotivo(''); limpar(); }} disabled={ocupado}
+                data-testid="rejeitar-contrato">
+                Rejeitar
+              </button>
+              )}
+              {podeCancelar && (
+              <button type="button" className="btn btn-outline btn-perigo-suave btn-sm" onClick={() => { setModo('cancelar'); setErroMotivo(''); limpar(); }} disabled={ocupado}
+                data-testid="cancelar-contrato">
+                Cancelar
+              </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!modo && status === 'EM_ANALISE_JURIDICA' && (podeTramitarJuridico || podeRejeitar || podeCancelar) && (
+          <div className="space-y-3">
+            {podeTramitarJuridico && (
+            <>
+            {/* Concluir a minuta exige ENTREGAR alguma coisa: o documento, o link da plataforma de
+                assinatura, ou os dois. Antes era so um botao que trocava o status, e o responsavel
+                recebia "colete a assinatura" sem receber de que. Exigir os dois travaria metade dos
+                casos — parte dos contratos circula em papel, parte por plataforma. */}
+            <FormSecao colunas={2}>
+              <CampoForm
+                label="Minuta (documento)"
+                erro={erroMinuta}
+                hint="Informe a minuta, o link de assinatura, ou os dois. Ao enviar, a solicitacao volta ao setor de origem para colher a assinatura."
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }} title="Anexar .docx ou .pdf">
+                    <HiPaperClip className="w-4 h-4" />
+                    <span className="ml-1">{arquivoMinuta ? 'Trocar arquivo' : 'Anexar minuta'}</span>
+                    <input
+                      type="file"
+                      name="arquivo_minuta"
+                      accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="sr-only"
+                      onChange={(e) => {
+                        setArquivoMinuta(e.target.files?.[0] || null);
+                        setErroMinuta('');
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  {arquivoMinuta ? (
+                    <>
+                      <span className="text-xs text-[var(--c-text)]" data-testid="minuta-nome">{arquivoMinuta.name}</span>
+                      <button type="button" className="btn btn-outline btn-sm" title="Remover"
+                        aria-label="Remover minuta" onClick={() => setArquivoMinuta(null)}>
+                        <HiTrash className="w-4 h-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-xs text-[var(--c-muted)]">Nenhum documento anexado</span>
+                  )}
+                </div>
+              </CampoForm>
+
+              <CampoForm label="Link de assinatura">
+                <input
+                  className="input input-sm"
+                  name="link_assinatura"
+                  placeholder="https://..."
+                  value={linkAssinatura}
+                  onChange={(e) => { setLinkAssinatura(e.target.value); setErroMinuta(''); }}
+                />
+              </CampoForm>
+            </FormSecao>
+            </>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              {podeTramitarJuridico && (
+              <button type="button" className="btn btn-primary btn-sm" disabled={ocupado}
+                data-testid="minuta-pronta"
+                onClick={enviarMinuta}>
+                {ocupado ? 'Enviando...' : 'Minuta pronta — enviar para assinatura'}
+              </button>
+              )}
+              {podeRejeitar && (
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => { setModo('rejeitar'); setErroMotivo(''); limpar(); }} disabled={ocupado}
+                data-testid="rejeitar-contrato-juridico">
+                Rejeitar
+              </button>
+              )}
+              {podeCancelar && (
+              <button type="button" className="btn btn-outline btn-perigo-suave btn-sm" onClick={() => { setModo('cancelar'); setErroMotivo(''); limpar(); }} disabled={ocupado}>
+                Cancelar
+              </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!modo && status === 'AGUARDANDO_ASSINATURA' && (podeConfirmarAssinatura || podeCancelar) && (
+          <div className="space-y-3">
+            {/* PI-18: este botao NAO cria titulo. Ele devolve a solicitacao ao Juridico, em destaque,
+                para a conferencia final — e e a conferencia que cria os titulos. */}
+            {podeConfirmarAssinatura && (
+            <div className="grid gap-2">
+              {linkAssinaturaSeguro && (
+                <label className="flex items-start gap-2 rounded-md bg-[var(--ui-surface-2)] px-3 py-2 text-sm text-[var(--c-text)]">
+                  <input type="checkbox" className="mt-1" checked={assinadoPeloLink}
+                    onChange={(e) => { setAssinadoPeloLink(e.target.checked); setErroAssinado(''); limpar(); }}
+                    data-testid="assinado-pelo-link" />
+                  <span>
+                    <strong className="font-semibold">Contrato assinado pelo link informado</strong>
+                    <span className="block text-xs text-[var(--c-muted)]">
+                      Ao confirmar esta opcao, anexar o contrato assinado deixa de ser obrigatorio para solicitar a revisao.
+                    </span>
+                  </span>
+                </label>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="btn btn-outline btn-sm" style={{ cursor: anexoAssinadoId ? 'default' : 'pointer' }}>
                   <HiPaperClip className="w-4 h-4" />
-                  <span className="ml-1">{arquivoMinuta ? 'Trocar arquivo' : 'Anexar minuta'}</span>
+                  <span className="ml-1">{arquivoAssinado || anexoAssinadoId
+                    ? 'Contrato assinado selecionado'
+                    : `Anexar contrato assinado${assinadoPeloLink ? ' (opcional)' : ''}`}</span>
                   <input
                     type="file"
-                    name="arquivo_minuta"
-                    accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    style={{ display: 'none' }}
+                    name="arquivo_contrato_assinado"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    className="sr-only"
+                    disabled={Boolean(anexoAssinadoId)}
                     onChange={(e) => {
-                      setArquivoMinuta(e.target.files?.[0] || null);
+                      setArquivoAssinado(e.target.files?.[0] || null);
+                      setAnexoAssinadoId(null);
+                      setErroAssinado('');
+                      limpar();
                       e.target.value = '';
                     }}
                   />
                 </label>
-                {arquivoMinuta ? (
+                {arquivoAssinado && !anexoAssinadoId && (
                   <>
-                    <span className="text-xs text-[var(--c-text)]" data-testid="minuta-nome">{arquivoMinuta.name}</span>
+                    <span className="text-xs text-[var(--c-text)]" data-testid="assinado-nome">{arquivoAssinado.name}</span>
                     <button type="button" className="btn btn-outline btn-sm" title="Remover"
-                      aria-label="Remover minuta" onClick={() => setArquivoMinuta(null)}>
+                      aria-label="Remover contrato assinado" onClick={() => setArquivoAssinado(null)}>
                       <HiTrash className="w-4 h-4" />
                     </button>
                   </>
-                ) : (
-                  <span className="text-xs text-[var(--c-muted)]">Nenhum documento anexado</span>
+                )}
+                {anexoAssinadoId && (
+                  <span className="text-xs text-[var(--c-muted)]">Upload confirmado. Pronto para reenviar.</span>
                 )}
               </div>
+              {erroAssinado && <p className="form-error">{erroAssinado}</p>}
+              <button type="button" className="btn btn-primary btn-sm justify-self-start" disabled={ocupado}
+                data-testid="solicitar-revisao"
+                onClick={solicitarRevisaoDoAssinado}>
+                {ocupado ? 'Enviando...' : 'Solicitar revisao'}
+              </button>
             </div>
-
-            <label className="grid gap-1 text-sm">
-              Link de assinatura
-              <input
-                className="input input-sm"
-                name="link_assinatura"
-                placeholder="https://..."
-                value={linkAssinatura}
-                onChange={(e) => setLinkAssinatura(e.target.value)}
-              />
-            </label>
+            )}
+            {podeCancelar && <div>
+              <button type="button" className="btn btn-outline btn-perigo-suave btn-sm" onClick={() => { setModo('cancelar'); setErroMotivo(''); limpar(); }} disabled={ocupado}>
+                Cancelar
+              </button>
+            </div>}
           </div>
+        )}
 
-          <p className="text-xs text-[var(--c-muted)]">
-            Informe a minuta, o link de assinatura, ou os dois. Ao enviar, a solicitacao volta ao
-            setor de origem para colher a assinatura.
-          </p>
-          </>
-          )}
-
+        {!modo && status === 'EM_REVISAO_JURIDICA' && (podeTramitarJuridico || podeRejeitar || podeCancelar) && (
           <div className="flex flex-wrap gap-2">
+            {/* PI-18: e AQUI que o compromisso financeiro nasce. */}
             {podeTramitarJuridico && (
             <button type="button" className="btn btn-primary btn-sm" disabled={ocupado}
-              data-testid="minuta-pronta"
-              onClick={enviarMinuta}>
-              {ocupado ? 'Enviando...' : 'Minuta pronta — enviar para assinatura'}
+              data-testid="conferir-assinado"
+              onClick={() => { setModo('aprovar-juridico'); setConfirmacaoJuridica(''); setErroConfirmacaoJuridica(''); limpar(); }}>
+              Conferido — aprovar contrato
             </button>
             )}
             {podeRejeitar && (
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setModo('rejeitar')} disabled={ocupado}
-              data-testid="rejeitar-contrato-juridico">
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => { setModo('rejeitar'); setErroMotivo(''); limpar(); }} disabled={ocupado}
+              data-testid="rejeitar-contrato-revisao">
               Rejeitar
             </button>
             )}
             {podeCancelar && (
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setModo('cancelar')} disabled={ocupado}>
+            <button type="button" className="btn btn-outline btn-perigo-suave btn-sm" onClick={() => { setModo('cancelar'); setErroMotivo(''); limpar(); }} disabled={ocupado}>
               Cancelar
             </button>
             )}
           </div>
-        </div>
-      )}
-
-      {!modo && status === 'AGUARDANDO_ASSINATURA' && (podeConfirmarAssinatura || podeCancelar) && (
-        <div className="space-y-3">
-          {/* PI-18: este botao NAO cria titulo. Ele devolve a solicitacao ao Juridico, em destaque,
-              para a conferencia final — e e a conferencia que cria os titulos. */}
-          {podeConfirmarAssinatura && (
-          <div className="grid gap-2">
-            {linkAssinaturaSeguro && (
-              <label className="flex items-start gap-2 rounded-md bg-[var(--c-surface-muted)] px-3 py-2 text-sm text-[var(--c-text)]">
-                <input type="checkbox" className="mt-0.5" checked={assinadoPeloLink}
-                  onChange={(e) => { setAssinadoPeloLink(e.target.checked); setErro(''); }}
-                  data-testid="assinado-pelo-link" />
-                <span>
-                  <strong className="font-semibold">Contrato assinado pelo link informado</strong>
-                  <span className="block text-xs text-[var(--c-muted)]">
-                    Ao confirmar esta opcao, anexar o contrato assinado deixa de ser obrigatorio para solicitar a revisao.
-                  </span>
-                </span>
-              </label>
-            )}
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="btn btn-outline btn-sm" style={{ cursor: anexoAssinadoId ? 'default' : 'pointer' }}>
-                <HiPaperClip className="w-4 h-4" />
-                <span className="ml-1">{arquivoAssinado || anexoAssinadoId
-                  ? 'Contrato assinado selecionado'
-                  : `Anexar contrato assinado${assinadoPeloLink ? ' (opcional)' : ''}`}</span>
-                <input
-                  type="file"
-                  name="arquivo_contrato_assinado"
-                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  style={{ display: 'none' }}
-                  disabled={Boolean(anexoAssinadoId)}
-                  onChange={(e) => {
-                    setArquivoAssinado(e.target.files?.[0] || null);
-                    setAnexoAssinadoId(null);
-                    setErro('');
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-              {arquivoAssinado && !anexoAssinadoId && (
-                <>
-                  <span className="text-xs text-[var(--c-text)]" data-testid="assinado-nome">{arquivoAssinado.name}</span>
-                  <button type="button" className="btn btn-outline btn-sm" title="Remover"
-                    aria-label="Remover contrato assinado" onClick={() => setArquivoAssinado(null)}>
-                    <HiTrash className="w-4 h-4" />
-                  </button>
-                </>
-              )}
-              {anexoAssinadoId && (
-                <span className="text-xs text-[var(--c-muted)]">Upload confirmado. Pronto para reenviar.</span>
-              )}
-            </div>
-            <button type="button" className="btn btn-primary btn-sm justify-self-start" disabled={ocupado}
-              data-testid="solicitar-revisao"
-              onClick={solicitarRevisaoDoAssinado}>
-              {ocupado ? 'Enviando...' : 'Solicitar revisao'}
-            </button>
-          </div>
-          )}
-          {podeCancelar && <div>
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => setModo('cancelar')} disabled={ocupado}>
-              Cancelar
-            </button>
-          </div>}
-        </div>
-      )}
-
-      {!modo && status === 'EM_REVISAO_JURIDICA' && (podeTramitarJuridico || podeRejeitar || podeCancelar) && (
-        <div className="flex flex-wrap gap-2">
-          {/* PI-18: e AQUI que o compromisso financeiro nasce. */}
-          {podeTramitarJuridico && (
-          <button type="button" className="btn btn-primary btn-sm" disabled={ocupado}
-            data-testid="conferir-assinado"
-            onClick={() => { setModo('aprovar-juridico'); setConfirmacaoJuridica(''); setErro(''); }}>
-            Conferido — aprovar contrato
-          </button>
-          )}
-          {podeRejeitar && (
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => setModo('rejeitar')} disabled={ocupado}
-            data-testid="rejeitar-contrato-revisao">
-            Rejeitar
-          </button>
-          )}
-          {podeCancelar && (
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => setModo('cancelar')} disabled={ocupado}>
-            Cancelar
-          </button>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+      {elementoConfirmacao}
+    </BlocoConteudo>
   );
 }

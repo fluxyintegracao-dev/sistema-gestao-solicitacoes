@@ -377,6 +377,172 @@ Enquanto o usuário ainda não estava resolvido, o filtro por responsável saía
 vazio, o servidor não aplicava recorte nenhum e a tela mostrava os leads de
 todo mundo como se fossem da pessoa. **Corrigido nesta leva.**
 
+## PARTE 7 — FISCAL, PROVISIONAMENTO E GOVERNANÇA
+
+*Achados de 05/09. Nada aqui foi alterado, salvo onde escrito.*
+
+### N28. O módulo de provisionamento não deixa mudar o status de uma provisão
+
+O serviço expõe cinco transições (enviar para análise, aprovar, cancelar,
+realizar, reabrir). O backend tem os cinco status. O detalhe trava a edição
+quando a provisão está cancelada ou realizada. O relatório tem um bloco
+"Pipeline por status".
+
+**E nenhuma tela permite mover uma provisão de status.** Na prática, o status
+só muda por fora do sistema.
+
+É a decisão mais visível do módulo. Não implementei — seria capacidade nova.
+
+### N29. "Já existe" era pintado de verde no lote contábil fiscal
+
+Quando o lote do período já existia, o backend respondia que **nada foi
+criado** — e a tela mostrava essa resposta na mesma faixa verde do lote
+recém-gerado, com o texto "Lote contábil fiscal processado". Quem lia
+acreditava ter gerado o rascunho do período. **Corrigido.**
+
+### N30. Gerar o ZIP do lote contábil fechava o período sem perguntar nada
+
+Um clique mudava o status do lote, gravava o arquivo no armazenamento fiscal e
+registrava evento de segurança — e o backend recusa gerar de novo um lote já
+enviado ou cancelado. Era o passo que fecha o período contábil, disparado sem
+confirmação. **Corrigido**, com o número do lote e a contagem na pergunta.
+
+### N31. O mesmo documento fiscal pode entrar em dois lotes contábeis vivos
+
+O sistema só recusa lote duplicado quando o existente não está cancelado.
+Cancelar um lote e gerar outro do mesmo período cria um segundo lote com os
+mesmos documentos — eles não são marcados como já exportados.
+
+E o lote congela a contagem e o valor no momento da criação: documento validado
+depois não entra, e nada na tela avisa.
+
+### N32. O relatório baixado podia ser a mensagem de erro
+
+Na governança, a exportação não conferia se a resposta deu certo. Um erro do
+servidor tem corpo, e esse corpo era salvo como `governanca-auditoria.csv`. A
+pessoa recebia um "relatório" que era a mensagem de erro, sem nenhum sinal de
+falha. **Corrigido.**
+
+### N33. Escolher um usuário no filtro de auditoria impede trocar de usuário
+
+As opções do filtro são consultadas com o próprio recorte aplicado. Escolhido
+um usuário, a dimensão "Usuário" passa a listar só ele — não dá para trocar
+pela faixa, só limpando. Defeito antigo, mais visível agora que o filtro tem
+etiquetas.
+
+### N34. Gerar snapshot da governança é gravação institucional, e não perguntava nada
+
+A fotografia dos indicadores entra no histórico que todos leem, e o botão ficava
+ao lado do "Atualizar", que só recarrega a tela — dois vizinhos com
+consequências de ordens de grandeza diferentes. **Confirmação adicionada.**
+
+### N35. Remover um comentário não deixa rastro no histórico
+
+A linha do tempo da solicitação filtra três tipos de evento, entre eles
+`COMENTARIO_REMOVIDO`. O evento é gravado e não é mostrado. É decisão de
+auditoria — preservei o comportamento.
+
+### N36. Uma tela de divergências fiscais anuncia a própria impotência
+
+O texto de apoio diz que ela "ainda não altera pedidos, recebimentos ou
+financeiro". É leitura pura para um dado que existe para gerar ação. Vale
+decidir se ela ganha ação ou sai do menu.
+
+### N37. Dez campos de ID digitáveis ao lado de uma busca que preenche sozinha
+
+No vínculo manual de documento fiscal, a pessoa digita identificadores à mão
+enquanto a busca logo acima já preenche o campo certo. Digitar um ID que está
+numa tabela ao lado é convite a erro silencioso. **Não removi nenhum campo.**
+
+### N38. Uma troca de página da auditoria dispara cinco consultas
+
+Resumo, indicadores, opções e usuários são recalculados a cada página, sem
+depender dela. Desperdício puro; o conserto não cabia numa reorganização.
+
+## PARTE 8 — UMA CAPACIDADE QUE SAIU SEM SUA PALAVRA
+
+### N39. O painel de "quais filtros aparecem" foi removido do provisionamento
+
+Na listagem de provisionamentos existia um painel que deixava a pessoa escolher
+quais dos 8 campos de filtro ficavam visíveis. Ele foi **removido** na migração,
+com o argumento de que existia para administrar espaço numa grade de 8 campos e
+que a marcação nova é compacta.
+
+**O argumento é razoável e a regra é clara: capacidade não sai sem a sua
+palavra.** Registro como remoção a confirmar, não como fato consumado. Se
+quiser de volta, é reverter uma parte da tela.
+
+Vale dizer o que o painel escondia: ele ocultava o **campo** sem limpar o
+**valor**. Desmarcar "Credor" com um credor digitado deixava a lista filtrada
+por um critério que não estava mais em lugar nenhum da tela — filtro ativo
+invisível. Esse defeito, sim, sumiu com a migração: agora todo filtro ativo é
+etiqueta visível e removível.
+
+## PARTE 9 — O CONTROLE DO JURÍDICO PODE SER CONTORNADO PELOS ADITIVOS
+
+### N40. O valor que decide o caminho do contrato não é o valor que a tela mostra
+
+**Este é o achado mais relevante do dia.**
+
+Quando um contrato é aprovado, o sistema escolhe entre dois caminhos:
+
+- **abaixo do limite do Jurídico** → o contrato vira ATIVO e os títulos
+  financeiros são criados na hora;
+- **acima do limite** → o contrato vai para o Jurídico e **nenhum título é
+  criado** até a conferência.
+
+O cabeçalho da tela mostra `valor_total + valor_aditivos`. O código que decide
+o caminho compara **apenas `valor_total`** — sem os aditivos.
+
+**Consequência:** um contrato que só ultrapassa o limite do Jurídico por causa
+dos aditivos é aprovado pelo caminho de baixo. Os títulos nascem, o dinheiro
+entra na fila de pagamento, e o Jurídico nunca vê.
+
+Quem aprova está olhando um número maior que o número que decide.
+
+Não alterei nada: é regra de backend, e mudar o critério de roteamento é
+decisão sua, não de layout.
+
+### N41. A tela nunca diz qual dos dois caminhos vai acontecer
+
+Os textos de ajuda da mesma tela se contradizem — um diz "ao aprovar, as
+previsões viram títulos"; o outro diz "é na conferência que as previsões viram
+títulos, **não antes**".
+
+Fui ao código: **as duas são verdadeiras**, em ramos diferentes. Mas a tela
+nunca informa em qual ramo aquele contrato vai cair.
+
+A confirmação que acrescentei declara **os dois** desfechos, em vez de escolher
+um e arriscar afirmar o errado. O conserto certo é o backend devolver o limite
+(ou um "vai criar títulos: sim/não") para a mensagem poder afirmar uma coisa só.
+
+### N42. A baixa de títulos é aplicada um a um e não desfaz nada
+
+Se falhar no segundo de três, o primeiro **fica baixado**. Isso não era dito em
+lugar nenhum. **A confirmação agora avisa antes.**
+
+E a pergunta anterior era "Confirmar baixa de 3 título(s)?" — um número, sem
+valor, sem conta bancária, sem data e sem forma de pagamento. A pessoa
+autorizava "3 títulos" e o sistema baixava dezenas de milhares de reais numa
+conta que ela não viu. **Corrigido**: a pergunta agora nomeia total em
+dinheiro, conta, data e forma.
+
+### N43. O resumo de pagamentos somava tudo e a lista mostrava quatro
+
+Numa solicitação com 8 títulos, o resumo dizia "Valor total R$ 80.000" sobre
+uma lista de 4 cartões somando R$ 40.000, sem nada indicando o corte.
+**Corrigido** — a lista passou a mostrar o conjunto.
+
+E o mesmo resumo trocava de fonte em silêncio: com títulos, somava os títulos;
+sem títulos — ou quando a consulta **falhava** — mostrava campos da própria
+solicitação, com o mesmo rótulo. **Corrigido**: o rótulo declara a origem, e a
+falha virou condição visível.
+
+### N44. "Ver pagamentos" só aparecia com mais de dois pagamentos
+
+Quem tinha exatamente dois nunca soube que existia uma lista completa, e nada
+dizia que os dois exibidos eram um recorte. **Corrigido.**
+
 ## RESUMO PARA DECIDIR
 
 | # | Achado | Classe | Urgência |

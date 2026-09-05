@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HiAdjustmentsHorizontal } from 'react-icons/hi2';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  Paginacao,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  useAvisos
+} from '../../../components/padrao';
+import StatusBadge from '../../../components/StatusBadge';
 import {
   getProvisionamentoFinanceiroContexto,
   listarCategoriasMacroProvisionamento,
   listarProvisoesFinanceiras
 } from '../../../services/provisoesFinanceiras';
-import { TabelaPadrao } from '../../../components/padrao';
 import { formatarMoedaBRL } from '../utils/moeda';
 
 const DEFAULT_FILTERS = {
@@ -21,15 +32,19 @@ const DEFAULT_FILTERS = {
   data_final: ''
 };
 
-const FILTER_OPTIONS = [
-  { id: 'obra_id', label: 'Obra' },
-  { id: 'categoria_macro_id', label: 'Item macro' },
-  { id: 'prioridade', label: 'Prioridade' },
-  { id: 'busca', label: 'Busca' },
-  { id: 'fornecedor', label: 'Credor' },
-  { id: 'usuario_criacao_id', label: 'Criador' },
-  { id: 'data_inicial', label: 'Data inicial' },
-  { id: 'data_final', label: 'Data final' }
+const STATUS_OPCOES = [
+  { valor: 'previsto', rotulo: 'Previsto' },
+  { valor: 'em_analise', rotulo: 'Em analise' },
+  { valor: 'aprovado', rotulo: 'Aprovado' },
+  { valor: 'cancelado', rotulo: 'Cancelado' },
+  { valor: 'realizado', rotulo: 'Realizado' }
+];
+
+const PRIORIDADE_OPCOES = [
+  { valor: 'baixa', rotulo: 'Baixa' },
+  { valor: 'media', rotulo: 'Media' },
+  { valor: 'alta', rotulo: 'Alta' },
+  { valor: 'critica', rotulo: 'Critica' }
 ];
 
 /* A consulta continua pedindo ao servidor a ordem PADRÃO da lista
@@ -59,8 +74,6 @@ const CAMPO_ORDENACAO_POR_COLUNA = {
 // que ordem, no painel "Colunas") e as larguras. Substitui o painel de
 // colunas próprio da tela (`colunasVisiveis`/`toggleColuna`).
 const STORAGE_KEY = 'tabela:provisionamentos-financeiros';
-
-const DEFAULT_VISIBLE_FILTERS = FILTER_OPTIONS.map((item) => item.id);
 
 function formatarData(valor) {
   if (!valor) return '-';
@@ -97,17 +110,24 @@ function formatarPrioridade(valor) {
   return labels[normalized] || '-';
 }
 
-function ResumoCard({ titulo, valor }) {
-  return (
-    <div className="rounded-xl border border-[var(--c-border)] bg-white px-4 py-4 shadow-sm">
-      <div className="text-xs uppercase tracking-wide text-[var(--c-muted)]">{titulo}</div>
-      <div className="mt-2 text-xl font-semibold">{valor}</div>
-    </div>
-  );
+/*
+  R25 — a família semântica do status do provisionamento. Cancelado é
+  NEUTRO (é uma decisão registrada, não um erro) e realizado/aprovado é
+  SUCESSO; a classificação automática do StatusBadge não conhece o
+  vocabulário deste módulo e jogaria "previsto" e "em analise" em famílias
+  que não são as que a operação lê.
+*/
+function familiaStatus(valor) {
+  const normalizado = String(valor || '').toLowerCase();
+  if (normalizado === 'realizado' || normalizado === 'aprovado') return 'success';
+  if (normalizado === 'cancelado') return 'neutral';
+  if (normalizado === 'em_analise') return 'info';
+  return 'warning';
 }
 
 export default function ProvisionamentosFinanceiros() {
   const navigate = useNavigate();
+  const { avisos, avisar, fechar } = useAvisos();
   const [contexto, setContexto] = useState(null);
   const [categorias, setCategorias] = useState([]);
   const [lista, setLista] = useState([]);
@@ -115,10 +135,8 @@ export default function ProvisionamentosFinanceiros() {
   const [resumo, setResumo] = useState({ total_registros_filtrados: 0, valor_total_filtrado: 0 });
   const [loadingBase, setLoadingBase] = useState(true);
   const [loadingLista, setLoadingLista] = useState(false);
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtros, setFiltros] = useState(DEFAULT_FILTERS);
   const [ordenacao, setOrdenacao] = useState(ORDENACAO_PADRAO);
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(DEFAULT_VISIBLE_FILTERS);
 
   useEffect(() => {
     async function carregarBase() {
@@ -132,13 +150,14 @@ export default function ProvisionamentosFinanceiros() {
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       } catch (error) {
         console.error(error);
-        alert(error?.message || 'Erro ao carregar o modulo de provisoes.');
+        avisar.erro(error?.message || 'Erro ao carregar o modulo de provisoes.');
       } finally {
         setLoadingBase(false);
       }
     }
 
     carregarBase();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -168,13 +187,14 @@ export default function ProvisionamentosFinanceiros() {
         });
       } catch (error) {
         console.error(error);
-        alert(error?.message || 'Erro ao listar provisoes.');
+        avisar.erro(error?.message || 'Erro ao listar provisoes.');
       } finally {
         setLoadingLista(false);
       }
     }
 
     carregarLista();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contexto, filtros, ordenacao, meta.page, meta.limit]);
 
   const obrasAcesso = useMemo(() => (
@@ -185,9 +205,69 @@ export default function ProvisionamentosFinanceiros() {
     Array.isArray(contexto?.criadores_filtro) ? contexto.criadores_filtro : []
   ), [contexto]);
 
+  // MÓDULO DE DINHEIRO: o recorte da PÁGINA carregada é somado aqui — é o
+  // número que responde "quanto vale o que estou vendo agora", distinto do
+  // total do recorte, que fica na faixa.
+  const valorDaPagina = useMemo(
+    () => lista.reduce((soma, item) => soma + Number(item.valor_previsto || 0), 0),
+    [lista]
+  );
+
+  /*
+    R12 — os recortes ENUMERÁVEIS (obra, item macro, status, prioridade,
+    criador) viram MARCAÇÃO com etiqueta removível. O endpoint aceita UM
+    valor por chave, então cada dimensão é `unico: true`: a marca fica
+    REDONDA e marcar outro valor substitui. Marcação múltipla mostraria duas
+    etiquetas e mandaria um filtro só — capacidade aparente sem efeito (R15).
+
+    R23: são recortes de UMA consulta só, então o filtro APLICA AO MARCAR —
+    sem botão "aplicar" e sem rascunho.
+  */
+  const ativos = useMemo(() => ({
+    obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : []),
+    categoria_macro_id: new Set(filtros.categoria_macro_id ? [String(filtros.categoria_macro_id)] : []),
+    status: new Set(filtros.status ? [String(filtros.status)] : []),
+    prioridade: new Set(filtros.prioridade ? [String(filtros.prioridade)] : []),
+    usuario_criacao_id: new Set(filtros.usuario_criacao_id ? [String(filtros.usuario_criacao_id)] : [])
+  }), [filtros]);
+
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra',
+      unico: true,
+      opcoes: obrasAcesso.map((obra) => ({ valor: String(obra.id), rotulo: formatarObra(obra) }))
+    },
+    {
+      id: 'categoria_macro_id',
+      rotulo: 'Item macro',
+      unico: true,
+      opcoes: categorias.map((categoria) => ({ valor: String(categoria.id), rotulo: categoria.nome }))
+    },
+    { id: 'status', rotulo: 'Status', unico: true, opcoes: STATUS_OPCOES },
+    { id: 'prioridade', rotulo: 'Prioridade', unico: true, opcoes: PRIORIDADE_OPCOES },
+    {
+      id: 'usuario_criacao_id',
+      rotulo: 'Criador',
+      unico: true,
+      opcoes: criadoresFiltro.map((criador) => ({
+        valor: String(criador.id),
+        rotulo: criador.nome || criador.email
+      }))
+    }
+  ], [obrasAcesso, categorias, criadoresFiltro]);
+
   function atualizarFiltro(campo, valor) {
     setMeta((atual) => ({ ...atual, page: 1 }));
     setFiltros((atual) => ({ ...atual, [campo]: valor ?? '' }));
+  }
+
+  function alternarFiltro(dimensao, valor) {
+    setMeta((atual) => ({ ...atual, page: 1 }));
+    setFiltros((atual) => ({
+      ...atual,
+      [dimensao]: String(atual[dimensao]) === String(valor) ? '' : String(valor)
+    }));
   }
 
   function limparFiltros() {
@@ -195,176 +275,119 @@ export default function ProvisionamentosFinanceiros() {
     setFiltros(DEFAULT_FILTERS);
   }
 
-  function toggleFiltro(id) {
-    setFiltrosVisiveis((atual) => (
-      atual.includes(id)
-        ? atual.filter((item) => item !== id)
-        : [...atual, id]
-    ));
-  }
-
-  function renderFiltro(id) {
-    switch (id) {
-      case 'obra_id':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Obra
-            <select className="input" value={filtros.obra_id} onChange={(event) => atualizarFiltro('obra_id', event.target.value)}>
-              <option value="">Todas</option>
-              {obrasAcesso.map((obra) => (
-                <option key={obra.id} value={obra.id}>{formatarObra(obra)}</option>
-              ))}
-            </select>
-          </label>
-        );
-      case 'categoria_macro_id':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Item macro
-            <select className="input" value={filtros.categoria_macro_id} onChange={(event) => atualizarFiltro('categoria_macro_id', event.target.value)}>
-              <option value="">Todos</option>
-              {categorias.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
-              ))}
-            </select>
-          </label>
-        );
-      case 'status':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Status
-            <select className="input" value={filtros.status} onChange={(event) => atualizarFiltro('status', event.target.value)}>
-              <option value="">Todos</option>
-              <option value="previsto">Previsto</option>
-              <option value="em_analise">Em analise</option>
-              <option value="aprovado">Aprovado</option>
-              <option value="cancelado">Cancelado</option>
-              <option value="realizado">Realizado</option>
-            </select>
-          </label>
-        );
-      case 'prioridade':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Prioridade
-            <select className="input" value={filtros.prioridade} onChange={(event) => atualizarFiltro('prioridade', event.target.value)}>
-              <option value="">Todas</option>
-              <option value="baixa">Baixa</option>
-              <option value="media">Media</option>
-              <option value="alta">Alta</option>
-              <option value="critica">Critica</option>
-            </select>
-          </label>
-        );
-      case 'busca':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Busca
-            <input className="input" value={filtros.busca} onChange={(event) => atualizarFiltro('busca', event.target.value)} placeholder="Codigo, descricao ou credor" />
-          </label>
-        );
-      case 'fornecedor':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Credor
-            <input className="input" value={filtros.fornecedor} onChange={(event) => atualizarFiltro('fornecedor', event.target.value)} placeholder="Nome do credor" />
-          </label>
-        );
-      case 'usuario_criacao_id':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Criador
-            <select className="input" value={filtros.usuario_criacao_id} onChange={(event) => atualizarFiltro('usuario_criacao_id', event.target.value)}>
-              <option value="">Todos</option>
-              {criadoresFiltro.map((criador) => (
-                <option key={criador.id} value={criador.id}>{criador.nome || criador.email}</option>
-              ))}
-            </select>
-          </label>
-        );
-      case 'data_inicial':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Data inicial
-            <input type="date" className="input" value={filtros.data_inicial} onChange={(event) => atualizarFiltro('data_inicial', event.target.value)} />
-          </label>
-        );
-      case 'data_final':
-        return (
-          <label key={id} className="grid gap-1 text-sm">
-            Data final
-            <input type="date" className="input" value={filtros.data_final} onChange={(event) => atualizarFiltro('data_final', event.target.value)} />
-          </label>
-        );
-      default:
-        return null;
-    }
-  }
-
   if (loadingBase) {
-    return <div className="page"><p>Carregando modulo...</p></div>;
+    return (
+      <Pagina>
+        <PageHeader titulo="Provisionamentos" />
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        <BlocoConteudo>Carregando modulo...</BlocoConteudo>
+      </Pagina>
+    );
   }
 
   return (
-    <div className="page space-y-6">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="page-title">Provisionamentos</h1>
-          <p className="page-subtitle">Acompanhe previsoes de desembolso por obra, categoria e periodo.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {Boolean(contexto?.permissoes?.pode_categorias) && (
-            <button type="button" className="btn btn-outline" onClick={() => navigate('/provisoes-financeiras/categorias')}>
-              Categorias macro
-            </button>
-          )}
-          {Boolean(contexto?.permissoes?.pode_criar) && (
-            <button type="button" className="btn btn-primary" onClick={() => navigate('/provisoes-financeiras/nova')}>
-              Nova provisao
-            </button>
-          )}
-        </div>
-      </div>
+    <Pagina>
+      {/*
+        C2 × B3 (critério do cliente, 05/09) — a FAIXA fica com o TOTAL e os
+        blocos ficam com os RECORTES. Por isso a contagem de registros e o
+        VALOR TOTAL filtrado subiram para o cabeçalho: são os dois números
+        que precisam acompanhar a pessoa enquanto ela rola a lista. Os
+        antigos cartões "Valor total filtrado" e "Registros filtrados"
+        mudaram de conteúdo (não sumiram): passaram a mostrar o recorte que
+        só eles sabem — o da PÁGINA carregada.
 
-      <div className="mx-auto grid w-full max-w-6xl gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <ResumoCard titulo="Valor total filtrado" valor={formatarMoedaBRL(resumo.valor_total_filtrado)} />
-        <ResumoCard titulo="Registros filtrados" valor={String(resumo.total_registros_filtrados || 0)} />
-        <ResumoCard titulo="Pagina atual" valor={`${meta.page || 1} / ${meta.pages || 1}`} />
-      </div>
+        R11/C6 — o botão "Categorias macro" saiu da barra de ações: é
+        CAMINHO PARA OUTRA TELA. Conferido antes de remover, como a regra
+        exige: `/provisoes-financeiras/categorias` (`prov-categorias`) é
+        item de PRIMEIRO nível do menu do módulo no `navigationConfig` e
+        está no Ctrl+K. "Nova provisao" fica: é a ação principal desta
+        listagem, não um atalho de módulo.
+      */}
+      <PageHeader
+        titulo="Provisionamentos"
+        contagem={loadingLista ? null : `${resumo.total_registros_filtrados || meta.total || 0} provisao(oes)`}
+        descricao={`${formatarMoedaBRL(resumo.valor_total_filtrado)} previstos no recorte`}
+        acaoPrincipal={contexto?.permissoes?.pode_criar
+          ? { rotulo: 'Nova provisao', to: '/provisoes-financeiras/nova' }
+          : undefined}
+        secundarias={[{ rotulo: 'Limpar filtros', onClick: limparFiltros }]}
+      />
 
-      <div className="card relative mx-auto w-full max-w-6xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold">Filtros</h2>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-outline inline-flex items-center gap-2" onClick={() => setMostrarFiltros((valor) => !valor)}>
-              <HiAdjustmentsHorizontal className="h-4 w-4" />
-              Filtros
-            </button>
-            <button type="button" className="btn btn-outline" onClick={limparFiltros}>
-              Limpar
-            </button>
-          </div>
-        </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-        {mostrarFiltros && (
-          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {FILTER_OPTIONS.filter((item) => filtrosVisiveis.includes(item.id)).map((item) => renderFiltro(item.id))}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              {FILTER_OPTIONS.map((item) => (
-                <label key={item.id} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={filtrosVisiveis.includes(item.id)} onChange={() => toggleFiltro(item.id)} />
-                  <span>{item.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
+      <StatGrid colunas={2}>
+        <StatTile
+          label="Valor nesta pagina"
+          valor={formatarMoedaBRL(valorDaPagina)}
+          sub={`Pagina ${meta.page || 1} de ${meta.pages || 1}`}
+        />
+        <StatTile
+          label="Registros nesta pagina"
+          valor={String(lista.length)}
+          /* B3: o total do recorte já está na faixa e não se repete aqui —
+             dois números iguais em lugares diferentes fazem o leitor parar
+             para procurar a diferença que não existe. */
+          sub={`${meta.limit || 25} por pagina`}
+        />
+      </StatGrid>
 
-      </div>
+      <BlocoConteudo
+        titulo="Provisoes registradas"
+        descricao="Acompanhe previsoes de desembolso por obra, categoria e periodo."
+        variante="primario"
+        cor="var(--c-primary)"
+      >
+        {/*
+          R12/R3/R16 — o recorte era um painel de OITO selects e inputs atrás
+          de um botão "Filtros", com um segundo painel de caixas escolhendo
+          QUAIS filtros aparecem. Vira a BarraFiltros das Solicitações: busca
+          única em cima ocupando a faixa, marcação múltipla abaixo e
+          etiquetas removíveis.
 
-      <div className="card mx-auto w-full max-w-6xl">
+          DEFEITO DE SIGNIFICADO CORRIGIDO AQUI: o painel "quais filtros
+          aparecem" (`filtrosVisiveis`/`toggleFiltro`) escondia o CAMPO sem
+          limpar o VALOR — desmarcar "Credor" com um credor digitado deixava
+          a lista filtrada por um critério que não estava mais em lugar
+          nenhum da tela. Com as etiquetas, todo filtro ativo é visível e
+          removível (F3), que é o que a capacidade tentava resolver.
+
+          Credor e o período não são enumeráveis (texto livre e datas
+          contínuas), então vão em `campos`, na mesma faixa.
+        */}
+        <BarraFiltros
+          busca={{
+            valor: filtros.busca,
+            aoMudar: (valor) => atualizarFiltro('busca', valor),
+            placeholder: 'Buscar codigo, descricao ou credor'
+          }}
+          campos={[
+            {
+              id: 'fornecedor',
+              rotulo: 'Credor',
+              valor: filtros.fornecedor,
+              aoMudar: (valor) => atualizarFiltro('fornecedor', valor)
+            },
+            {
+              id: 'data_inicial',
+              rotulo: 'Data inicial',
+              tipo: 'date',
+              valor: filtros.data_inicial,
+              aoMudar: (valor) => atualizarFiltro('data_inicial', valor)
+            },
+            {
+              id: 'data_final',
+              rotulo: 'Data final',
+              tipo: 'date',
+              valor: filtros.data_final,
+              aoMudar: (valor) => atualizarFiltro('data_final', valor)
+            }
+          ]}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+
         <TabelaPadrao
           colunas={[
             {
@@ -409,7 +432,8 @@ export default function ProvisionamentosFinanceiros() {
               tipo: 'texto',
               ordenavel: true,
               valorOrdenacao: (item) => item.descricao || '',
-              render: (item) => item.descricao || '-'
+              // T6: texto longo trunca com o conteúdo completo no tooltip.
+              render: (item) => <span title={item.descricao || undefined}>{item.descricao || '-'}</span>
             },
             {
               id: 'fornecedor',
@@ -422,6 +446,8 @@ export default function ProvisionamentosFinanceiros() {
             {
               id: 'valor',
               titulo: 'Valor previsto',
+              // R1/R17/T7 — MÓDULO DE DINHEIRO: 190px, à direita, em
+              // tabular-nums, e NUNCA trunca (nem por arrasto do usuário).
               tipo: 'valor',
               ordenavel: true,
               // Dinheiro interessa do MAIOR para o menor no primeiro clique.
@@ -433,12 +459,15 @@ export default function ProvisionamentosFinanceiros() {
               id: 'status',
               titulo: 'Status',
               tipo: 'status',
-              render: (item) => formatarStatus(item.status)
+              // R25: pílula do sistema (token + ícone) no lugar do texto solto.
+              render: (item) => (
+                <StatusBadge status={formatarStatus(item.status)} kind={familiaStatus(item.status)} />
+              )
             },
             {
               id: 'prioridade',
               titulo: 'Prioridade',
-              tipo: 'status',
+              tipo: 'badge',
               render: (item) => formatarPrioridade(item.prioridade)
             }
           ]}
@@ -460,6 +489,9 @@ export default function ProvisionamentosFinanceiros() {
           storageKey={STORAGE_KEY}
           rotuloRolagem="Provisionamentos financeiros"
           larguraAcoes={140}
+          // A1: além do botão focável, a linha inteira responde a Enter/Espaço
+          // (o TabelaPadrao dá o tabIndex quando recebe `aoClicarLinha`).
+          aoClicarLinha={(item) => navigate(`/provisoes-financeiras/${item.id}`)}
           acoesLinha={(item) => (
             <button
               type="button"
@@ -471,20 +503,17 @@ export default function ProvisionamentosFinanceiros() {
           )}
         />
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <span className="text-[var(--c-muted)]">
-            Pagina {meta.page || 1} de {meta.pages || 1} · {meta.total || 0} registro(s)
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="btn btn-outline" disabled={(meta.page || 1) <= 1} onClick={() => setMeta((atual) => ({ ...atual, page: Math.max(1, (atual.page || 1) - 1) }))}>
-              Anterior
-            </button>
-            <button type="button" className="btn btn-outline" disabled={!meta.pages || (meta.page || 1) >= meta.pages} onClick={() => setMeta((atual) => ({ ...atual, page: (atual.page || 1) + 1 }))}>
-              Proxima
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+        {/* R16b — o rodapé de lista paginada tem UM dono: o `Paginacao`, que
+            mostra a POSIÇÃO junto das setas (sem ela a pessoa não sabe se
+            vale continuar clicando). Os dois botões soltos saíram. */}
+        <Paginacao
+          pagina={meta.page || 1}
+          totalPaginas={meta.pages || 1}
+          carregando={loadingLista}
+          rotuloRegistro="provisao"
+          aoMudarPagina={(pagina) => setMeta((atual) => ({ ...atual, page: pagina }))}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

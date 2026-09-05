@@ -13,6 +13,13 @@ import {
   HiOutlineShieldCheck,
   HiOutlineScale
 } from 'react-icons/hi2';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  Avisos,
+  useConfirmacao
+} from '../../../components/padrao';
 import { useAuth } from '../../../contexts/AuthContext';
 import CrComparativoView from '../components/CrComparativoView';
 import CrConfiguracoesView from '../components/CrConfiguracoesView';
@@ -64,6 +71,7 @@ function currentMonth() {
 
 export default function CustosRecebiveis() {
   const { user, refreshSession } = useAuth();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const [searchParams, setSearchParams] = useSearchParams();
   const [obras, setObras] = useState([]);
   const [obrasLoading, setObrasLoading] = useState(false);
@@ -418,9 +426,29 @@ export default function CustosRecebiveis() {
   }
 
   async function handlePublish(planId, justification) {
-    if (!window.confirm(
-      'Publicar esta versão fará com que ela substitua a versão vigente da obra. Deseja continuar?'
-    )) return;
+    /*
+      R19: era `window.confirm` — a caixa do Chrome, que ignora tema e
+      tokens, não existe no DOM e dá o mesmo peso a "salvo" e a "substituir
+      a versão vigente da obra".
+
+      R26: obra e versão são fixadas em `const` ANTES do `await`. O modal do
+      sistema NÃO congela a página: a lista de planos continua clicável, e
+      ler `selectedObra`/`planData` depois da confirmação abriria a janela em
+      que a pessoa lê a versão A e a publicação acontece na obra B.
+
+      R21: o retorno é DESESTRUTURADO. `const ok = await confirmar(...)`
+      guarda um objeto, que é sempre truthy — o "Cancelar" publicaria.
+    */
+    const obraAlvo = selectedObra;
+    const versaoAlvo = (planData?.planos || []).find(
+      (plano) => Number(plano.id) === Number(planId)
+    )?.versao;
+    const { ok } = await confirmar({
+      titulo: 'Publicar versao do plano micro',
+      mensagem: `Publicar ${versaoAlvo ? `a versao v${versaoAlvo}` : 'esta versao'} da obra ${obraAlvo?.nome || obraAlvo?.codigo || 'selecionada'}? Ela substitui a versao vigente para todos que consultam custos, recebiveis e medicoes desta obra.`,
+      rotuloConfirmar: 'Publicar versao'
+    });
+    if (!ok) return;
     try {
       setPublishing(true);
       setFeedback(null);
@@ -506,45 +534,102 @@ export default function CustosRecebiveis() {
 
   if (!activeTab) {
     return (
-      <div className="page cr-page">
-        <section className="cr-section cr-empty-state cr-empty-state--large">
-          <HiOutlineChartBarSquare className="h-7 w-7" />
-          <strong>Nenhuma área do módulo foi liberada</strong>
-          <span>Solicite ao administrador pelo menos uma permissão de visualização.</span>
-        </section>
-      </div>
+      /*
+        A classe `cr-page` FICA na raiz: é nela que o CSS do módulo declara
+        os tokens locais (`--cr-accent`, `--cr-surface`, `--cr-border`…) que
+        TODAS as visões filhas consomem. Sem ela o módulo inteiro perde a
+        cor. O ritmo vertical passa a ser do `Pagina`.
+      */
+      <Pagina className="cr-page">
+        <PageHeader
+          titulo="Custos e Recebiveis"
+          descricao="Planeje o mes, acompanhe medicoes e compare com os lancamentos financeiros."
+        />
+        <BlocoConteudo titulo="Nenhuma area do modulo foi liberada">
+          <div className="cr-empty-state cr-empty-state--large">
+            {/* R10: `h-7 w-7` (28px) não é degrau da escala — 24px é. */}
+            <HiOutlineChartBarSquare className="h-6 w-6" />
+            <strong>Nenhuma area do modulo foi liberada</strong>
+            <span>Solicite ao administrador pelo menos uma permissao de visualizacao.</span>
+          </div>
+        </BlocoConteudo>
+      </Pagina>
     );
   }
 
-  return (
-    <div className="page cr-page">
-      <header className="cr-page-header">
-        <div>
-          <span>Planejamento e acompanhamento por obra</span>
-          <h1>Custos e Recebíveis</h1>
-          <p>Planeje o mês, acompanhe medições e compare com os lançamentos financeiros.</p>
-        </div>
-        <div className="cr-page-header__actions">
-          {canViewObligations ? (
-            <button
-              type="button"
-              className="cr-obligation-counter"
-              data-overdue={Number(obligationSummary?.vencidas || 0) > 0 || undefined}
-              onClick={() => updateQuery({ aba: 'obrigacoes' })}
-            >
-              <HiOutlineClock className="h-4 w-4" />
-              <span>Prazos</span>
-              <strong>{obligationSummary?.vencidas || 0} vencida(s)</strong>
-              <small>{obligationSummary?.pendentes || 0} pendente(s)</small>
-            </button>
-          ) : null}
-          <button type="button" className="btn btn-outline" onClick={handleRefresh}>
-            <HiOutlineArrowPath className="h-4 w-4" />
-            Atualizar
-          </button>
-        </div>
-      </header>
+  const abaAtual = visibleTabs.find((tab) => tab.id === activeTab)
+    || availableTabs.find((tab) => tab.id === activeTab);
 
+  return (
+    /*
+      A classe `cr-page` FICA na raiz (tokens locais do módulo, ver acima);
+      o vão entre blocos e o título de página passam a ser do `Pagina`.
+    */
+    <Pagina className="cr-page">
+      {/*
+        R13/R5: o cabeçalho era um `header` próprio que rolava para fora da
+        tela levando o "Atualizar" e o contador de prazos junto. Agora é o
+        PageHeader: gruda abaixo da topbar, compacta na rolagem e nunca some.
+        O olho-de-boi "Planejamento e acompanhamento por obra" e a frase de
+        apoio viraram a linha única de `descricao`, com a área aberta em
+        `contagem` — em página longa a pessoa continua sabendo onde está.
+      */}
+      <PageHeader
+        titulo="Custos e Recebiveis"
+        contagem={abaAtual?.label || null}
+        descricao="Planeje o mes, acompanhe medicoes e compare com os lancamentos financeiros."
+        secundarias={[{
+          rotulo: 'Atualizar',
+          icone: <HiOutlineArrowPath className="h-4 w-4" />,
+          onClick: handleRefresh
+        }]}
+      >
+        {/*
+          O contador de prazos continua na faixa fixa, com o markup e o
+          estado `data-overdue` que o CSS do módulo pinta de vermelho quando
+          há obrigação vencida. Ele não é um botão de ação comum: é um
+          SINAL que também leva à aba de obrigações, e transformá-lo numa
+          ação de contorno apagaria o alerta de vencimento — remoção de
+          elemento visível exige aprovação do cliente.
+        */}
+        {canViewObligations ? (
+          <button
+            type="button"
+            className="cr-obligation-counter"
+            data-overdue={Number(obligationSummary?.vencidas || 0) > 0 || undefined}
+            onClick={() => updateQuery({ aba: 'obrigacoes' })}
+          >
+            <HiOutlineClock className="h-4 w-4" />
+            <span>Prazos</span>
+            <strong>{obligationSummary?.vencidas || 0} vencida(s)</strong>
+            <small>{obligationSummary?.pendentes || 0} pendente(s)</small>
+          </button>
+        ) : null}
+      </PageHeader>
+
+      {/*
+        R16/R19: UM dono para a faixa de avisos. O `div.cr-feedback` próprio
+        saiu e o mesmo estado `feedback` — que a CrImportacoesView recebe por
+        prop e continua recebendo, byte a byte — vira o aviso do sistema,
+        fechável. A condição de tela permanece: na aba de importações quem
+        mostra o retorno é a própria visão, senão apareceria duas vezes.
+      */}
+      {activeTab !== 'importacoes' ? (
+        <Avisos
+          avisos={feedback ? [{
+            id: 'cr-feedback',
+            tipo: feedback.tone === 'error' ? 'error' : 'success',
+            mensagem: feedback.message
+          }] : []}
+          aoFechar={() => setFeedback(null)}
+        />
+      ) : null}
+
+      {/*
+        R12 NÃO se aplica: a barra de abas escolhe QUAL área do módulo está
+        aberta (é o seletor de contexto da tela, refletido na URL `?aba=`),
+        não recorte de lista.
+      */}
       <nav className="cr-tabs" aria-label="Áreas de Custos e Recebíveis">
         {visibleTabs.map((tab) => {
           const Icon = TAB_ICONS[tab.id] || HiOutlineChartBarSquare;
@@ -593,6 +678,18 @@ export default function CustosRecebiveis() {
           })}
         />
       ) : activeTab !== 'obras' && !(activeTab === 'planejamento' && selectedObra) ? (
+      /*
+        R12: estes DOIS selects continuam legítimos — não são filtro de
+        lista, são o SELETOR DE CONTEXTO (qual obra e qual competência as
+        visões abaixo carregam, herdado pelo que se cria em seguida), o caso
+        que a própria R12 declara fora do seu escopo. O que muda é a
+        superfície: em vez de uma faixa solta sobre o canvas, um bloco com
+        título dizendo o que ele governa.
+      */
+      <BlocoConteudo
+        titulo="Contexto do modulo"
+        descricao="Obra e competencia valem para as areas abaixo."
+      >
       <section className="cr-context-bar" aria-label="Contexto do módulo">
         <label className="cr-field">
           <span>Obra em contexto</span>
@@ -627,12 +724,7 @@ export default function CustosRecebiveis() {
           </small>
         </div>
       </section>
-      ) : null}
-
-      {feedback && activeTab !== 'importacoes' ? (
-        <div className="cr-feedback" data-tone={feedback.tone || 'info'}>
-          {feedback.message}
-        </div>
+      </BlocoConteudo>
       ) : null}
 
       {activeTab === 'obras' ? (
@@ -763,6 +855,8 @@ export default function CustosRecebiveis() {
           onChanged={handleRefresh}
         />
       ) : null}
-    </div>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

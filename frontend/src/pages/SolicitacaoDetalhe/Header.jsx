@@ -1,60 +1,75 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { HiOutlineEllipsisHorizontal, HiOutlineInformationCircle } from 'react-icons/hi2';
-import StatusBadge from '../../components/StatusBadge';
+import { useEffect, useMemo, useState } from 'react';
+import { HiOutlineInformationCircle } from 'react-icons/hi2';
+import {
+  Avisos,
+  BlocoConteudo,
+  CampoForm,
+  CamposComVazios,
+  FormSecao,
+  useAvisos
+} from '../../components/padrao';
 import { corrigirTextoCorrompido } from '../../utils/texto';
 import { extrairParesDescricao } from '../../utils/formatarTexto';
 import { formatarDataLocalPtBr } from '../../utils/dateLocal';
-import { getTipoSolicitacaoBehavior } from '../../utils/tipoSolicitacao';
 import { formaPagamentoEhPix } from '../../utils/formaPagamento';
 
+/*
+  DADOS DO REGISTRO — o bloco principal do detalhe (migração de 05/09).
+
+  O que mudou, e por quê:
+
+  - A IDENTIDADE e as AÇÕES saíram daqui e foram para a faixa fixa
+    (`PageHeader` no index.jsx). Tela de detalhe tem seta de voltar, título
+    com a identificação do registro e barra de ações na faixa que ACOMPANHA
+    A ROLAGEM (C3/C4/C5/R13). O cabeçalho próprio desta tela não grudava:
+    era uma `div.sol-detail-header` comum, e a ação principal sumia ao rolar
+    numa tela que tem quinze blocos abaixo.
+
+  - O menu "⋯" escrito à mão (estado, `useEffect` de clique fora e de
+    Escape, `role="menu"`) virou o `MenuMais` do `PageHeader`. Eram ~60
+    linhas replicando um componente padrão.
+
+  - A grade de ladrilhos virou `CamposComVazios`. A contagem de campos
+    vazios era uma LISTA MANUAL de 14 pares `[contexto, temValor]`
+    espelhando, ladrilho a ladrilho, as condições do grid logo abaixo — duas
+    verdades sobre a mesma coisa, que só continuavam iguais por disciplina.
+    Agora a lista é UMA e a contagem sai dela (B4).
+
+  - `alert()` do navegador (falha ao gravar a ref. do contrato) virou faixa
+    `Avisos` dentro do bloco, ao lado do campo que a causou (R19).
+
+  Nenhum campo saiu da tela. Três mudaram de lugar, e o lugar novo é mais
+  visível que o antigo (B3 — informação aparece uma vez):
+    Valor      → contagem da faixa fixa (o total acompanha a rolagem);
+    Setor      → ladrilho de situação, no topo do corpo;
+    Vencimento → ladrilho de situação ("Data Resposta/Pagamento").
+  Os três continuam no index.jsx, que é quem os desenha agora.
+*/
+
 function formatarData(valor) {
-  return formatarDataLocalPtBr(valor);
+  // Vazio devolve `null`, NUNCA '-': a contagem de vazios do
+  // `CamposComVazios` sai da lista de campos, e formatador que devolve
+  // travessão faz todo campo parecer preenchido — o alternador "Ver todos
+  // os campos (N vazios)" mostraria zero para sempre.
+  const texto = formatarDataLocalPtBr(valor);
+  return !texto || texto === '-' ? null : texto;
 }
 
 function formatarDataHora(valor) {
-  if (!valor) return '-';
+  if (!valor) return null;
   const data = new Date(valor);
-  if (Number.isNaN(data.getTime())) return '-';
+  if (Number.isNaN(data.getTime())) return null;
   return data.toLocaleString('pt-BR');
 }
 
-function formatarValor(valor) {
-  if (valor === null || valor === undefined || valor === '') return '-';
+export function formatarValorSolicitacao(valor) {
+  if (valor === null || valor === undefined || valor === '') return null;
   const numero = Number(valor);
-  if (Number.isNaN(numero)) return '-';
+  if (!Number.isFinite(numero)) return null;
   return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function extrairMensagemErro(error) {
-  if (!error?.message) return 'Erro ao atualizar ref. do contrato';
-  try {
-    const parsed = JSON.parse(error.message);
-    return parsed?.error || error.message;
-  } catch {
-    return error.message;
-  }
-}
-
-/**
- * Um ladrilho do cabecalho, agora com LARGURA PROPRIA (nova organizacao, 23/08).
- *
- * `span` e quantas das 4 colunas o ladrilho ocupa. Vai como propriedade do ladrilho, e nao como
- * regra de CSS por posicao (`:nth-child`), porque metade destes campos so aparece quando ha
- * contrato — uma regra por posicao se desalinha sozinha na primeira solicitacao de compra.
- */
-function InfoItem({ label, value, span = 1, fullWidth = false }) {
-  return (
-    <div
-      className={`sol-detail-stat${fullWidth ? ' sol-detail-stat--full' : ''}`}
-      style={!fullWidth && span > 1 ? { gridColumn: `span ${span}` } : undefined}
-    >
-      <span className="sol-detail-stat-label">{label}</span>
-      <p className="sol-detail-stat-value">{value || '-'}</p>
-    </div>
-  );
-}
-
-function normalizarTexto(valor) {
+export function normalizarTexto(valor) {
   return String(valor || '')
     .trim()
     .toUpperCase()
@@ -62,7 +77,7 @@ function normalizarTexto(valor) {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-function limparDescricaoCompra(valor) {
+export function limparDescricaoCompra(valor) {
   const texto = String(valor || '').trim();
   if (!texto) return texto;
   if (normalizarTexto(texto).includes('SOLICITACAO DE COMPRA')) {
@@ -78,49 +93,45 @@ function limparDescricaoCompra(valor) {
     .trim() || 'Solicitacao de compra';
 }
 
+/**
+ * Texto de apoio do registro para a faixa fixa: o que ESTA solicitação é,
+ * em uma linha (R5/C2). A regra é a do oficial e não mudou — a descrição
+ * só aparece quando DIZ outra coisa que o título; quando os pares
+ * "Rótulo: valor" consumiram o texto inteiro, ou quando o que sobrou
+ * apenas ecoa o nome do tipo, não há apoio a mostrar.
+ */
+export function apoioDoRegistro(solicitacao, contratoDoFluxo) {
+  const descricaoCorrigida = limparDescricaoCompra(
+    corrigirTextoCorrompido(solicitacao?.descricao || '')
+  );
+  const estruturada = extrairParesDescricao(descricaoCorrigida);
+  const exibida = estruturada.pares.length > 0 ? estruturada.textoLivre : descricaoCorrigida;
+  const refContrato = solicitacao?.contrato?.ref_contrato || '-';
+
+  if (String(exibida || '').trim() === String(refContrato || '').trim()) return '';
+  const eco = normalizarTexto(exibida) === normalizarTexto(solicitacao?.tipo?.nome);
+  if (estruturada.pares.length > 0 && (!exibida || eco)) return '';
+  if (eco) return '';
+  // O contrato do fluxo novo tem título próprio; ele é o melhor apoio.
+  if (contratoDoFluxo?.fluxo_novo && String(refContrato || '').trim() !== '-') {
+    return String(exibida || '').trim() || refContrato;
+  }
+  return String(exibida || '').trim();
+}
+
 export default function Header({
   solicitacao,
   // PI-16: o contrato do fluxo novo vive nesta solicitacao. O FAVORECIDO e a CHAVE PIX vem dele,
   // nao da solicitacao — quem recebe o pagamento pode ser um terceiro (PI-12).
   contratoDoFluxo = null,
-  onAlterarStatus,
-  onEnviarSetor,
-  mostrarAlterarStatus = true,
-  mostrarEnviarSetor = true,
-  podeEditarRefContrato = false,
   mostrarContratoInfo = true,
+  podeEditarRefContrato = false,
   contratosObra = [],
-  onSalvarRefContrato,
-  // Ação em destaque configurável por setor+estado (Configurações →
-  // Ação principal por setor). null = comportamento genérico atual.
-  acaoPrincipal = null
+  onSalvarRefContrato
 }) {
   const [contratoSelecionadoId, setContratoSelecionadoId] = useState('');
   const [salvandoRef, setSalvandoRef] = useState(false);
-  // Com ação principal mapeada, as ações secundárias moram no menu "⋯".
-  const [menuAcoesAberto, setMenuAcoesAberto] = useState(false);
-  const menuAcoesRef = useRef(null);
-  // Campos VAZIOS ficam ocultos por padrão; o alternador revela todos.
-  // Só apresentação: quais campos existem (e de onde vêm) é a regra do
-  // grid abaixo — campos que não se aplicam ao contexto (ex.: campo de
-  // contrato numa compra) continuam fora mesmo com o alternador ligado.
-  const [mostrarTodosCampos, setMostrarTodosCampos] = useState(false);
-
-  useEffect(() => {
-    if (!menuAcoesAberto) return undefined;
-    const aoClicar = (event) => {
-      if (!menuAcoesRef.current?.contains(event.target)) setMenuAcoesAberto(false);
-    };
-    const aoTeclar = (event) => {
-      if (event.key === 'Escape') setMenuAcoesAberto(false);
-    };
-    document.addEventListener('mousedown', aoClicar);
-    document.addEventListener('keydown', aoTeclar);
-    return () => {
-      document.removeEventListener('mousedown', aoClicar);
-      document.removeEventListener('keydown', aoTeclar);
-    };
-  }, [menuAcoesAberto]);
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     setContratoSelecionadoId(solicitacao?.contrato_id ? String(solicitacao.contrato_id) : '');
@@ -128,70 +139,60 @@ export default function Header({
 
   const opcoesContrato = useMemo(() => {
     if (!Array.isArray(contratosObra)) return [];
-    return contratosObra.map(contrato => ({
+    return contratosObra.map((contrato) => ({
       id: String(contrato.id),
       label: `${contrato.ref_contrato || '-'} (${contrato.codigo || '-'})`
     }));
   }, [contratosObra]);
 
-  const refContratoAtual = solicitacao?.contrato?.ref_contrato || '-';
-  const codigoContratoAtual = solicitacao?.codigo_contrato || solicitacao?.contrato?.codigo || '-';
-  const numeroContratoCabecalho = String(codigoContratoAtual || '')
-    .trim()
-    .replace(/^CT-\s*/i, '');
-  const houveAlteracaoRef = contratoSelecionadoId && String(contratoSelecionadoId) !== String(solicitacao?.contrato_id || '');
+  const refContratoAtual = solicitacao?.contrato?.ref_contrato || null;
+  const codigoContratoAtual = solicitacao?.codigo_contrato || solicitacao?.contrato?.codigo || null;
+  const houveAlteracaoRef = contratoSelecionadoId
+    && String(contratoSelecionadoId) !== String(solicitacao?.contrato_id || '');
 
   async function handleSalvarRefContrato() {
     if (!onSalvarRefContrato || !contratoSelecionadoId || !houveAlteracaoRef) return;
+    // R26: o contrato escolhido é fixado ANTES do await. A tela recarrega
+    // sozinha por evento (LiveUpdates) e o select podia ter mudado no meio.
+    const contratoAlvo = Number(contratoSelecionadoId);
     try {
       setSalvandoRef(true);
-      await onSalvarRefContrato(Number(contratoSelecionadoId));
+      await onSalvarRefContrato(contratoAlvo);
+      avisar.sucesso('Ref. do contrato atualizada.');
     } catch (error) {
-      alert(extrairMensagemErro(error));
+      let mensagem = error?.message || 'Erro ao atualizar ref. do contrato';
+      try {
+        mensagem = JSON.parse(error.message)?.error || mensagem;
+      } catch {
+        // mensagem já é o texto do erro
+      }
+      avisar.erro(mensagem);
     } finally {
       setSalvandoRef(false);
     }
   }
 
-  const historicos = Array.isArray(solicitacao?.historicos) ? solicitacao.historicos : [];
-  const comportamentoTipo = getTipoSolicitacaoBehavior(solicitacao?.tipo);
-  const subtipoSolicitacao = solicitacao?.tipoSubSolicitacao?.nome || '';
-  // O SUBTIPO SO APARECE QUANDO EXISTE (24/08).
-  //
-  // O item 1 tirou o subtipo do fluxo de contratos — o proprio tipo CONTRATO passou a disparar o
-  // fluxo. Mas o ladrilho continuava aparecendo com um travessao, porque `mostrar_subtipo` do TIPO
-  // seguia ligado: todo contrato novo exibia "Subtipo: -".
-  //
-  // E a mesma regra ja aplicada a Objeto, Contratado, Responsavel e ao periodo da medicao: ladrilho
-  // vazio e ruido que a pessoa aprende a ignorar, e ai para de ler os que importam.
-  //
-  // Contrato ANTIGO, aberto quando o subtipo existia, continua mostrando o dele — o valor esta la.
-  const exibirSubtipo = Boolean(subtipoSolicitacao);
-  const ultimoHistoricoStatus = [...historicos]
-    .filter(item => item?.acao === 'STATUS_ALTERADO')
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-  const setorStatusAtual = ultimoHistoricoStatus?.setor || solicitacao?.area_responsavel || null;
-  const descricaoCorrigida = limparDescricaoCompra(corrigirTextoCorrompido(solicitacao?.descricao || ''));
+  const subtipoSolicitacao = solicitacao?.tipoSubSolicitacao?.nome || null;
+  const descricaoCorrigida = limparDescricaoCompra(
+    corrigirTextoCorrompido(solicitacao?.descricao || '')
+  );
   // Descrição com pares "Rótulo: valor" vira lista legível abaixo da grade —
   // parágrafo corrido é mais difícil de ler. Só exibição; nada muda no banco.
   const descricaoEstruturada = useMemo(
     () => extrairParesDescricao(descricaoCorrigida),
     [descricaoCorrigida]
   );
-  const descricaoExibida = descricaoEstruturada.pares.length > 0
-    ? descricaoEstruturada.textoLivre
-    : descricaoCorrigida;
   const chavePixContrato = String(
     solicitacao?.favorecido_chave_pix
       || (formaPagamentoEhPix(solicitacao?.formaPagamento) ? contratoDoFluxo?.favorecido?.chave : '')
       || ''
   ).trim();
 
-
   // OBJETO, CONTRATADO e RESPONSAVEL existiam no banco e nunca chegavam a tela (esboco do cliente,
   // 23/08). Os tres sao do CONTRATO: numa solicitacao de compra ou reembolso nao ha o que mostrar,
-  // e eles ficam OCULTOS em vez de aparecerem com um travessao — ladrilho vazio e ruido que a
-  // pessoa aprende a ignorar, e ai para de ler os que importam.
+  // e por isso vao com `contexto` FALSO — ficam fora da tela E da contagem de vazios, em vez de
+  // aparecerem com um travessao. Ladrilho vazio e ruido que a pessoa aprende a ignorar, e ai para
+  // de ler os que importam.
   const contratados = Array.isArray(contratoDoFluxo?.contratados) ? contratoDoFluxo.contratados : [];
   const rotuloContratado = contratados
     // Separador ` · `, o mesmo que o resto do cabecalho usa para lista: dois formatos para a mesma
@@ -205,330 +206,161 @@ export default function Header({
     })
     .join(' · ');
 
-  // Conta os campos que o alternador pode revelar: o CONTEXTO do campo se
-  // aplica (mesma condição de negócio do grid) mas o valor está vazio.
-  // Espelha, ladrilho a ladrilho, as condições de ocultação por vazio do
-  // grid abaixo — campos de contexto que não se aplica não entram na conta.
-  const camposVaziosOcultos = [
-    [Boolean(contratoDoFluxo), Boolean(contratoDoFluxo?.objeto)],
-    [Boolean(contratoDoFluxo), contratados.length > 0],
-    [!contratoDoFluxo, Boolean(solicitacao?.parceiro)],
-    [!contratoDoFluxo, Boolean(solicitacao?.favorecido)],
-    [!contratoDoFluxo, Boolean(solicitacao?.formaPagamento?.nome)],
-    [!contratoDoFluxo, Boolean(solicitacao?.favorecido_chave_pix)],
-    [Boolean(contratoDoFluxo), Boolean(contratoDoFluxo?.responsavel?.nome)],
-    [!contratoDoFluxo, Boolean(solicitacao?.justificativa)],
-    [true, Boolean(solicitacao?.data_demissao)],
-    [true, Boolean(solicitacao?.data_inicio_medicao || solicitacao?.data_fim_medicao)],
-    [true, Boolean(solicitacao?.data_inicio_medicao || solicitacao?.data_fim_medicao)],
-    [true, exibirSubtipo],
-    [Boolean(contratoDoFluxo), Boolean(contratoDoFluxo?.favorecido)],
-    [Boolean(contratoDoFluxo), Boolean(contratoDoFluxo?.favorecido && chavePixContrato)]
-  ].filter(([contexto, temValor]) => contexto && !temValor).length;
+  const temContrato = Boolean(contratoDoFluxo);
+  const rotuloParceiro = solicitacao?.parceiro
+    ? (solicitacao.parceiro.cpf_cnpj
+      ? `${solicitacao.parceiro.nome} — ${solicitacao.parceiro.cpf_cnpj}`
+      : solicitacao.parceiro.nome)
+    : null;
+  const rotuloFavorecidoSolicitacao = solicitacao?.favorecido
+    ? (solicitacao.favorecido.cpf_cnpj
+      ? `${solicitacao.favorecido.nome} — ${solicitacao.favorecido.cpf_cnpj}`
+      : solicitacao.favorecido.nome)
+    : null;
+  const rotuloFavorecidoContrato = contratoDoFluxo?.favorecido
+    ? (contratoDoFluxo.favorecido.cpf_cnpj
+      ? `${contratoDoFluxo.favorecido.nome} — ${contratoDoFluxo.favorecido.cpf_cnpj}`
+      : contratoDoFluxo.favorecido.nome)
+    : null;
+  const rotuloChavePixContrato = chavePixContrato
+    ? `${chavePixContrato}${!solicitacao?.favorecido_chave_pix && contratoDoFluxo?.favorecido?.tipo
+      ? ` (${contratoDoFluxo.favorecido.tipo})`
+      : ''}`
+    : null;
+
+  /*
+    A ORDEM é a do esboço do cliente: identidade e partes primeiro (que
+    contrato é este, o que se contrata, com quem, quem responde), depois
+    datas. `contexto: false` tira o campo da tela E da contagem — é o que
+    substitui, sem espelhar condição nenhuma, os 14 pares que a contagem
+    manual mantinha à mão.
+  */
+  const campos = [
+    // No tipo CONTRATO o número já compõe o título da página: repetir aqui
+    // seria a mesma informação duas vezes (B3).
+    {
+      label: 'Contrato',
+      contexto: mostrarContratoInfo && !temContrato,
+      valor: codigoContratoAtual,
+      span: 2
+    },
+    { label: 'Objeto', contexto: temContrato, valor: contratoDoFluxo?.objeto || null, span: 4 },
+    // No fluxo novo o título faz parte da identidade da faixa. Contratos
+    // legados preservam a antiga Ref. do contrato, que não é um título.
+    {
+      label: 'Ref. do contrato',
+      contexto: mostrarContratoInfo && !contratoDoFluxo?.fluxo_novo,
+      valor: refContratoAtual,
+      span: 2
+    },
+    {
+      label: 'Contratado',
+      contexto: temContrato,
+      valor: rotuloContratado || null,
+      span: contratados.length > 1 ? 2 : 1
+    },
+    { label: 'Fornecedor / Credor', contexto: !temContrato, valor: rotuloParceiro, span: 2 },
+    { label: 'Favorecido', contexto: !temContrato, valor: rotuloFavorecidoSolicitacao, span: 2 },
+    {
+      label: 'Forma de pagamento',
+      contexto: !temContrato,
+      valor: solicitacao?.formaPagamento?.nome || null,
+      span: 2
+    },
+    {
+      label: 'Chave PIX informada',
+      contexto: !temContrato,
+      valor: solicitacao?.favorecido_chave_pix || null,
+      span: 2
+    },
+    { label: 'Responsavel', contexto: temContrato, valor: contratoDoFluxo?.responsavel?.nome || null },
+    { label: 'Obra', valor: solicitacao?.obra?.nome || null, span: 2 },
+    { label: 'Criado em', valor: formatarDataHora(solicitacao?.createdAt) },
+    { label: 'Justificativa', contexto: !temContrato, valor: solicitacao?.justificativa || null, span: 4 },
+    { label: 'Data de demissao', valor: formatarData(solicitacao?.data_demissao) },
+    { label: 'Inicio da medicao', valor: formatarData(solicitacao?.data_inicio_medicao) },
+    { label: 'Fim da medicao', valor: formatarData(solicitacao?.data_fim_medicao) },
+    { label: 'Subtipo', valor: subtipoSolicitacao, span: 2 },
+    // Quem recebe o pagamento e a chave para pagar. A chave segue a ordem definida pelo
+    // cliente (19/08): fixa 1, senao fixa 2, senao a variavel — a escolha e feita no backend,
+    // para a tela nao ter uma segunda versao da mesma regra.
+    { label: 'Favorecido do contrato', contexto: temContrato, valor: rotuloFavorecidoContrato, span: 2 },
+    { label: 'Chave PIX', contexto: temContrato, valor: rotuloChavePixContrato, span: 2 }
+  ];
 
   return (
-    <div className="sol-detail-header">
-      <div className="sol-detail-header-main">
-        <div className="sol-detail-title-wrap">
-          <span className="sol-detail-code-chip">{solicitacao.codigo || '-'}</span>
-          <h1 className="sol-detail-type">
-            {solicitacao.tipo?.nome || '-'}
-            {contratoDoFluxo && numeroContratoCabecalho && numeroContratoCabecalho !== '-'
-              ? ` - ${numeroContratoCabecalho}`
-              : ''}
-          </h1>
-          {contratoDoFluxo?.fluxo_novo && String(refContratoAtual || '').trim() !== '-' && (
-            <p className="sol-detail-title-text">{refContratoAtual}</p>
-          )}
-          {/* A descricao so aparece quando DIZ outra coisa que o titulo. No fluxo novo o titulo fica
-              logo abaixo do tipo, sem um segundo card na grade. Se a descricao trouxer informacao
-              adicional, ela continua disponivel como texto de apoio. */}
-          {/* Comparacao com `trim`: a descricao passa por `corrigirTextoCorrompido` e a ref vem crua
-              do banco — a do CT-0005 tem espaco no fim. Sem normalizar, "Teste" e "Teste  " seriam
-              textos diferentes e a repeticao continuaria na tela. */}
-          {(() => {
-            // Regra do oficial: a descricao so aparece quando DIZ outra coisa que o titulo.
-            // Duas supressões extras da reforma: quando os pares consumiram o texto inteiro,
-            // e quando o que sobrou apenas ecoa o nome do tipo ("COMPRA DIRETA" sob "Compra Direta").
-            if (String(descricaoExibida || '').trim() === String(refContratoAtual || '').trim()) return null;
-            const eco = normalizarTexto(descricaoExibida) === normalizarTexto(solicitacao.tipo?.nome);
-            if (descricaoEstruturada.pares.length > 0 && (!descricaoExibida || eco)) return null;
-            if (eco) return null;
-            return (
-              <p className="sol-detail-description">{descricaoExibida || 'Sem descricao informada.'}</p>
-            );
-          })()}
-        </div>
+    <>
+      <BlocoConteudo
+        titulo="Dados da solicitação"
+        variante="primario"
+        cor="var(--module-solicitacoes)"
+      >
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        <CamposComVazios colunas={4} campos={campos} />
 
-        <div className="sol-detail-header-side">
-          <div className="sol-detail-actions">
-            {acaoPrincipal ? (
-              <>
-                {/* Ação principal ao lado do status; secundárias no "⋯". */}
-                <button
-                  onClick={acaoPrincipal.executar}
-                  className="btn btn-primary sol-detail-action-btn"
-                  type="button"
-                >
-                  {acaoPrincipal.rotulo}
-                </button>
-                <StatusBadge status={solicitacao.status_global} setor={setorStatusAtual} />
-                {((mostrarAlterarStatus && acaoPrincipal.acao !== 'alterar_status')
-                  || (mostrarEnviarSetor && acaoPrincipal.acao !== 'enviar_setor')) && (
-                  <div className="sol-detail-mais-wrap" ref={menuAcoesRef}>
-                    <button
-                      type="button"
-                      className="btn btn-outline sol-detail-action-btn sol-detail-mais-btn"
-                      onClick={() => setMenuAcoesAberto((aberto) => !aberto)}
-                      aria-expanded={menuAcoesAberto}
-                      aria-haspopup="menu"
-                      aria-label="Mais ações"
-                      title="Mais ações"
-                    >
-                      <HiOutlineEllipsisHorizontal size={20} aria-hidden="true" />
-                    </button>
-                    {menuAcoesAberto && (
-                      <div className="sol-detail-mais-menu" role="menu">
-                        {mostrarAlterarStatus && acaoPrincipal.acao !== 'alterar_status' && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setMenuAcoesAberto(false);
-                              onAlterarStatus();
-                            }}
-                          >
-                            Alterar status
-                          </button>
-                        )}
-                        {mostrarEnviarSetor && acaoPrincipal.acao !== 'enviar_setor' && (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setMenuAcoesAberto(false);
-                              onEnviarSetor();
-                            }}
-                          >
-                            Enviar para outro setor
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Sem mapeamento de ação principal: comportamento atual. */}
-                {mostrarAlterarStatus && (
-                  <button onClick={onAlterarStatus} className="btn btn-outline sol-detail-action-btn" type="button">
-                    Alterar status
-                  </button>
-                )}
-                <StatusBadge status={solicitacao.status_global} setor={setorStatusAtual} />
-                {mostrarEnviarSetor && (
-                  <button onClick={onEnviarSetor} className="btn btn-outline sol-detail-action-btn" type="button">
-                    Enviar para outro setor
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-          <div className="sol-detail-header-date">
-            <span className="sol-detail-header-date-label">Data Resposta/Pagamento</span>
-            <strong className="sol-detail-header-date-value">{formatarData(solicitacao.data_vencimento)}</strong>
-          </div>
-        </div>
-      </div>
-
-      {/* UM bloco so, de 4 colunas, com cada ladrilho declarando a largura que precisa.
-          Eram dois grids de larguras fixas, e por isso "Obra" e "Objeto" — os textos mais longos —
-          ficavam na mesma medida de "Setor".
-
-          A ordem e a do esboco: identidade e partes primeiro (que contrato e este, o que se
-          contrata, com quem, quem responde), depois datas e valores. */}
-      <div className="sol-detail-stats-grid">
-        {/* Solicitacoes que apenas referenciam um contrato preservam o card. No tipo CONTRATO, o
-            numero ja compoe o titulo do cabecalho e nao deve ser repetido na grade. */}
-        {mostrarContratoInfo && !contratoDoFluxo && (
-          <InfoItem label="Contrato" value={codigoContratoAtual} span={2} />
-        )}
-
-        {contratoDoFluxo && (contratoDoFluxo.objeto || mostrarTodosCampos) && (
-          <InfoItem label="Objeto" value={contratoDoFluxo.objeto || '-'} fullWidth />
-        )}
-        {/* No fluxo novo o Titulo agora faz parte da identidade do cabecalho. Contratos legados
-            preservam a antiga Ref. do contrato na grade, pois esse dado nao representa um titulo. */}
-        {mostrarContratoInfo && !contratoDoFluxo?.fluxo_novo && (
-          <InfoItem
-            label="Ref. do contrato"
-            value={refContratoAtual}
-            span={2}
-          />
-        )}
-
-
-        {/* Uma coluna com um contratado, duas com varios: e a linha que o esboco desenha
-            (Contratado · Responsavel · Setor · Criado em), e uma lista de nomes nao cabe em um
-            quarto da largura. */}
-        {contratoDoFluxo && (contratados.length > 0 || mostrarTodosCampos) && (
-          <InfoItem label="Contratado" value={rotuloContratado || '-'} span={contratados.length > 1 ? 2 : 1} />
-        )}
-        {!contratoDoFluxo && (solicitacao.parceiro || mostrarTodosCampos) && (
-          <InfoItem
-            label="Fornecedor / Credor"
-            value={!solicitacao.parceiro
-              ? '-'
-              : solicitacao.parceiro.cpf_cnpj
-                ? `${solicitacao.parceiro.nome} — ${solicitacao.parceiro.cpf_cnpj}`
-                : solicitacao.parceiro.nome}
-            span={2}
-          />
-        )}
-        {!contratoDoFluxo && (solicitacao.favorecido || mostrarTodosCampos) && (
-          <InfoItem
-            label="Favorecido"
-            value={!solicitacao.favorecido
-              ? '-'
-              : solicitacao.favorecido.cpf_cnpj
-                ? `${solicitacao.favorecido.nome} — ${solicitacao.favorecido.cpf_cnpj}`
-                : solicitacao.favorecido.nome}
-            span={2}
-          />
-        )}
-        {!contratoDoFluxo && (solicitacao.formaPagamento?.nome || mostrarTodosCampos) && (
-          <InfoItem label="Forma de pagamento" value={solicitacao.formaPagamento?.nome || '-'} span={2} />
-        )}
-        {!contratoDoFluxo && (solicitacao.favorecido_chave_pix || mostrarTodosCampos) && (
-          <InfoItem label="Chave PIX informada" value={solicitacao.favorecido_chave_pix || '-'} span={2} />
-        )}
-        {contratoDoFluxo && (contratoDoFluxo.responsavel?.nome || mostrarTodosCampos) && (
-          <InfoItem label="Responsavel" value={contratoDoFluxo.responsavel?.nome || '-'} />
-        )}
-        <InfoItem label="Setor" value={solicitacao.area_responsavel || '-'} />
-        <InfoItem label="Criado em" value={formatarDataHora(solicitacao.createdAt)} />
-
-        <InfoItem label="Valor" value={formatarValor(solicitacao.valor)} />
-        {!contratoDoFluxo && (solicitacao.justificativa || mostrarTodosCampos) && (
-          <InfoItem label="Justificativa" value={solicitacao.justificativa || '-'} span={4} />
-        )}
-        {(solicitacao.data_demissao || mostrarTodosCampos) && <InfoItem label="Data de demissao" value={formatarData(solicitacao.data_demissao)} />}
-        {/* O periodo da medicao so aparece quando EXISTE — mesma regra ja aplicada a Objeto,
-            Contratado e Responsavel logo acima: ladrilho vazio e ruido que a pessoa aprende a
-            ignorar, e ai para de ler os que importam.
-            Antes eles apareciam com travessao em toda solicitacao, e o buraco passava despercebido
-            porque o ladrilho "Status" fechava a linha. Com o Status fora (item 10), dois campos
-            vazios passariam a desalinhar tudo o que vem depois. */}
-        {(solicitacao.data_inicio_medicao || solicitacao.data_fim_medicao || mostrarTodosCampos) && (
-          <>
-            <InfoItem label="Inicio da medicao" value={formatarData(solicitacao.data_inicio_medicao)} />
-            <InfoItem label="Fim da medicao" value={formatarData(solicitacao.data_fim_medicao)} />
-          </>
-        )}
-        {/* ITEM 10 (23/08): o ladrilho "Status" saiu. Era `solicitacao.status_global` — a MESMA
-            variavel que alimenta o `StatusBadge` da barra de acoes, a poucos centimetros daqui. O
-            badge fica sendo o unico lugar onde o status aparece. */}
-
-        {/* O Vencimento foi levado para o cabecalho, junto do status, sem duplicar a informacao. */}
-        <InfoItem label="Obra" value={solicitacao.obra?.nome || '-'} span={2} />
-
-        {/* ITEM 16 (23/08): o ladrilho "Apropriacao" saiu daqui. A mesma informacao aparecia em
-            TRES lugares — este, o card "Apropriacoes do contrato" e um bloco dentro do card
-            Financeiro (esse ultimo saiu pelo item 17). O card de baixo fica: e o unico dos tres que
-            tambem EDITA o rateio. */}
-
-        {(exibirSubtipo || mostrarTodosCampos) && <InfoItem label="Subtipo" value={subtipoSolicitacao || '-'} span={2} />}
-
-        {/* Quem recebe o pagamento e a chave para pagar. A chave segue a ordem definida pelo
-            cliente (19/08): fixa 1, senao fixa 2, senao a variavel — a escolha e feita no backend,
-            para a tela nao ter uma segunda versao da mesma regra. */}
-        {contratoDoFluxo && (contratoDoFluxo.favorecido || mostrarTodosCampos) && (
-          <InfoItem
-            label="Favorecido"
-            span={2}
-            value={!contratoDoFluxo.favorecido
-              ? '-'
-              : contratoDoFluxo.favorecido.cpf_cnpj
-                ? `${contratoDoFluxo.favorecido.nome} — ${contratoDoFluxo.favorecido.cpf_cnpj}`
-                : contratoDoFluxo.favorecido.nome}
-          />
-        )}
-        {contratoDoFluxo && ((contratoDoFluxo.favorecido && chavePixContrato) || mostrarTodosCampos) && (
-          <InfoItem
-            label="Chave PIX"
-            span={2}
-            value={!chavePixContrato
-              ? '-'
-              : `${chavePixContrato}${!solicitacao?.favorecido_chave_pix && contratoDoFluxo.favorecido?.tipo
-                ? ` (${contratoDoFluxo.favorecido.tipo})`
-                : ''}`}
-          />
-        )}
-      </div>
-
-      {/* Alternador dos campos vazios: revelar é decisão do usuário. */}
-      {(camposVaziosOcultos > 0 || mostrarTodosCampos) && (
-        <button
-          type="button"
-          className="sol-detail-toggle-campos"
-          onClick={() => setMostrarTodosCampos((atual) => !atual)}
-        >
-          {mostrarTodosCampos
-            ? 'Ocultar campos vazios'
-            : `Ver todos os campos (${camposVaziosOcultos} vazio${camposVaziosOcultos === 1 ? '' : 's'})`}
-        </button>
-      )}
-
-      {/* Pares "Rótulo: valor" da DESCRIÇÃO: leitura do texto livre,
-          não são campos do sistema — não alimentam título, previsão
-          nem relatório. Ficam abaixo dos oficiais, discretos; se um
-          repetir um campo oficial, o oficial é a autoridade. */}
-      {descricaoEstruturada.pares.length > 0 && (
-        <div className="sol-detail-informados" aria-label="Detalhes informados na descrição">
-          <p className="sol-detail-informados-titulo">
-            <HiOutlineInformationCircle aria-hidden="true" />
-            Detalhes informados
-            <span className="sol-detail-informados-nota">lidos da descrição</span>
-          </p>
-          <dl className="sol-detail-informados-lista">
-            {descricaoEstruturada.pares.map((par, indice) => (
-              <div key={`${par.rotulo}-${indice}`} className="sol-detail-informados-par">
-                <dt>{par.rotulo}</dt>
-                <dd>{par.valor}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
-
-      {mostrarContratoInfo && podeEditarRefContrato && (
-        <div className="sol-detail-contract-editor">
-          <p className="sol-detail-contract-editor-title">Editar ref. do contrato</p>
-          <div className="flex flex-col md:flex-row gap-2">
-            <select
-              className="input"
-              value={contratoSelecionadoId}
-              onChange={e => setContratoSelecionadoId(e.target.value)}
-            >
-              <option value="">Selecione um contrato</option>
-              {opcoesContrato.map(opcao => (
-                <option key={opcao.id} value={opcao.id}>
-                  {opcao.label}
-                </option>
+        {/* Pares "Rótulo: valor" da DESCRIÇÃO: leitura do texto livre,
+            não são campos do sistema — não alimentam título, previsão
+            nem relatório. Ficam abaixo dos oficiais, discretos; se um
+            repetir um campo oficial, o oficial é a autoridade. */}
+        {descricaoEstruturada.pares.length > 0 && (
+          <div className="sol-detail-informados" aria-label="Detalhes informados na descrição">
+            <p className="sol-detail-informados-titulo">
+              <HiOutlineInformationCircle aria-hidden="true" />
+              Detalhes informados
+              <span className="sol-detail-informados-nota">lidos da descrição</span>
+            </p>
+            <dl className="sol-detail-informados-lista">
+              {descricaoEstruturada.pares.map((par, indice) => (
+                <div key={`${par.rotulo}-${indice}`} className="sol-detail-informados-par">
+                  <dt>{par.rotulo}</dt>
+                  <dd>{par.valor}</dd>
+                </div>
               ))}
-            </select>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleSalvarRefContrato}
-              disabled={!houveAlteracaoRef || salvandoRef}
-            >
-              {salvandoRef ? 'Salvando...' : 'Salvar ref.'}
-            </button>
+            </dl>
           </div>
-        </div>
+        )}
+      </BlocoConteudo>
+
+      {/* Vincular a solicitação a outro contrato é raro e muda o destino do
+          dinheiro: bloco secundário, recolhido, mas sempre à vista. O select
+          aqui é ENTRADA DE DADO (escolher o contrato), não filtro — uso que
+          a R12 mantém legítimo. */}
+      {mostrarContratoInfo && podeEditarRefContrato && (
+        <BlocoConteudo
+          titulo="Editar ref. do contrato"
+          variante="secundario"
+          descricao="Troca o contrato a que esta solicitação se refere."
+          recolhivel
+          recolhidoPadrao
+        >
+          <FormSecao colunas={2}>
+            <CampoForm label="Contrato da obra">
+              <select
+                className="input"
+                value={contratoSelecionadoId}
+                onChange={(e) => setContratoSelecionadoId(e.target.value)}
+              >
+                <option value="">Selecione um contrato</option>
+                {opcoesContrato.map((opcao) => (
+                  <option key={opcao.id} value={opcao.id}>
+                    {opcao.label}
+                  </option>
+                ))}
+              </select>
+            </CampoForm>
+            <CampoForm label="&nbsp;">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSalvarRefContrato}
+                disabled={!houveAlteracaoRef || salvandoRef}
+              >
+                {salvandoRef ? 'Salvando...' : 'Salvar ref.'}
+              </button>
+            </CampoForm>
+          </FormSecao>
+        </BlocoConteudo>
       )}
-    </div>
+    </>
   );
 }

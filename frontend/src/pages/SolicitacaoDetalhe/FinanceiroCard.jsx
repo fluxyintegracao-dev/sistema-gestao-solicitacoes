@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import OverlayModal from '../../components/ui/OverlayModal';
+import StatusBadge from '../../components/StatusBadge';
+import {
+  Avisos,
+  BlocoConteudo,
+  CampoForm,
+  FormSecao,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  useAvisos
+} from '../../components/padrao';
 import PrevisoesContrato from './PrevisoesContrato';
 import ModalMedicao from './ModalMedicao';
 import { Link } from 'react-router-dom';
@@ -399,14 +410,21 @@ function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
-function statusClass(status) {
+/*
+  R2/R25 — a familia semantica do StatusBadge substitui as classes de paleta
+  crua que estavam aqui, PRESERVANDO o mapeamento anterior tom a tom (sky =
+  info, emerald = success, amber = warning, rose = danger, slate = neutral).
+  Passar `kind` explicito em vez de deixar o badge adivinhar pelo texto e
+  deliberado: a heuristica generica classifica CANCELADO como neutro e
+  PREVISAO como atencao, o que MUDARIA a cor que o usuario ve hoje.
+*/
+function familiaSituacao(status) {
   const normalized = String(status || '').toUpperCase();
-  if (normalized === 'PREVISAO') return 'bg-sky-100 text-sky-700';
-  if (normalized === 'LIBERADA') return 'bg-emerald-100 text-emerald-700';
-  if (normalized === 'QUITADO') return 'bg-emerald-100 text-emerald-700';
-  if (normalized === 'PARCIAL') return 'bg-amber-100 text-amber-700';
-  if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'bg-rose-100 text-rose-700';
-  return 'bg-slate-100 text-slate-700';
+  if (normalized === 'PREVISAO') return 'info';
+  if (normalized === 'LIBERADA' || normalized === 'QUITADO') return 'success';
+  if (normalized === 'PARCIAL') return 'warning';
+  if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'danger';
+  return 'neutral';
 }
 
 function rotuloSituacao(status) {
@@ -480,7 +498,7 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
 
   return (
     <div className="relative text-sm">
-      <span className="mb-1 block text-slate-500">{roleTitle} deste titulo</span>
+      <span className="mb-1 block text-[var(--c-muted)]">{roleTitle} deste titulo</span>
       <input
         className="input w-full"
         type="text"
@@ -489,20 +507,20 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
         onChange={(event) => setSearch(event.target.value)}
       />
       {pagamento?.parceiro_nome && (
-        <div className="mt-1 text-xs text-slate-500">
+        <div className="mt-1 text-xs text-[var(--c-muted)]">
           Selecionado: {pagamento.parceiro_nome}
         </div>
       )}
       {loading && (
-        <div className="mt-1 text-xs text-slate-500">Buscando parceiros...</div>
+        <div className="mt-1 text-xs text-[var(--c-muted)]">Buscando parceiros...</div>
       )}
       {options.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg">
           {options.map((partner) => (
             <button
               key={partner.id}
               type="button"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-sm hover:bg-slate-50"
+              className="w-full rounded-xl border border-[var(--c-border)] px-3 py-2 text-left text-sm hover:bg-[var(--c-bg)]"
               onClick={() => {
                 onSelect(pagamentoIndex, partner);
                 setSearch('');
@@ -510,7 +528,7 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
               }}
             >
               <div className="font-medium text-[var(--c-text)]">{partner.nome}</div>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-[var(--c-muted)]">
                 {partner.cpf_cnpj || '-'} {partner.telefone ? `- ${partner.telefone}` : ''}
               </div>
             </button>
@@ -579,27 +597,40 @@ function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagament
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-[var(--c-text)]">Impacto gerencial antes de salvar</div>
-          <div className="text-xs text-slate-500">Confira DRE, caixa e consolidado deste titulo.</div>
+          <div className="text-xs text-[var(--c-muted)]">Confira DRE, caixa e consolidado deste titulo.</div>
         </div>
         {form.intercompany && (
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+          <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }}>
             Entre Empresas
           </span>
         )}
       </div>
       <div className="grid gap-3 md:grid-cols-3">
-        <div className={`rounded-xl border px-3 py-2 ${dreAtiva ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">DRE</div>
+        <div
+          className="rounded-xl border px-3 py-2"
+          style={dreAtiva
+            ? { borderColor: 'var(--sem-success-border)', background: 'var(--sem-success-bg)', color: 'var(--sem-success)' }
+            : { borderColor: 'var(--sem-warning-border)', background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }}
+        >
+          <div className="text-xs font-semibold uppercase tracking-[0.16em]">DRE</div>
           <div className="mt-1 text-sm font-semibold">{dreTexto}</div>
           <div className="mt-1 text-xs opacity-80">{getCategoriaDreResumo(categoria)}</div>
         </div>
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Caixa</div>
+        <div
+          className="rounded-xl border px-3 py-2"
+          style={{ borderColor: 'var(--sem-info-border)', background: 'var(--sem-info-bg)', color: 'var(--sem-info)' }}
+        >
+          <div className="text-xs font-semibold uppercase tracking-[0.16em]">Caixa</div>
           <div className="mt-1 text-sm font-semibold">{caixaTexto}</div>
           <div className="mt-1 text-xs opacity-80">Vai para o fluxo previsto ate a baixa.</div>
         </div>
-        <div className={`rounded-xl border px-3 py-2 ${form.intercompany ? 'border-violet-200 bg-violet-50 text-violet-800' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em]">Consolidado</div>
+        <div
+          className="rounded-xl border px-3 py-2"
+          style={form.intercompany
+            ? { borderColor: 'var(--sem-info-border)', background: 'var(--sem-info-bg)', color: 'var(--sem-info)' }
+            : { borderColor: 'var(--c-border)', background: 'var(--c-bg)', color: 'var(--c-text)' }}
+        >
+          <div className="text-xs font-semibold uppercase tracking-[0.16em]">Consolidado</div>
           <div className="mt-1 text-sm font-semibold">{consolidadoTexto}</div>
           <div className="mt-1 text-xs opacity-80">
             {form.intercompany
@@ -635,7 +666,13 @@ export default function FinanceiroCard({
   const [titulos, setTitulos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [erro, setErro] = useState('');
+  /*
+    R19/R28 — o `erro` de string solta e os tres `alert()` do navegador viraram
+    UM canal so: `useAvisos`. Erro e sucesso passam pela mesma faixa semantica
+    do sistema, dentro da pagina, fechavel — e o sucesso agora FICA (R28), em
+    vez de sumir junto com o modal que fechava no mesmo gesto.
+  */
+  const { avisos, avisar, fechar: fecharAviso, limpar: limparAvisos } = useAvisos();
   const [modalOpen, setModalOpen] = useState(false);
   const [cadastroCredorModalOpen, setCadastroCredorModalOpen] = useState(false);
   const [cadastroCredorSaving, setCadastroCredorSaving] = useState(false);
@@ -753,17 +790,17 @@ export default function FinanceiroCard({
   async function carregarTitulos() {
     if (!podeVisualizarTitulos) {
       setTitulos([]);
-      setErro('');
+      limparAvisos();
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
-      setErro('');
+      limparAvisos();
       const data = await getTitulosFinanceirosPorSolicitacao(solicitacao.id);
       setTitulos(Array.isArray(data) ? data : []);
     } catch (error) {
-      setErro(error?.message || 'Erro ao carregar titulos da solicitacao');
+      avisar.erro(error?.message || 'Erro ao carregar titulos da solicitacao');
     } finally {
       setLoading(false);
     }
@@ -915,7 +952,7 @@ export default function FinanceiroCard({
       .catch((error) => {
         if (!active) return;
         setCategorias([]);
-        setErro(error?.message || 'Erro ao carregar categorias financeiras');
+        avisar.erro(error?.message || 'Erro ao carregar categorias financeiras');
       })
       .finally(() => {
         if (active) setLoadingCategorias(false);
@@ -983,7 +1020,7 @@ export default function FinanceiroCard({
         if (!active) return;
         setFormasPagamento([]);
         setCartoes([]);
-        setErro(error?.message || 'Erro ao carregar formas de pagamento');
+        avisar.erro(error?.message || 'Erro ao carregar formas de pagamento');
       })
       .finally(() => {
         if (active) setLoadingPagamento(false);
@@ -1487,13 +1524,13 @@ export default function FinanceiroCard({
     event.preventDefault();
     const erroValidacao = validarGeracaoConta();
     if (erroValidacao) {
-      setErro(erroValidacao);
+      avisar.erro(erroValidacao);
       return;
     }
 
     try {
       setSaving(true);
-      setErro('');
+      limparAvisos();
       const impostosPayload = descontoFinanceiro > 0
         ? [{
             tipo_imposto: 'DESCONTO',
@@ -1568,9 +1605,9 @@ export default function FinanceiroCard({
       if (typeof onTituloCriado === 'function') {
         await onTituloCriado();
       }
-      alert('Conta gerada com sucesso.');
+      avisar.sucesso('Conta gerada com sucesso.');
     } catch (error) {
-      setErro(error?.message || 'Erro ao gerar conta');
+      avisar.erro(error?.message || 'Erro ao gerar conta');
     } finally {
       setSaving(false);
     }
@@ -1579,7 +1616,7 @@ export default function FinanceiroCard({
   async function handleSalvarCredor() {
     try {
       setCredorSaving(true);
-      setErro('');
+      limparAvisos();
       await updateCredorSolicitacao(solicitacao.id, credorSelecionado?.id || null);
       setCredorModalOpen(false);
       setCredorSearch('');
@@ -1587,9 +1624,9 @@ export default function FinanceiroCard({
       if (typeof onSolicitacaoAtualizada === 'function') {
         await onSolicitacaoAtualizada();
       }
-      alert('Credor atualizado com sucesso.');
+      avisar.sucesso('Credor atualizado com sucesso.');
     } catch (error) {
-      setErro(error?.message || 'Erro ao atualizar credor');
+      avisar.erro(error?.message || 'Erro ao atualizar credor');
     } finally {
       setCredorSaving(false);
     }
@@ -1601,6 +1638,21 @@ export default function FinanceiroCard({
       ...current,
       [name]: ['cpf_cnpj', 'representante_cpf'].includes(name) ? maskCpfCnpj(value) : value
     }));
+  }
+
+  function fecharModalGerarConta() {
+    limparAvisos();
+    setModalOpen(false);
+    resetModalState(solicitacao);
+  }
+
+  // Fechar sem salvar devolve o credor que a solicitacao TEM hoje — a escolha
+  // dentro do modal e rascunho ate "Salvar credor".
+  function fecharCredorModal() {
+    setCredorModalOpen(false);
+    setCredorSearch('');
+    setCredorOptions([]);
+    setCredorSelecionado(solicitacao?.parceiro || null);
   }
 
   function fecharCadastroCredorModal() {
@@ -1615,7 +1667,7 @@ export default function FinanceiroCard({
       label: 'CPF/CNPJ do credor'
     });
     if (documentoErro) {
-      setErro(documentoErro);
+      avisar.erro(documentoErro);
       return;
     }
     if (onlyDigits(cadastroCredorForm.cpf_cnpj).length === 14) {
@@ -1625,13 +1677,13 @@ export default function FinanceiroCard({
         label: 'CPF do representante legal'
       });
       if (representanteErro) {
-        setErro(representanteErro);
+        avisar.erro(representanteErro);
         return;
       }
     }
     try {
       setCadastroCredorSaving(true);
-      setErro('');
+      limparAvisos();
       await cadastrarCredorSolicitacao(solicitacao.id, {
         nome: cadastroCredorForm.nome,
         cpf_cnpj: onlyDigits(cadastroCredorForm.cpf_cnpj),
@@ -1647,13 +1699,75 @@ export default function FinanceiroCard({
       if (typeof onSolicitacaoAtualizada === 'function') {
         await onSolicitacaoAtualizada();
       }
-      alert('Credor cadastrado e vinculado com sucesso.');
+      avisar.sucesso('Credor cadastrado e vinculado com sucesso.');
     } catch (error) {
-      setErro(error?.message || 'Erro ao cadastrar credor');
+      avisar.erro(error?.message || 'Erro ao cadastrar credor');
     } finally {
       setCadastroCredorSaving(false);
     }
   }
+
+  // Um modal por vez: a faixa de avisos mora no modal aberto (erro ao lado do
+  // campo que o causou) e volta para o bloco quando nao ha nenhum — e assim a
+  // confirmacao de "conta gerada" fica visivel depois que o modal fecha (R28).
+  const algumModalAberto = modalOpen || credorModalOpen || cadastroCredorModalOpen;
+
+  /*
+    R17 — toda coluna declara o que ELA E; a medida e o alinhamento vem do
+    tipo, nunca da tela. `saldo` e `tipo: 'valor'`: 190px, a direita e
+    tabular, dimensionada para R$ 9.999.999.999,99 sem truncar (T7).
+  */
+  const colunasTitulos = [
+    {
+      id: 'titulo',
+      titulo: 'Titulo',
+      tipo: 'identidade',
+      noCard: 'titulo',
+      render: (titulo) => {
+        const nome = limparDescricaoTituloCompra(titulo.descricao) || `${titulo.tipo} #${titulo.id}`;
+        return podeExecutarAcoesFinanceiras ? (
+          // Link para o REGISTRO RELACIONADO fica no corpo, junto do dado que
+          // o origina — e e ele que da o caminho por TECLADO da linha (A1).
+          <Link className="font-medium" to={`/financeiro/titulos/${titulo.id}`} title={nome}>
+            {nome}
+          </Link>
+        ) : (
+          <span className="font-medium" title={nome}>{nome}</span>
+        );
+      }
+    },
+    {
+      id: 'parceiro',
+      titulo: 'Parceiro',
+      tipo: 'texto',
+      render: (titulo) => titulo.parceiro?.nome || '-'
+    },
+    {
+      id: 'vencimento',
+      titulo: 'Vencimento',
+      tipo: 'data',
+      render: (titulo) => formatDate(titulo.data_vencimento)
+    },
+    {
+      id: 'situacao',
+      titulo: 'Situacao',
+      tipo: 'status',
+      render: (titulo) => {
+        const situacao = situacaoPorTitulo.get(String(titulo.id)) || titulo.status;
+        return (
+          <span data-testid={`situacao-titulo-${titulo.id}`}>
+            <StatusBadge status={rotuloSituacao(situacao)} kind={familiaSituacao(situacao)} />
+          </span>
+        );
+      }
+    },
+    {
+      id: 'saldo',
+      titulo: 'Saldo',
+      tipo: 'valor',
+      render: (titulo) => formatCurrency(titulo.valor_saldo)
+    }
+  ];
 
   return (
     <>
@@ -1668,71 +1782,75 @@ export default function FinanceiroCard({
         onFechar={() => setMedicaoAberta(null)}
         onSalvo={() => setRecarregarParcelas((n) => n + 1)}
       />
-      <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-sm space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Financeiro</h2>
-            <p className="text-sm text-[var(--c-muted)]">
-              {podeExecutarAcoesFinanceiras
-                ? 'Gere contas a pagar ou receber sem sair do fluxo da solicitacao.'
-                : 'Acompanhe titulos, parcelas, medicoes e pagamentos desta solicitacao.'}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {podeExecutarAcoesFinanceiras && (
-              <Link to="/financeiro/titulos" className="btn btn-outline">
-                Ver titulos
-              </Link>
-            )}
-            {podeExecutarAcoesFinanceiras && (
+      {/*
+        B2 — bloco SECUNDARIO, como os demais blocos do detalhe da solicitacao.
+        O primario desta tela e a identificacao do registro (Header/InfoCard);
+        este card e um dos blocos de trabalho, e dois primarios na mesma tela
+        seriam defeito.
+      */}
+      <BlocoConteudo
+        titulo="Financeiro"
+        variante="secundario"
+        descricao={podeExecutarAcoesFinanceiras
+          ? 'Gere contas a pagar ou receber sem sair do fluxo da solicitacao.'
+          : 'Acompanhe titulos, parcelas, medicoes e pagamentos desta solicitacao.'}
+        acoes={podeExecutarAcoesFinanceiras ? (
+          <span className="app-actionbar">
+            {/*
+              Este link vai para a LISTA do modulo, nao para o registro
+              relacionado — pela regra "onde a navegacao mora" (04/09) ele
+              pertence ao hub do Financeiro, nao a barra de acoes do bloco.
+              NAO removi: remover elemento visivel exige aprovacao do
+              responsavel. Registrado no relatorio como proposta.
+            */}
+            <Link to="/financeiro/titulos" className="btn btn-outline">
+              Ver titulos
+            </Link>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                limparAvisos();
+                setCadastroCredorForm(criarCredorFormPadrao());
+                setCadastroCredorModalOpen(true);
+              }}
+            >
+              Cadastrar credor
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                limparAvisos();
+                setCredorSelecionado(solicitacao?.parceiro || null);
+                setCredorSearch('');
+                setCredorOptions([]);
+                setCredorModalOpen(true);
+              }}
+            >
+              Editar credor
+            </button>
+            <span title={geracaoManualDesabilitada ? motivoGeracaoManualDesabilitada : undefined}>
               <button
                 type="button"
-                className="btn btn-outline"
+                className="btn btn-primary"
+                disabled={geracaoManualDesabilitada}
+                aria-label={geracaoManualDesabilitada
+                  ? `Gerar conta desabilitado. ${motivoGeracaoManualDesabilitada}`
+                  : 'Gerar conta'}
                 onClick={() => {
-                  setErro('');
-                  setCadastroCredorForm(criarCredorFormPadrao());
-                  setCadastroCredorModalOpen(true);
+                  limparAvisos();
+                  resetModalState(solicitacao);
+                  setModalOpen(true);
                 }}
               >
-                Cadastrar credor
+                Gerar conta
               </button>
-            )}
-            {podeExecutarAcoesFinanceiras && (
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => {
-                  setErro('');
-                  setCredorSelecionado(solicitacao?.parceiro || null);
-                  setCredorSearch('');
-                  setCredorOptions([]);
-                  setCredorModalOpen(true);
-                }}
-              >
-                Editar credor
-              </button>
-            )}
-            {podeExecutarAcoesFinanceiras && (
-              <span title={geracaoManualDesabilitada ? motivoGeracaoManualDesabilitada : undefined}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={geracaoManualDesabilitada}
-                  aria-label={geracaoManualDesabilitada
-                    ? `Gerar conta desabilitado. ${motivoGeracaoManualDesabilitada}`
-                    : 'Gerar conta'}
-                  onClick={() => {
-                    setErro('');
-                    resetModalState(solicitacao);
-                    setModalOpen(true);
-                  }}
-                >
-                  Gerar conta
-                </button>
-              </span>
-            )}
-          </div>
-        </div>
+            </span>
+          </span>
+        ) : null}
+      >
+        {!algumModalAberto && <Avisos avisos={avisos} aoFechar={fecharAviso} />}
 
         {/* PI-16: as previsoes de parcela do contrato, aqui no card do Financeiro — pedido do
             cliente. Antes da aprovacao nao existe titulo nenhum, entao esta e a unica leitura do
@@ -1750,122 +1868,90 @@ export default function FinanceiroCard({
         />
 
         {exibirTitulosDetalhados && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2">
-            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Titulos</div>
-            <div className="mt-1 text-lg font-semibold text-[var(--c-text)]">{titulos.length}</div>
-          </div>
-          <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2">
-            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Total</div>
-            <div className="mt-1 text-lg font-semibold text-[var(--c-text)]">{formatCurrency(totalTitulos)}</div>
-          </div>
-          <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2">
-            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Parceiro</div>
-            <div className="mt-1 text-sm font-medium text-[var(--c-text)]">{parceiroFinanceiro?.nome || 'Nao vinculado'}</div>
-            {podeExecutarAcoesFinanceiras && (
-              <div className="mt-1 flex min-w-0 items-baseline gap-1 text-xs text-[var(--c-muted)]">
-                <span className="shrink-0 font-medium">PIX:</span>
-                <span className="truncate" title={parceiroFinanceiroPix?.chave || ''}>
-                  {parceiroFinanceiroPix ? `${parceiroFinanceiroPix.tipo} - ${parceiroFinanceiroPix.chave}` : ''}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2">
-            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Valor sugerido</div>
-            <div className="mt-1 text-sm font-medium text-[var(--c-text)]">
-              {solicitacao.valor ? formatCurrency(solicitacao.valor) : 'Nao informado'}
-            </div>
-          </div>
-        </div>
+          <StatGrid colunas={4}>
+            <StatTile label="Titulos" valor={titulos.length} />
+            {/*
+              DEFEITO DE SIGNIFICADO, corrigido no ROTULO e nao no calculo
+              (o calculo nao e meu para mudar): o ladrilho soma
+              `valor_original` de cada titulo, e a coluna da tabela mostra
+              `valor_saldo`. Sao duas grandezas diferentes, e o rotulo "Total"
+              deixava o leitor tentar fechar uma com a outra. Agora cada um
+              diz o que e. Relatado ao responsavel.
+            */}
+            <StatTile
+              label="Total original"
+              valor={formatCurrency(totalTitulos)}
+              sub="Soma do valor original dos titulos (a coluna Saldo mostra o que resta)"
+            />
+            <StatTile
+              label="Parceiro"
+              valor={parceiroFinanceiro?.nome || 'Nao vinculado'}
+              sub={podeExecutarAcoesFinanceiras && parceiroFinanceiroPix
+                ? `PIX: ${parceiroFinanceiroPix.tipo} - ${parceiroFinanceiroPix.chave}`
+                : undefined}
+              title={podeExecutarAcoesFinanceiras ? (parceiroFinanceiroPix?.chave || undefined) : undefined}
+            />
+            <StatTile
+              label="Valor sugerido"
+              valor={solicitacao.valor ? formatCurrency(solicitacao.valor) : 'Nao informado'}
+            />
+          </StatGrid>
         )}
 
-        {exibirTitulosDetalhados && erro && !modalOpen && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {erro}
-          </div>
+        {exibirTitulosDetalhados && (
+          <TabelaPadrao
+            colunas={colunasTitulos}
+            itens={titulos}
+            getId={(titulo) => titulo.id}
+            carregando={loading}
+            storageKey="tabela:solicitacao-detalhe:titulos-financeiros"
+            vazio="Nenhum titulo financeiro foi gerado para esta solicitacao."
+            rotuloRolagem="Titulos financeiros da solicitacao"
+          />
         )}
+      </BlocoConteudo>
 
-        {exibirTitulosDetalhados && (loading ? (
-          <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
-            Carregando titulos financeiros...
-          </div>
-        ) : titulos.length === 0 ? (
-          <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
-            Nenhum titulo financeiro foi gerado para esta solicitacao.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {titulos.map((titulo) => {
-              const situacao = situacaoPorTitulo.get(String(titulo.id)) || titulo.status;
-              return (
-                <div
-                  key={titulo.id}
-                  className="rounded-xl border border-[var(--c-border)] px-3 py-3 text-sm"
-                >
-                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    {podeExecutarAcoesFinanceiras ? (
-                      <Link className="font-medium text-blue-600 hover:underline" to={`/financeiro/titulos/${titulo.id}`}>
-                        {limparDescricaoTituloCompra(titulo.descricao) || `${titulo.tipo} #${titulo.id}`}
-                      </Link>
-                    ) : (
-                      <span className="font-medium text-[var(--c-text)]">
-                        {limparDescricaoTituloCompra(titulo.descricao) || `${titulo.tipo} #${titulo.id}`}
-                      </span>
-                    )}
-                    <div className="text-[var(--c-muted)]">
-                      {titulo.parceiro?.nome || '-'} - vencimento {formatDate(titulo.data_vencimento)}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(situacao)}`}
-                      data-testid={`situacao-titulo-${titulo.id}`}
-                    >
-                      {rotuloSituacao(situacao)}
-                    </span>
-                    <span className="text-sm font-semibold text-[var(--c-text)]">
-                      {formatCurrency(titulo.valor_saldo)}
-                    </span>
-                  </div>
-                </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
+      {/*
+        R9 — cadastrar um credor INTERROMPE o trabalho principal (o detalhe da
+        solicitacao), entao e modal mesmo. R27 — a casca agora e o
+        `OverlayModal`: o corpo rola, cabecalho e rodape ficam, e o botao
+        "Cadastrar e vincular" nao some quando o formulario cresce (ele cresce:
+        CNPJ acrescenta quatro campos).
+      */}
       {cadastroCredorModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="card flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-3">
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--c-text)]">Cadastrar credor</h3>
-                <p className="text-sm text-[var(--c-muted)]">
-                  Cadastre uma pessoa como credor ativo e vincule a esta solicitacao.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={fecharCadastroCredorModal}
-                disabled={cadastroCredorSaving}
-              >
-                Fechar
-              </button>
+        /*
+          Sem `onFechar` DE PROPOSITO: o `OverlayModal` so liga o Escape quando
+          recebe um, e este painel guarda um formulario digitado. Fechar por
+          tecla acidental descartaria o cadastro. O caminho de saida sao os
+          botoes "Fechar"/"Cancelar" — que e exatamente o que a versao anterior
+          (feita a mao, sem tratador de teclado) fazia.
+        */
+        <OverlayModal
+          rotulo="Cadastrar credor"
+          largura="var(--modal-max-w-md, 640px)"
+        >
+          <div data-modal="cabecalho" className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-4">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--c-text)]">Cadastrar credor</h3>
+              <p className="text-sm text-[var(--c-muted)]">
+                Cadastre uma pessoa como credor ativo e vincule a esta solicitacao.
+              </p>
             </div>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={fecharCadastroCredorModal}
+              disabled={cadastroCredorSaving}
+            >
+              Fechar
+            </button>
+          </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">
-              {erro && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                  {erro}
-                </div>
-              )}
+          <div className="p-4">
+            <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
-              <label className="grid gap-1 text-sm text-[var(--c-muted)]">
-                Nome do credor
+            <FormSecao colunas={2}>
+              <CampoForm label="Nome do credor">
                 <input
                   className="input"
                   name="nome"
@@ -1874,10 +1960,9 @@ export default function FinanceiroCard({
                   placeholder="Ex.: Fornecedor ABC"
                   disabled={cadastroCredorSaving}
                 />
-              </label>
+              </CampoForm>
 
-              <label className="grid gap-1 text-sm text-[var(--c-muted)]">
-                CPF/CNPJ
+              <CampoForm label="CPF/CNPJ">
                 <input
                   className="input"
                   name="cpf_cnpj"
@@ -1886,10 +1971,9 @@ export default function FinanceiroCard({
                   placeholder="CPF ou CNPJ do credor"
                   disabled={cadastroCredorSaving}
                 />
-              </label>
+              </CampoForm>
 
-              <label className="grid gap-1 text-sm text-[var(--c-muted)]">
-                Telefone
+              <CampoForm label="Telefone">
                 <input
                   className="input"
                   name="telefone"
@@ -1898,10 +1982,9 @@ export default function FinanceiroCard({
                   placeholder="(00) 00000-0000"
                   disabled={cadastroCredorSaving}
                 />
-              </label>
+              </CampoForm>
 
-              <label className="grid gap-1 text-sm text-[var(--c-muted)]">
-                Email
+              <CampoForm label="Email">
                 <input
                   className="input"
                   name="email"
@@ -1911,116 +1994,107 @@ export default function FinanceiroCard({
                   placeholder="email@fornecedor.com"
                   disabled={cadastroCredorSaving}
                 />
-              </label>
+              </CampoForm>
+            </FormSecao>
 
-              {/* Aparecem e somem conforme o DOCUMENTO digitado: 14 digitos e CNPJ. Mostrar sempre
-                  faria o formulario pedir nome fantasia de pessoa fisica, que nao existe. */}
-              {onlyDigits(cadastroCredorForm.cpf_cnpj).length === 14 && (
-                <>
-                  <label className="grid gap-1 text-sm text-[var(--c-muted)]">
-                    Nome fantasia *
-                    <input
-                      className="input"
-                      name="nome_fantasia"
-                      value={cadastroCredorForm.nome_fantasia}
-                      onChange={handleCadastroCredorChange}
-                      placeholder="Como a empresa e conhecida"
-                      disabled={cadastroCredorSaving}
-                    />
-                  </label>
+            {/* Aparecem e somem conforme o DOCUMENTO digitado: 14 digitos e CNPJ. Mostrar sempre
+                faria o formulario pedir nome fantasia de pessoa fisica, que nao existe. */}
+            {onlyDigits(cadastroCredorForm.cpf_cnpj).length === 14 && (
+              <FormSecao legenda="Representante legal" colunas={2}>
+                <CampoForm label="Nome fantasia" obrigatorio linha>
+                  <input
+                    className="input"
+                    name="nome_fantasia"
+                    value={cadastroCredorForm.nome_fantasia}
+                    onChange={handleCadastroCredorChange}
+                    placeholder="Como a empresa e conhecida"
+                    disabled={cadastroCredorSaving}
+                  />
+                </CampoForm>
 
-                  <div className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--c-muted)]">
-                    Representante legal
-                  </div>
-                  <label className="grid gap-1 text-sm text-[var(--c-muted)]">
-                    Nome *
-                    <input
-                      className="input"
-                      name="representante_nome"
-                      value={cadastroCredorForm.representante_nome}
-                      onChange={handleCadastroCredorChange}
-                      placeholder="Quem assina pela empresa"
-                      disabled={cadastroCredorSaving}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-sm text-[var(--c-muted)]">
-                    CPF *
-                    <input
-                      className="input"
-                      name="representante_cpf"
-                      value={cadastroCredorForm.representante_cpf}
-                      onChange={handleCadastroCredorChange}
-                      placeholder="Somente numeros"
-                      disabled={cadastroCredorSaving}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-sm text-[var(--c-muted)]">
-                    Cargo
-                    <input
-                      className="input"
-                      name="representante_cargo"
-                      value={cadastroCredorForm.representante_cargo}
-                      onChange={handleCadastroCredorChange}
-                      placeholder="Socio, diretor, procurador"
-                      disabled={cadastroCredorSaving}
-                    />
-                  </label>
-                </>
-              )}
-            </div>
-
-            <div className="flex flex-col-reverse gap-2 border-t border-[var(--c-border)] pt-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={fecharCadastroCredorModal}
-                disabled={cadastroCredorSaving}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleCadastrarCredor}
-                disabled={cadastroCredorSaving}
-              >
-                {cadastroCredorSaving ? 'Cadastrando...' : 'Cadastrar e vincular'}
-              </button>
-            </div>
+                <CampoForm label="Nome" obrigatorio>
+                  <input
+                    className="input"
+                    name="representante_nome"
+                    value={cadastroCredorForm.representante_nome}
+                    onChange={handleCadastroCredorChange}
+                    placeholder="Quem assina pela empresa"
+                    disabled={cadastroCredorSaving}
+                  />
+                </CampoForm>
+                <CampoForm label="CPF" obrigatorio>
+                  <input
+                    className="input"
+                    name="representante_cpf"
+                    value={cadastroCredorForm.representante_cpf}
+                    onChange={handleCadastroCredorChange}
+                    placeholder="Somente numeros"
+                    disabled={cadastroCredorSaving}
+                  />
+                </CampoForm>
+                <CampoForm label="Cargo">
+                  <input
+                    className="input"
+                    name="representante_cargo"
+                    value={cadastroCredorForm.representante_cargo}
+                    onChange={handleCadastroCredorChange}
+                    placeholder="Socio, diretor, procurador"
+                    disabled={cadastroCredorSaving}
+                  />
+                </CampoForm>
+              </FormSecao>
+            )}
           </div>
-        </div>
+
+          <div data-modal="rodape" className="app-actionbar border-t border-[var(--c-border)] p-4">
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={fecharCadastroCredorModal}
+              disabled={cadastroCredorSaving}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleCadastrarCredor}
+              disabled={cadastroCredorSaving}
+            >
+              {cadastroCredorSaving ? 'Cadastrando...' : 'Cadastrar e vincular'}
+            </button>
+          </div>
+        </OverlayModal>
       )}
 
+      {/* R9/R27 — trocar o credor interrompe a leitura da solicitacao: modal.
+          A casca vira `OverlayModal` para o rodape ("Salvar credor") nao sair
+          do campo de visao quando a busca devolve muitos resultados. */}
       {credorModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="card w-full max-w-xl space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--c-text)]">Editar credor da solicitacao</h3>
-                <p className="text-sm text-[var(--c-muted)]">
-                  Atualize o credor vinculado ao pagamento desta solicitacao.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => {
-                  setCredorModalOpen(false);
-                  setCredorSearch('');
-                  setCredorOptions([]);
-                  setCredorSelecionado(solicitacao?.parceiro || null);
-                }}
-                disabled={credorSaving}
-              >
-                Fechar
-              </button>
+        <OverlayModal
+          rotulo="Editar credor da solicitacao"
+          largura="var(--modal-max-w-md, 640px)"
+          onFechar={credorSaving ? undefined : fecharCredorModal}
+        >
+          <div data-modal="cabecalho" className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-4">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--c-text)]">Editar credor da solicitacao</h3>
+              <p className="text-sm text-[var(--c-muted)]">
+                Atualize o credor vinculado ao pagamento desta solicitacao.
+              </p>
             </div>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={fecharCredorModal}
+              disabled={credorSaving}
+            >
+              Fechar
+            </button>
+          </div>
 
-            {erro && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                {erro}
-              </div>
-            )}
+          <div className="space-y-4 p-4">
+            <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
             <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2 text-sm">
               <span className="block text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Credor atual</span>
@@ -2036,15 +2110,17 @@ export default function FinanceiroCard({
               <label className="text-sm text-[var(--c-muted)]" htmlFor="solicitacao-credor-busca">
                 Buscar credor
               </label>
-              <input
-                id="solicitacao-credor-busca"
-                className="input w-full"
-                type="text"
-                value={credorSearch}
-                onChange={(event) => setCredorSearch(event.target.value)}
-                placeholder="Digite nome ou CPF/CNPJ do credor"
-                disabled={credorSaving}
-              />
+              <div className="flex">
+                <input
+                  id="solicitacao-credor-busca"
+                  className="input app-busca"
+                  type="text"
+                  value={credorSearch}
+                  onChange={(event) => setCredorSearch(event.target.value)}
+                  placeholder="Digite nome ou CPF/CNPJ do credor"
+                  disabled={credorSaving}
+                />
+              </div>
 
               {credorSearching && (
                 <div className="text-xs text-[var(--c-muted)]">Buscando credores...</div>
@@ -2071,62 +2147,69 @@ export default function FinanceiroCard({
                 </div>
               )}
             </div>
-
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setCredorSelecionado(null)}
-                disabled={credorSaving || !credorSelecionado}
-              >
-                Remover vinculo
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleSalvarCredor}
-                disabled={credorSaving}
-              >
-                {credorSaving ? 'Salvando...' : 'Salvar credor'}
-              </button>
-            </div>
           </div>
-        </div>
+
+          <div data-modal="rodape" className="app-actionbar border-t border-[var(--c-border)] p-4">
+            <button
+              type="button"
+              className="btn btn-outline btn-perigo-suave"
+              onClick={() => setCredorSelecionado(null)}
+              disabled={credorSaving || !credorSelecionado}
+            >
+              Remover vinculo
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary app-actionbar-apartada"
+              onClick={handleSalvarCredor}
+              disabled={credorSaving}
+            >
+              {credorSaving ? 'Salvando...' : 'Salvar credor'}
+            </button>
+          </div>
+        </OverlayModal>
       )}
 
       {modalOpen && (
-        <OverlayModal rotulo="Gerar conta" largura="var(--modal-max-w-lg, 860px)">
-          <div className="space-y-4 overflow-y-auto p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-[var(--c-text)]">Gerar conta</h3>
-                <p className="text-sm text-slate-500">
-                  O sistema sugere os dados da solicitacao. Voce confirma e cria o titulo.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => {
-                  setErro('');
-                  setModalOpen(false);
-                  resetModalState(solicitacao);
-                }}
-              >
-                Fechar
-              </button>
+        /*
+          Idem: nada de Escape aqui. Este e o formulario mais longo da tela
+          (rateios, N titulos, N parcelas) — perder tudo por uma tecla seria
+          pior que o defeito que a migracao veio consertar.
+        */
+        <OverlayModal
+          rotulo="Gerar conta"
+          largura="var(--modal-max-w-lg, 860px)"
+        >
+          {/*
+            R27 — o cabecalho e o rodape saem do corpo rolante. Este e o modal
+            mais alto do sistema (rateios + N titulos + N parcelas cada): sem a
+            marcacao, era exatamente aqui que o botao "Confirmar" ficava fora
+            do painel, cortado em silencio.
+          */}
+          <div data-modal="cabecalho" className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-4">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--c-text)]">Gerar conta</h3>
+              <p className="text-sm text-[var(--c-muted)]">
+                O sistema sugere os dados da solicitacao. Voce confirma e cria o titulo.
+              </p>
             </div>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={fecharModalGerarConta}
+              disabled={saving}
+            >
+              Fechar
+            </button>
+          </div>
 
-            {erro && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                {erro}
-              </div>
-            )}
+          <div className="space-y-4 p-4">
+            <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
-            <form className="space-y-4" onSubmit={handleSubmit}>
+            <form id="form-gerar-conta" className="space-y-4" onSubmit={handleSubmit}>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Tipo</span>
+                  <span className="mb-1 block text-[var(--c-muted)]">Tipo</span>
                   <select
                     className="input w-full"
                     value={form.tipo}
@@ -2138,7 +2221,7 @@ export default function FinanceiroCard({
                 </label>
 
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Status inicial</span>
+                  <span className="mb-1 block text-[var(--c-muted)]">Status inicial</span>
                   <select
                     className="input w-full"
                     value={form.status}
@@ -2147,13 +2230,13 @@ export default function FinanceiroCard({
                     <option value="ABERTO">Aberto</option>
                     <option value="PREVISAO">Previsao</option>
                   </select>
-                  <span className="mt-1 block text-xs text-slate-500">
+                  <span className="mt-1 block text-xs text-[var(--c-muted)]">
                     Previsao entra nos relatorios, mas nao permite baixa ate virar aberto.
                   </span>
                 </label>
 
                 <div className="space-y-2 text-sm">
-                  <span className="block text-slate-500">{parceiroRoleTitle}</span>
+                  <span className="block text-[var(--c-muted)]">{parceiroRoleTitle}</span>
                   <input
                     className="input w-full"
                     type="text"
@@ -2163,16 +2246,16 @@ export default function FinanceiroCard({
                   />
 
                   {searchingPartners && (
-                    <div className="text-xs text-slate-500">Buscando parceiros...</div>
+                    <div className="text-xs text-[var(--c-muted)]">Buscando parceiros...</div>
                   )}
 
                   {partnerOptions.length > 0 && (
-                    <div className="max-h-48 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-2">
+                    <div className="max-h-48 space-y-2 overflow-y-auto rounded-2xl border border-[var(--c-border)] p-2">
                       {partnerOptions.map((partner) => (
                         <button
                           key={partner.id}
                           type="button"
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          className="w-full rounded-xl border border-[var(--c-border)] px-3 py-2 text-left text-sm hover:bg-[var(--c-bg)]"
                           onClick={() => {
                             setSelectedPartner(partner);
                             aplicarCredorPadraoNosPagamentos(partner);
@@ -2181,7 +2264,7 @@ export default function FinanceiroCard({
                           }}
                         >
                           <div className="font-medium text-[var(--c-text)]">{partner.nome}</div>
-                          <div className="text-xs text-slate-500">{partner.cpf_cnpj || '-'} {partner.telefone ? `- ${partner.telefone}` : ''}</div>
+                          <div className="text-xs text-[var(--c-muted)]">{partner.cpf_cnpj || '-'} {partner.telefone ? `- ${partner.telefone}` : ''}</div>
                         </button>
                       ))}
                     </div>
@@ -2190,22 +2273,28 @@ export default function FinanceiroCard({
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
+                {/*
+                  R6 — TODO campo de dinheiro desta tela (editavel ou so de
+                  leitura) leva `.input-moeda`: minimo de 180px, alinhado a
+                  direita e tabular, dimensionado para R$ 9.999.999.999,99. A
+                  celula "Obra" e texto e continua alinhada a esquerda.
+                */}
                 <div className="text-sm">
-                  <span className="mb-1 block text-slate-500">Valor</span>
-                  <div className="input flex items-center bg-slate-50 text-slate-700">
+                  <span className="mb-1 block text-[var(--c-muted)]">Valor</span>
+                  <div className="input input-moeda flex items-center justify-end bg-[var(--c-bg)] text-[var(--c-text)]">
                     {form.valor || 'R$ 0,00'}
                   </div>
                 </div>
                 <div className="text-sm">
-                  <span className="mb-1 block text-slate-500">Obra</span>
-                  <div className="input flex items-center bg-slate-50 text-slate-700">
+                  <span className="mb-1 block text-[var(--c-muted)]">Obra</span>
+                  <div className="input flex items-center bg-[var(--c-bg)] text-[var(--c-text)]">
                     {solicitacao.obra?.nome || '-'}
                   </div>
                 </div>
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Desconto concedido</span>
+                  <span className="mb-1 block text-[var(--c-muted)]">Desconto concedido</span>
                   <input
-                    className="input w-full"
+                    className="input input-moeda w-full"
                     placeholder="R$ 0,00"
                     value={form.desconto_financeiro}
                     onChange={(event) => setForm((current) => ({
@@ -2220,14 +2309,19 @@ export default function FinanceiroCard({
                   <span className="app-note mt-2">Opcional. Reduz o valor liquido do titulo.</span>
                 </label>
                 <div className="text-sm">
-                  <span className="mb-1 block text-slate-500">Valor liquido previsto</span>
-                  <div className="input flex items-center bg-slate-50 text-slate-700">
+                  <span className="mb-1 block text-[var(--c-muted)]">Valor liquido previsto</span>
+                  <div className="input input-moeda flex items-center justify-end bg-[var(--c-bg)] text-[var(--c-text)]">
                     {formatCurrency(valorLiquidoPrevisto)}
                   </div>
                 </div>
                 <div className="text-sm">
-                  <span className="mb-1 block text-slate-500">Total das formas</span>
-                  <div className={`input flex items-center ${totalBateComSolicitacao ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                  <span className="mb-1 block text-[var(--c-muted)]">Total das formas</span>
+                  <div
+                    className="input input-moeda flex items-center justify-end"
+                    style={totalBateComSolicitacao
+                      ? { background: 'var(--sem-success-bg)', color: 'var(--sem-success)' }
+                      : { background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }}
+                  >
                     {formatCurrency(totalPagamentos)}
                     {!totalBateComSolicitacao && ` (${diferencaPagamentos > 0 ? 'faltam' : 'sobram'} ${formatCurrency(Math.abs(diferencaPagamentos))})`}
                   </div>
@@ -2235,7 +2329,7 @@ export default function FinanceiroCard({
               </div>
 
               <div className="space-y-2">
-                <span className="block text-sm text-slate-500">Categoria financeira</span>
+                <span className="block text-sm text-[var(--c-muted)]">Categoria financeira</span>
                 <div className="relative">
                   <div className="flex gap-2">
                     <input
@@ -2279,16 +2373,16 @@ export default function FinanceiroCard({
                   </div>
 
                   {categoriasAutocomplete.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full z-10 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-10 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg">
                       {categoriasAutocomplete.map((categoria) => (
                         <button
                           key={categoria.id}
                           type="button"
-                          className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-[var(--c-bg)]"
                         onClick={() => selecionarCategoria(categoria)}
                       >
                         <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>
-                        <span className="block text-xs text-slate-500">
+                        <span className="block text-xs text-[var(--c-muted)]">
                             {categoria.tipo} - {getCategoriaDreResumo(categoria)}
                           </span>
                       </button>
@@ -2297,12 +2391,12 @@ export default function FinanceiroCard({
                   )}
 
                   {categoriaSearch.trim() && !selectedCategory && !loadingCategorias && categoriasAutocomplete.length === 0 && (
-                    <div className="absolute left-0 right-0 top-full z-10 mt-2 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-500 shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-10 mt-2 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-3 text-sm text-[var(--c-muted)] shadow-lg">
                       Nenhuma categoria encontrada. Use a lupa para pesquisar com mais detalhes.
                     </div>
                   )}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-[var(--c-muted)]">
                   {selectedCategory
                     ? `${selectedCategory.tipo} - ${getCategoriaDreResumo(selectedCategory)}`
                     : loadingCategorias
@@ -2311,24 +2405,37 @@ export default function FinanceiroCard({
                 </div>
               </div>
 
-              <label className="app-filter-field">
-                <span className="app-filter-label">Competencia DRE</span>
-                <input
-                  className="input w-full"
-                  type="date"
-                  value={form.competencia_data}
-                  onChange={(event) => setForm((current) => ({ ...current, competencia_data: event.target.value }))}
-                  required={isCategoriaClassificadaParaDre(selectedCategory)}
-                />
-                <span className="mt-1 block text-xs text-slate-500">
-                  {isCategoriaClassificadaParaDre(selectedCategory)
+              {/*
+                Estes campos usavam `app-filter-field`/`app-filter-label`, que
+                sao a faixa de FILTRO do sistema — e eles nao filtram nada:
+                escrevem o titulo. Alem de dizer a coisa errada no DOM, a marca
+                estrutural da R12 le a faixa de filtro como filtro. Viraram
+                `CampoForm`, que e o que eles sao.
+              */}
+              <FormSecao colunas={1}>
+                <CampoForm
+                  label="Competencia DRE"
+                  obrigatorio={isCategoriaClassificadaParaDre(selectedCategory)}
+                  hint={isCategoriaClassificadaParaDre(selectedCategory)
                     ? 'Obrigatoria para DRE. Informe o periodo economico real.'
                     : 'Opcional quando o titulo nao entra na DRE.'}
-                </span>
-              </label>
+                  linha
+                >
+                  <input
+                    className="input"
+                    type="date"
+                    value={form.competencia_data}
+                    onChange={(event) => setForm((current) => ({ ...current, competencia_data: event.target.value }))}
+                    required={isCategoriaClassificadaParaDre(selectedCategory)}
+                  />
+                </CampoForm>
+              </FormSecao>
 
               {form.tipo === 'PAGAR' && podeGerenciarDadosPagamento && (
-                <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3.5 dark:border-sky-900/70 dark:bg-sky-950/20">
+                <div
+                  className="rounded-2xl border p-3"
+                  style={{ borderColor: 'var(--sem-info-border)', background: 'var(--sem-info-bg)' }}
+                >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-[var(--c-text)]">Dados para pagamento do credor</div>
@@ -2363,15 +2470,14 @@ export default function FinanceiroCard({
                   </div>
 
                   {paymentDraft.preparar_pagamento_pix && (
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <FormSecao colunas={2}>
                       {loadingBeneficiaries && (
-                        <div className="app-note md:col-span-2">Carregando dados bancarios do credor...</div>
+                        <div className="app-note form-campo--linha">Carregando dados bancarios do credor...</div>
                       )}
 
-                      <label className="app-filter-field">
-                        <span className="app-filter-label">Favorecido bancario vinculado</span>
+                      <CampoForm label="Favorecido bancario vinculado">
                         <select
-                          className="input w-full"
+                          className="input"
                           value={paymentDraft.payment_beneficiary_id}
                           disabled={loadingBeneficiaries}
                           onChange={(event) => {
@@ -2394,11 +2500,13 @@ export default function FinanceiroCard({
                             </option>
                           ))}
                         </select>
-                      </label>
+                      </CampoForm>
 
-                      <label className="flex items-start gap-2 rounded-xl border border-sky-100 bg-white/70 px-3 py-2 text-sm text-[var(--c-text)] dark:border-sky-900/60 dark:bg-slate-950/20">
+                      <label
+                        className="form-group flex items-start gap-2 rounded-xl border px-3 py-2 text-sm text-[var(--c-text)]"
+                        style={{ borderColor: 'var(--sem-info-border)', background: 'var(--c-surface)' }}
+                      >
                         <input
-                          className="mt-0.5"
                           type="checkbox"
                           checked={paymentDraft.usar_credor_como_favorecido}
                           disabled={!selectedPartner}
@@ -2412,17 +2520,16 @@ export default function FinanceiroCard({
                         />
                         <span>
                           Usar o próprio credor como favorecido
-                          <span className="mt-0.5 block text-xs text-[var(--c-muted)]">
+                          <span className="mt-1 block text-xs text-[var(--c-muted)]">
                             Nome, documento e chave PIX vêm do Cadastro de Pessoas.
                           </span>
                         </span>
                       </label>
 
                       {paymentDraft.usar_credor_como_favorecido && parceiroPixOptions.length > 1 && (
-                        <label className="app-filter-field md:col-span-2">
-                          <span className="app-filter-label">Chave PIX cadastrada no credor</span>
+                        <CampoForm label="Chave PIX cadastrada no credor" linha>
                           <select
-                            className="input w-full"
+                            className="input"
                             value={`${paymentDraft.pix_tipo_chave}:${paymentDraft.pix_chave}`}
                             onChange={(event) => {
                               const pix = parceiroPixOptions.find((item) => `${item.tipo}:${item.chave}` === event.target.value);
@@ -2440,49 +2547,45 @@ export default function FinanceiroCard({
                               </option>
                             ))}
                           </select>
-                        </label>
+                        </CampoForm>
                       )}
 
-                      <label className="app-filter-field">
-                        <span className="app-filter-label">Nome do favorecido</span>
+                      <CampoForm label="Nome do favorecido" obrigatorio>
                         <input
-                          className="input w-full"
+                          className="input"
                           value={paymentDraft.nome}
                           onChange={(event) => setPaymentDraft((current) => ({ ...current, nome: event.target.value }))}
                           required
                         />
-                      </label>
-                      <label className="app-filter-field">
-                        <span className="app-filter-label">CPF/CNPJ</span>
+                      </CampoForm>
+                      <CampoForm label="CPF/CNPJ" obrigatorio>
                         <input
-                          className="input w-full"
+                          className="input"
                           value={maskCpfCnpj(paymentDraft.cpf_cnpj)}
                           onChange={(event) => setPaymentDraft((current) => ({ ...current, cpf_cnpj: maskCpfCnpj(event.target.value) }))}
                           inputMode="numeric"
                           maxLength={18}
                           required
                         />
-                      </label>
-                      <label className="app-filter-field">
-                        <span className="app-filter-label">Tipo da chave PIX</span>
+                      </CampoForm>
+                      <CampoForm label="Tipo da chave PIX">
                         <select
-                          className="input w-full"
+                          className="input"
                           value={paymentDraft.pix_tipo_chave}
                           onChange={(event) => setPaymentDraft((current) => ({ ...current, pix_tipo_chave: event.target.value }))}
                         >
                           {PIX_TIPOS_CHAVE.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
                         </select>
-                      </label>
-                      <label className="app-filter-field">
-                        <span className="app-filter-label">Chave PIX</span>
+                      </CampoForm>
+                      <CampoForm label="Chave PIX" obrigatorio>
                         <input
-                          className="input w-full"
+                          className="input"
                           value={paymentDraft.pix_chave}
                           onChange={(event) => setPaymentDraft((current) => ({ ...current, pix_chave: event.target.value }))}
                           required
                         />
-                      </label>
-                    </div>
+                      </CampoForm>
+                    </FormSecao>
                   )}
                 </div>
               )}
@@ -2496,9 +2599,12 @@ export default function FinanceiroCard({
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      totalRateioValido ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                    }`}>
+                    <span
+                      className="valor-tabular rounded-full px-3 py-1 text-xs font-semibold"
+                      style={totalRateioValido
+                        ? { background: 'var(--sem-success-bg)', color: 'var(--sem-success)' }
+                        : { background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }}
+                    >
                       {(form.rateios || []).length === 0
                         ? 'Sem rateio'
                         : `${formatCurrency(totalRateioValor)} - ${totalRateioPercentual.toFixed(2)}%`}
@@ -2512,9 +2618,9 @@ export default function FinanceiroCard({
                 {(form.rateios || []).length > 0 && (
                   <div className="space-y-3">
                     {(form.rateios || []).map((rateio, rateioIndex) => (
-                      <div key={rateio.id || rateioIndex} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-2 xl:grid-cols-12">
+                      <div key={rateio.id || rateioIndex} className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 md:grid-cols-2 xl:grid-cols-12">
                         <label className="text-sm xl:col-span-4">
-                          <span className="mb-1 block text-slate-500">Obra/centro de custo</span>
+                          <span className="mb-1 block text-[var(--c-muted)]">Obra/centro de custo</span>
                           <select
                             className="input w-full"
                             value={rateio.obra_id}
@@ -2529,7 +2635,7 @@ export default function FinanceiroCard({
                           </select>
                         </label>
                         <label className="text-sm xl:col-span-2">
-                          <span className="mb-1 block text-slate-500">Tipo</span>
+                          <span className="mb-1 block text-[var(--c-muted)]">Tipo</span>
                           <select
                             className="input w-full"
                             value={rateio.tipo_rateio}
@@ -2541,9 +2647,9 @@ export default function FinanceiroCard({
                         </label>
                         {rateio.tipo_rateio === 'VALOR' ? (
                           <label className="text-sm xl:col-span-2">
-                            <span className="mb-1 block text-slate-500">Valor</span>
+                            <span className="mb-1 block text-[var(--c-muted)]">Valor</span>
                             <input
-                              className="input w-full"
+                              className="input input-moeda w-full"
                               placeholder="R$ 0,00"
                               value={rateio.valor_rateio}
                               onChange={(event) => updateRateio(rateioIndex, 'valor_rateio', normalizeCurrencyTyping(event.target.value))}
@@ -2552,7 +2658,7 @@ export default function FinanceiroCard({
                           </label>
                         ) : (
                           <label className="text-sm xl:col-span-2">
-                            <span className="mb-1 block text-slate-500">Percentual</span>
+                            <span className="mb-1 block text-[var(--c-muted)]">Percentual</span>
                             <input
                               className="input w-full"
                               inputMode="decimal"
@@ -2563,7 +2669,7 @@ export default function FinanceiroCard({
                           </label>
                         )}
                         <label className="text-sm xl:col-span-3">
-                          <span className="mb-1 block text-slate-500">Observacoes</span>
+                          <span className="mb-1 block text-[var(--c-muted)]">Observacoes</span>
                           <input
                             className="input w-full"
                             placeholder="Opcional"
@@ -2666,7 +2772,7 @@ export default function FinanceiroCard({
                         ? 'Crie titulos separados com vencimento, forma e valor proprios ate fechar o valor da solicitacao.'
                         : 'Informe o titulo unico desta solicitacao. Marque a opcao abaixo para gerar multiplos titulos.'}
                     </div>
-                    <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <label className="mt-3 flex items-center gap-2 text-sm font-medium text-[var(--c-text)]">
                       <input
                         type="checkbox"
                         checked={geracaoMultiplaTitulos}
@@ -2676,7 +2782,7 @@ export default function FinanceiroCard({
                       Gerar multiplos titulos
                     </label>
                     {freteTerceiroObrigatorio ? (
-                      <div className="mt-1 text-xs text-amber-700">
+                      <div className="mt-1 text-xs" style={{ color: 'var(--sem-warning)' }}>
                         Obrigatorio para separar a compra do frete pago ao terceiro.
                       </div>
                     ) : null}
@@ -2704,13 +2810,16 @@ export default function FinanceiroCard({
                   );
 
                   return (
-                    <div key={pagamento.id || pagamentoIndex} className="financeiro-forma-pagamento-item space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
+                    <div key={pagamento.id || pagamentoIndex} className="financeiro-forma-pagamento-item space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
                           {geracaoMultiplaTitulos ? `Titulo ${pagamentoIndex + 1}` : 'Titulo unico'}
                         </div>
+                        {/* R2 — era um <button> sem classe .btn: alvo de clique abaixo do
+                            minimo de 32px. Agora e botao de verdade, em vermelho suave
+                            (destrutivo visivel). */}
                         {geracaoMultiplaTitulos && (form.pagamentos || []).length > 1 && (
-                          <button type="button" className="text-sm font-semibold text-rose-600" onClick={() => removerPagamento(pagamentoIndex)}>
+                          <button type="button" className="btn btn-outline btn-perigo-suave" onClick={() => removerPagamento(pagamentoIndex)}>
                             Remover
                           </button>
                         )}
@@ -2739,7 +2848,7 @@ export default function FinanceiroCard({
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <label className="text-sm">
-                          <span className="mb-1 block text-slate-500">Forma de pagamento</span>
+                          <span className="mb-1 block text-[var(--c-muted)]">Forma de pagamento</span>
                           <select
                             className="input w-full"
                             value={pagamento.forma_pagamento_id}
@@ -2754,14 +2863,14 @@ export default function FinanceiroCard({
                         </label>
 
                         <div className="text-sm">
-                          <span className="mb-1 block text-slate-500">Valor desta forma</span>
+                          <span className="mb-1 block text-[var(--c-muted)]">Valor desta forma</span>
                           {usaDetalhe ? (
-                            <div className="financeiro-forma-pagamento-readonly input flex items-center bg-slate-50 text-slate-700">
+                            <div className="financeiro-forma-pagamento-readonly input input-moeda flex items-center justify-end bg-[var(--c-bg)] text-[var(--c-text)]">
                               {pagamento.valor || 'R$ 0,00'}
                             </div>
                           ) : (
                             <input
-                              className="input w-full"
+                              className="input input-moeda w-full"
                               type="text"
                               inputMode="decimal"
                               placeholder="R$ 0,00"
@@ -2776,7 +2885,7 @@ export default function FinanceiroCard({
                       <div className="grid gap-3 md:grid-cols-2">
                         {formaPermiteParcelamentoOperacional(forma) ? (
                           <label className="text-sm">
-                            <span className="mb-1 block text-slate-500">Parcelas</span>
+                            <span className="mb-1 block text-[var(--c-muted)]">Parcelas</span>
                             <input
                               className="input w-full"
                               type="number"
@@ -2788,14 +2897,14 @@ export default function FinanceiroCard({
                           </label>
                         ) : (
                           <div className="text-sm">
-                            <span className="mb-1 block text-slate-500">Parcelas</span>
-                            <div className="financeiro-forma-pagamento-readonly input flex items-center bg-slate-50 text-slate-500">1 parcela</div>
+                            <span className="mb-1 block text-[var(--c-muted)]">Parcelas</span>
+                            <div className="financeiro-forma-pagamento-readonly input flex items-center bg-[var(--c-bg)] text-[var(--c-muted)]">1 parcela</div>
                           </div>
                         )}
 
                         {usaCartao ? (
                           <label className="text-sm">
-                            <span className="mb-1 block text-slate-500">Data da compra</span>
+                            <span className="mb-1 block text-[var(--c-muted)]">Data da compra</span>
                             <input
                               className="input w-full"
                               type="date"
@@ -2805,12 +2914,12 @@ export default function FinanceiroCard({
                           </label>
                         ) : usaDetalhe ? (
                           <div className="text-sm">
-                            <span className="mb-1 block text-slate-500">Vencimento</span>
-                            <div className="financeiro-forma-pagamento-readonly input flex items-center bg-slate-50 text-slate-500">Definido nas parcelas</div>
+                            <span className="mb-1 block text-[var(--c-muted)]">Vencimento</span>
+                            <div className="financeiro-forma-pagamento-readonly input flex items-center bg-[var(--c-bg)] text-[var(--c-muted)]">Definido nas parcelas</div>
                           </div>
                         ) : (
                           <label className="text-sm">
-                            <span className="mb-1 block text-slate-500">Vencimento</span>
+                            <span className="mb-1 block text-[var(--c-muted)]">Vencimento</span>
                             <input
                               className="input w-full"
                               type="date"
@@ -2825,7 +2934,7 @@ export default function FinanceiroCard({
                       {forma?.exige_cartao && (
                         <div className="space-y-2">
                           <label className="text-sm">
-                            <span className="mb-1 block text-slate-500">Cartao utilizado</span>
+                            <span className="mb-1 block text-[var(--c-muted)]">Cartao utilizado</span>
                             <select
                               className="input w-full"
                               value={pagamento.cartao_id || ''}
@@ -2841,13 +2950,18 @@ export default function FinanceiroCard({
                                 );
                               })}
                             </select>
-                            <span className="mt-1 block text-xs text-slate-500">
+                            <span className="mt-1 block text-xs text-[var(--c-muted)]">
                               A conta vinculada ao cartao define a empresa que realizou o pagamento.
                             </span>
                           </label>
 
                           {cartaoSelecionado && (
-                            <div className={`rounded-lg border px-3 py-2 text-xs ${cartaoEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                            <div
+                              className="rounded-xl border px-3 py-2 text-xs"
+                              style={cartaoEntreEmpresas
+                                ? { borderColor: 'var(--sem-warning-border)', background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }
+                                : { borderColor: 'var(--sem-success-border)', background: 'var(--sem-success-bg)', color: 'var(--sem-success)' }}
+                            >
                               {cartaoEntreEmpresas
                                 ? `Entre empresas automatico: ${empresaContaCartao?.nome || 'empresa do cartao'} paga titulo de ${empresaTitulo?.nome || 'empresa da obra'}. O titulo e a classificacao gerencial permanecem na empresa da obra.`
                                 : `Pagamento na mesma empresa do titulo: ${empresaTitulo?.nome || empresaContaCartao?.nome || 'empresa da obra'}.`}
@@ -2858,19 +2972,19 @@ export default function FinanceiroCard({
 
                       {usaDetalhe && (
                         <div className="space-y-3">
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-[var(--c-muted)]">
                             Informe vencimento e valor de cada {getLabelParcelaForma(forma)}.
                           </div>
                           {(pagamento.parcelas || []).map((parcela, parcelaIndex) => (
-                            <div key={parcelaIndex} className="financeiro-forma-pagamento-parcela rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <div key={parcelaIndex} className="financeiro-forma-pagamento-parcela rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
                                 Parcela {parcelaIndex + 1}/{quantidade}
                               </div>
                               <div className="grid gap-3 md:grid-cols-2">
                                 <label className="text-sm">
-                                  <span className="mb-1 block text-slate-500">Valor</span>
+                                  <span className="mb-1 block text-[var(--c-muted)]">Valor</span>
                                   <input
-                                    className="input w-full"
+                                    className="input input-moeda w-full"
                                     type="text"
                                     inputMode="decimal"
                                     value={parcela.valor || ''}
@@ -2880,7 +2994,7 @@ export default function FinanceiroCard({
                                   />
                                 </label>
                                 <label className="text-sm">
-                                  <span className="mb-1 block text-slate-500">Vencimento</span>
+                                  <span className="mb-1 block text-[var(--c-muted)]">Vencimento</span>
                                   <input
                                     className="input w-full"
                                     type="date"
@@ -2893,7 +3007,7 @@ export default function FinanceiroCard({
                                 {formaAceitaDadosBoletoOuGuia(forma) && (
                                   <>
                                     <label className="text-sm md:col-span-2">
-                                      <span className="mb-1 block text-slate-500">Documento ou referencia</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Documento ou referencia</span>
                                       <input
                                         className="input w-full"
                                         value={parcela.numero_documento || ''}
@@ -2902,7 +3016,7 @@ export default function FinanceiroCard({
                                       />
                                     </label>
                                     <label className="text-sm">
-                                      <span className="mb-1 block text-slate-500">Codigo do banco</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Codigo do banco</span>
                                       <input
                                         className="input w-full"
                                         inputMode="numeric"
@@ -2914,7 +3028,7 @@ export default function FinanceiroCard({
                                       />
                                     </label>
                                     <label className="text-sm">
-                                      <span className="mb-1 block text-slate-500">Linha digitavel</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Linha digitavel</span>
                                       <input
                                         className="input w-full"
                                         value={parcela.linha_digitavel || ''}
@@ -2923,7 +3037,7 @@ export default function FinanceiroCard({
                                       />
                                     </label>
                                     <label className="text-sm md:col-span-2">
-                                      <span className="mb-1 block text-slate-500">Codigo de barras</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Codigo de barras</span>
                                       <input
                                         className="input w-full"
                                         value={parcela.codigo_barras || ''}
@@ -2935,7 +3049,10 @@ export default function FinanceiroCard({
                                 )}
 
                                 {isFormaCheque(forma) && (
-                                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800 md:col-span-2">
+                                  <div
+                                    className="rounded-xl border px-3 py-2 text-xs md:col-span-2"
+                                    style={{ borderColor: 'var(--sem-warning-border)', background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }}
+                                  >
                                     Os dados do cheque serao informados na baixa, quando o instrumento real for definido.
                                   </div>
                                 )}
@@ -2949,102 +3066,119 @@ export default function FinanceiroCard({
                 })}
               </div>
 
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    setErro('');
-                    setModalOpen(false);
-                    resetModalState(solicitacao);
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={saving || loadingBeneficiaries}
-                >
-                  {saving ? 'Gerando...' : loadingBeneficiaries ? 'Carregando credor...' : 'Confirmar'}
-                </button>
-              </div>
             </form>
+          </div>
+
+          {/*
+            O rodape sai do <form> para poder ficar FIXO no painel (R27); o
+            botao continua submetendo o MESMO formulario pelo atributo `form`,
+            entao nem o handler nem a validacao nativa dos campos mudam.
+          */}
+          <div data-modal="rodape" className="app-actionbar border-t border-[var(--c-border)] p-4">
+            <button
+              type="button"
+              className="btn btn-outline app-actionbar-apartada"
+              onClick={fecharModalGerarConta}
+              disabled={saving}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="form-gerar-conta"
+              className="btn btn-primary"
+              disabled={saving || loadingBeneficiaries}
+            >
+              {saving ? 'Gerando...' : loadingBeneficiaries ? 'Carregando credor...' : 'Confirmar'}
+            </button>
           </div>
         </OverlayModal>
       )}
 
+      {/*
+        Modal de escolha DENTRO do modal de gerar conta: o `ModalPortal`
+        empilha por ordem de montagem, entao este fica por cima e o Escape
+        fecha so ele. O `fixed inset-0` com `z-[60]` a mao ficava fora dessa
+        pilha — e o `overflow-hidden` do painel matava o sticky de qualquer
+        coisa dentro (R18).
+      */}
       {modalOpen && categoriaModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="card flex max-h-[72vh] w-full max-w-2xl flex-col gap-3 overflow-hidden">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
-                <p className="text-xs text-slate-500">
-                  Pesquise pelo nome e escolha uma categoria compativel com o tipo do titulo.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setCategoriaModalOpen(false)}
-              >
-                Fechar
-              </button>
+        <OverlayModal
+          rotulo="Selecionar categoria financeira"
+          largura="var(--modal-max-w-xl, 1120px)"
+          onFechar={() => setCategoriaModalOpen(false)}
+        >
+          <div data-modal="cabecalho" className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-4">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
+              <p className="text-xs text-[var(--c-muted)]">
+                Pesquise pelo nome e escolha uma categoria compativel com o tipo do titulo.
+              </p>
             </div>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setCategoriaModalOpen(false)}
+            >
+              Fechar
+            </button>
+          </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div className="flex flex-col gap-3 p-4">
+            {/* R3 — a busca usa `.app-busca` (cresce ate 480px, minimo 220).
+                Ela declara `flex: 1`, entao PRECISA de um pai em linha: solta
+                num flex-column ela esticaria na VERTICAL. */}
+            <div className="flex">
               <input
-                className="input w-full"
+                className="input app-busca"
                 type="text"
                 placeholder="Buscar categoria por ID, nome ou descricao"
                 value={categoriaSearch}
                 onChange={(event) => setCategoriaSearch(event.target.value)}
               />
+            </div>
 
-              <div className="text-xs text-slate-500">
-                {loadingCategorias
-                  ? 'Carregando categorias financeiras...'
-                  : `${categoriasFiltradas.length} categoria(s) disponivel(is) para ${String(form.tipo || '').toLowerCase()}.`}
-              </div>
+            <div className="text-xs text-[var(--c-muted)]">
+              {loadingCategorias
+                ? 'Carregando categorias financeiras...'
+                : `${categoriasFiltradas.length} categoria(s) disponivel(is) para ${String(form.tipo || '').toLowerCase()}.`}
+            </div>
 
-              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 p-2">
-                {loadingCategorias ? (
-                  <div className="px-3 py-4 text-sm text-slate-500">
-                    Buscando categorias...
-                  </div>
-                ) : categoriasFiltradas.length === 0 ? (
-                  <div className="px-3 py-4 text-sm text-slate-500">
-                    Nenhuma categoria encontrada para esse filtro.
-                  </div>
-                ) : categoriasFiltradas.map((categoria) => (
-                  <button
-                    key={categoria.id}
-                    type="button"
-                    className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${
-                      selectedCategory?.id === categoria.id
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-slate-200 hover:bg-slate-50'
-                    }`}
-                    onClick={() => selecionarCategoria(categoria)}
-                  >
-                    <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="font-medium text-[var(--c-text)]">{categoria.nome}</div>
-                        <div className="text-xs text-slate-500">
-                          {categoria.tipo} - {categoria.descricao || 'Sem descricao complementar'}
-                        </div>
+            <div className="space-y-2 overscroll-contain rounded-2xl border border-[var(--c-border)] p-2">
+              {loadingCategorias ? (
+                <div className="px-3 py-4 text-sm text-[var(--c-muted)]">
+                  Buscando categorias...
+                </div>
+              ) : categoriasFiltradas.length === 0 ? (
+                <div className="px-3 py-4 text-sm text-[var(--c-muted)]">
+                  Nenhuma categoria encontrada para esse filtro.
+                </div>
+              ) : categoriasFiltradas.map((categoria) => (
+                <button
+                  key={categoria.id}
+                  type="button"
+                  className="w-full rounded-2xl border px-3 py-2 text-left text-sm transition"
+                  style={selectedCategory?.id === categoria.id
+                    ? { borderColor: 'var(--c-primary)', background: 'var(--sem-info-bg)' }
+                    : { borderColor: 'var(--c-border)' }}
+                  onClick={() => selecionarCategoria(categoria)}
+                >
+                  <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <div className="font-medium text-[var(--c-text)]">{categoria.nome}</div>
+                      <div className="text-xs text-[var(--c-muted)]">
+                        {categoria.tipo} - {categoria.descricao || 'Sem descricao complementar'}
                       </div>
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        #{categoria.id}
-                      </span>
                     </div>
-                  </button>
-                ))}
-              </div>
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+                      #{categoria.id}
+                    </span>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
-        </div>
+        </OverlayModal>
       )}
     </>
   );
