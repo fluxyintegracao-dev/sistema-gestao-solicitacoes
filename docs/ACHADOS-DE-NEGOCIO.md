@@ -735,6 +735,66 @@ porque cada colaborador tem exatamente uma pendência crítica.
 Fica registrado porque a suspeita era razoável e a resposta é verificável —
 se alguém a levantar de novo, o caminho já está andado.
 
+### N53. [CRÍTICO] A mesma consulta devolve resultados diferentes em máquinas diferentes, e a tela não avisa
+
+> **Classificado CRÍTICO por decisão do cliente em 05/09.** O argumento é dele e
+> eu assino: usuário obtendo resultado diferente da mesma consulta, em máquinas
+> diferentes, não é inconveniência de interface — é número errado chegando a
+> quem decide, sem nada na tela que denuncie.
+
+**O que acontece.** Duas telas de consulta guardam **no navegador** quais filtros
+aparecem. Essa preferência não é cosmética: ela **muda o conjunto de registros
+que a consulta devolve**. O mesmo usuário, com os mesmos filtros preenchidos,
+vê listas diferentes conforme a máquina em que abriu — e nenhuma das duas telas
+diz isso.
+
+**São dois mecanismos opostos, e os dois erram:**
+
+**1. Consulta de títulos — o filtro escondido NÃO é enviado.**
+`frontend/src/pages/FinanceiroTitulos.jsx:522` define `pickVisibleFilters`, e ela
+recorta o que vai para o servidor nas linhas **1108**, **1472** e **1567**. Um
+filtro que o usuário escondeu deixa de restringir a consulta.
+
+*Efeito:* alguém esconde "Obra" no desktop do escritório para desafogar a faixa.
+A consulta passa a trazer **todas as obras**. No notebook, onde o filtro continua
+visível e preenchido, traz **uma obra**. Mesma pergunta, dois totais — e o de
+cima é maior, que é a direção que engana.
+
+**2. Solicitações — o filtro escondido CONTINUA restringindo.**
+`frontend/src/pages/Solicitacoes/Filtros.jsx:150` (`alternarFiltroVisivel`) só
+mexe na lista do que aparece; o **valor permanece aplicado**. E a chave dessa
+preferência — `solicitacoes:filtros-visiveis` (`:113`, `:134`) — **não tem o id
+do usuário**, então numa estação compartilhada a escolha de um vale para o
+próximo que sentar ali.
+
+*Efeito:* a lista está recortada por um filtro que **não está na tela**. A pessoa
+vê "12 solicitações" e conclui que são todas. Não há como descobrir olhando.
+
+**O que separa isso de um defeito de layout.** A preferência de exibição virou
+**parâmetro de consulta**. São coisas de naturezas diferentes: o que aparece na
+tela é gosto do usuário; o que entra na pergunta ao servidor é regra do negócio.
+Enquanto as duas moram no mesmo lugar, mudar a aparência muda o número.
+
+**Não é pela URL.** Vale registrar porque a suspeita inicial foi essa: a
+preferência **não** viaja no endereço. Se viajasse, ao menos dois usuários com o
+mesmo link veriam o mesmo resultado. Ela mora no `localStorage` de cada
+navegador, que é justamente o que torna o resultado dependente da máquina e
+impossível de reproduzir por quem recebe o número.
+
+**Onde está no código.**
+- `frontend/src/pages/FinanceiroTitulos.jsx:522` (`pickVisibleFilters`), aplicada em `:1108`, `:1472`, `:1567`; preferência gravada em `:2052-2056`.
+- `frontend/src/pages/Solicitacoes/Filtros.jsx:150` (esconder não limpa), chave sem usuário em `:113` e `:134`.
+- A terceira tela com o mesmo seletor, `ProvisionamentosFinanceiros.jsx:172-179`, **faz o certo**: esconder limpa o valor. Serve de modelo para as outras duas.
+
+**O que decidir.** Duas saídas, e a escolha é do responsável:
+(a) **esconder sempre limpa o valor** — o filtro invisível nunca restringe nada
+(é o que a tela de Provisionamentos já faz); ou
+(b) **filtro com valor aplicado nunca pode ser escondido** — some da lista de
+escondíveis enquanto estiver preenchido.
+As duas resolvem. A (a) é mais simples; a (b) preserva o recorte de quem o
+montou de propósito. **O que não pode continuar é a terceira situação de hoje:
+esconder muda o resultado em silêncio, e cada máquina responde uma coisa.**
+
 ### N52. [CRÍTICO] O mapa de risco é desenhado a partir de quatro tabelas que ninguém alimenta — e ignora o risco que está na mesma resposta
 
 > **Classificado CRÍTICO por decisão do cliente em 05/09**, pelo argumento
