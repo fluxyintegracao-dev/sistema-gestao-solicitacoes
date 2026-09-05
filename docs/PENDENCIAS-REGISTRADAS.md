@@ -2993,3 +2993,52 @@ do que o comando casou. Uma amostra de duas linhas teria mostrado
 comentários com código de regra (R6, R19/R3, R21), não com `TODO`. Se um dia
 quisermos mapear dívida de verdade, é esse o padrão a varrer — e aí o
 levantamento tem matéria-prima real. Fica como proposta, não como pendência.
+
+---
+
+## 05/09 — Trinta minutos esperando um deploy que estava certo em não acontecer
+
+Duas corridas da matriz morreram por prazo, 15 minutos cada, esperando o
+preview servir o commit `fbaca9c`. O deploy não estava travado. Ele estava
+**certo em não existir**.
+
+O `fbaca9c` mexeu em três arquivos, todos em `frontend/scripts/` — provas e
+checks. Nada em `frontend/src`. A Vercel não republica quando o que muda não
+entra no build, então a marca do build ficaria no commit anterior para
+sempre, e a minha espera nunca terminaria.
+
+Medido, e é o ponto inteiro:
+
+```
+git diff --stat 445479e HEAD -- frontend/src frontend/index.html \
+    frontend/package.json frontend/vite.config.js
+(vazio)
+```
+
+**O preview já estava servindo, byte a byte, o aplicativo que eu queria
+medir.** Eu recusei a corrida porque o NÚMERO não batia.
+
+### O defeito de raciocínio, e ele é do mesmo dia inteiro
+
+A regra que eu tinha escrito — *"verificar build velho é o mesmo que não
+verificar"* — está certa. O que eu errei foi o que ela mede: **eu amarrei
+"mesmo aplicativo" a "mesmo commit"**, e as duas coisas não são a mesma. Todo
+commit de script, de prova ou de documentação quebra a igualdade de SHA sem
+mudar uma linha do que a pessoa vê.
+
+É a mesma família de tudo que me pegou hoje: o check que media a opacidade do
+ícone em vez do efeito do clique, o grep que contou "TODOS" como "TODO", a
+concordância entre duas listas lida como cobertura. **O indicador no lugar da
+coisa.**
+
+### O conserto
+
+A espera passou a perguntar a coisa certa antes de desistir: quando a marca
+não bate, ela compara o CÓDIGO DO APLICATIVO (`src`, `index.html`,
+`package.json`, `vite.config`) entre o commit servido e o pedido. Sem
+diferença, a corrida segue — e o cabeçalho da matriz registra os dois SHAs e
+o motivo, para ninguém ler depois achando que se mediu build velho.
+
+Com QUALQUER diferença de aplicativo, a espera continua exatamente como
+antes, e a mensagem de bloqueio agora diz **quais arquivos** diferem, em vez
+de mandar "verificar o deploy".

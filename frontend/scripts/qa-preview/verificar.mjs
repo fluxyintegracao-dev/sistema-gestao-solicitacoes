@@ -80,6 +80,10 @@ const filtroTelas = valorDe('--telas')?.split(',').map((s) => s.trim()).filter(B
 const capturar = !flag('--sem-capturas');
 
 let shaEsperado = valorDe('--esperar-sha');
+// Preenchido quando a marca do build difere do commit esperado mas o
+// APLICATIVO é o mesmo — vai para o cabeçalho da matriz, porque quem lê
+// precisa saber de que código ela está falando.
+let buildEquivalente = null;
 if (flag('--esperar-head')) {
   shaEsperado = execSync('git rev-parse HEAD', { cwd: RAIZ_REPO, encoding: 'utf8' }).trim();
 }
@@ -160,6 +164,45 @@ async function login(page) {
 }
 
 /* ----------------------------------------------- espera do deploy (Vercel) */
+/*
+  O QUE PRECISA SER O MESMO É O APLICATIVO, NÃO O COMMIT (05/09).
+
+  Esta espera comparava a marca do build com o SHA do commit e desistia em
+  15 minutos. Custou duas corridas perdidas — 30 minutos — esperando um
+  deploy que a Vercel tinha, com razão, decidido não fazer: o commit em
+  questão mexia SÓ em `frontend/scripts/`, que não entra no build. Nenhum
+  arquivo do aplicativo mudou, então não havia o que publicar, e a marca
+  ficaria no commit anterior para sempre.
+
+  Ou seja: o preview já estava servindo exatamente o código que eu queria
+  medir, e eu recusei a corrida porque o NÚMERO não batia.
+
+  Agora, quando a marca não bate, o harness pergunta a coisa certa antes de
+  desistir: o aplicativo servido é o mesmo que o meu? Ele compara o
+  CÓDIGO-FONTE do app (src, index.html, package.json, vite.config) entre o
+  commit publicado e o esperado. Se não há diferença, a corrida segue — e o
+  relatório registra os dois SHAs e o porquê, para ninguém achar depois que
+  a matriz mediu outra coisa.
+
+  Se houver QUALQUER diferença de aplicativo, a espera continua como antes:
+  medir build velho é o mesmo que não medir.
+*/
+function mesmoAplicativo(shaServido, shaAlvo) {
+  if (!shaServido || !shaAlvo) return null;
+  const alvos = ['frontend/src', 'frontend/index.html', 'frontend/package.json', 'frontend/vite.config.js'];
+  try {
+    const diferenca = execSync(
+      `git diff --name-only ${shaServido} ${shaAlvo} -- ${alvos.join(' ')}`,
+      { cwd: RAIZ_REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    ).trim();
+    return { igual: diferenca === '', arquivos: diferenca ? diferenca.split('\n') : [] };
+  } catch {
+    // Commit servido desconhecido para este clone (ex.: veio de outro
+    // branch): não dá para afirmar equivalência, então não se afirma.
+    return null;
+  }
+}
+
 async function esperarDeploy(page) {
   if (!shaEsperado) return;
   const limite = Date.now() + 15 * 60 * 1000;
@@ -172,8 +215,19 @@ async function esperarDeploy(page) {
       console.log(`\n[qa-preview] deploy confirmado: build ${sha.slice(0, 8)}`);
       return;
     }
+    const equivalente = mesmoAplicativo(sha, shaEsperado);
+    if (equivalente?.igual) {
+      buildEquivalente = { servido: sha, esperado: shaEsperado };
+      console.log(`\n[qa-preview] a marca do build é ${sha.slice(0, 8)} e não ${shaEsperado.slice(0, 8)}, MAS o aplicativo é o mesmo:`);
+      console.log('[qa-preview] nenhuma diferença em frontend/src, index.html, package.json ou vite.config entre os dois commits.');
+      console.log('[qa-preview] a Vercel não republica quando só mudam scripts ou documentação. Seguindo — e o relatório registra os dois.');
+      return;
+    }
     if (Date.now() > limite) {
-      throw new Error(`BLOQUEIO: 15min e o preview não serviu o commit ${shaEsperado.slice(0, 8)} (marca atual: "${sha || 'sem marca — build antigo'}"). Verifique o deploy da Vercel.`);
+      const porQue = equivalente
+        ? `o aplicativo DIFERE em ${equivalente.arquivos.length} arquivo(s) — ex.: ${equivalente.arquivos.slice(0, 3).join(', ')}`
+        : 'não foi possível comparar os dois commits neste clone';
+      throw new Error(`BLOQUEIO: 15min e o preview não serviu o commit ${shaEsperado.slice(0, 8)} (marca atual: "${sha || 'sem marca — build antigo'}"), e ${porQue}. Verifique o deploy da Vercel.`);
     }
     process.stdout.write('.');
     await page.waitForTimeout(20000);
@@ -1604,6 +1658,14 @@ function escreverSaidas(resultados, meta) {
   linhas.push('> · — N/A (a regra não se aplica; motivo registrado).');
   linhas.push('');
   linhas.push(`- Verificação: **${meta.quando}** · preview: ${meta.base} · build servido: \`${meta.build || 'sem marca'}\``);
+  if (meta.equivalencia) {
+    linhas.push(
+      `- **A marca do build é \`${meta.equivalencia.servido.slice(0, 8)}\` e o commit pedido foi \`${meta.equivalencia.esperado.slice(0, 8)}\`** —`
+      + ' e isso está certo: o aplicativo é IDÊNTICO entre os dois (nenhuma diferença em `frontend/src`, `index.html`,'
+      + ' `package.json` ou `vite.config`). Os commits no meio mexeram só em scripts de verificação e documentação, que não'
+      + ' entram no build, então a Vercel não republicou — não há build velho aqui.'
+    );
+  }
   linhas.push(`- Telas verificadas: ${resultados.length} · Itens: ${ITENS_DOD.join(', ')}`);
   const totalFalhas = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'FALHOU').length, 0);
   const totalSemDado = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'SEM DADO').length, 0);
@@ -2271,7 +2333,15 @@ const errosDeJs = [];
       console.log(`[qa-preview]   ${falhas === 0 ? '✓ sem falhas' : `✖ ${falhas} item(ns) FALHOU`}`);
     }
 
-    escreverSaidas(resultados, { quando: agora(), base: BASE, build });
+    escreverSaidas(resultados, {
+      quando: agora(),
+      base: BASE,
+      build,
+      // Quando a marca do build não é o commit pedido mas o aplicativo é o
+      // mesmo, isso vai para o cabeçalho da matriz. Matriz que não diz de
+      // que código está falando é matriz que alguém vai ler errado depois.
+      equivalencia: buildEquivalente || undefined
+    });
     const totalFalhas = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'FALHOU').length, 0);
     const semDado = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'SEM DADO').length, 0);
     /*
