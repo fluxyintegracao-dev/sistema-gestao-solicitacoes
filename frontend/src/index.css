@@ -2036,7 +2036,7 @@ a:hover {
 
 .sol-surface-card {
   background: var(--sol-surface);
-  border: 1px solid var(--sol-border-color);
+  border: 1px solid var(--ui-border);
   box-shadow: var(--sol-shadow);
 }
 
@@ -2109,8 +2109,8 @@ a:hover {
   min-height: 28px;
   padding: 0.2rem 0.65rem;
   border-radius: 999px;
-  border: 1px solid var(--sol-border-color);
-  background: color-mix(in srgb, var(--sol-surface-muted) 88%, var(--sol-surface));
+  border: 1px solid var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface-soft) 88%, var(--sol-surface));
 }
 
 .sol-filtros-soma-label {
@@ -2130,7 +2130,7 @@ a:hover {
 }
 
 .sol-filter-field {
-  border: 1px solid var(--sol-border-color);
+  border: 1px solid var(--ui-border);
   border-radius: 8px;
   background: var(--sol-surface);
   padding: 0.65rem 0.7rem 0.7rem;
@@ -2411,7 +2411,7 @@ a:hover {
   gap: 0.6rem;
   padding-bottom: 0.45rem;
   margin-bottom: 0.45rem;
-  border-bottom: 1px solid var(--sol-border-color);
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .sol-filter-multi-list {
@@ -2458,7 +2458,7 @@ a:hover {
   gap: 0.5rem;
   margin-top: 0.9rem;
   padding-top: 0.75rem;
-  border-top: 1px solid var(--sol-border-color);
+  border-top: 1px solid var(--ui-border);
 }
 
 .sol-floating-panel {
@@ -2992,8 +2992,8 @@ a:hover {
 }
 
 .solicitacao-nova-page .nova-solicitacao-results-list {
-  border-color: var(--sol-border-color);
-  background: color-mix(in srgb, var(--sol-surface-muted) 70%, transparent);
+  border-color: var(--ui-border);
+  background: color-mix(in srgb, var(--ui-surface-soft) 70%, transparent);
   border-radius: 12px;
   padding: 0.3rem;
 }
@@ -3020,8 +3020,8 @@ a:hover {
 
 .solicitacao-nova-page .nova-solicitacao-obra-results {
   z-index: 30;
-  border-color: color-mix(in srgb, var(--c-primary) 18%, var(--sol-border-color));
-  background: color-mix(in srgb, #ffffff 90%, var(--sol-surface-muted));
+  border-color: color-mix(in srgb, var(--c-primary) 18%, var(--ui-border));
+  background: color-mix(in srgb, #ffffff 90%, var(--ui-surface-soft));
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
 }
 
@@ -3049,7 +3049,7 @@ a:hover {
 }
 
 .solicitacao-nova-page .nova-solicitacao-obra-result:hover {
-  border-color: color-mix(in srgb, var(--c-primary) 22%, var(--sol-border-color));
+  border-color: color-mix(in srgb, var(--c-primary) 22%, var(--ui-border));
   background: color-mix(in srgb, var(--c-primary) 5%, #ffffff);
   transform: translateY(-1px);
 }
@@ -3140,7 +3140,7 @@ a:hover {
   gap: 0.7rem;
   margin-top: 0.35rem;
   padding-top: 0.9rem;
-  border-top: 1px solid color-mix(in srgb, var(--sol-border-color) 82%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--ui-border) 82%, transparent);
 }
 
 .solicitacao-nova-page .nova-solicitacao-anexos {
@@ -5062,7 +5062,7 @@ input[type="file"]:disabled {
 }
 
 .app-summary-card {
-  border: 1px solid var(--app-summary-border, var(--sol-border-color));
+  border: 1px solid var(--app-summary-border, var(--ui-border));
   border-radius: 12px;
   background: var(--app-summary-bg, var(--premium-glass-bg));
   padding: 0.75rem 0.8rem;
@@ -5284,7 +5284,7 @@ input[type="file"]:disabled {
 }
 
 .app-filter-field {
-  border: 1px solid var(--sol-border-color);
+  border: 1px solid var(--ui-border);
   border-radius: 12px;
   background: var(--premium-glass-bg);
   padding: 0.65rem 0.7rem 0.7rem;
@@ -5321,25 +5321,25 @@ input[type="file"]:disabled {
 
 .app-table-shell .table {
   width: 100%;
-  font-size: var(--sol-font-base);
+  font-size: var(--fonte-corpo);
 }
 
 .app-table-shell .table thead th {
-  font-size: var(--sol-font-header);
+  font-size: var(--fonte-detalhe);
   letter-spacing: 0.03em;
   padding-top: 10px;
   padding-bottom: 10px;
   background: color-mix(in srgb, var(--premium-glass-bg) 90%, transparent);
   color: color-mix(in srgb, var(--c-text) 78%, #334155);
-  border-bottom: 1px solid var(--sol-border-color);
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .app-table-shell .table tbody td {
-  font-size: var(--sol-font-base);
+  font-size: var(--fonte-corpo);
   line-height: 1.25rem;
   padding-top: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--sol-border-color);
+  border-bottom: 1px solid var(--ui-border);
   color: #102544;
 }
 
@@ -5361,7 +5361,7 @@ input[type="file"]:disabled {
 }
 
 .app-list-card {
-  border: 1px solid var(--sol-border-color);
+  border: 1px solid var(--ui-border);
   border-radius: 12px;
   background: var(--premium-glass-bg);
   padding: 0.9rem 1rem;
@@ -5369,7 +5369,7 @@ input[type="file"]:disabled {
 }
 
 .app-empty-card {
-  border: 1px solid var(--sol-border-color);
+  border: 1px solid var(--ui-border);
   border-radius: 12px;
   background: var(--premium-panel-bg);
   padding: 2rem 1rem;
@@ -5466,7 +5466,7 @@ input[type="file"]:disabled {
 }
 
 .finance-category-section {
-  border: 1px solid var(--sol-border-color);
+  border: 1px solid var(--ui-border);
   border-radius: 14px;
   background: var(--premium-glass-bg);
   padding: 0.85rem;
@@ -5578,7 +5578,7 @@ input[type="file"]:disabled {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  border: 1px solid var(--sol-border-color);
+  border: 1px solid var(--ui-border);
   border-radius: 14px;
 }
 
@@ -5588,7 +5588,7 @@ input[type="file"]:disabled {
   align-items: center;
   gap: 0.75rem;
   padding: 0.78rem 0.95rem;
-  border-top: 1px solid var(--sol-border-color);
+  border-top: 1px solid var(--ui-border);
   background: color-mix(in srgb, var(--premium-glass-bg) 92%, transparent);
   font-size: 0.84rem;
 }

@@ -2091,3 +2091,72 @@ As duas saídas:
   `ListaAvancada`, ganhando visões e filtros salvos.
 
 Está em (a) hoje, que é a opção que não remove nada.
+
+## O CSS de Compras restila o SHELL do sistema — meio corrigido, de propósito
+
+`modules/solicitacao-compra/compras-responsive.css` (1.365 linhas) entra
+**global** pelo `main.jsx` e vale onde a classe `.compras-responsive-scope`
+estiver: 13 rotas pelo `Layout.jsx`, mais uma aplicação à mão dentro da
+`SolicitacaoDetalhe`. Dentro desse escopo ele redefine **12 classes da
+topbar** e **15 classes genéricas `app-*`** — que são do sistema de design,
+não do módulo.
+
+E duas telas **já reformadas e aprovadas** estão nesse escopo
+(`configuracoes-status-pedidos-compra` e `configuracoes-cotacao`): usam o
+padrão e recebem, por cima, o dialeto de um módulo.
+
+### O que foi corrigido agora
+
+As **24 declarações de fonte abaixo do piso de 12px** — a menor era 9,28px —
+subiram para o degrau `--fonte-detalhe`. É regra, não estrutura, e o critério
+vigente desde 02/09 é explícito: entre "cabe mais" e "lê-se melhor", vence a
+leitura.
+
+### O que NÃO foi corrigido, e por quê
+
+As sobrescritas de `topbar-*` e `app-*`. Desfazê-las muda o arranjo das 13
+rotas — e essas rotas são justamente as que a rodada de Compras vai reformar.
+**Consertar a folha antes de reformar as telas quebraria as telas que estão
+para ser refeitas.** Vai junto com a rodada de Compras.
+
+## O tamanho real de Compras, medido (o cliente pediu cedo)
+
+Três levantamentos paralelos, 27 arquivos. O número que importa:
+
+| Classe | Telas | Linhas |
+|---|---|---:|
+| Wrappers (não fazer nada) | 2 | 10 |
+| Leves | 9 | ~2.400 |
+| Médias | 8 | ~4.100 |
+| **Pesadas** | **4** | **~11.000** |
+
+E as quatro pesadas são o projeto: `GerenciarCotacaoSolicitacao` (3.764
+linhas, **7 componentes num arquivo**, 42 `useState` só na página, 60 caixas
+do navegador), `PedidoCompraDetalhe` (2.746, 58 caixas), `NovaSolicitacaoCompra`
+(2.356, 46 `useState`) e `GestaoFornecedores`.
+
+**Três descobertas que mudam o plano:**
+
+1. **Duas das "telas" não existem**: `NovaCompraDireta` e `RevisarCompraDireta`
+   são wrappers de 5 linhas que renderizam o pai com uma flag. Reformar o pai
+   reforma as duas rotas de graça.
+2. **Não há economia de escala entre as telas de Revisar.** Medi de dois
+   jeitos independentes: o par mais parecido do conjunto tem 0,17 de
+   sobreposição de classes e 16 linhas idênticas. A intuição de "são a mesma
+   tela três vezes" é falsa — são markup próprio, uma a uma.
+3. **A duplicação real está em outro lugar, e é a mais cara**: o
+   `ModalRespostaInternaCotacao` (449 linhas, dentro do `Gerenciar`) é o MESMO
+   formulário da `CotacaoFornecedorPublica` — mesmos campos, mesma regra,
+   **zero linha em comum**. E a `CotacaoFornecedorPublica` já está reformada,
+   com `FormSecao`/`CampoForm`/`TabelaPadrao`, enquanto o interno tem 39
+   `<input>` crus. É trabalho já feito e não reaproveitado.
+
+**Onde o prazo pode estourar**: o comparativo de preços do `Gerenciar` tem
+duas tabelas cruas com coluna fixa e **colunas geradas dinamicamente, uma por
+fornecedor**. O `TabelaPadrao` não faz coluna dinâmica por dado. Ou o
+componente cresce (R16b), ou vira exceção registrada — é **decisão de
+produto**, e é o item de maior risco de prazo do módulo inteiro.
+
+**Também medido**: os dez relatórios de Compras não são "parecidos", são
+COPIADOS — `buildSearchParams` com o mesmo md5 nos dez. Ali a economia de
+escala existe de verdade: a primeira custa, as nove seguintes são aplicação.

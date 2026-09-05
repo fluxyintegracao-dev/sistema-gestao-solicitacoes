@@ -224,7 +224,7 @@ export default function CartoesRecarga() {
       const estavaEditando = Boolean(editandoId);
       await salvarCartaoRecarga({ ...form, ultimos_quatro: String(form.ultimos_quatro).replace(/\D/g, '') }, editandoId);
       limparRascunho();
-      avisar.sucesso(estavaEditando ? 'Alterações do cartão salvas.' : 'Cartão cadastrado.', undefined, { persistente: true });
+      avisar.sucesso(estavaEditando ? 'Alterações do cartão salvas.' : 'Cartão cadastrado.');
       await carregar({
         preservarAvisos: true,
         prefixoErro: 'A gravação passou, mas a lista abaixo não foi atualizada: '

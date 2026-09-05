@@ -83,7 +83,30 @@ export function useAvisos() {
       const iguais = atuais.some((aviso) => aviso.tipo === tipo && aviso.mensagem === texto);
       return iguais ? atuais : [...atuais, { id, tipo, mensagem: texto, titulo }];
     });
-    if (tipo === 'success' && !opcoes?.persistente) {
+    /*
+      R28 (decisão do cliente, 04/09; executada aqui em 05/09): o aviso de
+      SUCESSO passa a ser PERSISTENTE por padrão, fechado pela pessoa.
+
+      O motivo é o que se viu em dezenas de telas: a confirmação de gravação
+      sumia em 6s. Quem desviou o olhar para conferir outra coisa voltava
+      para uma tela sem nenhum sinal de que o registro tinha sido salvo — e
+      salvava de novo. Confirmação que some sozinha não confirma nada a quem
+      não estava olhando.
+
+      A mudança é GLOBAL de propósito: alterar isso tela a tela deixaria o
+      sistema falando dois idiomas sobre a mesma coisa.
+
+      `opcoes.efemero` reintroduz o sumiço automático para o caso raro em que
+      o sucesso é ruído (retorno de rotina que se repete muitas vezes na
+      mesma sessão). Não é o padrão, é a exceção — e quem a usar tem de dizer
+      por quê.
+
+      Verificado antes de inverter: os 117 arquivos que renderizam <Avisos>
+      passam `aoFechar`, então o "x" sempre existe. E o "x" só virou alvo
+      clicável de verdade nesta mesma leva (M1: ele tinha 16px). Aviso
+      persistente sem botão de fechar seria armadilha, não melhoria.
+    */
+    if (tipo === 'success' && opcoes?.efemero) {
       timers.current.set(id, setTimeout(() => fechar(id), TEMPO_SUCESSO));
     }
     return id;
@@ -97,8 +120,8 @@ export function useAvisos() {
 
   const avisar = useMemo(() => ({
     erro: (mensagem, titulo) => empilhar('error', mensagem, titulo),
-    // `opcoes.persistente` desliga o sumico automatico dos 6s — para a
-    // confirmacao de gravacao que precisa esperar a pessoa voltar o olhar.
+    // R28: sucesso e PERSISTENTE por padrao. `opcoes.efemero` devolve o
+    // sumico automatico dos 6s — excecao, nao regra.
     sucesso: (mensagem, titulo, opcoes) => empilhar('success', mensagem, titulo, opcoes),
     alerta: (mensagem, titulo) => empilhar('warning', mensagem, titulo),
     informacao: (mensagem, titulo) => empilhar('info', mensagem, titulo)

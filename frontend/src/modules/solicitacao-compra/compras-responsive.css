@@ -1,3 +1,27 @@
+/* ============================================================================
+   AVISO (05/09) — ESTE ARQUIVO RESTILA O SHELL DO SISTEMA
+   ----------------------------------------------------------------------------
+   Ele entra GLOBAL pelo main.jsx e vale onde `.compras-responsive-scope`
+   estiver — 13 rotas pelo Layout.jsx, mais uma aplicação à mão dentro da
+   SolicitacaoDetalhe. Dentro desse escopo ele redefine 12 classes da TOPBAR
+   e 15 classes genéricas `app-*`, que são do sistema de design e não deste
+   módulo. Duas telas JÁ REFORMADAS E APROVADAS estão nesse escopo
+   (configuracoes-status-pedidos-compra e configuracoes-cotacao): elas usam o
+   padrão e recebem, por cima, o dialeto de um módulo.
+
+   Corrigido AGORA, porque é regra e não estrutura: as 24 declarações de
+   fonte abaixo do piso de 12px (a menor era 9,28px) passaram para o degrau
+   `--fonte-detalhe`. O critério vigente desde 02/09 é CONFORTO E CLAREZA DE
+   LEITURA — entre "cabe mais" e "lê-se melhor", vence a leitura; mais
+   rolagem é aceitável, apertar os olhos não.
+
+   NÃO corrigido aqui, de propósito: as sobrescritas de `topbar-*` e `app-*`.
+   Desfazê-las muda o arranjo das 13 rotas, e essas rotas são justamente as
+   que a rodada de Compras vai reformar. Consertar a folha antes de reformar
+   as telas quebraria as telas que estão para ser refeitas. Vai junto com a
+   rodada de Compras, registrado em docs/PENDENCIAS-REGISTRADAS.md.
+   ========================================================================== */
+
 /*
  * Compras responsive surface
  *
@@ -56,7 +80,7 @@
 .compras-responsive-scope .topbar-status-chip {
   min-height: 1.75rem;
   padding-inline: 0.62rem;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .page {
@@ -133,7 +157,7 @@
   min-height: 2.35rem;
   padding: 0.48rem 0.78rem;
   border-radius: 0.58rem;
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   box-shadow: none;
 }
 
@@ -176,7 +200,7 @@
 .compras-responsive-scope :is(.sol-filtros-subtitle, .compras-filter-subtitle) {
   margin: 0.16rem 0 0;
   color: var(--compras-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
 }
 
@@ -193,7 +217,7 @@
 
 .compras-responsive-scope :is(.sol-filter-label, .app-filter-label) {
   color: var(--compras-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -238,7 +262,7 @@
 
 .compras-responsive-scope :is(.app-summary-label, .dashboard-metric-label) {
   color: var(--compras-muted);
-  font-size: 0.6rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -255,7 +279,7 @@
 .compras-responsive-scope .dashboard-metric-detail {
   margin-top: 0.18rem;
   color: var(--compras-muted);
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope :is(.compras-table-card, .app-table-shell, .sol-table-wrapper) {
@@ -277,13 +301,13 @@
 .compras-responsive-scope :is(.compras-data-table, .table, .sol-table) th {
   padding-block: 0.48rem;
   color: var(--compras-muted);
-  font-size: 0.63rem;
+  font-size: var(--fonte-detalhe);
   letter-spacing: 0.065em;
 }
 
 .compras-responsive-scope :is(.compras-data-table, .table, .sol-table) td {
   padding-block: 0.48rem;
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.15rem;
 }
 
@@ -297,7 +321,7 @@
   width: max-content;
   margin: 0.4rem 0.65rem 0.5rem;
   color: var(--compras-muted);
-  font-size: 0.62rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compras-mobile-list {
@@ -343,7 +367,7 @@
 .compras-responsive-scope .compras-mobile-record-title > span {
   margin-top: 0.16rem;
   color: var(--compras-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compras-mobile-record-grid {
@@ -361,7 +385,7 @@
 .compras-responsive-scope .compras-mobile-field > span {
   display: block;
   color: var(--compras-muted);
-  font-size: 0.58rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -372,7 +396,7 @@
   margin-top: 0.18rem;
   overflow-wrap: anywhere;
   color: var(--compras-ink);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compras-mobile-record-actions {
@@ -521,7 +545,7 @@
     max-width: 100%;
     margin-bottom: 0.15rem;
     overflow: hidden;
-    font-size: 0.58rem;
+    font-size: var(--fonte-detalhe);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -728,7 +752,7 @@
 
 /* Itens de compra: catalogacao e controles compartilhados pela tabela expansivel. */
 .compras-responsive-scope .compra-item-index {
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.08em;
   color: var(--c-muted);
@@ -742,7 +766,7 @@
   min-height: 1.55rem;
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: 0.04em;
@@ -789,7 +813,7 @@
 .compras-responsive-scope .compra-item-cataloged-banner > span,
 .compras-responsive-scope .compra-item-eyebrow {
   color: var(--c-muted);
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -873,7 +897,7 @@
   border-radius: 0.38rem;
   background: transparent;
   color: var(--c-muted);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   cursor: pointer;
 }
@@ -966,7 +990,7 @@
 .compras-responsive-scope .compra-item-autocomplete-loading {
   padding-right: 0.25rem;
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   white-space: nowrap;
 }
 
@@ -1066,7 +1090,7 @@
 .compras-responsive-scope .compra-item-autocomplete-options small,
 .compras-responsive-scope .compra-item-autocomplete-help {
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compra-item-autocomplete-empty {
@@ -1081,7 +1105,7 @@
   align-items: center;
   gap: 0.35rem;
   color: #17633b;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 650;
 }
 
@@ -1093,7 +1117,7 @@
 
 .compras-responsive-scope .compra-item-code-preview small {
   color: var(--c-muted);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compra-item-code-preview {
@@ -1180,7 +1204,7 @@
   padding: 0.55rem 0.65rem;
   background: var(--c-surface-muted);
   color: var(--c-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.07em;
   text-align: left;
@@ -1249,7 +1273,7 @@
 .compras-responsive-scope .compra-item-cell-main small,
 .compras-responsive-scope .compra-item-cell-quantity small {
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compra-item-cell-quantity strong,
@@ -1315,7 +1339,7 @@
 
 .compras-responsive-scope .compra-item-expanded-spec > span {
   color: var(--c-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.07em;
   text-transform: uppercase;
