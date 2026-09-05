@@ -2911,3 +2911,34 @@ coluna alinhada à direita ficou 217px fora do lugar. `display: grid` +
 `align-content: center` zera a linha de base e preserva o alinhamento
 horizontal. Pelo hábito eu teria escolhido o flex e desalinhado toda coluna
 monetária do sistema.
+
+---
+
+## 05/09 — O M2 mede a ÁRVORE LOCAL; o resto da matriz mede o BUILD PUBLICADO
+
+Percebido ao planejar o que fazer enquanto a matriz roda, e vale registrar
+porque muda como se trabalha durante uma corrida.
+
+Trinta e quatro dos trinta e cinco itens da matriz são medidos no navegador,
+contra o preview publicado — o SHA que o harness confere antes de começar. O
+**M2 é a exceção**: ele roda `node scripts/validarLayout.mjs` na máquina, ou
+seja, lê o **código-fonte local**.
+
+Duas consequências práticas:
+
+1. **Editar `frontend/src/**` durante uma corrida contamina a matriz.** As
+   telas medidas antes da edição leem uma árvore; as depois, outra. A matriz
+   sai dizendo que mediu um SHA e terá misturado dois estados — o mesmo
+   defeito que eu evito segurando o push, só que por dentro.
+2. É por isso que a árvore local e o SHA publicado precisam estar iguais
+   quando a matriz começa. Hoje isso acontece por disciplina (só disparo
+   depois de publicar), não por trava.
+
+**Enquanto uma corrida está em pé, o que dá para avançar sem contaminar** é
+o que o validador estático não lê: documentação, e trabalho de levantamento
+que não escreve em `src/`. Qualquer conserto de tela espera a corrida
+terminar.
+
+**Melhoria possível, não feita:** o harness poderia comparar o SHA publicado
+com o `git rev-parse HEAD` local no começo e recusar a corrida quando
+diferem — hoje ele confere só o publicado. Fica registrado como proposta.
