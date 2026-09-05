@@ -1848,3 +1848,59 @@ node scripts/validarLayout.mjs && npm run test:responsive && npm run build
 Hábito que depende de memória para incluir uma lista falha do mesmo jeito que
 regra sem check. O ciclo de verificação passa a ser **um** comando, e o que
 ele não cobrir precisa entrar nele, não na minha lembrança.
+
+## A PROVA DE MORDIDA ME PEGOU AFROUXANDO UM CHECK (05/09)
+
+O melhor caso do dia para o mecanismo de provas, porque a vítima fui eu.
+
+### O que eu ia fazer
+
+A matriz reprovou `comercial-unidades · F3` — "filtro abriu sem opções de
+MARCAÇÃO". O filtro está certo: as opções vêm de `empreendimentos.map(...)` e
+a base do preview não devolveu nenhum empreendimento. O painel abriu vazio
+por falta de dado, não por defeito.
+
+Escrevi um conserto que me pareceu óbvio: **painel vazio vira SEM DADO**.
+Argumentei até bem — vermelho sem defeito mente igual a verde sem medir.
+
+### Por que estava errado
+
+`npm run verificar` reprovou na hora, e a reprovação veio da prova
+`itensDoRunnerMordem.mjs`, que planta defeitos e exige que o check morda:
+
+```
+FALHA  F3 ← filtro que abre sem nenhuma opção de marcação
+       :: SEM DADO — ... capacidade NÃO PROVADA
+```
+
+A fixture planta uma tela que **genuinamente não tem marcação nenhuma**. O
+painel dela também abre vazio. Ou seja: **a minha distinção não distingue
+nada** — os dois casos renderizam a mesma coisa, e o meu conserto abria
+exatamente o buraco que a prova existe para achar.
+
+### O que isso ensina, e é diferente das outras lições do dia
+
+As outras foram sobre check que não via defeito. **Esta foi sobre eu quase
+apagar um check que via**, com um argumento que soava certo — inclusive
+citando a regra do projeto sobre vermelho falso.
+
+Argumento bom não é prova. O que separou os dois foi a fixture: ela mostra
+que o sinal que eu ia usar (painel vazio) é o MESMO nos dois casos, e nenhum
+raciocínio conserta um sinal que não discrimina.
+
+### O conserto de verdade, que fica pendente
+
+Para separar os dois casos o **componente** precisa dizer qual é: a
+`BarraFiltros` renderiza um estado vazio explícito quando uma dimensão tem
+zero opções. Aí:
+
+| O painel mostra | Veredito |
+|---|---|
+| controles de marcação | PASSOU |
+| o estado vazio do componente | SEM DADO |
+| qualquer outra coisa, ou nada | FALHOU |
+
+É mudança em componente compartilhado, então vai para a leva de componente,
+junto da R28 e do `TabelaPadrao`. **Até lá a célula fica FALHOU** — e é
+melhor assim: célula vermelha que eu sei explicar é mais honesta que verde
+que eu não consigo defender.
