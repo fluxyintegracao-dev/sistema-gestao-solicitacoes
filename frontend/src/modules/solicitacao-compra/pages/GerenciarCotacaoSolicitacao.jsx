@@ -3880,8 +3880,20 @@ export default function GerenciarCotacaoSolicitacao() {
       )}
 
       {/* Fornecedores vinculados + envio */}
+      {/*
+        ESTE E O BLOCO PRINCIPAL DA TELA (B2, 05/09).
+
+        A tela tinha um `variante="primario"`, mas dentro do MODAL do
+        comparativo — e o check descarta o que esta em modal, com razao: o
+        que a pessoa ve ao abrir a tela nao pode depender de ela ter aberto
+        alguma coisa. Na pagina sobravam so blocos secundarios, ou seja,
+        nenhum assumia a resposta central. E a resposta central desta tela e
+        esta: quem foi convidado a cotar e por qual link.
+      */}
       <BlocoConteudo
         titulo="Fornecedores e links de cotacao"
+        variante="primario"
+        cor="var(--module-compras)"
         contagem={`${solicitacao.fornecedores?.length || 0} vinculado(s)`}
         descricao="Pesquise fornecedores cadastrados, faca cadastro rapido e gere os links do portal."
       >

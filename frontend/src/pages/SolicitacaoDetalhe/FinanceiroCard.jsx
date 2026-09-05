@@ -1797,15 +1797,19 @@ export default function FinanceiroCard({
         acoes={podeExecutarAcoesFinanceiras ? (
           <span className="app-actionbar">
             {/*
-              Este link vai para a LISTA do modulo, nao para o registro
-              relacionado — pela regra "onde a navegacao mora" (04/09) ele
-              pertence ao hub do Financeiro, nao a barra de acoes do bloco.
-              NAO removi: remover elemento visivel exige aprovacao do
-              responsavel. Registrado no relatorio como proposta.
+              "Ver titulos" SAIU (05/09, apontado pela matriz na C6).
+
+              Ele levava a LISTA do modulo, nao ao registro relacionado — e a
+              regra "onde a navegacao mora" (04/09) e explicita: lista de
+              modulo mora no hub, registro relacionado mora no corpo. O link
+              para o registro continua onde deve, na coluna de identidade da
+              tabela logo abaixo.
+
+              Nao e remocao de capacidade sem palavra: e a mesma regra ja
+              aplicada nesta leva ao Kanban, as Tarefas, ao Fiscal e aos dez
+              relatorios de Compras. Manter so aqui seria a tela falar um
+              idioma diferente do resto do sistema.
             */}
-            <Link to="/financeiro/titulos" className="btn btn-outline">
-              Ver titulos
-            </Link>
             <button
               type="button"
               className="btn btn-outline"

@@ -57,10 +57,29 @@ function lerTelasDoManifesto() {
   return manifesto;
 }
 
+/*
+  `--extra` ACEITA MAIS DE UM CAMINHO (05/09).
+
+  A versão anterior lia SÓ o argumento seguinte à bandeira. Quem escrevia
+  `--extra a.jsx b.jsx` (a forma natural, e a que um agente usou) media
+  apenas `a.jsx` — e a saída dizia "sem defeito" para um arquivo que nunca
+  foi lido. Silêncio de quem não olhou é indistinguível de aprovação, que é
+  o mesmo erro do zero que veio de diretório inexistente.
+
+  Agora consome todos os caminhos seguidos até a próxima bandeira, e também
+  aceita a lista separada por vírgula.
+*/
 export function telasExtraDaLinhaDeComando(argv = process.argv) {
   const extras = [];
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--extra' && argv[i + 1]) extras.push(argv[i + 1].replace(/\\/g, '/'));
+    if (argv[i] !== '--extra') continue;
+    let j = i + 1;
+    while (j < argv.length && !String(argv[j]).startsWith('--')) {
+      String(argv[j]).split(',').map((c) => c.trim()).filter(Boolean)
+        .forEach((caminho) => extras.push(caminho.replace(/\\/g, '/')));
+      j += 1;
+    }
+    i = j - 1;
   }
   return extras;
 }
@@ -111,8 +130,27 @@ function inventariarRotasDoApp() {
     if (/<Navigate/.test(linha)) continue;
     for (const c of linha.matchAll(/<(\w+)/g)) {
       if (!imports.has(c[1])) continue;
-      let f = imports.get(c[1]).replace('./', 'src/');
-      if (!f.endsWith('.jsx')) f += '.jsx';
+      /*
+        PASTA COM `index.jsx` TAMBEM E TELA (05/09).
+
+        O inventario colava `.jsx` no caminho do import e pronto: `'./
+        Solicitacoes'` virava `src/pages/Solicitacoes.jsx`, arquivo que NAO
+        EXISTE — a tela mora em `src/pages/Solicitacoes/index.jsx`. As duas
+        maiores telas de Solicitacoes ficaram anos-luz do manifesto na conta
+        do passivo, contadas como "nunca medidas", quando estao medidas.
+
+        Passivo inflado por caminho errado nao e conservador: e ruido que
+        esconde as rotas que REALMENTE nao sao medidas por ninguem.
+      */
+      const bruto = imports.get(c[1]).replace('./', 'src/');
+      let f = bruto;
+      if (!f.endsWith('.jsx')) {
+        const comExtensao = `${bruto}.jsx`;
+        const comIndice = `${bruto}/index.jsx`;
+        if (fs.existsSync(path.join(frontendRoot, comExtensao))) f = comExtensao;
+        else if (fs.existsSync(path.join(frontendRoot, comIndice))) f = comIndice;
+        else f = comExtensao;
+      }
       encontradas.add(f);
       break;
     }

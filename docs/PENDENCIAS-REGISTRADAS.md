@@ -2458,3 +2458,134 @@ análise jurídica em produção agora"*.
 
 Feito: seção própria antes da Parte 1, com o aviso de que é o único do
 documento nessa condição.
+
+---
+
+## 05/09 — As duas telas de revisão de compra ficam FORA da matriz automática, e a decisão é sua
+
+`/solicitacoes-compra/revisar` e `/solicitacoes-compra-direta/revisar` voltaram
+da matriz como "a tela NÃO ABRIU: redirecionada — acesso/política bloqueando o
+usuário de QA". **Esse diagnóstico era falso**, e a tela levou a culpa.
+
+O que essas telas são: etapas de um fluxo. Os dados delas não vêm do servidor —
+vêm do rascunho que a tela "nova" grava no NAVEGADOR enquanto a pessoa
+preenche o formulário. Sem rascunho na sessão, a tela devolve a pessoa para a
+"nova". Isso é o comportamento **certo**: revisar um formulário que não foi
+preenchido não significa nada.
+
+### Por que eu não mandei o robô preencher o formulário e medir
+
+Porque o botão seguinte, na própria tela de revisão, **cria a solicitação de
+compra de verdade** — e os checks desta bateria clicam em botões (é assim que
+eles provam R1, F1, C6). Levar o harness até essa tela é aceitar que um clique
+errado abra pedido de compra no ambiente de desenvolvimento, que é
+compartilhado. A regra desta sessão é explícita: somente navegação e leitura.
+
+Escolhi a lacuna declarada em vez do risco de escrever no ambiente de todos.
+
+### O que fica no lugar
+
+As duas telas agora são declaradas no manifesto (`soPeloFluxo`) e aparecem na
+matriz como **SEM DADO**, com o motivo por extenso — não como reprovação e não
+como aprovação. Capacidade sem evidência continua visível, que é o ponto.
+
+### O que eu preciso de você
+
+Uma de três:
+
+1. **Deixar como está** — duas telas de 186 sem medição automática, o resto da
+   matriz honesta.
+2. **Um ambiente de QA descartável** (ou um usuário de QA que não possa
+   confirmar compra): aí o robô dirige o fluxo inteiro e as duas telas entram
+   na matriz como todas as outras.
+3. **Medição manual assistida**: eu preparo o roteiro, alguém preenche o
+   formulário no preview e eu meço a tela com o rascunho já na sessão.
+
+Minha recomendação é a (2), porque é a única que vira cobertura permanente. A
+(1) é aceitável hoje; a (3) resolve uma vez e não se repete.
+
+---
+
+## 05/09 — Dois erros de mira do harness, do mesmo tipo, na mesma corrida
+
+Registro porque é o mesmo defeito de raciocínio aparecendo duas vezes, e ele já
+tinha sido registrado antes com outro nome.
+
+**1. O T3 acusava quatro telas de não redimensionar coluna.** O motivo era
+"coluna arrastada mudou 0px". Não era a tela: o harness pegava a posição da
+alça e mandava o mouse para aquele ponto **sem rolar a página e sem conferir
+quem estava por cima**. Nas telas de painel a primeira tabela vive depois dos
+cartões de resumo — o ponto caía fora da janela, o navegador não entregava o
+clique a ninguém, e o arrasto simplesmente não acontecia. Rolar também não
+bastava: `scrollIntoView` encosta o elemento no topo, que é exatamente onde
+mora a faixa fixa.
+
+O T2, ao lado, **já tinha aprendido isso em 03/09** ("o check media o próprio
+erro de mira") e ganhado duas tentativas com confirmação de que o ponteiro
+pousou no alvo. A lição ficou no check onde ela nasceu, e não virou regra do
+harness. Agora o T3 confere quem recebe o ponteiro antes de arrastar e, quando
+não consegue mirar, diz **quem estava por cima** em vez de acusar a tela.
+
+**2. O resolvedor conhecia duas formas de abrir um registro; existem três.**
+`solicitacao-compra-detalhe` e `gerenciar-cotacao` voltaram como "não abriu"
+por estouro de 30s. A listagem de Compras abre o registro por um **botão na
+célula de ações** (o olho), que não é âncora e não faz a linha inteira navegar.
+É a pergunta permanente ("de quantos jeitos isso é feito aqui?") caindo no
+mesmo resolvedor pela segunda vez em dois dias — antes tinham sido duas
+tabelas onde ele supunha uma.
+
+**A regra que fica:** todo passo do harness que dispara ponteiro em coordenada
+confirma antes que a coordenada é do alvo; e todo passo que supõe UMA forma de
+fazer alguma coisa nesta base tenta as formas que existem e, se nenhuma
+funcionar, **diz o que encontrou** — em vez de devolver a falha como defeito da
+tela.
+
+**Bônus do mesmo lote:** a lista mais grave da matriz ("TELAS QUE NÃO
+ABRIRAM") imprimia `undefined` no lugar do nome da tela — lia `r.id` num objeto
+cujo campo é `r.tela`. O aviso mais importante do relatório era o único que não
+dizia de quem estava falando.
+
+---
+
+## 05/09 — O M2 dependia do estado de OUTRA tela (e eu só descobri por acidente)
+
+O M2 lê a saída do validador estático e reprova a tela quando ela é citada.
+A primeira linha da função era: **se o validador saiu com 0, todo mundo passa,
+sem olhar linha nenhuma.**
+
+Enquanto o validador esteve verde, isso pareceu certo. Bastou eu colocar uma
+tela nova fora do manifesto (o HomeHub) para o validador reprovar — e aí, de
+repente, 200 telas passaram a ser julgadas por linhas de AVISO que sempre
+estiveram na saída. A `gerenciar-cotacao` reprovou por uma **exceção
+registrada**, isto é, por uma decisão que eu mesmo tinha mandado manter, com
+justificativa escrita no manifesto.
+
+Dois defeitos no mesmo lugar:
+
+1. **Exceção registrada contando como defeito.** O validador escreve, com
+   todas as letras, "tolerado por exceção registrada". O M2 lia a linha e
+   reprovava assim mesmo.
+2. **O resultado de uma tela dependia de outra.** Um check cujo veredito muda
+   porque uma tela vizinha entrou ou saiu do manifesto não mede a tela que ele
+   diz medir.
+
+Agora o M2 lê **só o que o próprio validador chamou de FALHA no arquivo desta
+tela**. AVISO não reprova ali de propósito: quem escolhe a palavra é o
+validador, e ele usa AVISO para duas coisas que não são defeito da tela —
+passivo já congelado num trinco (que segura o build inteiro) e "não consegui
+provar" (que é lacuna de evidência). A R3, que tem motivo próprio para reprovar
+em AVISO, faz isso na função dela, lendo o trinco.
+
+**A regra que fica:** o veredito de um item da matriz depende só da tela que
+ele mede. Se depender do estado global, ele mede o global, não a tela.
+
+---
+
+## 05/09 — Risco residual registrado pelo conserto do T6 em contratos
+
+As pílulas de pendência (`fx-badge`) do relatório operacional de contratos são
+`nowrap` dentro de um `flex-wrap`. Os rótulos de hoje são curtos ("sem anexo",
+"sem referência", "valor zerado") e cabem. Se o backend passar a devolver um
+rótulo mais largo que ~156px, a célula pode cortar sem tooltip. Não foi
+consertado porque envolver pílula em `CelulaDupla` seria usar o componente
+fora do que ele é — fica registrado para quando (e se) o rótulo mudar.

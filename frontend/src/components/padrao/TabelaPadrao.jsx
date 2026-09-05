@@ -1043,9 +1043,28 @@ export default function TabelaPadrao({
         <tbody>
           {blocos.map((bloco) => (
             <Fragmento key={bloco.chave ?? '__unico'}>
+              {/*
+                A LINHA DE GRUPO RESPEITA AS COLUNAS DE CONTROLE (05/09).
+
+                O `colSpan` cobria a tabela inteira, então o PRIMEIRO `td` da
+                faixa de grupo caía embaixo da coluna de marcar/expandir — que
+                é centralizada — enquanto o rótulo do grupo é alinhado à
+                esquerda. Cabeçalho centralizado sobre célula à esquerda: a
+                `governanca-auditoria` (única tela que combina `agruparPor`
+                com `linhaExpansivel`) reprovava no T1 por isso, e visualmente
+                o rótulo do grupo começava colado na borda, fora do prumo da
+                primeira coluna de conteúdo.
+
+                Agora a faixa emite as células de controle vazias e só depois
+                o rótulo — mesma fonte de alinhamento que o cabeçalho. Em
+                tabela sem marcação e sem expansão o resultado é idêntico ao
+                de antes.
+              */}
               {agruparPor && bloco.chave !== null ? (
                 <tr className="app-tabela-grupo">
-                  <td colSpan={totalColunas}>
+                  {selecao ? <td className="celula-selecao" /> : null}
+                  {linhaExpansivel ? <td className="celula-expandir" /> : null}
+                  <td colSpan={totalColunas - (selecao ? 1 : 0) - (linhaExpansivel ? 1 : 0)}>
                     {agruparPor.titulo ? agruparPor.titulo(bloco.chave, bloco.itens) : bloco.chave}
                   </td>
                 </tr>

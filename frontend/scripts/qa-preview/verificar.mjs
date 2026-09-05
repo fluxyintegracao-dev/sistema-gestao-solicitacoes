@@ -256,16 +256,46 @@ const RESOLVEDORES = {
       if (tamanho > maior) { maior = tamanho; alvo = i; }
     }
     /*
-      Clicar na linha OU no primeiro link dela: as duas formas existem no
-      repositório (`aoClicarLinha` e âncora por linha). Se nenhuma navegar, o
-      resolvedor falha alto — medir a listagem achando que é o detalhe é o
-      pior resultado possível.
+      TRÊS FORMAS DE ABRIR UM REGISTRO, NÃO DUAS (05/09).
+
+      Este resolvedor conhecia âncora na linha e clique na linha. A
+      `SolicitacoesCompra` abre o registro por um BOTÃO na célula de ações
+      (o olho, `title="Abrir detalhes"`), que não é âncora nem faz a linha
+      inteira navegar: o clique na linha não levou a lugar nenhum, o
+      `waitForURL` estourou os 30s e DUAS telas voltaram como "NÃO ABRIU" —
+      `solicitacao-compra-detalhe` e `gerenciar-cotacao`, que depende dela.
+
+      É a pergunta permanente ("de quantos jeitos isso é feito aqui?") caindo
+      no mesmo resolvedor pela segunda vez em dois dias: primeiro eram duas
+      tabelas em vez de uma, agora são três formas de abrir em vez de duas.
+      Por isso agora ele TENTA as formas em ordem e, se nenhuma navegar, diz
+      quais existiam na linha — em vez de acusar a tela de não abrir.
     */
-    const link = linhas.nth(alvo).locator('a[href]').first();
-    if (await link.count()) await link.click();
-    else await linhas.nth(alvo).click();
-    await page.waitForURL(padraoDetalhe, { timeout: 30000 });
-    return new URL(page.url()).pathname;
+    const linha = linhas.nth(alvo);
+    const formas = [
+      { nome: 'âncora na linha', loc: linha.locator('a[href]').first() },
+      {
+        nome: 'botão de abrir na célula de ações',
+        loc: linha.locator('button[title*="detalh" i], button[aria-label*="detalh" i]').first()
+      },
+      { nome: 'clique na própria linha', loc: linha }
+    ];
+    const existentes = [];
+    for (const forma of formas) {
+      if (!(await forma.loc.count())) continue;
+      existentes.push(forma.nome);
+      await forma.loc.click({ timeout: 5000 }).catch(() => {});
+      const navegou = await page.waitForURL(padraoDetalhe, { timeout: 8000 })
+        .then(() => true).catch(() => false);
+      if (navegou) return new URL(page.url()).pathname;
+    }
+    throw new Error(`nenhuma forma de abrir o registro levou a ${padraoDetalhe} a partir de ${rotaLista}`
+      + ` — tentadas: ${existentes.join(', ') || 'nenhuma (a linha não tem âncora nem botão de abrir)'};`
+      + ` a URL ficou em ${new URL(page.url()).pathname}`);
+  },
+  /* O PEDIDO de compra: a listagem e /pedidos-compra, o detalhe /pedidos-compra/:id. */
+  async pedidoCompraDetalhe(page) {
+    return RESOLVEDORES.abrirPiorRegistro(page, '/pedidos-compra', /\/pedidos-compra\/\d+$/);
   },
   async fiscalDocumentoDetalhe(page) {
     return RESOLVEDORES.abrirPiorRegistro(page, '/fiscal/documentos', /\/fiscal\/documentos\/\d+/);
@@ -415,11 +445,36 @@ function r3Para(arquivo, validador, caixas) {
 }
 
 
+/*
+  EXCEÇÃO REGISTRADA NÃO É DEFEITO DA TELA (05/09).
+
+  O M2 pegava QUALQUER linha do validador que citasse o arquivo da tela e
+  transformava em FALHOU — inclusive as linhas que o próprio validador
+  emite dizendo "tolerado por exceção registrada", que são justamente as
+  decisões que alguém tomou, escreveu no manifesto e assinou. A
+  `gerenciar-cotacao` reprovou por uma exceção que EU tinha mandado manter.
+
+  E o gatilho foi pior do que o defeito: enquanto o validador saía com 0,
+  `m2Para` devolvia PASSOU para todo mundo sem nem olhar as linhas. Bastou
+  o validador reprovar por OUTRA tela (uma tela minha, fora do manifesto)
+  para 200 telas passarem a ser julgadas por linhas de aviso que sempre
+  estiveram ali. Check cujo resultado depende do estado de OUTRA tela não
+  mede a tela que ele diz medir.
+
+  Agora o M2 lê só o que o próprio validador chamou de FALHA no arquivo
+  DESTA tela. AVISO não reprova aqui de propósito: quem escolhe a palavra é
+  o validador, e ele usa AVISO para duas coisas que não são defeito desta
+  tela — passivo já congelado num trinco (que segura o build inteiro, não a
+  tela) e "não consegui provar" (que é lacuna de evidência, não erro). A
+  R3, que tem motivo próprio para reprovar em AVISO, faz isso na função
+  dela, com o trinco na mão.
+*/
 function m2Para(arquivo, validador) {
-  if (validador.ok) return { estado: 'PASSOU' };
-  const linhas = validador.saida.split('\n').filter((l) => l.includes(arquivo));
-  return linhas.length
-    ? { estado: 'FALHOU', motivo: `validador estático: ${linhas[0].trim().slice(0, 160)}` }
+  const falhas = String(validador?.saida || '')
+    .split('\n')
+    .filter((l) => l.trim().startsWith('FALHA') && l.includes(arquivo));
+  return falhas.length
+    ? { estado: 'FALHOU', motivo: `validador estático: ${falhas[0].trim().slice(0, 160)}` }
     : { estado: 'PASSOU' };
 }
 
@@ -506,6 +561,65 @@ async function checarAffordanceAlinhamento(page, resultado) {
     resultado.T2 = { estado: 'FALHOU', motivo: `affordance do alinhamento não aparece com o ponteiro SOBRE o cabeçalho (opacidade ${opacidade}) — R15` };
   }
   await page.mouse.move(4, 4);
+}
+
+/*
+  MIRA A ALÇA ANTES DE ARRASTAR — e diz quem recebeu o ponteiro (05/09).
+
+  O T3 pegava o `boundingBox()` da alça e mandava o mouse para o centro
+  dele, sem rolar nada e sem conferir quem estava por cima. Nas telas de
+  PAINEL a primeira tabela vive depois dos cartões de resumo: o cabeçalho
+  dela nasce ABAIXO da dobra, e o ponto de arrasto caía fora da janela — o
+  navegador não entrega `pointerdown` a ninguém, o arrasto não acontece, e o
+  item reprovava a tela com "coluna arrastada mudou 0px". Quatro telas
+  reprovadas por erro de mira do próprio harness.
+
+  E rolar não basta: `scrollIntoViewIfNeeded` encosta o elemento no TOPO da
+  janela, que é exatamente onde mora a faixa fixa (C1). O ponto passa a
+  existir e cai na faixa, não na alça — o mesmo 0px, agora por cobertura.
+
+  Este é o mesmo defeito que o T2 já tinha aprendido em 03/09 ("o check
+  media o próprio erro de mira") e que o T3 repetia intacto ao lado. A lição
+  não tinha ficado no lugar onde vale: quem dispara ponteiro em coordenada
+  confirma, ANTES, que a coordenada é do alvo — e, quando não consegue,
+  diz QUEM recebeu, em vez de acusar a tela de um defeito que é dele.
+*/
+async function mirarAlca(page, alca) {
+  await alca.scrollIntoViewIfNeeded().catch(() => {});
+  await page.waitForTimeout(150);
+  let ultimo = null;
+  for (let tentativa = 0; tentativa < 4; tentativa += 1) {
+    const caixa = await alca.boundingBox();
+    if (!caixa) {
+      return { ponto: null, estado: 'FALHOU', motivo: 'alça de redimensionamento invisível' };
+    }
+    const ponto = { x: caixa.x + caixa.width / 2, y: caixa.y + caixa.height / 2 };
+    const quemRecebe = await page.evaluate(({ x, y }) => {
+      if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
+        return { fora: true };
+      }
+      const alvo = document.elementFromPoint(x, y);
+      if (!alvo) return { fora: true };
+      if (alvo.classList.contains('resizable-th-handle')) return null;
+      const r = alvo.getBoundingClientRect();
+      const nome = alvo.getAttribute('class') || alvo.tagName.toLowerCase();
+      return { fora: false, quem: String(nome).slice(0, 80), base: Math.round(r.bottom) };
+    }, ponto);
+    if (!quemRecebe) return { ponto };
+    ultimo = quemRecebe;
+    // Coberto por elemento fixo (a faixa) → rola PARA CIMA o tanto que
+    // falta para a alça sair de baixo dele. Fora da janela → aproxima.
+    const recuo = quemRecebe.fora ? 160 : Math.max(12, quemRecebe.base - ponto.y + 16);
+    await page.evaluate((d) => window.scrollBy(0, -d), recuo);
+    await page.waitForTimeout(150);
+  }
+  return {
+    ponto: null,
+    estado: 'SEM DADO',
+    motivo: ultimo?.fora
+      ? 'o ponto de arrasto da coluna não coube na janela em quatro tentativas — o redimensionamento NÃO FOI EXERCITADO'
+      : `o ponto de arrasto da coluna está coberto por outro elemento ("${ultimo?.quem}") em quatro tentativas — o redimensionamento NÃO FOI EXERCITADO`
+  };
 }
 
 async function checarRedimensionamento(page, tela, resultado) {
@@ -623,15 +737,18 @@ async function checarRedimensionamento(page, tela, resultado) {
     resultado.T3 = { estado: 'FALHOU', motivo: `coluna de conteúdo (índice ${idx}) sem alça de redimensionamento` };
     return;
   }
-  const caixa = await alca.boundingBox();
-  if (!caixa) {
-    resultado.T3 = { estado: 'FALHOU', motivo: 'alça de redimensionamento invisível' };
+  const mira = await mirarAlca(page, alca);
+  if (!mira.ponto) {
+    resultado.T3 = mira.estado === 'SEM DADO'
+      ? { estado: 'SEM DADO', motivo: mira.motivo }
+      : { estado: 'FALHOU', motivo: mira.motivo };
     return;
   }
+  const { ponto } = mira;
   const armazemAntes = await instantaneoDoArmazem();
-  await page.mouse.move(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
+  await page.mouse.move(ponto.x, ponto.y);
   await page.mouse.down();
-  await page.mouse.move(caixa.x + caixa.width / 2 + 64, caixa.y + caixa.height / 2, { steps: 6 });
+  await page.mouse.move(ponto.x + 64, ponto.y, { steps: 6 });
   await page.mouse.up();
   await page.waitForTimeout(300);
   const medidaDepois = await medir();
@@ -1059,7 +1176,9 @@ function escreverSaidas(resultados, meta) {
   const naoAbriram = resultados.filter((r) => Object.values(r.itens).some((i) => i.estado === 'NAO ABRIU'));
   if (naoAbriram.length) {
     linhas.push(`- **TELAS QUE NÃO ABRIRAM: ${naoAbriram.length}** — nada nelas foi medido, e rodada com tela que não abre NÃO fecha:`);
-    naoAbriram.forEach((r) => linhas.push(`  - \`${r.id}\` — ${r.erro}`));
+    // `r.id` nunca existiu neste objeto — o campo é `tela`. A lista mais
+    // grave da matriz vinha imprimindo `undefined` no lugar do nome da tela.
+    naoAbriram.forEach((r) => linhas.push(`  - \`${r.tela}\` — ${r.erro}`));
   }
   linhas.push(`- **Células FALHOU: ${totalFalhas}**${totalFalhas === 0 ? '' : ' (justificativas abaixo)'}`);
   /*
@@ -1273,6 +1392,29 @@ const errosDeJs = [];
           if (rotaAtual.startsWith('/login')) {
             throw new Error(`BLOQUEIO: a sessão de QA caiu e o novo login não segurou (tela "${tela.id}"). A corrida foi abortada e a matriz NÃO foi regravada — o que estava no disco continua valendo.`);
           }
+        }
+        /*
+          NEM TODO REDIRECIONAMENTO É POLÍTICA DE ACESSO (05/09).
+
+          As duas telas de REVISÃO de compra (`/solicitacoes-compra/revisar`
+          e a da compra direta) são etapas de um FLUXO: os dados delas não
+          vêm do servidor, vêm do rascunho que a tela "nova" grava no
+          navegador enquanto a pessoa preenche. Sem rascunho na sessão, elas
+          mandam a pessoa de volta para a "nova" — que é o comportamento
+          CERTO, e o harness lia como "acesso/política bloqueando o usuário
+          de QA": diagnóstico falso, com a tela levando a culpa.
+
+          Por que não dirigir o fluxo e medir de verdade: a tela de revisão
+          termina no botão que CRIA a solicitação de compra no ambiente
+          compartilhado, e os checks desta bateria clicam em botões. Levar o
+          robô até lá é aceitar que um clique errado abra pedido de compra
+          de verdade no ambiente de desenvolvimento — o que a regra desta
+          sessão proíbe ("somente navegação e leitura"). Fica como lacuna de
+          evidência DECLARADA, com o motivo à vista, e a decisão de cobrir
+          isso de outro jeito está registrada em docs/PENDENCIAS-REGISTRADAS.md.
+        */
+        if (rotaAtual !== rota && tela.soPeloFluxo) {
+          throw new Error(`SO-PELO-FLUXO: ${tela.soPeloFluxo} (redirecionou de ${rota} para ${rotaAtual})`);
         }
         if (rotaAtual !== rota) {
           throw new Error(`redirecionada de ${rota} para ${rotaAtual} — acesso/política bloqueando o usuário de QA`);
@@ -1648,12 +1790,20 @@ const errosDeJs = [];
           afirmações que ninguém verificou.
         */
         const [PRIMEIRO, ...DEMAIS] = ITENS_DOD;
+        // Tela declarada como "só pelo fluxo" não é reprovação: é lacuna de
+        // evidência, com o motivo dito por extenso. FALHOU aqui seria acusar
+        // a tela de um comportamento que é o correto dela.
+        const soPeloFluxo = String(resultado.erro || '').startsWith('SO-PELO-FLUXO: ');
         if (!resultado.itens[PRIMEIRO]) {
-          resultado.itens[PRIMEIRO] = { estado: 'FALHOU', motivo: `a tela NÃO ABRIU: ${resultado.erro}` };
+          resultado.itens[PRIMEIRO] = soPeloFluxo
+            ? { estado: 'SEM DADO', motivo: `a tela NÃO FOI MEDIDA: ${String(resultado.erro).replace('SO-PELO-FLUXO: ', '')}` }
+            : { estado: 'FALHOU', motivo: `a tela NÃO ABRIU: ${resultado.erro}` };
         }
         DEMAIS.forEach((item) => {
           if (!resultado.itens[item]) {
-            resultado.itens[item] = { estado: 'NAO ABRIU', motivo: 'não medido — a tela não abriu (ver o motivo na primeira coluna)' };
+            resultado.itens[item] = soPeloFluxo
+              ? { estado: 'SEM DADO', motivo: 'não medido — a tela é etapa de fluxo (ver o motivo na primeira coluna)' }
+              : { estado: 'NAO ABRIU', motivo: 'não medido — a tela não abriu (ver o motivo na primeira coluna)' };
           }
         });
         console.error(`[qa-preview]   ✖ ${tela.id}: ${resultado.erro}`);

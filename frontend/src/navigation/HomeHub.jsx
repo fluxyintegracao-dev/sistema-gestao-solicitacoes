@@ -8,6 +8,7 @@ import { getListaPreferencias, salvarListaPreferencias } from '../services/lista
 import { blocosPermitidos, resolverLayoutHome, rotuloBlocoHome } from './blocosHome';
 import { COMPONENTE_BLOCO_EXTRA } from './BlocosHomeExtras';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
+import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
 import NavCard from './NavCard';
 import SeusAtalhos from './SeusAtalhos';
 import { vencimentoHumano } from '../utils/formatarTexto';
@@ -36,6 +37,20 @@ const TONE_ICON = {
 // tudo salvo no banco. Ocultou = some POR COMPLETO; volta só pelo
 // "Adicionar bloco" do modo Personalizar. Os blocos opcionais carregam
 // dados sob demanda (BlocosHomeExtras) — desligado não consulta nada.
+//
+// MIGRADA PARA O PADRÃO DA CASA EM 05/09 — e a lição é a de sempre neste
+// projeto: esta é a PRIMEIRA tela que todo mundo vê (rota `/`) e foi a
+// última a entrar no padrão, porque nunca esteve no manifesto de QA.
+// Duzentas telas foram medidas por cima dela. O que mudou aqui é só ONDE
+// cada coisa mora — nenhum bloco, atalho, contador ou ação saiu:
+//   * a casca virou `Pagina` (ritmo vertical do componente, R10) e o
+//     cabeçalho próprio virou `PageHeader` (faixa fixa presa à topbar:
+//     C1/C2/X2);
+//   * cada bloco passou a ser um `BlocoConteudo` — a superfície branca
+//     sobre o canvas que a B1 procura pelo nome `.app-bloco`. As seções
+//     internas (`.hub-pendencias`, `.hub-atalhos`, `.hub-resolver`,
+//     `.hub-obras-resumo`, `.hub-extra`) já desenhavam um cartão à mão:
+//     elas perderam a casca no CSS para não virar cartão dentro de cartão.
 export default function HomeHub() {
   const { user } = useContext(AuthContext);
   const [pendencias, setPendencias] = useState([]);
@@ -58,6 +73,17 @@ export default function HomeHub() {
   const [isMobileHome, setIsMobileHome] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
   ));
+  /*
+    A faixa gerencial "A pagar no mês, por obra" é contexto opcional de
+    tela larga, e essa regra vivia SÓ no CSS (`display: none` abaixo de
+    1280px). Com cada bloco da Home dentro de um `BlocoConteudo`, esconder
+    apenas o conteúdo deixaria o CARTÃO VAZIO na tela — casca com padding
+    e sombra em volta de nada. Quem decide passa a ser a tela: sem
+    largura, o bloco não é montado (05/09).
+  */
+  const [temLarguraGerencial, setTemLarguraGerencial] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches
+  ));
 
   useFecharAoSair(adicionarBlocoRef, adicionarBlocoAberto, () => setAdicionarBlocoAberto(false));
   useFecharAoSair(adicionarModuloRef, adicionarModuloAberto, () => setAdicionarModuloAberto(false));
@@ -72,6 +98,13 @@ export default function HomeHub() {
   useEffect(() => {
     const media = window.matchMedia('(max-width: 767px)');
     const listener = (event) => setIsMobileHome(event.matches);
+    media.addEventListener('change', listener);
+    return () => media.removeEventListener('change', listener);
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1280px)');
+    const listener = (event) => setTemLarguraGerencial(event.matches);
     media.addEventListener('change', listener);
     return () => media.removeEventListener('change', listener);
   }, []);
@@ -259,6 +292,12 @@ export default function HomeHub() {
   }, [pendencias]);
 
   const itensVisiveis = pendencias.filter((item) => Number(item?.quantidade) > 0);
+  // Apoio da faixa (C2/R5): o número que a pessoa veio ver. Some as
+  // MESMAS quantidades dos cartões de pendência — a faixa dá o total, os
+  // blocos dão o recorte (é a leitura de C2 × B3 registrada em 05/09).
+  const totalPendencias = itensVisiveis.reduce(
+    (soma, item) => soma + Number(item.quantidade || 0), 0
+  );
   const papel = String(user?.setor?.nome || user?.area || user?.perfil || '').trim();
 
   // ----- Conteúdo de cada bloco (null = bloco sem nada a mostrar) -----
@@ -375,7 +414,7 @@ export default function HomeHub() {
             </div>
           </div>
         )}
-        <ul className="hub-grid" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ul className="hub-grid">
           {modulosVisiveis.map((mod) => {
             const unicoFilho = mod.children.length === 1 ? mod.children[0] : null;
             const destino = unicoFilho ? unicoFilho.to : `/hub/${mod.id}`;
@@ -423,7 +462,7 @@ export default function HomeHub() {
 
     // Contexto gerencial opcional (telas largas, permissão financeira):
     // as obras com maior saldo a pagar no mês. Não é dashboard.
-    obras_resumo: resumoObras.length > 0 ? (
+    obras_resumo: temLarguraGerencial && resumoObras.length > 0 ? (
       <section className="hub-obras-resumo" aria-label="Maiores saldos a pagar no mês por obra">
         <h2 className="hub-pendencias-title">A pagar no mês, por obra</h2>
         <ul className="hub-obras-resumo-lista">
@@ -489,10 +528,34 @@ export default function HomeHub() {
     return segmentos;
   })();
 
+  /*
+    B2 — UM bloco principal por tela, e nesta a pergunta central é "o que
+    eu resolvo agora?": a barra de cor fica em "Para resolver agora" e,
+    quando ele não tem item, em "Suas pendências". Se nenhum dos dois
+    estiver visível (o usuário ocultou, ou o dia está limpo), ela vai para
+    o PRIMEIRO bloco da ordem — que é o topo que o próprio usuário montou.
+    Assim existe sempre exatamente um, em qualquer arranjo de blocos.
+
+    Sem módulo nenhum liberado, o principal é o aviso que explica isso
+    (renderizado fora desta lista), e aqui não há primário.
+  */
+  const idBlocoPrimario = modules.length === 0
+    ? null
+    : (['resolver', 'pendencias'].find((id) => blocosVisiveis.some((b) => b.id === id))
+      || blocosVisiveis[0]?.id);
+
   const renderizarBloco = (bloco) => (
-    <div
+    <BlocoConteudo
       key={bloco.id}
       className="hub-bloco"
+      variante={bloco.id === idBlocoPrimario ? 'primario' : 'neutro'}
+      /* Tom semântico da barra do principal: pendência é "atenção"
+         (--sem-warning); em qualquer outro bloco ela é só hierarquia. */
+      cor={bloco.id !== idBlocoPrimario
+        ? undefined
+        : (bloco.id === 'resolver' || bloco.id === 'pendencias'
+          ? 'var(--sem-warning)'
+          : 'var(--c-primary)')}
       draggable={personalizando && !isMobileHome}
       onDragStart={() => { dragBlocoRef.current = bloco.id; }}
       onDragOver={(event) => { if (personalizando) event.preventDefault(); }}
@@ -530,35 +593,38 @@ export default function HomeHub() {
         </div>
       )}
       {bloco.conteudo}
-    </div>
+    </BlocoConteudo>
   );
 
   return (
-    <div className="hub-page">
-      {/* Cabeçalho enxuto: quem é o usuário + entrada discreta da
-          personalização (mesmo padrão do detalhe da solicitação). */}
-      <header className="hub-header">
-        <div className="hub-header-texto">
-          <h1 className="hub-title">{user?.nome ? user.nome : 'Início'}</h1>
-          {papel && <p className="hub-subtitle hub-subtitle--papel">{papel}</p>}
-        </div>
-        {!isMobileHome && (
-          <div className="hub-header-acoes">
-            <button
-              type="button"
-              className={`btn btn-outline btn-sm ${personalizando ? 'sol-detail-personalizando' : ''}`}
-              onClick={() => {
-                setPersonalizando((atual) => !atual);
-                setAdicionarBlocoAberto(false);
-                setAdicionarModuloAberto(false);
-              }}
-              aria-pressed={personalizando}
-            >
-              {personalizando ? 'Concluir personalização' : 'Personalizar'}
-            </button>
-          </div>
-        )}
-      </header>
+    <Pagina className="hub-home-page">
+      {/*
+        FAIXA FIXA DO PADRÃO (C1/C2/X2) no lugar do cabeçalho próprio da
+        Home: título (quem é o usuário), apoio em UMA linha na própria
+        faixa (total de pendências + papel) e a personalização na barra de
+        ações — personalizar é AÇÃO SOBRE ESTA TELA, não caminho para
+        outra (R11/C6), então é ali que ela mora.
+
+        A entrada continua escondida no celular, como era: arrastar bloco
+        e escolher largura são gestos de desktop, e a decisão está no
+        comentário do `isMobileHome`.
+      */}
+      <PageHeader
+        titulo={user?.nome ? user.nome : 'Início'}
+        contagem={`${totalPendencias} pendência(s)`}
+        descricao={papel || 'Início do sistema'}
+        secundarias={isMobileHome ? [] : [{
+          rotulo: personalizando ? 'Concluir personalização' : 'Personalizar',
+          title: personalizando
+            ? 'Sair do modo de personalização da Home'
+            : 'Reordenar, ocultar e redimensionar os blocos da sua Home',
+          onClick: () => {
+            setPersonalizando((atual) => !atual);
+            setAdicionarBlocoAberto(false);
+            setAdicionarModuloAberto(false);
+          }
+        }]}
+      />
 
       {personalizando && (
         <div className="sol-detail-blocos-toolbar hub-personalizar-toolbar">
@@ -611,16 +677,24 @@ export default function HomeHub() {
         </div>
       )}
 
+      {/* Sem módulo liberado, ESTE é o bloco principal da tela (B2): é ele
+          que responde a única pergunta que sobra — "e agora?". */}
       {modules.length === 0 && (
-        <section className="hub-pendencias" role="status" aria-label="Nenhum módulo disponível">
+        <BlocoConteudo
+          className="hub-bloco"
+          variante="primario"
+          cor="var(--sem-warning)"
+          role="status"
+          aria-label="Nenhum módulo disponível"
+        >
           <h2 className="hub-pendencias-title">Nenhum módulo disponível para o seu acesso</h2>
-          <p className="hub-subtitle" style={{ margin: 0 }}>
+          <p className="hub-subtitle">
             Seu usuário ainda não tem permissão em nenhum módulo do sistema. Fale com o
             administrador para liberar os acessos do seu setor. Enquanto isso, você pode
             revisar seus dados em <Link to="/perfil">Meu Perfil</Link> ou sair e entrar com
             outro usuário.
           </p>
-        </section>
+        </BlocoConteudo>
       )}
 
       {segmentosBlocos.map((segmento, indice) => (
@@ -639,6 +713,6 @@ export default function HomeHub() {
           <button type="button" onClick={() => setToast('')} aria-label="Fechar aviso">×</button>
         </div>
       )}
-    </div>
+    </Pagina>
   );
 }

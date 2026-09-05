@@ -9,6 +9,7 @@ import {
   HiOutlineScale,
   HiOutlineWallet
 } from 'react-icons/hi2';
+import { BlocoConteudo } from '../../../components/padrao';
 import { obterCustosRecebiveisDashboard } from '../services/custosRecebiveis';
 import CrMonthlySummaryCard from './CrMonthlySummaryCard';
 
@@ -225,26 +226,37 @@ export default function CrDashboardView({
 
   return (
     <div className="cr-ops-dashboard">
-      <section className="cr-section cr-ops-overview">
-        <div className="cr-section-heading">
-          <div>
-            <span className="cr-scope-kicker">
-              Carteira consolidada
-            </span>
-            <h2>{filteredPortfolio.total_obras} obra(s) no recorte executivo</h2>
-            <p>
-              {competencias.length > 1
-                ? `${competencias.length} competências selecionadas`
-                : `Competência ${formatMonth(competencias[0] || competencia)}`}
-              {' '}· valores realizados consideram baixas financeiras ativas.
-            </p>
-          </div>
+      {/*
+        B1/B2 (matriz) — A CARTEIRA CONSOLIDADA É O BLOCO DA TELA.
+
+        A visão geral era feita só de `cr-section`: um dialeto local que
+        repete borda, raio e fundo com números próprios e não é o bloco que a
+        B1 procura sobre o canvas. Esta seção — a que responde a pergunta
+        central da aba — passa a ser o `BlocoConteudo` padrão, na variante
+        primária com a barra na cor do módulo (B2: UM primário por tela).
+
+        Nada de texto mudou de lugar: o olho-de-boi virou o título do bloco, a
+        contagem do recorte virou `contagem`, a linha das competências virou
+        `descricao` e o "Atualizar" continua à direita, agora em `acoes`. O
+        espaçamento interno é o do componente padrão — por isso a classe
+        `cr-ops-overview`, que só declarava um grid com gap próprio, sai.
+      */}
+      <BlocoConteudo
+        titulo="Carteira consolidada"
+        contagem={`${filteredPortfolio.total_obras} obra(s) no recorte executivo`}
+        descricao={`${competencias.length > 1
+          ? `${competencias.length} competências selecionadas`
+          : `Competência ${formatMonth(competencias[0] || competencia)}`
+        } · valores realizados consideram baixas financeiras ativas.`}
+        variante="primario"
+        cor="var(--cr-accent)"
+        acoes={(
           <button type="button" className="btn btn-outline" onClick={load} disabled={loading}>
             <HiOutlineArrowPath className="h-4 w-4" />
             {loading ? 'Atualizando...' : 'Atualizar'}
           </button>
-        </div>
-
+        )}
+      >
         <div className="cr-ops-ledger">
           <div className="cr-ops-ledger__group">
             <div className="cr-ops-ledger__title">
@@ -324,7 +336,7 @@ export default function CrDashboardView({
             </div>
           </div>
         </div>
-      </section>
+      </BlocoConteudo>
 
       <section className="cr-section cr-portfolio-planning">
         <div className="cr-section-heading">

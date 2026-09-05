@@ -64,6 +64,32 @@
   gap: 0.5rem;
 }
 
+/* C1 (matriz) — A FAIXA COMPACTA E UMA LINHA SO.
+
+   O contador de prazos chega ao `PageHeader` como `children`, e o componente
+   os desenha DEPOIS da `.app-page-header-row`. Como a faixa e
+   `flex-direction: column`, ele virava uma SEGUNDA linha: 118px de altura
+   compacta, num espaco que a R13 reserva para uma linha. Aqui a faixa desta
+   tela passa a ser uma linha horizontal — titulo e apoio a esquerda, acoes e
+   o sinal de prazos a direita, que e onde a faixa padrao poe o que precisa
+   acompanhar a rolagem. Nenhuma medida nova: so a DIRECAO muda, o vao entre
+   os dois continua sendo o `gap` que a propria faixa ja declara. Com isso a
+   altura compacta passa a ser a mesma de qualquer faixa padrao com um botao
+   de contorno — o contador (40px) e mais baixo que o botao. */
+.cr-page .app-page-header {
+  flex-direction: row;
+  align-items: center;
+}
+
+.cr-page .app-page-header > .app-page-header-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cr-page .app-page-header > .cr-obligation-counter {
+  flex: 0 0 auto;
+}
+
 .cr-obligation-counter {
   display: grid;
   grid-template-columns: auto auto auto;
@@ -1277,10 +1303,9 @@
   gap: 12px;
 }
 
-.cr-ops-overview {
-  display: grid;
-  gap: 14px;
-}
+/* `.cr-ops-overview` saiu junto com a classe: a carteira consolidada agora e
+   um `BlocoConteudo`, e o vao entre cabecalho e corpo do bloco e o do
+   componente padrao (`.app-bloco-corpo`), nao um gap de 14px so desta tela. */
 
 .cr-scope-kicker {
   display: block;
@@ -3406,6 +3431,15 @@
 }
 
 @media (max-width: 760px) {
+  /* No 390 nao ha largura para titulo, acoes e o sinal de prazos na mesma
+     linha: a faixa volta a empilhar. A C1 mede a altura compacta no desktop;
+     o que o mobile (X2) cobra e que a faixa gruda e nao some, e isso
+     continua valendo empilhado. */
+  .cr-page .app-page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .cr-competence-filter__panel {
     position: static;
     width: 100%;

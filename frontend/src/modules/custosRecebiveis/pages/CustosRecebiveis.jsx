@@ -545,8 +545,9 @@ export default function CustosRecebiveis() {
           titulo="Custos e Recebiveis"
           /* C2 (matriz): mesmo o estado sem area liberada carrega apoio na
              faixa — quem chega aqui precisa saber POR QUE a tela esta vazia,
-             e o apoio e o unico lugar que sobrevive a rolagem. */
-          contagem="Nenhuma area liberada"
+             e o apoio e o unico lugar que sobrevive a rolagem. A contagem e
+             um NUMERO (zero areas), nao um adjetivo: e o que a C2 mede. */
+          contagem="0 area(s) liberada(s)"
           descricao="Solicite ao administrador pelo menos uma permissao de visualizacao deste modulo."
         />
         <BlocoConteudo titulo="Nenhuma area do modulo foi liberada">
@@ -575,13 +576,20 @@ export default function CustosRecebiveis() {
         tela levando o "Atualizar" e o contador de prazos junto. Agora é o
         PageHeader: gruda abaixo da topbar, compacta na rolagem e nunca some.
         O olho-de-boi "Planejamento e acompanhamento por obra" e a frase de
-        apoio viraram a linha única de `descricao`, com a área aberta em
-        `contagem` — em página longa a pessoa continua sabendo onde está.
+        apoio viraram a linha única de `descricao` — em página longa a pessoa
+        continua sabendo onde está.
+
+        C2 × B3 (critério de 05/09): a FAIXA fica com o TOTAL, os BLOCOS com
+        os recortes. O total do módulo é quantas obras ele enxerga; a carteira
+        consolidada, ali embaixo, conta as obras do recorte do filtro
+        executivo — dois números que respondem perguntas diferentes. A área
+        aberta era a `contagem` e desceu para a `descricao`: continua dizendo
+        onde a pessoa está, sem ocupar o lugar de um número que não é.
       */}
       <PageHeader
         titulo="Custos e Recebiveis"
-        contagem={abaAtual?.label || null}
-        descricao="Planeje o mes, acompanhe medicoes e compare com os lancamentos financeiros."
+        contagem={`${obras.length} obra(s)`}
+        descricao={`${abaAtual?.label ? `${abaAtual.label} · ` : ''}Planeje o mes, acompanhe medicoes e compare com os lancamentos financeiros.`}
         secundarias={[{
           rotulo: 'Atualizar',
           icone: <HiOutlineArrowPath className="h-4 w-4" />,

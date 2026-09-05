@@ -9,7 +9,7 @@
 // Uso: node scripts/validarNavegacao.mjs  (sai com código 1 se falhar)
 // =====================================================================
 import { createServer } from 'vite';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -101,6 +101,87 @@ function extrairRedirecionamentos() {
     const de = match[1].startsWith('/') ? match[1] : `/${match[1]}`;
     mapa.set(de, match[2]);
   }
+
+  /*
+    SEGUNDA FORMA DE REDIRECIONAR (05/09) — e o check conhecia uma so.
+
+    O padrao acima acha `element={<Navigate to="...">}` escrito direto na
+    rota. Mas neste repositorio a outra metade dos redirecionamentos mora
+    num COMPONENTE DE GUARDA: `<Route path="sst" element={<SstDashboardRoute>
+    <SstDashboard /></SstDashboardRoute>} />`, e e o guarda que faz o
+    `<Navigate>`.
+
+    Isso apareceu quando o modo simplificado do SST tirou 12 telas do
+    catalogo de destinos: o check acusou 30 "destinos perdidos" e mandou
+    declarar o redirecionamento — que ja existia, escrito da outra forma.
+    Check que manda fazer o que ja esta feito nao protege: ensina a ignorar.
+
+    O criterio para aceitar e o mesmo da varredura de alcance: guarda que
+    redireciona por CONSTANTE (configuracao) redireciona para todo mundo, e
+    portanto preserva o destino de verdade. Guarda que redireciona por
+    PERMISSAO nao entra — ali a tela existe e abre para quem pode.
+  */
+  const guardas = new Map();
+  for (const m of src.matchAll(/function\s+(\w+)\s*\(\s*\{[^}]*\}\s*\)\s*\{/g)) {
+    let i = m.index + m[0].length;
+    let profundidade = 1;
+    while (i < src.length && profundidade > 0) {
+      if (src[i] === '{') profundidade += 1;
+      else if (src[i] === '}') profundidade -= 1;
+      i += 1;
+    }
+    const corpo = src.slice(m.index, i);
+    const porConstante = corpo.match(/if\s*\(\s*[A-Z][A-Z0-9_]{2,}\s*\)\s*\{?\s*return\s*<Navigate\s+to=\{?([^}\n]+)/);
+    if (porConstante) guardas.set(m[1], porConstante[1].trim().replace(/["'>\s]+$/, ''));
+  }
+  for (const m of src.matchAll(/path="([^"]+)"[^\n]*/g)) {
+    if (/<Navigate/.test(m[0])) continue;
+    for (const c of m[0].matchAll(/<(\w+)/g)) {
+      if (!guardas.has(c[1])) continue;
+      const de = m[1].startsWith('/') ? m[1] : `/${m[1]}`;
+      if (!mapa.has(de)) mapa.set(de, `${guardas.get(c[1])} (via ${c[1]})`);
+      break;
+    }
+  }
+  /*
+    TERCEIRA FORMA: a PROPRIA TELA redireciona (05/09).
+
+    Depois de ensinar a guarda, sobraram 19 — todos `/sst/<recurso>`, que
+    caem na rota curinga `sst/:resource`. Quem redireciona ali nao e guarda
+    nenhuma: e a SstCrudPage, com
+    `if (!isSstResourceVisible(resource)) return <Navigate to="/sst" />`.
+
+    Mesmo criterio das outras duas: a condicao vem de um helper de
+    `constants/` (configuracao, igual para todo mundo), nao de `user`. Uma
+    rota curinga cujo componente redireciona por configuracao preserva
+    TODOS os destinos que caem nela.
+  */
+  const rotasCuringa = [];
+  for (const m of src.matchAll(/path="([^"]+:[^"]*)"[^\n]*/g)) {
+    for (const c of m[0].matchAll(/<(\w+)/g)) {
+      const imp = src.match(new RegExp(`(?:const|let)\\s+${c[1]}\\s*=\\s*(?:React\\.)?lazy\\(\\s*\\(\\)\\s*=>\\s*import\\(\\s*'([^']+)'`));
+      if (!imp) continue;
+      let arq = imp[1].replace('./', 'src/');
+      if (!arq.endsWith('.jsx')) arq += '.jsx';
+      const completo = path.join(raiz, arq);
+      if (!existsSync(completo)) continue;
+      const codigo = readFileSync(completo, 'utf8');
+      const deConstantes = new Set();
+      for (const i2 of codigo.matchAll(/import\s*\{([^}]+)\}\s*from\s*'[^']*constants[^']*'/g)) {
+        i2[1].split(',').forEach((n) => deConstantes.add(n.trim().split(/\s+as\s+/).pop()));
+      }
+      if (!deConstantes.size) continue;
+      for (const cond of codigo.matchAll(/if\s*\((.{1,160}?)\)\s*\{?\s*return\s*<Navigate\s+to=\{?([^}\n]+)/g)) {
+        if (/\buser\b|\bperfil\b|\bpermiss/i.test(cond[1])) continue;
+        if (![...deConstantes].some((n) => new RegExp(`\\b${n}\\b`).test(cond[1]))) continue;
+        const prefixo = (m[1].startsWith('/') ? m[1] : `/${m[1]}`).split('/:')[0];
+        rotasCuringa.push({ prefixo, destino: `${cond[2].trim().replace(/["'>\s]+$/, '')} (via ${c[1]})` });
+        break;
+      }
+      break;
+    }
+  }
+  mapa.curingas = rotasCuringa;
   return mapa;
 }
 
@@ -148,7 +229,8 @@ try {
     const chave = antigo.split('#')[0];
     const coberto = antigo === '/'
       ? alvos.has('/dashboard')
-      : alvos.has(chave) || destinos.some((d) => d.to === antigo);
+      : alvos.has(chave) || destinos.some((d) => d.to === antigo)
+        || (redirecionamentos.curingas || []).some((c) => chave.startsWith(`${c.prefixo}/`));
     if (coberto) continue;
     // Saiu do menu, mas o App.jsx redireciona: destino preservado.
     if (redirecionamentos.has(chave)) {

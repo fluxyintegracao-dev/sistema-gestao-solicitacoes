@@ -83,8 +83,27 @@
   font-size: var(--fonte-detalhe);
 }
 
+/*
+  O CONTAINER MATAVA A FAIXA FIXA (05/09) — apontado pela matriz.
+
+  `container-type: inline-size` cria contencao, e contencao no ANCESTRAL de
+  um `position: sticky` sequestra o sticky: a faixa da tela de cotacoes
+  sumia na rolagem e sobrepunha a topbar em 493px. Valia para as 13 rotas do
+  escopo, no desktop e no 390.
+
+  E o conserto nao podia ser mover o container para dentro: a consulta
+  reorganiza `.app-page-header-row` e `.app-page-actions`, que estao DENTRO
+  da faixa. Um container que precisa conter a faixa nao pode coexistir com
+  uma faixa que precisa grudar. Sao incompativeis por construcao.
+
+  A troca, feita de olhos abertos: a consulta passa a ser de VIEWPORT, com o
+  mesmo limiar de 68rem. O que muda e o ponto de disparo — antes ele media a
+  largura do conteudo (que encolhe quando o menu lateral esta aberto), agora
+  mede a janela. Na pratica a reorganizacao acontece um pouco mais tarde com
+  o menu aberto. Faixa fixa que funciona vale mais que rearranjo que dispara
+  no pixel exato: C1 e X2 sao itens da definicao de pronto, o rearranjo nao.
+*/
 .compras-responsive-scope .page {
-  container: compras-page / inline-size;
   width: 100%;
   min-width: 0;
   max-width: 94rem;
@@ -478,7 +497,7 @@
   max-width: 100%;
 }
 
-@container compras-page (max-width: 68rem) {
+@media (max-width: 68rem) {
   .compras-responsive-scope .app-toolbar-card {
     align-items: flex-start;
   }

@@ -77,10 +77,27 @@ function BlocoGrupo({ titulo, descricao, rows, storageKey, labelHeader = 'Descri
             // R17: a empresa/obra/referencia/status agrupada nomeia a linha.
             tipo: 'identidade',
             noCard: 'titulo',
+            /*
+              T6 — A CÉLULA É SEMPRE CelulaDupla, TENHA EMPRESA OU NÃO.
+
+              Sem empresa o render devolvia a STRING SOLTA, e string solta
+              nesta coluna é cortada no meio da palavra: estes quatro blocos
+              vivem num grid de duas colunas, a tabela nasce no piso (1090px
+              num contêiner de 569px) e a coluna de conteúdo desce ao seu
+              mínimo de 160px. Aí "RETROESCAVADEIRA" não cabe, não quebra
+              (`overflow-wrap: normal` na `.app-tabela`, para não partir
+              palavra) e o `td` recorta com `overflow: hidden` — sem `title`
+              em nenhum ANCESTRAL, que é onde a T6 procura o tooltip.
+
+              Na CelulaDupla quem trunca é o span (nowrap + reticências) e o
+              texto completo fica no `title` do wrapper, acima dele. Tooltip
+              declarado na célula, não dependente de medição em runtime.
+            */
             render: (row) => (
-              row.empresa
-                ? <CelulaDupla principal={formatLabel ? formatLabel(row.label) : row.label} sub={row.empresa} />
-                : (formatLabel ? formatLabel(row.label) : row.label)
+              <CelulaDupla
+                principal={formatLabel ? formatLabel(row.label) : row.label}
+                sub={row.empresa || null}
+              />
             )
           },
           { id: 'total', titulo: 'Contratos', tipo: 'numero', render: (row) => number(row.total) },
@@ -365,11 +382,24 @@ export default function ContratosRelatorioOperacional() {
                   // R17: o codigo do contrato nomeia a pendencia listada.
                   tipo: 'identidade',
                   noCard: 'titulo',
-                  render: (item) => item.codigo
+                  // T6, mesmo motivo dos blocos de agrupamento: a coluna de
+                  // conteúdo desta tabela também nasce no piso de 160px (as
+                  // outras seis somam mais que o contêiner), e o código do
+                  // contrato aqui é texto livre — "CONTRATO DE PRESTAÇÃO DE
+                  // SERVIÇO DE RETROESCAVADEIRA…" é um valor real da base.
+                  render: (item) => <CelulaDupla principal={item.codigo} />
                 },
-                { id: 'referencia', titulo: 'Referência', tipo: 'texto', render: (item) => item.referencia || '-' },
-                { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra || '-' },
-                { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => item.empresa || '-' },
+                /*
+                  As três colunas de texto livre abaixo levam o MESMO
+                  conteúdo (descrição de contrato, nome de obra, razão
+                  social) com 180px — um degrau só acima do piso onde a de
+                  identidade já corta. Palavra de ~19 caracteres estoura
+                  também aqui, então elas seguem o mesmo caminho: truncam no
+                  span e levam o texto inteiro no `title` da CelulaDupla.
+                */
+                { id: 'referencia', titulo: 'Referência', tipo: 'texto', render: (item) => <CelulaDupla principal={item.referencia || '-'} /> },
+                { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => <CelulaDupla principal={item.obra || '-'} /> },
+                { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => <CelulaDupla principal={item.empresa || '-'} /> },
                 { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => money(item.valor_total) },
                 { id: 'saldo', titulo: 'A pagar', tipo: 'valor', render: (item) => money(item.total_a_pagar) },
                 {

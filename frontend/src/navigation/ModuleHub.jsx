@@ -29,7 +29,10 @@ export default function ModuleHub() {
       </header>
 
       <nav aria-label={`Telas do módulo ${mod.label}`}>
-        <ul className="hub-grid" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {/* A zeragem da lista ja mora na propria `.hub-grid`, com a mesma
+            explicacao: medida, mesmo 0, nao se escreve na tela (R10). O
+            `style` inline aqui repetia o que a classe ja fazia. */}
+        <ul className="hub-grid">
           {mod.children.map((item) => (
             <li key={item.id}>
               <NavCard

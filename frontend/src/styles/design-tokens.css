@@ -184,6 +184,19 @@
   width: 100%;
 }
 
+/* A HOME MIGROU PARA `Pagina`/`PageHeader` (05/09).
+   O ritmo vertical, o respiro do topo e a faixa fixa passaram a vir dos
+   componentes padrão; da tela sobra só a LARGURA ÚTIL — os mesmos 1520px
+   que a `.hub-page` já usava, para os cards de módulo não perderem a
+   quarta coluna nos monitores largos.
+   Especificidade dupla de propósito: `responsive-system.css` carrega
+   DEPOIS e tem um `.layout-main :where(…, .page, …) { max-width: 100% }`
+   que empataria com um seletor de uma classe só e venceria por ordem. */
+.app-pagina.hub-home-page {
+  max-width: 1520px;
+  margin-inline: auto;
+}
+
 .hub-header {
   margin: 2px 0 12px;
   display: flex;
@@ -200,21 +213,16 @@
   padding-top: 4px;
 }
 
-/* Blocos personalizáveis da Home (mesmo motor do detalhe) */
+/* Blocos personalizáveis da Home (mesmo motor do detalhe). A superfície,
+   o padding e o vão entre eles vêm do `BlocoConteudo`/`Pagina` desde a
+   migração de 05/09 — as margens que cada bloco carregava saíram com
+   elas, senão somariam ao vão do componente. */
 .hub-bloco {
   min-width: 0;
 }
 
-.hub-bloco > nav {
-  margin: 0 0 14px;
-}
-
-.hub-bloco .sol-detail-bloco-recolhido {
-  margin: 0 0 14px;
-}
-
 .hub-personalizar-toolbar {
-  margin: 0 0 14px;
+  margin: 0;
 }
 
 /* Largura "Normal" = meia largura em telas largas; abaixo disso a
@@ -222,7 +230,11 @@
 .hub-blocos-colunas {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0 14px;
+  /* O MESMO vão do `Pagina` entre blocos (--esp-4): antes o espaçamento
+     vertical vinha da margem que cada seção da Home carregava, e essas
+     margens saíram junto com as cascas. Linha zerada aqui = blocos
+     colados. */
+  gap: var(--esp-4);
   align-items: start;
 }
 
@@ -230,6 +242,28 @@
   .hub-blocos-colunas {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/*
+  CARTÃO DENTRO DE BLOCO RECUA UM TOM (05/09).
+
+  Com a Home dentro de `BlocoConteudo`, os cards que antes flutuavam
+  sobre o canvas acinzentado passaram a ficar em cima do branco do bloco
+  — branco sobre branco, distinguidos só pela borda. O sistema já resolve
+  isso no ladrilho padrão (`.app-stat` usa `--ui-surface-2`), e é esse
+  tratamento que se aplica aqui.
+
+  Fora de bloco nada muda: o hub de MÓDULO (nível 2) continua desenhando
+  os mesmos cards direto sobre o canvas, e lá o branco é que os destaca.
+  O card tracejado "Adicionar" fica de fora porque o fundo dele é a
+  ausência de fundo.
+*/
+.app-bloco .hub-card,
+.app-bloco .hub-pendencia-cartao,
+.app-bloco .hub-resolver-item,
+.app-bloco .hub-obras-resumo-item,
+.app-bloco .hub-atalho-card:not(.hub-atalho-card--adicionar) {
+  background: var(--ui-surface-2);
 }
 
 .hub-title {
@@ -246,6 +280,11 @@
 }
 
 .hub-grid {
+  /* zeragem da lista: veio do `style` inline da Home, que o validador
+     estático reprova (R10 — medida, mesmo 0, não se escreve na tela). */
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
   /* NO MÁXIMO 4 colunas em telas grandes; 3, 2 e 1 conforme estreita.
      Vale igual no modo normal e no de personalização — ocultar um card
@@ -368,25 +407,36 @@
 }
 
 /* --- Faixa "Suas pendências" ------------------------------------- */
-.hub-pendencias {
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 14px;
-  box-shadow: var(--ui-shadow-sm);
-}
+/*
+  SEM CASCA PRÓPRIA (05/09) — vale para as cinco seções da Home
+  (`.hub-pendencias`, `.hub-atalhos`, `.hub-resolver`, `.hub-obras-resumo`
+  e `.hub-extra`).
 
+  Cada uma desenhava à mão o cartão branco sobre o canvas: fundo, borda,
+  raio e sombra iguais aos do sistema, com nome próprio. Era exatamente
+  por isso que a B1 reprovava a tela inicial dizendo "nenhum bloco na
+  tela" — ela procura a SUPERFÍCIE PADRÃO (`.app-bloco`) e aqui havia
+  cinco cópias dela com outro nome.
+
+  Agora cada bloco da Home é um `BlocoConteudo`, e estas seções são só o
+  conteúdo dentro dele — cartão dentro de cartão seria a dobra que a
+  migração veio desfazer.
+*/
+
+/* Título de bloco da Home: o mesmo degrau do `.app-bloco-titulo` do
+   sistema (18px, `--fonte-bloco`), porque agora ele É o título de um
+   bloco. Era 13px em caixa alta — uma "sobrancelha" que ficava abaixo do
+   piso da escala e quebrava a hierarquia página 22 > bloco 18 > corpo 14
+   (R10) justamente na primeira tela do sistema. */
 .hub-pendencias-title {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin: 0 0 10px;
-  font-size: 13px;
+  gap: var(--esp-2);
+  margin: 0 0 var(--esp-3);
+  font-size: var(--fonte-bloco);
+  line-height: var(--lh-titulo);
   font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--app-muted-color);
+  color: var(--c-text);
 }
 
 .hub-pendencias-list {
@@ -943,15 +993,8 @@
 
 /* =====================================================================
    ATALHOS — seção "Seus atalhos" da Home
+   (superfície: o `BlocoConteudo` que a envolve — ver .hub-pendencias)
    ===================================================================== */
-.hub-atalhos {
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 14px;
-  box-shadow: var(--ui-shadow-sm);
-}
 
 .hub-atalhos-cabecalho {
   display: flex;
@@ -960,7 +1003,13 @@
   gap: 10px;
 }
 
+/* M1/R2 — é botão, e botão tem alvo mínimo de clique. O desenho continua
+   sendo o de um link (sem borda, sem fundo); o que cresce é a ÁREA.
+   Mesmo arranjo do `.app-campos-toggle` do sistema. */
 .hub-atalhos-vertodos {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--alvo-clique);
   border: none;
   background: none;
   padding: 0;
@@ -1000,7 +1049,9 @@
   gap: 9px;
   flex: 1;
   min-width: 0;
-  padding: 8px 30px 8px 10px;
+  /* O rótulo para antes do alvo do "×"/cadeado (acima), que agora ocupa
+     `--alvo-clique` a partir de `--esp-1` da borda. */
+  padding: 8px calc(var(--alvo-clique) + var(--esp-2)) 8px 10px;
   text-decoration: none;
   color: var(--app-text-color, var(--c-text));
 }
@@ -1032,16 +1083,27 @@
   -webkit-box-orient: vertical;
 }
 
+/*
+  M1 (05/09) — o "×" do atalho media 20×20px: quatro alvos abaixo do
+  mínimo na PRIMEIRA tela do sistema, e o dedo no celular tinha 20px para
+  acertar entre o card inteiro (que navega) e o botão (que remove).
+
+  O que cresce é a ÁREA, não o desenho: a caixa passa a ser
+  `--alvo-clique` (32px no mouse, 44px no toque, sozinha, pelo token) e o
+  ícone continua com 13px. É o mesmo arranjo dos botões só-ícone do
+  sistema (`.alert-close`, `.app-tabela-expandir`, `.app-mais-menu`):
+  fundo transparente, realce só no hover.
+*/
 .hub-atalho-remover,
 .hub-atalho-cadeado {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: var(--esp-1);
+  right: var(--esp-1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: var(--alvo-clique);
+  height: var(--alvo-clique);
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -1120,10 +1182,12 @@
   border-bottom: 1px solid var(--ui-border);
 }
 
+/* Fora do card, o mesmo botão fecha o modal — e o alvo mínimo vale igual
+   (media 28px). */
 .hub-atalhos-modal-topo .hub-atalho-remover {
   position: static;
-  width: 28px;
-  height: 28px;
+  width: var(--alvo-clique);
+  height: var(--alvo-clique);
 }
 
 .hub-atalhos-modal-busca {
@@ -1379,15 +1443,8 @@
 
 /* =====================================================================
    HOME — "Para resolver agora": o trabalho em si, em lista compacta
+   (superfície: o `BlocoConteudo` que a envolve — ver .hub-pendencias)
    ===================================================================== */
-.hub-resolver {
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 14px;
-  box-shadow: var(--ui-shadow-sm);
-}
 
 .hub-resolver-lista {
   display: flex;
@@ -1507,15 +1564,8 @@
 
 /* =====================================================================
    HOME — faixa gerencial "A pagar no mês, por obra" (telas largas)
+   (superfície: o `BlocoConteudo` que a envolve — ver .hub-pendencias)
    ===================================================================== */
-.hub-obras-resumo {
-  margin: 14px 0 0;
-  padding: 12px 14px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 14px;
-  box-shadow: var(--ui-shadow-sm);
-}
 
 .hub-obras-resumo-lista {
   display: grid;
@@ -1562,24 +1612,16 @@
   color: var(--app-muted-color);
 }
 
-@media (max-width: 1279px) {
-  /* Faixa opcional: só quando sobra espaço em telas largas. */
-  .hub-obras-resumo {
-    display: none;
-  }
-}
+/* A regra "só quando sobra espaço em telas largas" saiu daqui em 05/09:
+   esconder o CONTEÚDO deixava a casca do `BlocoConteudo` vazia na tela.
+   Quem decide agora é a Home (`temLarguraGerencial`, HomeHub.jsx) — o
+   bloco não é montado abaixo de 1280px. Duas cópias da mesma regra em
+   camadas diferentes é como ela some de vista. */
 
 /* =====================================================================
    HOME — blocos opcionais (carregamento sob demanda)
+   (superfície: o `BlocoConteudo` que a envolve — ver .hub-pendencias)
    ===================================================================== */
-.hub-extra {
-  margin: 0 0 14px;
-  padding: 12px 14px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 14px;
-  box-shadow: var(--ui-shadow-sm);
-}
 
 .hub-extra-estado {
   margin: 2px 0 0;
@@ -1992,7 +2034,13 @@
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
 }
 
+/* M1/R2 — o "×" que fecha o aviso também é botão. */
 .hub-toast button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--alvo-clique);
+  min-height: var(--alvo-clique);
   border: none;
   background: none;
   color: inherit;

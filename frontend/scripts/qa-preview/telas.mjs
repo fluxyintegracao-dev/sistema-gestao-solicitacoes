@@ -1579,16 +1579,37 @@ export const TELAS = [
   },
   // ---- Rodada 7 (final): nucleo de Compras, relatorios restantes e avulsas (05/09) ----
   {
+    /*
+      A TELA QUE TODO MUNDO VE PRIMEIRO, E QUE PASSOU 200 TELAS INVISIVEL.
+
+      `/` e servida pelo HomeHub, nao pelo Dashboard. Ele nunca foi migrado e
+      nunca entrou neste manifesto: a minha varredura de "telas pendentes"
+      procurava por padrao de nome de arquivo (`*Page`, `pages/*`) e o HomeHub
+      mora em `src/navigation/`. Filtro de nome nao e inventario — foi assim
+      que a PRIMEIRA tela do sistema ficou de fora da refatoracao inteira.
+    */
+    id: 'inicio',
+    arquivo: 'src/navigation/HomeHub.jsx',
+    rota: '/',
+    tipo: 'painel'
+  },
+  {
     id: 'dashboard',
     arquivo: 'src/pages/Dashboard.jsx',
-    rota: '/',
+    // ERRO MEU, pego pela matriz (05/09): declarei a rota como `/`, que e
+    // servida pelo HomeHub — nao pelo Dashboard. A matriz mediu o HomeHub e
+    // reportou as falhas dele como se fossem do Dashboard, que esta migrado.
+    // Apontar o harness para a tela errada e a terceira vez nesta leva
+    // (antes: /sst/colaboradores, escondido pelo modo simplificado).
+    rota: '/dashboard',
     tipo: 'painel'
   },
   {
     id: 'treinamento',
     arquivo: 'src/pages/Treinamento.jsx',
     rota: '/treinamento',
-    tipo: 'listagem'
+    tipo: 'listagem',
+    cadastroInline: "\"Novo guia\" abre o formulario na propria tela: o guia e escrito ali, com o conteudo a vista. Tirando o formulario sobra a lista, mas escrever um guia num modal seria redigir texto longo numa caixa (R9 revista em 04/09)"
   },
   {
     id: 'prioridades-diretoria',
@@ -1600,7 +1621,14 @@ export const TELAS = [
     id: 'perfil',
     arquivo: 'src/pages/Perfil.jsx',
     rota: '/perfil',
-    tipo: 'form'
+    tipo: 'form',
+    naoAplica: {
+      // A C3 pede seta de voltar em tela de DETALHE DE REGISTRO — a seta
+      // existe para devolver a pessoa ao registro-pai. O perfil nao tem
+      // pai: chega-se por ele pelo menu do usuario, de qualquer tela. Uma
+      // seta ali teria de inventar um destino.
+      C3: 'tela do proprio usuario, alcancada pelo menu de qualquer lugar — nao ha registro-pai a que voltar'
+    }
   },
   {
     id: 'arquivos-modelos',
@@ -1683,13 +1711,15 @@ export const TELAS = [
     id: 'revisar-solicitacao-compra',
     arquivo: 'src/modules/solicitacao-compra/pages/RevisarSolicitacaoCompra.jsx',
     rota: '/solicitacoes-compra/revisar',
-    tipo: 'detalhe'
+    tipo: 'detalhe',
+    soPeloFluxo: 'etapa de fluxo: os dados vêm do rascunho que a tela "nova" grava no NAVEGADOR, não do servidor — sem rascunho a tela devolve a pessoa para /solicitacoes-compra/nova, que é o comportamento certo. Não é medida por URL porque o passo seguinte dela CRIA a solicitação no ambiente compartilhado, e esta bateria clica em botões'
   },
   {
     id: 'revisar-compra-direta',
     arquivo: 'src/modules/solicitacao-compra/pages/RevisarCompraDireta.jsx',
     rota: '/solicitacoes-compra-direta/revisar',
-    tipo: 'detalhe'
+    tipo: 'detalhe',
+    soPeloFluxo: 'mesma coisa da revisão de solicitação: o rascunho da compra direta vive no navegador e o passo seguinte CRIA a compra no ambiente compartilhado'
   },
   {
     id: 'solicitacao-compra-detalhe',
@@ -1697,11 +1727,56 @@ export const TELAS = [
     resolver: 'solicitacaoCompraDetalhe',
     tipo: 'detalhe'
   },
+  /*
+    ---- Rodada 8 (05/09): as QUATRO rotas que ninguem media ----
+
+    Sairam do trinco de cobertura depois que ele parou de contar caminho
+    errado como rota nao medida. Nao sao sobras de nenhuma rodada: sao telas
+    com rota no App.jsx que nunca estiveram em nenhuma das duas listas —
+    entre elas o detalhe do PEDIDO DE COMPRA, com 2859 linhas, que e onde a
+    compra vira compromisso de pagamento.
+  */
+  {
+    id: 'hub-modulo',
+    arquivo: 'src/navigation/ModuleHub.jsx',
+    rota: '/hub/compras',
+    tipo: 'painel'
+  },
+  {
+    id: 'solicitacoes-arquivadas',
+    arquivo: 'src/pages/SolicitacoesArquivadas.jsx',
+    rota: '/solicitacoes-arquivadas',
+    tipo: 'listagem'
+  },
+  {
+    id: 'pedido-compra-detalhe',
+    arquivo: 'src/modules/solicitacao-compra/pages/PedidoCompraDetalhe.jsx',
+    resolver: 'pedidoCompraDetalhe',
+    tipo: 'detalhe'
+  },
+  {
+    id: 'compra-finalizada',
+    arquivo: 'src/modules/solicitacao-compra/pages/RevisarSolicitacaoCompraFinal.jsx',
+    rota: '/solicitacoes-compra/finalizada/1',
+    tipo: 'detalhe',
+    soPeloFluxo: 'e a tela de CONFIRMACAO logo depois de criar a solicitacao: tudo que ela mostra vem do location.state daquela navegacao, e a rota e guardada pelo fluxo de criacao. Chegar ali por URL exigiria criar uma solicitacao de verdade no ambiente compartilhado'
+  },
   {
     id: 'gerenciar-cotacao',
     arquivo: 'src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx',
     resolver: 'gerenciarCotacao',
-    tipo: 'mista'
+    /*
+      DECLARADA COMO 'mista' ATE 05/09, E ESTAVA ERRADO.
+
+      A tela e a gestao da cotacao DE UMA solicitacao: chega-se por
+      /solicitacoes-compra/:id/cotacao, o titulo traz o codigo da
+      solicitacao e a seta volta para o detalhe dela. A seta ali nao e
+      redundante (R11) — ela e o caminho de volta ao registro, que o menu
+      nao oferece. Com 'mista' o C3 reprovava a tela por ter a seta, e o
+      conserto pela mensagem seria TIRAR a seta: deixar a pessoa sem volta
+      para consertar uma classificacao minha.
+    */
+    tipo: 'detalhe'
   },
 ];
 

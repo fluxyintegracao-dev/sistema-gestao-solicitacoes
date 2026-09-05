@@ -298,145 +298,158 @@ export default function ComprasDelegacao() {
         (responsável, prazo, motivo) que se edita e se salva ali mesmo.
         `TabelaPadrao` aqui seria forçar linha em cima de formulário — o
         cartão é a forma certa para este trabalho.
+
+        B2: os cartões passam a morar DENTRO do bloco principal da tela — é
+        a lista de solicitacoes abertas que responde "quem responde por cada
+        compra e para quando". Antes a tela inteira era secundária (busca e
+        cartões), então nenhum bloco assumia a resposta central. A busca
+        acima e cada cartão aqui dentro seguem secundários: eles recortam e
+        detalham essa resposta, não a substituem.
       */}
-      <div className="grid gap-4 xl:grid-cols-2">
-        {solicitacoesFiltradas.map((solicitacao) => {
-          const edicao = getEdicao(solicitacao);
-          const prazoInfo = getPrazoInfo({ ...solicitacao, prazo_compra: edicao.prazo_compra });
-          const responsavelSelecionadoId = Number(edicao.responsavel_id || 0);
-          const responsavelSelecionadoElegivel = usuarios.some(
-            (usuario) => Number(usuario.id) === responsavelSelecionadoId
-          );
-          const responsavelNaoListado = responsavelSelecionadoId > 0 && !responsavelSelecionadoElegivel;
-          const responsavelForaCompras = podeGerenciarDelegacao && responsavelNaoListado;
-          /*
-            ACHADO (registrado no relatório): quando o registro NÃO traz
-            `compradorResponsavel`, a opção exibe "Usuario #12" — um id onde
-            deveria estar um nome. O histórico desta tela grava nome; a lista
-            de responsáveis, nesse caso de borda, não tem de onde tirar.
-          */
-          const responsavelForaComprasNome = solicitacao.compradorResponsavel?.nome
-            || `Usuario #${responsavelSelecionadoId}`;
+      <BlocoConteudo
+        titulo="Solicitacoes abertas"
+        variante="primario"
+        cor="var(--module-compras)"
+      >
+        <div className="grid gap-4 xl:grid-cols-2">
+          {solicitacoesFiltradas.map((solicitacao) => {
+            const edicao = getEdicao(solicitacao);
+            const prazoInfo = getPrazoInfo({ ...solicitacao, prazo_compra: edicao.prazo_compra });
+            const responsavelSelecionadoId = Number(edicao.responsavel_id || 0);
+            const responsavelSelecionadoElegivel = usuarios.some(
+              (usuario) => Number(usuario.id) === responsavelSelecionadoId
+            );
+            const responsavelNaoListado = responsavelSelecionadoId > 0 && !responsavelSelecionadoElegivel;
+            const responsavelForaCompras = podeGerenciarDelegacao && responsavelNaoListado;
+            /*
+              ACHADO (registrado no relatório): quando o registro NÃO traz
+              `compradorResponsavel`, a opção exibe "Usuario #12" — um id onde
+              deveria estar um nome. O histórico desta tela grava nome; a lista
+              de responsáveis, nesse caso de borda, não tem de onde tirar.
+            */
+            const responsavelForaComprasNome = solicitacao.compradorResponsavel?.nome
+              || `Usuario #${responsavelSelecionadoId}`;
 
-          return (
-            <BlocoConteudo
-              key={solicitacao.id}
-              variante="secundario"
-              titulo={`SC-${String(solicitacao.id).padStart(5, '0')}`}
-              descricao={`${solicitacao.obra?.nome || 'Sem obra'} · ${solicitacao.solicitante?.nome || 'Sem solicitante'}`}
-              acoes={<StatusBadge status={prazoInfo.label} kind={prazoInfo.kind} />}
-            >
-              {/* R12: select de FORMULÁRIO (entrada de dado) continua
-                  legítimo — o que a regra proíbe é select de FILTRO. */}
-              <FormSecao colunas={2}>
-                <CampoForm
-                  label="Responsavel"
-                  hint={responsavelForaCompras && podeGerenciarDelegacao
-                    ? 'A atribuicao anterior foi preservada. Selecione um usuario de Compras ou remova o responsavel antes de salvar.'
-                    : (podeGerenciarDelegacao && !responsavelForaCompras
-                      ? 'Somente usuarios ativos vinculados ao setor de Compras.'
-                      : undefined)}
-                >
-                  <select
-                    className="input"
-                    value={edicao.responsavel_id}
-                    onChange={(event) => updateEdicao(solicitacao.id, { responsavel_id: event.target.value })}
-                    disabled={!podeGerenciarDelegacao}
-                  >
-                    <option value="">Sem responsavel</option>
-                    {responsavelNaoListado ? (
-                      <option value={responsavelSelecionadoId} disabled>
-                        {responsavelForaComprasNome}
-                        {responsavelForaCompras ? ' - fora do setor de Compras (atribuicao anterior)' : ''}
-                      </option>
-                    ) : null}
-                    {usuarios.map((usuario) => (
-                      <option key={usuario.id} value={usuario.id}>
-                        {usuario.nome} {usuario.setor ? `- ${usuario.setor}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </CampoForm>
-
-                <CampoForm label="Prazo para finalizar pedido">
-                  <input
-                    className="input"
-                    type="date"
-                    value={edicao.prazo_compra || ''}
-                    onChange={(event) => updateEdicao(solicitacao.id, { prazo_compra: event.target.value })}
-                    disabled={!podeGerenciarDelegacao}
-                  />
-                </CampoForm>
-
-                {prazoInfo.atrasado ? (
+            return (
+              <BlocoConteudo
+                key={solicitacao.id}
+                variante="secundario"
+                titulo={`SC-${String(solicitacao.id).padStart(5, '0')}`}
+                descricao={`${solicitacao.obra?.nome || 'Sem obra'} · ${solicitacao.solicitante?.nome || 'Sem solicitante'}`}
+                acoes={<StatusBadge status={prazoInfo.label} kind={prazoInfo.kind} />}
+              >
+                {/* R12: select de FORMULÁRIO (entrada de dado) continua
+                    legítimo — o que a regra proíbe é select de FILTRO. */}
+                <FormSecao colunas={2}>
                   <CampoForm
-                    label={podeGerenciarDelegacao ? 'Motivo para delegar com prazo vencido' : 'Motivo do atraso'}
-                    tipo="texto-longo"
-                    obrigatorio
+                    label="Responsavel"
+                    hint={responsavelForaCompras && podeGerenciarDelegacao
+                      ? 'A atribuicao anterior foi preservada. Selecione um usuario de Compras ou remova o responsavel antes de salvar.'
+                      : (podeGerenciarDelegacao && !responsavelForaCompras
+                        ? 'Somente usuarios ativos vinculados ao setor de Compras.'
+                        : undefined)}
                   >
-                    <textarea
+                    <select
                       className="input"
-                      rows={3}
-                      value={podeGerenciarDelegacao
-                        ? (edicao.motivo_delegacao_vencida || '')
-                        : (edicao.motivo_atraso || '')}
-                      onChange={(event) => updateEdicao(
-                        solicitacao.id,
-                        podeGerenciarDelegacao
-                          ? { motivo_delegacao_vencida: event.target.value }
-                          : { motivo_atraso: event.target.value }
-                      )}
-                      placeholder={podeGerenciarDelegacao
-                        ? 'Explique por que esta solicitacao esta sendo delegada com prazo ja vencido.'
-                        : 'Explique o motivo do atraso antes de salvar.'}
+                      value={edicao.responsavel_id}
+                      onChange={(event) => updateEdicao(solicitacao.id, { responsavel_id: event.target.value })}
+                      disabled={!podeGerenciarDelegacao}
+                    >
+                      <option value="">Sem responsavel</option>
+                      {responsavelNaoListado ? (
+                        <option value={responsavelSelecionadoId} disabled>
+                          {responsavelForaComprasNome}
+                          {responsavelForaCompras ? ' - fora do setor de Compras (atribuicao anterior)' : ''}
+                        </option>
+                      ) : null}
+                      {usuarios.map((usuario) => (
+                        <option key={usuario.id} value={usuario.id}>
+                          {usuario.nome} {usuario.setor ? `- ${usuario.setor}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </CampoForm>
+
+                  <CampoForm label="Prazo para finalizar pedido">
+                    <input
+                      className="input"
+                      type="date"
+                      value={edicao.prazo_compra || ''}
+                      onChange={(event) => updateEdicao(solicitacao.id, { prazo_compra: event.target.value })}
+                      disabled={!podeGerenciarDelegacao}
                     />
                   </CampoForm>
+
+                  {prazoInfo.atrasado ? (
+                    <CampoForm
+                      label={podeGerenciarDelegacao ? 'Motivo para delegar com prazo vencido' : 'Motivo do atraso'}
+                      tipo="texto-longo"
+                      obrigatorio
+                    >
+                      <textarea
+                        className="input"
+                        rows={3}
+                        value={podeGerenciarDelegacao
+                          ? (edicao.motivo_delegacao_vencida || '')
+                          : (edicao.motivo_atraso || '')}
+                        onChange={(event) => updateEdicao(
+                          solicitacao.id,
+                          podeGerenciarDelegacao
+                            ? { motivo_delegacao_vencida: event.target.value }
+                            : { motivo_atraso: event.target.value }
+                        )}
+                        placeholder={podeGerenciarDelegacao
+                          ? 'Explique por que esta solicitacao esta sendo delegada com prazo ja vencido.'
+                          : 'Explique o motivo do atraso antes de salvar.'}
+                      />
+                    </CampoForm>
+                  ) : null}
+                </FormSecao>
+
+                {(solicitacao.motivo_delegacao_vencida || solicitacao.motivo_atraso) ? (
+                  <>
+                    <MotivoRegistrado
+                      label="Motivo da delegacao com prazo vencido"
+                      motivo={solicitacao.motivo_delegacao_vencida}
+                    />
+                    <MotivoRegistrado
+                      label="Motivo informado pelo responsavel"
+                      motivo={solicitacao.motivo_atraso}
+                    />
+                  </>
                 ) : null}
-              </FormSecao>
 
-              {(solicitacao.motivo_delegacao_vencida || solicitacao.motivo_atraso) ? (
-                <>
-                  <MotivoRegistrado
-                    label="Motivo da delegacao com prazo vencido"
-                    motivo={solicitacao.motivo_delegacao_vencida}
-                  />
-                  <MotivoRegistrado
-                    label="Motivo informado pelo responsavel"
-                    motivo={solicitacao.motivo_atraso}
-                  />
-                </>
-              ) : null}
-
-              <div className="app-actionbar">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={(event) => abrirSolicitacao(event, solicitacao)}
-                  disabled={salvandoId === solicitacao.id}
-                >
-                  Abrir
-                </button>
-                {podeGerenciarDelegacao || prazoInfo.atrasado ? (
+                <div className="app-actionbar">
                   <button
                     type="button"
-                    className="btn btn-primary"
-                    onClick={(event) => salvarDelegacao(event, solicitacao)}
+                    className="btn btn-outline"
+                    onClick={(event) => abrirSolicitacao(event, solicitacao)}
                     disabled={salvandoId === solicitacao.id}
                   >
-                    {salvandoId === solicitacao.id
-                      ? 'Salvando...'
-                      : (podeGerenciarDelegacao ? 'Salvar delegacao' : 'Salvar motivo')}
+                    Abrir
                   </button>
-                ) : null}
-              </div>
-            </BlocoConteudo>
-          );
-        })}
+                  {podeGerenciarDelegacao || prazoInfo.atrasado ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={(event) => salvarDelegacao(event, solicitacao)}
+                      disabled={salvandoId === solicitacao.id}
+                    >
+                      {salvandoId === solicitacao.id
+                        ? 'Salvando...'
+                        : (podeGerenciarDelegacao ? 'Salvar delegacao' : 'Salvar motivo')}
+                    </button>
+                  ) : null}
+                </div>
+              </BlocoConteudo>
+            );
+          })}
 
-        {!loading && solicitacoesFiltradas.length === 0 ? (
-          <div className="app-empty-card xl:col-span-2">Nenhuma solicitacao de compra aberta encontrada.</div>
-        ) : null}
-      </div>
+          {!loading && solicitacoesFiltradas.length === 0 ? (
+            <div className="app-empty-card xl:col-span-2">Nenhuma solicitacao de compra aberta encontrada.</div>
+          ) : null}
+        </div>
+      </BlocoConteudo>
     </Pagina>
   );
 }
