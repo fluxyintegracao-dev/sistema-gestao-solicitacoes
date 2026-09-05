@@ -35,7 +35,23 @@ import {
 } from '../services/contratos';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { buscarParceiros } from '../services/parceiros';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  FormSecao,
+  CampoForm,
+  BarraFiltros,
+  alternarValorFiltro,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
+
+const DESCRICAO_GESTAO = 'Cadastro, importacao e acompanhamento dos contratos por obra.';
+const DESCRICAO_OBRA = 'Acompanhamento dos contratos vinculados as suas obras.';
 
 export default function GestaoContratos() {
   const { user } = useAuth();
@@ -45,11 +61,16 @@ export default function GestaoContratos() {
   // ?obra_id= / ?codigo= / ?ref= / ?q= chegam da busca universal (Ctrl+K)
   // e das ações rápidas de obra: a lista abre já filtrada. Um ?q= com
   // dígitos vira filtro de código; sem dígitos, de referência.
+  // R12: obra e recorte ENUMERAVEL — vira MARCACAO (conjunto), nao select de
+  // escolha unica. O servico so aceita um obra_id, entao a dimensao e `unico`
+  // (marca redonda, marcar outra substitui) — sem isso a tela mostraria duas
+  // etiquetas e mandaria filtro nenhum.
   const [filtros, setFiltros] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const q = String(params.get('q') || '').trim();
+    const obraInicial = String(params.get('obra_id') || '').trim();
     return {
-      obra_id: params.get('obra_id') || '',
+      obra: new Set(obraInicial ? [obraInicial] : []),
       codigo: params.get('codigo') || (q && /\d/.test(q) ? q : ''),
       ref: params.get('ref') || (q && !/\d/.test(q) ? q : '')
     };
@@ -98,6 +119,36 @@ export default function GestaoContratos() {
   const [resultadosCredor, setResultadosCredor] = useState([]);
   const [buscaCredorEdicao, setBuscaCredorEdicao] = useState('');
   const [resultadosCredorEdicao, setResultadosCredorEdicao] = useState([]);
+  /*
+    R3/R19 — as 38 caixas do navegador desta tela (33 alert, 4 confirm e 1
+    prompt) saem juntas: aviso vira faixa do sistema (`useAvisos`) e
+    confirmacao vira o modal do sistema (`useConfirmacao`). A caixa do Chrome
+    ignora tema e tokens, bloqueia a pagina, nao existe no DOM para o harness
+    medir e some sem rastro.
+  */
+  const { avisos, avisar, fechar } = useAvisos();
+  /*
+    R26 — trocar a caixa do navegador pelo modal do sistema MUDA O MODELO DE
+    CONCORRENCIA da acao: o `confirm` bloqueava a pagina, o modal nao. Com a
+    tela clicavel por tras, reler o estado depois do `await` faria a tela
+    perguntar sobre o contrato A e agir sobre o contrato B — consentimento
+    valido registrado para a acao errada. Por isso toda acao confirmada aqui
+    fixa o alvo numa `const` ANTES do `await` e opera sobre ela.
+  */
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
+  /*
+    R9 (revista em 04/09) — o cadastro de contrato abre em MODAL. O teste da
+    regra: tirando o formulario, sobra tela? Sobra, e muita: barra de
+    importacao/exportacao, faixa de filtros, tabela de 12 colunas com ordenacao
+    e selecao, barra de acoes do contrato selecionado, modal de edicao e modal
+    de anexos. A prova mais forte esta no proprio arquivo: para quem e do setor
+    OBRA esta tela renderiza SEM formulario nenhum (ramo `isSetorObra`) e
+    continua sendo uma tela inteira. Ou seja, a tela existe para ACOMPANHAR
+    contratos por obra; cadastrar um contrato novo INTERROMPE esse trabalho —
+    e o modal protege o que estava sendo feito e devolve a pessoa ao lugar.
+    Fica simetrico com a edicao, que ja era modal.
+  */
+  const [novoContratoAberto, setNovoContratoAberto] = useState(false);
 
   const setorTokens = [
     String(user?.setor?.nome || '').toUpperCase(),
@@ -123,26 +174,46 @@ export default function GestaoContratos() {
     ));
   }, [contratos]);
 
+  // O recorte que o servico entende: obra_id unico, codigo e referencia.
+  const recorte = useMemo(() => ({
+    obra_id: filtros.obra.size ? filtros.obra.values().next().value : '',
+    codigo: filtros.codigo,
+    ref: filtros.ref
+  }), [filtros]);
+
   useEffect(() => {
-    if (podeAcessar) {
-      carregar();
-      carregarCombos();
-    } else {
+    if (!podeAcessar) {
       setLoading(false);
+      return;
     }
+    carregarCombos();
   }, [podeAcessar, isSetorObra]);
+
+  /*
+    R23 — o filtro APLICA AO MARCAR, sem botao "Buscar". Sao TRES dimensoes
+    (obra, codigo e referencia), abaixo do criterio de consulta cara da regra
+    (4+ dimensoes combinadas ou mais de 2s de resposta): uma requisicao so por
+    recorte. Sem isso a etiqueta na faixa apareceria antes de a lista mudar, e
+    etiqueta que aparece antes da lista mente (F3).
+    A busca digitada espera 350ms — a espera de digitacao e da propria regra.
+  */
+  useEffect(() => {
+    if (!podeAcessar) return undefined;
+    const atraso = setTimeout(() => { carregar(recorte); }, 350);
+    return () => clearTimeout(atraso);
+  }, [recorte, podeAcessar]);
 
   async function carregar(overrideFiltros) {
     try {
       setLoading(true);
-      const data = await getContratosResumo(overrideFiltros ?? filtros);
+      const data = await getContratosResumo(overrideFiltros ?? recorte);
       setContratos(Array.isArray(data) ? data : []);
       if (contratoSelecionadoId && !data?.some?.(item => String(item.id) === String(contratoSelecionadoId))) {
         setContratoSelecionadoId(null);
       }
     } catch (error) {
       console.error(error);
-      alert('Erro ao carregar contratos');
+      avisar.erro('Erro ao carregar contratos.');
     } finally {
       setLoading(false);
     }
@@ -377,7 +448,7 @@ export default function GestaoContratos() {
           </p>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_auto]">
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
           <input
             className="input input-sm"
             value={busca}
@@ -403,7 +474,7 @@ export default function GestaoContratos() {
               <button
                 type="button"
                 key={credor.id}
-                className="block w-full rounded px-2 py-2 text-left text-sm hover:bg-[var(--c-surface-alt)]"
+                className="block w-full rounded px-2 py-2 text-left text-sm hover:bg-[var(--ui-surface-soft)]"
                 onClick={() => adicionarCredorContrato(credor, setter, setResultados, setBusca)}
               >
                 <span className="font-semibold">{credor.nome}</span>
@@ -420,7 +491,7 @@ export default function GestaoContratos() {
         ) : (
           <div className="space-y-2">
             {lista.map(credor => (
-              <div key={credor.parceiro_id} className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 md:grid-cols-[minmax(220px,1fr)_minmax(180px,1fr)_auto]">
+              <div key={credor.parceiro_id} className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <div className="text-sm">
                   <p className="font-semibold text-[var(--c-text)]">{credor.nome || `Credor ${credor.parceiro_id}`}</p>
                   <p className="text-xs text-[var(--c-muted)]">{credor.cpf_cnpj || 'Documento nao informado'}</p>
@@ -470,7 +541,7 @@ export default function GestaoContratos() {
         )}
 
         {lista.map((item, index) => (
-          <div key={`${index}-${item.apropriacao_id || 'nova'}`} className="grid gap-2 lg:grid-cols-[minmax(220px,1.5fr)_100px_100px_minmax(160px,1fr)_auto]">
+          <div key={`${index}-${item.apropriacao_id || 'nova'}`} className="grid gap-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,1fr)_auto]">
             <select
               className="input input-sm"
               value={item.apropriacao_id}
@@ -528,20 +599,10 @@ export default function GestaoContratos() {
     carregarApropriacoesObra(formEdicao.obra_id, setApropriacoesEdicaoDisponiveis);
   }, [formEdicao.obra_id]);
 
-  function onChangeFiltro(e) {
-    const { name, value } = e.target;
-    setFiltros(prev => ({ ...prev, [name]: value }));
-  }
-
-  async function aplicarFiltros(e) {
-    e?.preventDefault();
-    await carregar();
-  }
-
-  async function limparFiltros() {
-    const limpo = { obra_id: '', codigo: '', ref: '' };
-    setFiltros(limpo);
-    await carregar(limpo);
+  // R23: nao existe "aplicar" — mexer no recorte ja dispara a consulta pelo
+  // efeito acima. Limpar so zera o estado; quem recarrega e o mesmo efeito.
+  function limparFiltros() {
+    setFiltros({ obra: new Set(), codigo: '', ref: '' });
   }
 
   function parseMoeda(valor) {
@@ -583,7 +644,7 @@ export default function GestaoContratos() {
       };
 
       if (!payload.obra_id || !payload.codigo) {
-        alert('Obra e codigo sao obrigatorios.');
+        avisar.alerta('Informe a obra e o codigo do contrato.');
         return;
       }
 
@@ -607,14 +668,27 @@ export default function GestaoContratos() {
       setCredoresContrato([]);
       setBuscaCredor('');
       setResultadosCredor([]);
+      setNovoContratoAberto(false);
       await carregar();
-      alert('Contrato criado com sucesso.');
+      avisar.sucesso('Contrato criado com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao criar contrato.');
+      avisar.erro(error?.message || 'Erro ao criar contrato.');
     } finally {
       setSalvando(false);
     }
+  }
+
+  function abrirNovoContrato() {
+    setNovoContratoAberto(true);
+  }
+
+  // Fechar NAO descarta o que foi digitado: na versao inline os campos
+  // ficavam preenchidos ate o envio, e perder o formulario num clique errado
+  // seria capacidade a menos. O `handleCriarContrato` e quem limpa, depois de
+  // gravar.
+  function fecharNovoContrato() {
+    setNovoContratoAberto(false);
   }
 
   function iniciarEdicao(contrato) {
@@ -684,7 +758,7 @@ export default function GestaoContratos() {
 
     const nome = String(arquivo.name || '').toLowerCase();
     if (!nome.endsWith('.docx') && !nome.endsWith('.pdf')) {
-      alert('Selecione a negociação detalhada em formato .docx ou .pdf.');
+      avisar.alerta('Selecione a negociação detalhada em formato .docx ou .pdf.');
       return;
     }
 
@@ -696,7 +770,7 @@ export default function GestaoContratos() {
     event.target.value = '';
     if (!arquivo) return;
     if (!/\.(pdf|docx|png|jpe?g)$/i.test(String(arquivo.name || ''))) {
-      alert('Selecione o documento em PDF, DOCX, JPG ou PNG.');
+      avisar.alerta('Selecione o documento em PDF, DOCX, JPG ou PNG.');
       return;
     }
     setDocumentacaoJuridicaEdicao((atual) => ({ ...atual, [tipo]: arquivo }));
@@ -704,7 +778,7 @@ export default function GestaoContratos() {
 
   async function salvarEdicao(contrato) {
     if (!podeGerenciarContratos) {
-      alert('Seu usuario nao tem permissao para editar contratos.');
+      avisar.erro('Seu usuario nao tem permissao para editar contratos.');
       return;
     }
     if (salvandoEdicaoId) return;
@@ -727,7 +801,7 @@ export default function GestaoContratos() {
       Number.isNaN(ajusteSolicitadoNumerico) ||
       Number.isNaN(ajustePagoNumerico)
     ) {
-      alert('Valor inválido.');
+      avisar.alerta('Valor inválido.');
       return;
     }
 
@@ -745,7 +819,7 @@ export default function GestaoContratos() {
     };
 
     if (!payload.obra_id || !payload.codigo || !payload.ref_contrato) {
-      alert('Obra, código e Ref. do Contrato são obrigatórios.');
+      avisar.alerta('Obra, código e Ref. do Contrato são obrigatórios.');
       return;
     }
 
@@ -753,7 +827,7 @@ export default function GestaoContratos() {
     const documentosJuridicosSelecionados = Object.entries(documentacaoJuridicaEdicao)
       .filter(([, arquivo]) => Boolean(arquivo));
     if (!possuiAlteracoesCadastrais && !negociacaoEdicaoArquivo && documentosJuridicosSelecionados.length === 0) {
-      alert('Nenhuma alteração para salvar.');
+      avisar.alerta('Nenhuma alteração para salvar.');
       return;
     }
 
@@ -793,15 +867,17 @@ export default function GestaoContratos() {
         negociacaoAtualizada ? 'negociação detalhada' : null,
         documentacaoJuridicaAtualizada ? 'documentação jurídica' : null
       ].filter(Boolean);
-      alert(`${partesAtualizadas.join(', ')} atualizada(s) com sucesso.`);
+      avisar.sucesso(`${partesAtualizadas.join(', ')} atualizada(s) com sucesso.`);
     } catch (error) {
       console.error(error);
       if (negociacaoAtualizada && possuiAlteracoesCadastrais && !dadosContratoAtualizados) {
-        alert(`A negociação detalhada foi enviada, mas os outros dados do contrato não foram atualizados: ${error?.message || 'erro ao atualizar contrato'}. O modal permanecerá aberto para tentar novamente.`);
+        // Sucesso PARCIAL nao e sucesso: o tom semantico acompanha o que de
+        // fato aconteceu (parte gravou, parte nao).
+        avisar.alerta(`A negociação detalhada foi enviada, mas os outros dados do contrato não foram atualizados: ${error?.message || 'erro ao atualizar contrato'}. O modal permanecerá aberto para tentar novamente.`);
       } else if (negociacaoAtualizada || documentacaoJuridicaAtualizada || dadosContratoAtualizados) {
-        alert(`As alterações foram salvas, mas não foi possível recarregar a listagem: ${error?.message || 'erro ao recarregar contratos'}.`);
+        avisar.alerta(`As alterações foram salvas, mas não foi possível recarregar a listagem: ${error?.message || 'erro ao recarregar contratos'}.`);
       } else {
-        alert(error?.message || ((negociacaoEdicaoArquivo || documentosJuridicosSelecionados.length > 0)
+        avisar.erro(error?.message || ((negociacaoEdicaoArquivo || documentosJuridicosSelecionados.length > 0)
           ? 'Erro ao enviar os documentos do contrato.'
           : 'Erro ao atualizar contrato.'));
       }
@@ -813,42 +889,80 @@ export default function GestaoContratos() {
   // Quebra de contrato (PI-6): zera o saldo e exclui os titulos em aberto. So aparece para
   // contrato do fluxo novo ja ativo — nos demais nao ha saldo comprometido para encerrar.
   async function encerrarContratoItem(contrato) {
-    const motivo = prompt(`Encerrar o contrato ${contrato.codigo}?
-
-Isto zera o saldo restante e exclui os titulos em aberto. Informe o motivo:`);
-    if (motivo === null) return;
-    if (!String(motivo).trim()) { alert('Informe o motivo do encerramento.'); return; }
+    /*
+      R26 — ALVO FIXADO ANTES DO `await`. O contrato chega por parametro, preso
+      no clique da barra de selecao; a const abaixo deixa isso explicito e
+      fecha a porta para alguem voltar a ler `contratoSelecionado` depois da
+      confirmacao. O modal do sistema NAO bloqueia a tela: com ele aberto, um
+      clique noutra linha da tabela trocaria o alvo em silencio e a auditoria
+      guardaria um consentimento valido para a acao errada.
+    */
+    const alvo = contrato;
+    /*
+      R19 — o `window.prompt` que pedia o motivo virou o `campo` do
+      useConfirmacao: pergunta e justificativa num passo so, dentro do modal
+      do sistema. `obrigatorio` mantem o botao desabilitado ate ter texto, que
+      era o papel do alert "Informe o motivo do encerramento".
+      CONSENTIMENTO — a mensagem declara a irreversibilidade E identifica o
+      contrato pelo codigo, que e como a pessoa o ve na tabela.
+    */
+    const { ok, texto } = await confirmar({
+      titulo: 'Encerrar contrato',
+      mensagem: `Encerrar o contrato ${alvo.codigo}? Esta acao nao pode ser desfeita: o saldo restante e zerado e os titulos em aberto do contrato sao excluidos.`,
+      rotuloConfirmar: 'Encerrar contrato',
+      destrutiva: true,
+      campo: { rotulo: 'Motivo do encerramento', obrigatorio: true, multilinha: true }
+    });
+    // R21 — retorno DESESTRUTURADO. `const ok = await confirmar(...)` compila,
+    // roda e faz o "Cancelar" SEGUIR COM A ACAO: objeto e sempre truthy.
+    if (!ok) return;
+    const motivo = String(texto || '').trim();
+    if (!motivo) return;
     try {
-      const r = await encerrarContratoFluxoNovo(contrato.id, motivo);
+      const r = await encerrarContratoFluxoNovo(alvo.id, motivo);
       const ajustados = (r.titulos_ajustados_ao_valor_pago || []).length;
-      alert(
-        `Contrato ${contrato.codigo} encerrado.
-`
-        + `Saldo zerado: R$ ${Number(r.saldo_zerado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-`
-        + `Titulos excluidos: ${(r.titulos_excluidos || []).length}`
-        + (ajustados ? `
-Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
-      );
+      avisar.sucesso([
+        `Contrato ${alvo.codigo} encerrado.`,
+        `Saldo zerado: ${formatMoeda(r.saldo_zerado || 0)}.`,
+        `Titulos excluidos: ${(r.titulos_excluidos || []).length}.`,
+        ajustados ? `Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}.` : null
+      ].filter(Boolean).join(' '));
       setContratoSelecionadoId(null);
       await carregar();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao encerrar contrato.');
+      avisar.erro(error?.message || 'Erro ao encerrar contrato.');
     }
   }
 
   async function excluirContratoItem(contrato) {
-    if (!confirm(`Excluir o contrato ${contrato.codigo}?`)) return;
+    // R26 — alvo fixado ANTES do await, pelo mesmo motivo do encerramento.
+    const alvo = contrato;
+    /*
+      CONSENTIMENTO — o texto antigo era "Excluir o contrato X?" e nao dizia
+      que a exclusao e definitiva. Confirmacao destrutiva declara a
+      irreversibilidade no proprio texto e identifica QUAL registro: aqui o
+      codigo do contrato e a obra, que sao os dois campos pelos quais a pessoa
+      reconhece a linha na tabela.
+    */
+    const { ok } = await confirmar({
+      titulo: 'Excluir contrato',
+      mensagem: `Excluir o contrato ${alvo.codigo}${alvo.obra?.nome ? ` da obra ${alvo.obra.nome}` : ''}? Esta acao nao pode ser desfeita: o contrato e seus vinculos saem do sistema e nao ha como recupera-los.`,
+      rotuloConfirmar: 'Excluir contrato',
+      destrutiva: true
+    });
+    // R21 — desestruturado; ler o objeto como booleano faria o "Cancelar"
+    // excluir o contrato.
+    if (!ok) return;
     try {
-      await excluirContrato(contrato.id);
-      setContratos((current) => current.filter((item) => String(item.id) !== String(contrato.id)));
+      await excluirContrato(alvo.id);
+      setContratos((current) => current.filter((item) => String(item.id) !== String(alvo.id)));
       setContratoSelecionadoId(null);
       await carregar();
-      alert('Contrato excluído com sucesso.');
+      avisar.sucesso('Contrato excluído com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao excluir contrato.');
+      avisar.erro(error?.message || 'Erro ao excluir contrato.');
     }
   }
 
@@ -859,7 +973,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
       setAnexos(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert('Erro ao carregar anexos.');
+      avisar.erro('Erro ao carregar anexos.');
     }
   }
 
@@ -872,7 +986,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
       setUploadAnexos([]);
     } catch (error) {
       console.error(error);
-      alert('Erro ao enviar anexos.');
+      avisar.erro('Erro ao enviar anexos.');
     }
   }
 
@@ -911,17 +1025,52 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
     if (!file) return;
 
     if (!String(file.name || '').toLowerCase().endsWith('.csv')) {
-      alert('Utilize o arquivo modelo em CSV para importar as apropriações dos contratos.');
+      avisar.alerta('Utilize o arquivo modelo em CSV para importar as apropriações dos contratos.');
       return;
     }
 
-    if (!confirm(`Importar apropriações usando o arquivo "${file.name}"?\n\nEsta rotina altera somente os vínculos de apropriação dos contratos encontrados na planilha. Valores solicitados, pagos, ajustes, saldo, credores e descrições não serão alterados.`)) {
-      return;
-    }
+    /*
+      R26 — o alvo das tres confirmacoes e o ARQUIVO, e ele ja esta fixado na
+      const `file` acima: lido de forma sincrona do evento (o input inclusive
+      ja teve o `value` limpo na primeira linha), nunca relido do DOM depois
+      do `await`. Trocar o arquivo no seletor com o modal aberto nao muda o
+      que sera importado.
+    */
+    const { ok: okImportar } = await confirmar({
+      titulo: 'Importar apropriações',
+      mensagem: `Importar as apropriações do arquivo "${file.name}"? Esta rotina altera somente os vinculos de apropriacao dos contratos encontrados na planilha; valores solicitados, pagos, ajustes, saldo, credores e descricoes nao sao alterados.`,
+      rotuloConfirmar: 'Continuar'
+    });
+    // R21 — desestruturado nas TRES confirmacoes desta funcao.
+    if (!okImportar) return;
 
-    const substituir = confirm('Deseja substituir as apropriações atuais dos contratos presentes na planilha?\n\nOK = substituir as apropriações atuais desses contratos.\nCancelar = apenas adicionar/atualizar as apropriações da planilha.');
-    if (substituir && !confirm('Confirme a substituição das apropriações atuais dos contratos listados no arquivo. Os valores financeiros dos contratos serão preservados.')) {
-      return;
+    /*
+      Escolha de MODO, nao cancelamento. No `confirm` do navegador esta
+      pergunta era "OK = substituir / Cancelar = apenas adicionar" — um botao
+      chamado "Cancelar" que NAO cancelava, e seguia com a importacao. Aqui os
+      dois rotulos dizem o que fazem, e a mensagem diz o que acontece se a
+      caixa for fechada — o modal do sistema tem saidas que o `confirm` nao
+      tinha (Escape e clique no fundo), e nenhuma delas pode levar a uma acao
+      que a pessoa nao escolheu. Fechar cai no modo ADITIVO, que nao apaga
+      nada; a importacao em si ja foi consentida no passo anterior.
+    */
+    const { ok: substituir } = await confirmar({
+      titulo: 'Modo da importação',
+      mensagem: `Como aplicar as apropriações do arquivo "${file.name}" aos contratos listados nele? "Substituir" troca os vinculos de apropriacao atuais desses contratos; "Apenas adicionar/atualizar" mantem os atuais e so acrescenta o que esta na planilha. Fechar esta caixa segue pelo modo "apenas adicionar/atualizar".`,
+      rotuloConfirmar: 'Substituir as apropriações atuais',
+      rotuloCancelar: 'Apenas adicionar/atualizar'
+    });
+
+    if (substituir) {
+      // CONSENTIMENTO — a confirmacao destrutiva declara a irreversibilidade e
+      // identifica o alvo (o arquivo cujos contratos serao trocados).
+      const { ok: okSubstituir } = await confirmar({
+        titulo: 'Confirmar substituição',
+        mensagem: `Substituir as apropriações atuais dos contratos listados em "${file.name}"? Esta acao nao pode ser desfeita: os vinculos de apropriacao atuais desses contratos sao trocados pelos da planilha. Os valores financeiros dos contratos sao preservados.`,
+        rotuloConfirmar: 'Substituir',
+        destrutiva: true
+      });
+      if (!okSubstituir) return;
     }
 
     try {
@@ -935,13 +1084,15 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
       const erros = Array.isArray(resultado?.erros) ? resultado.erros : [];
 
       if (erros.length > 0) {
+        // A faixa do sistema e texto corrido: o resumo junta com separador
+        // visivel em vez de quebra de linha, que a caixa do navegador exibia.
         const resumoErros = erros
           .slice(0, 5)
           .map(item => `Linha ${item.linha}: ${item.error}`)
-          .join('\n');
-        alert(`Contratos afetados: ${contratosAfetados}. Apropriações vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}. Erros: ${erros.length}.\n${resumoErros}${erros.length > 5 ? '\n...' : ''}`);
+          .join(' · ');
+        avisar.alerta(`Contratos afetados: ${contratosAfetados}. Apropriações vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}. Erros: ${erros.length}. ${resumoErros}${erros.length > 5 ? ' ...' : ''}`);
       } else {
-        alert(`Importação concluída. Contratos afetados: ${contratosAfetados}. Apropriações vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}.`);
+        avisar.sucesso(`Importação concluída. Contratos afetados: ${contratosAfetados}. Apropriações vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}.`);
       }
     } catch (error) {
       console.error(error);
@@ -950,10 +1101,10 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
         const resumoErros = erros
           .slice(0, 8)
           .map(item => `Linha ${item.linha}: ${item.error}`)
-          .join('\n');
-        alert(`${error?.message || 'Erro ao importar apropriações dos contratos.'}\n${resumoErros}${erros.length > 8 ? '\n...' : ''}`);
+          .join(' · ');
+        avisar.erro(`${error?.message || 'Erro ao importar apropriações dos contratos.'} ${resumoErros}${erros.length > 8 ? ' ...' : ''}`);
       } else {
-        alert(error?.message || 'Erro ao importar apropriações dos contratos.');
+        avisar.erro(error?.message || 'Erro ao importar apropriações dos contratos.');
       }
     } finally {
       setImportandoContratos(false);
@@ -965,7 +1116,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
       await exportarContratosCsv(filtros);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao exportar contratos.');
+      avisar.erro(error?.message || 'Erro ao exportar contratos.');
     }
   }
 
@@ -983,7 +1134,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
     });
     setFiles(proximoEstado);
     if (rejeitados.length > 0) {
-      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+      avisar.alerta(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
     }
   }
 
@@ -993,7 +1144,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
     });
     setUploadAnexos(proximoEstado);
     if (rejeitados.length > 0) {
-      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+      avisar.alerta(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
     }
   }
 
@@ -1021,13 +1172,13 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
     try {
       const urlArquivo = await obterUrlAssinada(caminhoArquivo);
       if (!urlArquivo) {
-        alert('Arquivo inválido.');
+        avisar.erro('Arquivo inválido.');
         return;
       }
       window.open(urlArquivo, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error(error);
-      alert('Erro ao visualizar anexo.');
+      avisar.erro('Erro ao visualizar anexo.');
     }
   }
 
@@ -1035,7 +1186,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
     try {
       const urlArquivo = await obterUrlAssinada(caminhoArquivo);
       if (!urlArquivo) {
-        alert('Arquivo inválido.');
+        avisar.erro('Arquivo inválido.');
         return;
       }
 
@@ -1055,97 +1206,105 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error(error);
-      alert('Erro ao baixar anexo.');
+      avisar.erro('Erro ao baixar anexo.');
     }
   }
 
+  /*
+    R12/R23 — a faixa de filtros vira a BarraFiltros do sistema: busca larga em
+    cima e, abaixo, o recorte por MARCACAO com etiquetas removiveis. O que
+    mudou de forma, e por que:
+
+    - OBRA era um <select> de escolha unica (o defeito que a R12 nomeia: com
+      select o estado do filtro so e visivel abrindo a lista). Vira marcacao
+      com etiqueta na faixa. Como o servico aceita um `obra_id` so, a dimensao
+      e `unico`.
+    - CODIGO ocupa a busca unica da faixa (F1: uma busca por contexto) — e a
+      coluna de identidade da tabela, entao e por ele que se procura.
+    - REFERENCIA fica em `campos`, o espaco declarado da BarraFiltros para o
+      recorte que NAO e enumeravel: nao existe lista fechada de referencias de
+      contrato para marcar. Nao e porta dos fundos — o recorte enumeravel
+      (obra) esta em `filtros`, com marcacao.
+    - O botao "Buscar" SAI: com 3 dimensoes a tela esta abaixo do criterio de
+      consulta cara da R23, entao o recorte aplica ao marcar/digitar.
+  */
   function renderFiltros() {
     return (
-      <form
-        onSubmit={aplicarFiltros}
-        className="sol-surface-card solicitacoes-filtros app-filters-card rounded-xl p-4 md:p-5"
-      >
-        <div className="sol-filtros-head">
-          <div>
-            <p className="sol-filtros-title">Filtros</p>
-            <p className="sol-filtros-subtitle">
-              Refine por obra, codigo e referencia para localizar contratos mais rapido.
-            </p>
-          </div>
-        </div>
-
-        <div className="sol-filtros-grid">
-        <label className="sol-filter-field">
-          <span className="sol-filter-label">Obra</span>
-          <select
-            name="obra_id"
-            value={filtros.obra_id}
-            onChange={onChangeFiltro}
-            className="input w-full"
-          >
-            <option value="">Todas</option>
-            {obras.map(obra => (
-              <option key={obra.id} value={obra.id}>
-                {obra.codigo} - {obra.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="sol-filter-field">
-          Código do contrato
-          <input
-            name="codigo"
-            value={filtros.codigo}
-            onChange={onChangeFiltro}
-            className="input w-full"
-            placeholder="Ex: CTR-001"
-          />
-        </label>
-
-        <label className="sol-filter-field">
-          <span className="sol-filter-label">Ref. do Contrato</span>
-          <input
-            name="ref"
-            value={filtros.ref}
-            onChange={onChangeFiltro}
-            className="input w-full"
-            placeholder="Buscar por referencia"
-          />
-        </label>
-
-        <div className="flex flex-wrap items-end gap-2">
-          <button type="submit" className="btn btn-outline">
-            Buscar
-          </button>
-          <button type="button" className="btn btn-outline" onClick={limparFiltros}>
-            Limpar
-          </button>
-        </div>
-        </div>
-      </form>
+      <BarraFiltros
+        busca={{
+          valor: filtros.codigo,
+          aoMudar: (valor) => setFiltros((prev) => ({ ...prev, codigo: valor })),
+          placeholder: 'Buscar pelo código do contrato'
+        }}
+        campos={[{
+          id: 'ref',
+          rotulo: 'Ref. do Contrato',
+          tipo: 'text',
+          valor: filtros.ref,
+          aoMudar: (valor) => setFiltros((prev) => ({ ...prev, ref: valor }))
+        }]}
+        filtros={[{
+          id: 'obra',
+          rotulo: 'Obra',
+          unico: true,
+          opcoes: obras.map((obra) => ({
+            valor: String(obra.id),
+            rotulo: `${obra.codigo} - ${obra.nome}`
+          }))
+        }]}
+        ativos={{ obra: filtros.obra }}
+        aoAlternar={(dimensao, valor, opcoes) => setFiltros((prev) => ({
+          ...alternarValorFiltro(prev, dimensao, valor, opcoes),
+          codigo: prev.codigo,
+          ref: prev.ref
+        }))}
+        aoLimpar={limparFiltros}
+      />
     );
   }
 
-  if (loading) return <p>Carregando contratos...</p>;
-
+  // B5 — o "Acesso restrito" era um paragrafo solto ocupando a tela inteira,
+  // sem cabecalho e sem superficie. Agora tem faixa fixa e bloco, como
+  // qualquer outro estado da tela.
   if (!podeAcessar) {
     return (
-      <p className="text-gray-600">
-        Acesso restrito. Solicite ao administrador do sistema.
-      </p>
+      <Pagina>
+        <PageHeader titulo="Gestão de Contratos" descricao={DESCRICAO_GESTAO} />
+        <BlocoConteudo titulo="Acesso restrito" variante="primario" cor="var(--c-primary)">
+          <p className="app-note">
+            Você não tem acesso aos contratos. Solicite ao administrador do sistema.
+          </p>
+        </BlocoConteudo>
+      </Pagina>
     );
   }
+
+  /*
+    O `if (loading) return <p>Carregando contratos...</p>` saiu: com o filtro
+    aplicando ao digitar (R23), ele trocaria a tela inteira — faixa fixa,
+    filtros e tudo — por uma frase a cada tecla, e o campo perderia o foco.
+    Quem informa o carregamento agora e a propria TabelaPadrao (`carregando`),
+    no lugar onde o dado vai aparecer.
+  */
 
   if (isSetorObra) {
     return (
-      <div className="page solicitacoes-page contratos-page">
-        <h1 className="text-2xl font-semibold">Gestão de Contratos</h1>
-        <p className="page-subtitle">Acompanhamento dos contratos vinculados as suas obras.</p>
+      <Pagina>
+        {/* R13/C1 + R5 — o h1 solto e o p.page-subtitle sobre o canvas viram a
+            FAIXA FIXA do topo: com 12 colunas de contrato para rolar, o titulo
+            e o apoio ficavam para tras da primeira tela. A contagem entra na
+            prop `contagem`, nao embutida no texto. */}
+        <PageHeader
+          titulo="Gestão de Contratos"
+          contagem={loading ? null : `${contratos.length} contrato(s)`}
+          descricao={DESCRICAO_OBRA}
+        />
 
-        {renderFiltros()}
+        <Avisos avisos={avisos} aoFechar={fechar} />
 
-        <div className="card sol-surface-card app-table-shell">
+        <BlocoConteudo titulo="Contratos das suas obras" variante="primario" cor="var(--c-primary)">
+          {renderFiltros()}
+
           <TabelaPadrao
             colunas={[
               {
@@ -1190,221 +1349,274 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
             ]}
             itens={contratos}
             getId={c => c.id}
+            carregando={loading}
             storageKey="tabela:gestao-contratos:setor-obra"
             rotuloRolagem="Contratos das suas obras"
             vazio="Nenhum contrato encontrado."
           />
-        </div>
-      </div>
+        </BlocoConteudo>
+      </Pagina>
     );
   }
 
+  /*
+    R16 — UM dono para a faixa de avisos. Com um modal aberto ela vive DENTRO
+    dele: o erro do salvar acontece com o modal na frente e, na pagina, ficaria
+    atras do fundo escuro — dito e nao visto. Sem modal, logo abaixo da faixa
+    fixa. Nunca as duas ao mesmo tempo.
+  */
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+  const modalNoTopo = novoContratoAberto
+    ? 'novo'
+    : (contratoEmEdicao ? 'edicao' : (modalAnexos ? 'anexos' : null));
+
   return (
-    <div className="page solicitacoes-page contratos-page">
-      <h1 className="page-title">Gestão de Contratos</h1>
-      <p className="page-subtitle">Cadastro, importacao e acompanhamento dos contratos por obra.</p>
+    <Pagina>
+      {/* R13/C1 + R5 — o h1 e o p.page-subtitle soltos viram a FAIXA FIXA do
+          topo, com superficie propria. Com 12 colunas de contrato para rolar,
+          era exatamente o cabecalho e as acoes que sumiam da vista.
+          C5: "Novo contrato" e a acao principal, sempre a um clique. */}
+      <PageHeader
+        titulo="Gestão de Contratos"
+        contagem={loading ? null : `${contratos.length} contrato(s)`}
+        descricao={DESCRICAO_GESTAO}
+        acaoPrincipal={{ rotulo: 'Novo contrato', onClick: abrirNovoContrato }}
+      />
+
+      {!modalNoTopo && faixaAvisos}
 
       {user?.perfil === 'SUPERADMIN' && (
-        <div className="sol-surface-card rounded-xl p-3 md:p-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className="btn btn-outline px-3"
-            onClick={baixarModeloImportacaoContratos}
-            title="Baixar modelo de apropriacoes dos contratos"
-            aria-label="Baixar modelo de apropriacoes dos contratos"
-          >
-            <HiArrowDownTray className="w-4 h-4" />
-            Modelo apropriacoes
-          </button>
+        /* B2 — o bloco primario da tela e a lista; a importacao e secundaria.
+           O texto de apoio ("importacao segura...") passa a ser a `descricao`
+           do bloco, ancorada ao titulo a que se refere. */
+        <BlocoConteudo
+          titulo="Importação de apropriações"
+          variante="secundario"
+          descricao="Importacao segura: altera somente os vinculos de apropriacao dos contratos listados."
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-outline px-3"
+              onClick={baixarModeloImportacaoContratos}
+              title="Baixar modelo de apropriacoes dos contratos"
+              aria-label="Baixar modelo de apropriacoes dos contratos"
+            >
+              <HiArrowDownTray className="w-4 h-4" />
+              Modelo apropriacoes
+            </button>
 
-          <button
-            type="button"
-            className="btn btn-outline px-3"
-            onClick={handleExportarContratos}
-            title="Exportar contratos e apropriacoes (.csv)"
-            aria-label="Exportar contratos e apropriacoes"
-          >
-            Exportar CSV
-          </button>
+            <button
+              type="button"
+              className="btn btn-outline px-3"
+              onClick={handleExportarContratos}
+              title="Exportar contratos e apropriacoes (.csv)"
+              aria-label="Exportar contratos e apropriacoes"
+            >
+              Exportar CSV
+            </button>
 
-          <label
-            className={`btn btn-outline px-3 cursor-pointer ${importandoContratos ? 'opacity-60 pointer-events-none' : ''}`}
-            title="Importar apenas apropriacoes dos contratos (.csv)"
-            aria-label="Importar apenas apropriacoes dos contratos"
-          >
-            <HiArrowUpTray className="w-4 h-4" />
-            Importar apropriacoes
-            <input
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={onSelecionarArquivoImportacao}
-            disabled={importandoContratos}
-            />
-          </label>
-
-          <span className="app-note">
-            Importacao segura: altera somente os vinculos de apropriacao dos contratos listados.
-          </span>
-        </div>
+            <label
+              className={`btn btn-outline px-3 cursor-pointer ${importandoContratos ? 'opacity-60 pointer-events-none' : ''}`}
+              title="Importar apenas apropriacoes dos contratos (.csv)"
+              aria-label="Importar apenas apropriacoes dos contratos"
+            >
+              <HiArrowUpTray className="w-4 h-4" />
+              Importar apropriacoes
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={onSelecionarArquivoImportacao}
+                disabled={importandoContratos}
+              />
+            </label>
+          </div>
+        </BlocoConteudo>
       )}
 
-      <form
-        onSubmit={handleCriarContrato}
-        className="card sol-surface-card rounded-xl p-4 md:p-5 space-y-5"
-      >
-        <div className="sol-filtros-head">
-          <div>
-            <p className="sol-filtros-title">Novo contrato</p>
-            <p className="sol-filtros-subtitle">
-            Cadastre contrato, valor e documentos vinculados a obra correta.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.8fr)_minmax(220px,1fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
-          <div>
-            <label className="grid gap-1 text-sm">Obra</label>
-            <select
-            name="obra_id"
-            value={form.obra_id}
-            onChange={onChangeForm}
-            className="input w-full"
-            >
-            <option value="">Selecione</option>
-            {obras.map(obra => (
-              <option key={obra.id} value={obra.id}>
-                {obra.codigo} - {obra.nome}
-              </option>
-            ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="grid gap-1 text-sm">Código</label>
-            <input
-            name="codigo"
-            value={form.codigo}
-            onChange={onChangeForm}
-            className="input w-full"
-            placeholder="Ex: CTR-001"
-            />
-          </div>
-
-          <div>
-            <label className="grid gap-1 text-sm">Ref. do Contrato</label>
-            <input
-            name="ref_contrato"
-            value={form.ref_contrato}
-            onChange={onChangeForm}
-            className="input w-full"
-            />
-          </div>
-
-          <div>
-            <label className="grid gap-1 text-sm">Valor</label>
-            <input
-            name="valor_total"
-            value={valorDisplay}
-            onChange={e => setValorDisplay(e.target.value)}
-            onBlur={() => {
-              const numero = parseMoeda(valorDisplay);
-              setValorDisplay(numero ? formatMoeda(numero) : '');
-            }}
-            className="input w-full"
-            />
-          </div>
-
-        </div>
-
-        <div className="grid gap-3 xl:grid-cols-2">
-          <div>
-          <label className="grid gap-1 text-sm">Descrição</label>
-          <textarea
-            name="descricao"
-            value={form.descricao}
-            onChange={onChangeForm}
-            className="input w-full"
-            rows="3"
-          />
-          </div>
-
-          <div>
-          <label className="grid gap-1 text-sm">Itens de Apropriação</label>
-          <textarea
-            name="itens_apropriacao"
-            value={form.itens_apropriacao}
-            onChange={onChangeForm}
-            className="input w-full"
-            rows="3"
-            placeholder="Descreva os itens de apropriação do contrato"
-          />
-          </div>
-
-        </div>
-
-        {renderApropriacoesEditor({
-          lista: apropriacoesContrato,
-          disponiveis: apropriacoesDisponiveis,
-          setter: setApropriacoesContrato
-        })}
-
-        {renderCredoresEditor({
-          lista: credoresContrato,
-          setter: setCredoresContrato,
-          busca: buscaCredor,
-          setBusca: setBuscaCredor,
-          resultados: resultadosCredor,
-          setResultados: setResultadosCredor
-        })}
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-          <div>
-          <label className="grid gap-1 text-sm">Anexos do contrato</label>
-          <div className="flex items-center gap-2 flex-wrap mt-1">
-            <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
-            <HiPaperClip className="w-4 h-4" />
-            <span>Anexar arquivos</span>
-            <input
-              type="file"
-              multiple
-              className="hidden"
-              onChange={e => {
-                adicionarArquivosNovoContrato(e.target.files);
-                e.target.value = '';
-              }}
-            />
-            </label>
-            <span className="app-note">
-            {files.length > 0
-              ? `${files.length} arquivo(s) selecionado(s)`
-              : 'Nenhum arquivo selecionado'}
+      {/* R9 — o cadastro sai de dentro da tela e vira modal (o raciocinio
+          esta na declaracao de `novoContratoAberto`). Mesmos handlers, mesmo
+          payload, mesmos campos: so a moldura mudou.
+          R27 — cabecalho e rodape marcados ficam FIXOS e o miolo rola: o botao
+          "Criar contrato" nao sai da vista por mais alto que o formulario
+          fique (apropriacoes e credores crescem por linha). */}
+      {novoContratoAberto && (
+        <OverlayModal
+          aberto
+          rotulo="Novo contrato"
+          onFechar={fecharNovoContrato}
+        >
+          <div data-modal="cabecalho" className="app-bloco-head p-4">
+            <h2 className="app-bloco-titulo">Novo contrato</h2>
+            <span className="app-bloco-acoes">
+              <button type="button" className="btn btn-outline btn-sm" onClick={fecharNovoContrato}>
+                Fechar
+              </button>
             </span>
           </div>
-          <PendingAttachmentsList
-            items={files}
-            onRemove={(index) => removerArquivoNovoContrato(index)}
-            className="mt-2 space-y-1"
-            itemClassName="flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
-            removeButtonClassName="text-blue-600 font-semibold px-2"
-          />
+
+          <div className="p-4 space-y-4">
+            {modalNoTopo === 'novo' && faixaAvisos}
+            <p className="app-note">
+              Cadastre contrato, valor e documentos vinculados a obra correta.
+            </p>
+
+            <form id="form-novo-contrato" onSubmit={handleCriarContrato} className="space-y-4">
+              <FormSecao legenda="Dados do contrato" colunas={2}>
+                <CampoForm label="Obra" obrigatorio>
+                  {/* Entrada de dado do cadastro: select de FORMULARIO segue
+                      legitimo (R12 vale para recorte de lista). */}
+                  <select
+                    name="obra_id"
+                    value={form.obra_id}
+                    onChange={onChangeForm}
+                    className="input w-full"
+                  >
+                    <option value="">Selecione</option>
+                    {obras.map(obra => (
+                      <option key={obra.id} value={obra.id}>
+                        {obra.codigo} - {obra.nome}
+                      </option>
+                    ))}
+                  </select>
+                </CampoForm>
+
+                <CampoForm label="Código" obrigatorio>
+                  <input
+                    name="codigo"
+                    value={form.codigo}
+                    onChange={onChangeForm}
+                    className="input w-full"
+                    placeholder="Ex: CTR-001"
+                  />
+                </CampoForm>
+
+                <CampoForm label="Ref. do Contrato">
+                  <input
+                    name="ref_contrato"
+                    value={form.ref_contrato}
+                    onChange={onChangeForm}
+                    className="input w-full"
+                  />
+                </CampoForm>
+
+                {/* R6 — campo de dinheiro usa .input-moeda: piso de 180px (cabe
+                    R$ 9.999.999.999,99), alinhado a direita e tabular-nums. O
+                    arquivo inteiro nao usava a classe uma vez sequer. */}
+                <CampoForm label="Valor">
+                  <input
+                    name="valor_total"
+                    value={valorDisplay}
+                    inputMode="decimal"
+                    onChange={e => setValorDisplay(e.target.value)}
+                    onBlur={() => {
+                      const numero = parseMoeda(valorDisplay);
+                      setValorDisplay(numero ? formatMoeda(numero) : '');
+                    }}
+                    className="input input-moeda w-full"
+                  />
+                </CampoForm>
+
+                <CampoForm label="Descrição" tipo="texto-longo">
+                  <textarea
+                    name="descricao"
+                    value={form.descricao}
+                    onChange={onChangeForm}
+                    className="input w-full"
+                    rows="3"
+                  />
+                </CampoForm>
+
+                <CampoForm label="Itens de Apropriação" tipo="texto-longo">
+                  <textarea
+                    name="itens_apropriacao"
+                    value={form.itens_apropriacao}
+                    onChange={onChangeForm}
+                    className="input w-full"
+                    rows="3"
+                    placeholder="Descreva os itens de apropriação do contrato"
+                  />
+                </CampoForm>
+              </FormSecao>
+
+              {renderApropriacoesEditor({
+                lista: apropriacoesContrato,
+                disponiveis: apropriacoesDisponiveis,
+                setter: setApropriacoesContrato
+              })}
+
+              {renderCredoresEditor({
+                lista: credoresContrato,
+                setter: setCredoresContrato,
+                busca: buscaCredor,
+                setBusca: setBuscaCredor,
+                resultados: resultadosCredor,
+                setResultados: setResultadosCredor
+              })}
+
+              <div>
+                <span className="form-label">Anexos do contrato</span>
+                <div className="flex items-center gap-2 flex-wrap mt-1">
+                  <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
+                    <HiPaperClip className="w-4 h-4" />
+                    <span>Anexar arquivos</span>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={e => {
+                        adicionarArquivosNovoContrato(e.target.files);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  <span className="app-note">
+                    {files.length > 0
+                      ? `${files.length} arquivo(s) selecionado(s)`
+                      : 'Nenhum arquivo selecionado'}
+                  </span>
+                </div>
+                {/* R2/R25 — o "Remover" de cada anexo era texto azul cru sem
+                    alvo de clique; vira botao do sistema. */}
+                <PendingAttachmentsList
+                  items={files}
+                  onRemove={(index) => removerArquivoNovoContrato(index)}
+                  className="mt-2 space-y-1"
+                  itemClassName="flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
+                  removeButtonClassName="btn btn-outline btn-sm"
+                />
+              </div>
+            </form>
           </div>
 
-          <div className="flex justify-start xl:justify-end">
+          <div data-modal="rodape" className="app-actionbar p-4">
             <button
-            type="submit"
-            disabled={salvando}
-            className="btn btn-primary w-full md:w-auto md:px-5"
+              type="submit"
+              form="form-novo-contrato"
+              disabled={salvando}
+              className="btn btn-primary"
             >
-            {salvando ? 'Salvando...' : 'Criar contrato'}
+              {salvando ? 'Salvando...' : 'Criar contrato'}
+            </button>
+            <button type="button" className="btn btn-outline" onClick={fecharNovoContrato}>
+              Cancelar
             </button>
           </div>
-        </div>
-      </form>
+        </OverlayModal>
+      )}
 
-      {renderFiltros()}
+      {/* R18 — a `.contratos-table-card` declara `overflow: hidden` no
+          index.css e era ancestral do contedor de rolagem da tabela: sticky
+          dentro dela (coluna fixa, cabecalho grudado) para de funcionar em
+          silencio. A classe sai; quem da a superficie agora e o BlocoConteudo,
+          e o `.app-table-shell` interno recorta com `overflow: clip`, que nao
+          cria scrollport. Nenhuma linha de CSS foi tocada. A propria
+          TabelaPadrao ja monta o `.app-table-shell` (que recorta com
+          `overflow: clip`), entao nao ha involucro extra a escrever. */}
+      <BlocoConteudo titulo="Contratos" variante="primario" cor="var(--c-primary)">
+        {renderFiltros()}
 
-      <div className="card sol-surface-card app-table-shell contratos-table-card">
         <TabelaPadrao
           colunas={[
             {
@@ -1486,6 +1698,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           ]}
           itens={contratosOrdenados}
           getId={c => c.id}
+          carregando={loading}
           storageKey="tabela:gestao-contratos:principal"
           rotuloRolagem="Contratos"
           vazio="Nenhum contrato encontrado."
@@ -1501,16 +1714,20 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           }}
           linhaSelecionada={contrato => String(contrato.id) === String(contratoSelecionadoId)}
         />
-      </div>
+      </BlocoConteudo>
 
       {contratoSelecionado && (
         <div className="contratos-selection-toolbar fixed left-1/2 -translate-x-1/2 bottom-4 z-40">
           <span className="contratos-selection-toolbar__title">
             {contratoSelecionado.codigo}
           </span>
+          {/* R2 — os cinco botoes desta barra traziam `!min-h-0 h-9`, que
+              anula com !important o piso do `.btn` (32px no desktop, 44px no
+              toque) e os deixava com 36px. Os overrides saem; a altura volta a
+              ser a do sistema. */}
           <button
             type="button"
-            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            className="btn btn-outline px-3 inline-flex items-center gap-2"
             onClick={() => abrirAnexos(contratoSelecionado)}
           >
             <HiEye className="w-4 h-4" />
@@ -1519,7 +1736,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           {podeGerenciarContratos && (
             <button
               type="button"
-              className="btn btn-primary !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-primary px-3 inline-flex items-center gap-2"
               onClick={() => iniciarEdicao(contratoSelecionado)}
             >
               <HiPencilSquare className="w-4 h-4" />
@@ -1530,7 +1747,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
             && contratoSelecionado?.status_contrato === 'ATIVO' && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline px-3 inline-flex items-center gap-2"
               onClick={() => encerrarContratoItem(contratoSelecionado)}
               title="Zera o saldo restante e exclui os titulos em aberto"
             >
@@ -1541,7 +1758,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           {podeGerenciarContratos && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline px-3 inline-flex items-center gap-2"
               onClick={() => excluirContratoItem(contratoSelecionado)}
             >
               <HiTrash className="w-4 h-4" />
@@ -1550,7 +1767,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           )}
           <button
             type="button"
-            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            className="btn btn-outline px-3 inline-flex items-center gap-2"
             onClick={() => setContratoSelecionadoId(null)}
           >
             <HiXMark className="w-4 h-4" />
@@ -1580,7 +1797,10 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
             </div>
 
             <div className="contratos-edit-modal__body">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(180px,0.8fr)_minmax(220px,1fr)]">
+              {modalNoTopo === 'edicao' && faixaAvisos}
+              {/* R10 — a trilha tinha px escrito na tela (180px/220px). As
+                  proporcoes ficam, as medidas saem. */}
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,1fr)]">
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Obra</span>
                   <select
@@ -1629,6 +1849,9 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
                   />
                 </label>
 
+                {/* R6 — os tres campos abaixo sao dinheiro: `.input-moeda` da
+                    o piso de 180px (cabe R$ 9.999.999.999,99), o alinhamento a
+                    direita e o tabular-nums. */}
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Valor contratado</span>
                   <input
@@ -1637,7 +1860,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
                     name="valor_total"
                     value={formEdicao.valor_total}
                     onChange={onChangeEdicao}
-                    className="input w-full"
+                    className="input input-moeda w-full"
                   />
                 </label>
 
@@ -1649,7 +1872,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
                     name="ajuste_solicitado"
                     value={formEdicao.ajuste_solicitado}
                     onChange={onChangeEdicao}
-                    className="input w-full"
+                    className="input input-moeda w-full"
                   />
                 </label>
 
@@ -1661,7 +1884,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
                     name="ajuste_pago"
                     value={formEdicao.ajuste_pago}
                     onChange={onChangeEdicao}
-                    className="input w-full"
+                    className="input input-moeda w-full"
                   />
                 </label>
 
@@ -1805,45 +2028,66 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
         </div>
       )}
 
+      {/* R27 — este modal era feito a mao: painel com teto de altura,
+          `overflow: hidden` e NENHUM corpo rolante proprio. Com muitos anexos
+          o que saia da vista era justamente o RODAPE, isto e, o botao "Enviar
+          anexos" — modal que esconde o botao de acao parece funcional e nao e.
+          Migrado para o OverlayModal, onde a estrutura ja resolve: os filhos
+          marcados com data-modal="cabecalho"/"rodape" ficam fixos e o miolo
+          rola entre eles. */}
       {modalAnexos && (
-        <div className="contratos-anexos-modal fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-6">
-          <div className="contratos-anexos-modal__panel card w-full space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold">
-                Anexos do contrato {modalAnexos.codigo}
-              </h2>
-              <button onClick={() => setModalAnexos(null)}>Fechar</button>
-            </div>
+        <OverlayModal
+          aberto
+          rotulo={`Anexos do contrato ${modalAnexos.codigo}`}
+          largura="var(--modal-max-w-sm)"
+          onFechar={() => setModalAnexos(null)}
+        >
+          <div data-modal="cabecalho" className="app-bloco-head p-4">
+            <h2 className="app-bloco-titulo">
+              Anexos do contrato {modalAnexos.codigo}
+            </h2>
+            <span className="app-bloco-acoes">
+              {/* R2 — era um <button> sem className nenhuma: sem alvo minimo,
+                  sem contorno, sem tema. */}
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setModalAnexos(null)}>
+                Fechar
+              </button>
+            </span>
+          </div>
 
-            <div className="contratos-anexos-modal__list space-y-2">
+          <div className="p-4 space-y-4">
+            {modalNoTopo === 'anexos' && faixaAvisos}
+
+            <div className="space-y-2">
               {anexos.length === 0 && (
-                <p className="text-sm text-gray-500">
+                <p className="app-note">
                   Nenhum anexo encontrado.
                 </p>
               )}
               {anexos.map(anexo => (
                 <div
                   key={anexo.id}
-                  className="flex items-center justify-between gap-3 text-sm border rounded px-3 py-2"
+                  className="flex items-center justify-between gap-3 text-sm border border-[var(--c-border)] rounded px-3 py-2"
                 >
                   <span className="truncate flex-1" title={anexo.nome_original}>
                     {anexo.nome_original}
                   </span>
-                  <div className="flex items-center gap-3 whitespace-nowrap">
-                    <a
-                      href="#"
-                      onClick={async e => {
-                        e.preventDefault();
-                        await visualizarAnexoContrato(anexo.caminho_arquivo);
-                      }}
-                      className="text-blue-600 hover:underline"
-                    >
-                      Visualizar
-                    </a>
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    {/* R2/R25 — "Visualizar" era <a href="#"> com
+                        preventDefault (link que nao navega, sem alvo de clique)
+                        e "Baixar" um <button> sem `.btn`; os dois em azul cru.
+                        Sao duas ACOES: viram botoes do sistema. */}
                     <button
                       type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => visualizarAnexoContrato(anexo.caminho_arquivo)}
+                    >
+                      Visualizar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
                       onClick={() => baixarAnexoContrato(anexo.caminho_arquivo, anexo.nome_original)}
-                      className="text-blue-600 hover:underline"
                     >
                       Baixar
                     </button>
@@ -1853,7 +2097,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
             </div>
 
             <div>
-              <label className="text-sm text-gray-600">Enviar novos anexos</label>
+              <span className="form-label">Enviar novos anexos</span>
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
                   <HiPaperClip className="w-4 h-4" />
@@ -1868,7 +2112,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
                     }}
                   />
                 </label>
-                <span className="text-xs text-[var(--c-muted)]">
+                <span className="app-note">
                   {uploadAnexos.length > 0
                     ? `${uploadAnexos.length} arquivo(s) selecionado(s)`
                     : 'Nenhum arquivo selecionado'}
@@ -1879,21 +2123,25 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
                 onRemove={(index) => removerArquivoModal(index)}
                 className="mt-2 space-y-1"
                 itemClassName="flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
-                removeButtonClassName="text-blue-600 font-semibold px-2"
+                removeButtonClassName="btn btn-outline btn-sm"
               />
             </div>
-
-            <div className="contratos-anexos-modal__footer">
-              <button
-                onClick={enviarAnexos}
-                className="btn btn-primary"
-              >
-                Enviar anexos
-              </button>
-            </div>
           </div>
-        </div>
+
+          <div data-modal="rodape" className="app-actionbar p-4">
+            <button
+              type="button"
+              onClick={enviarAnexos}
+              disabled={uploadAnexos.length === 0}
+              className="btn btn-primary"
+            >
+              Enviar anexos
+            </button>
+          </div>
+        </OverlayModal>
       )}
-    </div>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

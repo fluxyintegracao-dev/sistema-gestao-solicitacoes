@@ -68,13 +68,7 @@
     "src/modules/sst/pages/SstTimeline.jsx",
     "src/navigation/ModuleHub.jsx",
     "src/pages/ArquivosModelos.jsx",
-    "src/pages/ComercialContratos.jsx",
-    "src/pages/ComercialEmpreendimentos.jsx",
-    "src/pages/ComercialMapaUnidades.jsx",
-    "src/pages/ComercialModelosContrato.jsx",
     "src/pages/ComercialRelatorioOperacional.jsx",
-    "src/pages/ComercialTabelasPreco.jsx",
-    "src/pages/ComercialUnidades.jsx",
     "src/pages/ComprasRelatorioCategoriasInsumos.jsx",
     "src/pages/ComprasRelatorioCiclo.jsx",
     "src/pages/ComprasRelatorioComprasDiretas.jsx",
@@ -85,10 +79,8 @@
     "src/pages/ComprasRelatorioFornecedores.jsx",
     "src/pages/ComprasRelatorioPendenciasCotacoes.jsx",
     "src/pages/ComprasRelatorioPrecosInsumos.jsx",
-    "src/pages/ContratoFluxoNovo.jsx",
     "src/pages/ContratosRelatorioOperacional.jsx",
     "src/pages/CrmRelatorioExecutivo.jsx",
-    "src/pages/GestaoContratos.jsx",
     "src/pages/NovaSolicitacao.jsx",
     "src/pages/Perfil.jsx",
     "src/pages/PrioridadesDiretoria.jsx",
@@ -98,6 +90,6 @@
     "src/pages/SolicitacoesRelatorioOperacional.jsx",
     "src/pages/Treinamento.jsx"
   ],
-  "atualizado_em": "2026-09-04",
-  "total_em": 93
+  "atualizado_em": "2026-09-05",
+  "total_em": 85
 }

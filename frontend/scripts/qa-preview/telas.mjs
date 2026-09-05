@@ -1087,6 +1087,78 @@ export const TELAS = [
     }
   },
 
+
+  /* ============ RODADA 3 — COMERCIAL E CONTRATOS (05/09): 8 telas.
+     Entram aqui e no manifesto estático no MESMO commit. ============ */
+
+  {
+    id: 'contratos-gestao',
+    arquivo: 'src/pages/GestaoContratos.jsx',
+    rota: '/gestao-contratos',
+    tipo: 'listagem'
+  },
+  {
+    id: 'comercial-contratos',
+    arquivo: 'src/pages/ComercialContratos.jsx',
+    rota: '/comercial/contratos',
+    tipo: 'listagem',
+    cadastroInline: "a tela anuncia \"Contratos de venda\" e o formulário é o que ela existe para fazer"
+  },
+  {
+    id: 'comercial-empreendimentos',
+    arquivo: 'src/pages/ComercialEmpreendimentos.jsx',
+    rota: '/comercial/empreendimentos',
+    tipo: 'listagem',
+    cadastroInline: "a tela existe PARA cadastrar empreendimento (R9 revista em 04/09)"
+  },
+  {
+    id: 'comercial-unidades',
+    arquivo: 'src/pages/ComercialUnidades.jsx',
+    rota: '/comercial/unidades',
+    tipo: 'listagem',
+    cadastroInline: "a tela existe PARA cadastrar unidade comercial (R9 revista em 04/09)"
+  },
+  {
+    id: 'comercial-modelos-contrato',
+    arquivo: 'src/pages/ComercialModelosContrato.jsx',
+    rota: '/comercial/modelos-contrato',
+    tipo: 'listagem',
+    cadastroInline: "páginas de modelo é o exemplo literal da tabela da R9 revista"
+  },
+  {
+    id: 'comercial-tabelas-preco',
+    arquivo: 'src/pages/ComercialTabelasPreco.jsx',
+    rota: '/comercial/tabelas-preco',
+    tipo: 'listagem',
+    cadastroInline: "a tela existe PARA montar tabela de preço (R9 revista em 04/09)"
+  },
+  {
+    id: 'comercial-mapa-unidades',
+    arquivo: 'src/pages/ComercialMapaUnidades.jsx',
+    rota: '/comercial/mapa-unidades',
+    tipo: 'mista',
+    naoAplica: {
+      F1: "mapa de cards por agrupamento: não há listagem com recorte",
+      F2: "idem F1",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'contratos-novo',
+    arquivo: 'src/pages/ContratoFluxoNovo.jsx',
+    rota: '/contratos/novo',
+    tipo: 'form',
+    naoAplica: {
+      F1: "tela de registro sem listagem",
+      F2: "idem F1",
+      F3: "idem F1",
+      F4: "idem F1",
+      C4: "não é tela de detalhe de registro"
+    }
+  },
 ];
 
 /** Itens da DoD, na ordem da matriz. */
