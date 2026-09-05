@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 import {
   HiOutlineArrowPath,
   HiOutlineBanknotes,
@@ -326,6 +327,25 @@ export default function FinanceiroPagamentos() {
   });
   const [obraSearch, setObraSearch] = useState('');
   const [obraSuggestionsOpen, setObraSuggestionsOpen] = useState(false);
+  /*
+    A LISTA DE OBRAS NÃO FECHAVA DE JEITO NENHUM (05/09).
+
+    Aqui o estado `obraSuggestionsOpen` até existia, mas ninguém o
+    desligava sem consumir a busca: só `handleSelectObra` (escolher uma
+    obra) e `handleClearObra` (o botão "Limpar") o punham em falso. Não
+    havia caminho para apenas DISPENSAR a camada — e ela é `absolute
+    z-20` sobre a faixa de filtros, tapando "Origem" e "Conta pagadora"
+    logo abaixo. Clicar fora não fazia nada; `Esc` não fazia nada.
+
+    Faltava só o gancho: o estado já estava pronto, o hook agora o
+    desliga. A seleção continua funcionando por duas razões, ambas
+    conferidas: o ref envolve o campo E a lista (clique na opção é
+    DENTRO, o hook não fecha no `mousedown`) e a opção já trazia
+    `onMouseDown` com `preventDefault` de antes — foi a única das onze
+    que já tinha a proteção.
+  */
+  const obraSugestoesRef = useRef(null);
+  useFecharAoSair(obraSugestoesRef, obraSuggestionsOpen, () => setObraSuggestionsOpen(false));
   const [batchForm, setBatchForm] = useState({
     payment_account_id: '',
     data_programada: today()
@@ -999,7 +1019,7 @@ export default function FinanceiroPagamentos() {
                     <span className="sol-filter-label">Parceiro ID</span>
                     <input className="input w-full" inputMode="numeric" value={filters.parceiro_id} onChange={(e) => setFilters((c) => ({ ...c, parceiro_id: e.target.value }))} />
                   </label>
-                  <div className="sol-filter-field relative xl:col-span-3">
+                  <div className="sol-filter-field relative xl:col-span-3" ref={obraSugestoesRef}>
                     <span className="sol-filter-label">Obra</span>
                     <div className="flex gap-2">
                       <input

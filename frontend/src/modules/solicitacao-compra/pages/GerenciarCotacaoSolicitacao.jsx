@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useFecharAoSair } from '../../../hooks/useFecharAoSair';
 import {
   HiOutlineArrowTopRightOnSquare,
   HiOutlineArrowDownTray,
@@ -1611,6 +1612,33 @@ function SecaoEnvioFornecedores({
   }, [fornecedores, categoriaSelecionada]);
 
   const buscaFornecedorNormalizada = normalizeText(fornecedorBusca);
+  /*
+    A LISTA DE FORNECEDORES NÃO FECHAVA DE JEITO NENHUM (05/09).
+
+    Ela não tinha estado de aberta: aparecia por `texto digitado > 0` e só
+    sumia quando a pessoa APAGAVA o que digitou ou escolhia uma categoria.
+    Como é `absolute z-20`, ficava pousada sobre o seletor de categoria e
+    o botão "Buscar" logo abaixo — e não havia como dispensá-la sem perder
+    o termo buscado. Clicar fora não fazia nada; `Esc` não fazia nada.
+
+    Agora `deveMostrarAutocomplete` (a CONDIÇÃO de haver o que mostrar)
+    continua igual — inclusive para o aviso de estado vazio, que depende
+    dela — e ganha um `autocompleteAberto` por cima, que é o que o clique
+    fora e o `Esc` desligam. Digitar de novo, ou focar o campo, reabre.
+
+    A seleção segue viva por dois motivos, os dois necessários: o ref
+    envolve o campo E a lista (clique na opção é DENTRO, o hook não fecha
+    no `mousedown`), e a opção ganhou `onMouseDown` com `preventDefault`
+    para não perder o foco do campo — aqui a escolha é MÚLTIPLA, a pessoa
+    marca vários fornecedores em sequência sem sair do campo.
+  */
+  const autocompleteFornecedorRef = useRef(null);
+  const [autocompleteFornecedorAberto, setAutocompleteFornecedorAberto] = useState(false);
+  useFecharAoSair(
+    autocompleteFornecedorRef,
+    autocompleteFornecedorAberto,
+    () => setAutocompleteFornecedorAberto(false)
+  );
   const deveMostrarAutocomplete = buscaFornecedorNormalizada.length > 0 && !categoriaFornecedorId;
   const deveMostrarListaCategoria = Boolean(categoriaFornecedorId);
   const fornecedoresAutocomplete = useMemo(() => {
@@ -1806,14 +1834,18 @@ function SecaoEnvioFornecedores({
                   )}
                 </div>
                 <div className="mb-2 flex flex-wrap items-start gap-2">
-                  <div className="app-busca relative">
+                  <div className="app-busca relative" ref={autocompleteFornecedorRef}>
                     <input
                       className="input"
                       placeholder="Digite nome, CNPJ, email ou contato"
                       value={fornecedorBusca}
-                      onChange={(e) => onChangeFornecedorBusca(e.target.value)}
+                      onChange={(e) => {
+                        setAutocompleteFornecedorAberto(true);
+                        onChangeFornecedorBusca(e.target.value);
+                      }}
+                      onFocus={() => setAutocompleteFornecedorAberto(true)}
                     />
-                    {deveMostrarAutocomplete && (
+                    {deveMostrarAutocomplete && autocompleteFornecedorAberto && (
                       <div
                         className="cotacao-fornecedores-autocomplete absolute left-0 right-0 z-20 mt-1 rounded-xl border"
                         style={{ top: '100%', borderColor: 'var(--c-border)', background: 'var(--c-surface)', boxShadow: 'var(--ui-shadow-lg)' }}
@@ -1837,6 +1869,7 @@ function SecaoEnvioFornecedores({
                                   borderColor: 'var(--c-border)',
                                   background: checked ? 'var(--sem-info-bg)' : 'transparent'
                                 }}
+                                onMouseDown={(event) => event.preventDefault()}
                                 onClick={() => onToggleFornecedor(selectionKey, !checked, f)}
                               >
                                 <input type="checkbox" checked={checked} readOnly className="mt-1" />

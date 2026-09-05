@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import OverlayModal from '../../components/ui/OverlayModal';
 import StatusBadge from '../../components/StatusBadge';
 import {
@@ -25,6 +25,7 @@ import {
 } from '../../utils/categoriaFinanceira';
 import CategoriaFinanceiraAutocomplete from '../../components/ui/CategoriaFinanceiraAutocomplete';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import { canManagePaymentBeneficiaries } from '../../utils/acessoProduto';
 import {
   atualizarPaymentBeneficiary,
@@ -462,6 +463,27 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
   const [search, setSearch] = useState('');
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  /*
+    A LISTA DE PARCEIROS DO PAGAMENTO NÃO FECHAVA DE JEITO NENHUM (05/09).
+
+    Não havia estado de aberta: a camada existia sempre que `options`
+    tivesse itens, e essa lista só era esvaziada ao ESCOLHER um parceiro
+    ou ao apagar a busca abaixo de dois caracteres. Como é `absolute
+    z-20` e este campo se repete por pagamento, a lista de um pagamento
+    cobria o pagamento seguinte. Clicar fora não fazia nada; `Esc` não
+    fazia nada.
+
+    Agora existe `listaAberta`: digitar ou focar o campo abre, clicar
+    fora e `Esc` fecham, sem perder o termo buscado.
+
+    A seleção continua funcionando: o ref envolve o campo E a lista
+    (clique na opção é DENTRO, o hook não fecha no `mousedown`), e a
+    opção ganhou `onMouseDown` com `preventDefault` para o foco não sair
+    do campo antes do `onClick`.
+  */
+  const campoRef = useRef(null);
+  const [listaAberta, setListaAberta] = useState(false);
+  useFecharAoSair(campoRef, listaAberta, () => setListaAberta(false));
   const roleLabel = getParceiroRoleLabel(tipo);
   const roleTitle = getParceiroRoleTitle(tipo);
 
@@ -497,14 +519,18 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
   }, [search, tipo]);
 
   return (
-    <div className="relative text-sm">
+    <div className="relative text-sm" ref={campoRef}>
       <span className="mb-1 block text-[var(--c-muted)]">{roleTitle} deste titulo</span>
       <input
         className="input w-full"
         type="text"
         placeholder={pagamento?.parceiro_nome || `Buscar ${roleLabel} por nome ou CPF/CNPJ`}
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onFocus={() => setListaAberta(true)}
+        onChange={(event) => {
+          setListaAberta(true);
+          setSearch(event.target.value);
+        }}
       />
       {pagamento?.parceiro_nome && (
         <div className="mt-1 text-xs text-[var(--c-muted)]">
@@ -514,13 +540,14 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
       {loading && (
         <div className="mt-1 text-xs text-[var(--c-muted)]">Buscando parceiros...</div>
       )}
-      {options.length > 0 && (
+      {listaAberta && options.length > 0 && (
         <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg">
           {options.map((partner) => (
             <button
               key={partner.id}
               type="button"
               className="w-full rounded-xl border border-[var(--c-border)] px-3 py-2 text-left text-sm hover:bg-[var(--c-bg)]"
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 onSelect(pagamentoIndex, partner);
                 setSearch('');
@@ -694,6 +721,29 @@ export default function FinanceiroCard({
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [categoriaModalOpen, setCategoriaModalOpen] = useState(false);
   const [categoriaSearch, setCategoriaSearch] = useState('');
+  /*
+    AS DUAS CAMADAS DA CATEGORIA FINANCEIRA NÃO FECHAVAM DE JEITO NENHUM
+    (05/09) — a lista de sugestões e o aviso "Nenhuma categoria
+    encontrada", que é flutuante do mesmo jeito (`absolute`, mesma
+    âncora) e por isso conta como camada, não como texto de apoio.
+
+    Nenhuma das duas tinha estado de aberta: apareciam por texto digitado
+    e sumiam só ao ESCOLHER uma categoria ou apagar a busca. Ficavam
+    sobre a "Competência DRE" logo abaixo. Clicar fora não fazia nada;
+    `Esc` não fazia nada.
+
+    Um estado só governa as duas, porque as duas são a MESMA camada em
+    dois estados (com resultado e sem): abrir uma e deixar a outra
+    presa seria trocar metade do defeito.
+
+    A seleção continua funcionando: o ref envolve o campo E as duas
+    camadas (clique na opção é DENTRO, o hook não fecha no `mousedown`),
+    e a opção ganhou `onMouseDown` com `preventDefault` para o foco não
+    sair do campo antes do `onClick`.
+  */
+  const listaCategoriasRef = useRef(null);
+  const [listaCategoriasAberta, setListaCategoriasAberta] = useState(false);
+  useFecharAoSair(listaCategoriasRef, listaCategoriasAberta, () => setListaCategoriasAberta(false));
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [cartoes, setCartoes] = useState([]);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
@@ -2334,14 +2384,16 @@ export default function FinanceiroCard({
 
               <div className="space-y-2">
                 <span className="block text-sm text-[var(--c-muted)]">Categoria financeira</span>
-                <div className="relative">
+                <div className="relative" ref={listaCategoriasRef}>
                   <div className="flex gap-2">
                     <input
                       className="input w-full"
                       type="text"
                       placeholder="Digite para buscar a categoria"
                       value={categoriaSearch}
+                      onFocus={() => setListaCategoriasAberta(true)}
                       onChange={(event) => {
+                        setListaCategoriasAberta(true);
                         setCategoriaSearch(event.target.value);
                         if (selectedCategory) {
                           setSelectedCategory(null);
@@ -2376,13 +2428,14 @@ export default function FinanceiroCard({
                     )}
                   </div>
 
-                  {categoriasAutocomplete.length > 0 && (
+                  {listaCategoriasAberta && categoriasAutocomplete.length > 0 && (
                     <div className="absolute left-0 right-0 top-full z-10 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg">
                       {categoriasAutocomplete.map((categoria) => (
                         <button
                           key={categoria.id}
                           type="button"
                           className="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-[var(--c-bg)]"
+                          onMouseDown={(event) => event.preventDefault()}
                         onClick={() => selecionarCategoria(categoria)}
                       >
                         <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>
@@ -2394,7 +2447,7 @@ export default function FinanceiroCard({
                     </div>
                   )}
 
-                  {categoriaSearch.trim() && !selectedCategory && !loadingCategorias && categoriasAutocomplete.length === 0 && (
+                  {listaCategoriasAberta && categoriaSearch.trim() && !selectedCategory && !loadingCategorias && categoriasAutocomplete.length === 0 && (
                     <div className="absolute left-0 right-0 top-full z-10 mt-2 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-3 text-sm text-[var(--c-muted)] shadow-lg">
                       Nenhuma categoria encontrada. Use a lupa para pesquisar com mais detalhes.
                     </div>

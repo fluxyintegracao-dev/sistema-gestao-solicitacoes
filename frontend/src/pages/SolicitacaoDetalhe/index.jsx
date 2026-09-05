@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import { useLiveUpdateSubscription } from '../../contexts/LiveUpdatesContext';
 
 import Header, { apoioDoRegistro, formatarValorSolicitacao } from './Header';
@@ -278,6 +279,24 @@ export default function SolicitacaoDetalhe() {
   const [prefsLayoutUsuario, setPrefsLayoutUsuario] = useState(null);
   const [personalizando, setPersonalizando] = useState(false);
   const [adicionarBlocoAberto, setAdicionarBlocoAberto] = useState(false);
+  /*
+    "ADICIONAR BLOCO" SÓ FECHAVA CLICANDO DE NOVO NO PRÓPRIO BOTÃO (05/09).
+
+    Este painel é cópia literal do "Adicionar bloco" do HomeHub — mesma
+    classe, mesmo `role="menu"`, mesmo markup — e a cópia trouxe o desenho
+    sem trazer o fechamento: lá o `useFecharAoSair` está ligado desde o
+    início, aqui ele nunca foi. Resultado: aberto o menu, ele ficava por
+    cima da barra de personalização até a pessoa adivinhar que era para
+    clicar no botão de novo, e `Esc` não fazia nada.
+
+    O ref vai no `.sol-detail-adicionar-wrap`, que envolve o botão E o
+    painel — clicar numa opção é clique DENTRO, o hook não fecha no
+    `mousedown` e o `readicionarBloco` do `onClick` continua rodando (é
+    o mesmo arranjo do HomeHub, e é por isso que lá nunca precisou de
+    `preventDefault`).
+  */
+  const adicionarBlocoRef = useRef(null);
+  useFecharAoSair(adicionarBlocoRef, adicionarBlocoAberto, () => setAdicionarBlocoAberto(false));
   const dragBlocoRef = useRef(null);
   // Abaixo de 768px o detalhe vira ABAS, com a ação principal fixa no topo.
   const [isMobileDetalhe, setIsMobileDetalhe] = useState(() => (
@@ -1508,7 +1527,7 @@ export default function SolicitacaoDetalhe() {
             + 'No celular valem a ordem e os blocos mantidos — largura é só do desktop.'}
         >
           <div className="sol-detail-blocos-toolbar">
-            <div className="sol-detail-adicionar-wrap">
+            <div className="sol-detail-adicionar-wrap" ref={adicionarBlocoRef}>
               <button
                 type="button"
                 className="btn btn-outline btn-sm"

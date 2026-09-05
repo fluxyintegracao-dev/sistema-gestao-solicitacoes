@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 import {
   Pagina,
   PageHeader,
@@ -75,6 +76,34 @@ export default function CartoesRecarga() {
   const [editandoId, setEditandoId] = useState(null);
   const [buscaFornecedor, setBuscaFornecedor] = useState('');
   const [fornecedores, setFornecedores] = useState([]);
+  /*
+    A LISTA DE FORNECEDORES DO CARTÃO NÃO FECHAVA DE JEITO NENHUM (05/09).
+
+    Ela não tinha estado de aberta: existia enquanto `fornecedores.length`
+    fosse maior que zero, e o único jeito de esvaziar essa lista era
+    ESCOLHER um fornecedor (o `onMouseDown` da opção chama
+    `setFornecedores([])`) ou apagar a busca. Como é `absolute z-20`, ela
+    ficava sobre a seção "Usuários vinculados" logo abaixo — quem
+    desistisse da troca não tinha como dispensá-la. Clicar fora não fazia
+    nada; `Esc` não fazia nada.
+
+    Agora existe `sugestoesFornecedorAbertas`, que o clique fora e o `Esc`
+    desligam; digitar ou focar o campo reabre.
+
+    A seleção continua funcionando, e aqui ela é MAIS sensível que nas
+    outras: a escolha mora no `onMouseDown` da opção, exatamente o evento
+    em que o hook fecha. Ela sobrevive porque o ref envolve o campo E a
+    lista — o alvo está DENTRO, o hook não dispara — e porque o handler
+    de React roda antes do listener de documento. O `preventDefault` que
+    a opção já trazia continua onde estava.
+  */
+  const sugestoesFornecedorRef = useRef(null);
+  const [sugestoesFornecedorAbertas, setSugestoesFornecedorAbertas] = useState(false);
+  useFecharAoSair(
+    sugestoesFornecedorRef,
+    sugestoesFornecedorAbertas,
+    () => setSugestoesFornecedorAbertas(false)
+  );
   const [buscaUsuario, setBuscaUsuario] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -316,15 +345,16 @@ export default function CartoesRecarga() {
             >
               {/* O `relative` mora aqui, e não no CampoForm: é a âncora da
                   lista de sugestões, que é filha deste bloco. */}
-              <div className="relative">
+              <div className="relative" ref={sugestoesFornecedorRef}>
                 <input
                   className="input w-full"
                   value={buscaFornecedor}
-                  onChange={(e) => { setBuscaFornecedor(e.target.value); setForm((v) => ({ ...v, parceiro_id: '', parceiro_nome: '' })); }}
+                  onFocus={() => setSugestoesFornecedorAbertas(true)}
+                  onChange={(e) => { setSugestoesFornecedorAbertas(true); setBuscaFornecedor(e.target.value); setForm((v) => ({ ...v, parceiro_id: '', parceiro_nome: '' })); }}
                   placeholder="Buscar fornecedor"
                   autoComplete="off"
                 />
-                {fornecedores.length ? (
+                {sugestoesFornecedorAbertas && fornecedores.length ? (
                   <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--ui-surface)] p-1 shadow-lg">
                     {fornecedores.map((item) => (
                       <button

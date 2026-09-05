@@ -251,12 +251,14 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
     passaria a ser falso para o próprio menu — clicar numa opção fecharia o
     menu ANTES do `onClick` dela e o alinhamento nunca seria aplicado.
     Trocar um defeito por outro do mesmo tamanho.
+
+    O ref sintético escrito à mão que vivia aqui (`{ contains: … }`) SAIU
+    em 05/09: a capacidade de olhar mais de um ref é do `useFecharAoSair`
+    agora, porque o mesmo defeito reapareceu em outras camadas flutuantes
+    e cada tela reinventando o contorno é como ele volta. O comportamento
+    é o mesmo — a lista abaixo é lida a cada evento, não congelada.
   */
-  const dentroDoMenuOuDoCabecalho = useRef(null);
-  dentroDoMenuOuDoCabecalho.current = {
-    contains: (alvo) => Boolean(ref.current?.contains(alvo) || menuRef.current?.contains(alvo))
-  };
-  useFecharAoSair(dentroDoMenuOuDoCabecalho, aberto, () => setAberto(false));
+  useFecharAoSair([ref, menuRef], aberto, () => setAberto(false));
   const direcao = ordem?.coluna === coluna.id ? ordem.direcao : null;
 
   /*

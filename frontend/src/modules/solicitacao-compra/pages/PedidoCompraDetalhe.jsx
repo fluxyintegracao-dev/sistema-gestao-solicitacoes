@@ -1,5 +1,6 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useFecharAoSair } from '../../../hooks/useFecharAoSair';
 import {
   adicionarItemPedidoCompra,
   atualizarStatusPedidoCompra,
@@ -527,6 +528,31 @@ export default function PedidoCompraDetalhe() {
   const [buscaFornecedorFrete, setBuscaFornecedorFrete] = useState('');
   const [fornecedoresFrete, setFornecedoresFrete] = useState([]);
   const [credorFreteSelecionado, setCredorFreteSelecionado] = useState(null);
+  /*
+    A LISTA DE CREDORES DO FRETE NÃO FECHAVA DE JEITO NENHUM (05/09).
+
+    Não havia estado de aberta: a camada existia sempre que
+    `fornecedoresFrete.length` fosse maior que zero e o credor ainda não
+    tivesse sido escolhido. Ou seja, só saía da tela ao SELECIONAR alguém
+    ou ao apagar a busca abaixo de dois caracteres. Como é `absolute z-20`
+    dentro do modal de frete, ela cobria o bloco de "Cadastro rápido do
+    credor/transportador" logo abaixo — quem quisesse cadastrar um credor
+    novo tinha de apagar o que digitou para enxergar o formulário.
+
+    Agora existe `listaCredorFreteAberta`: digitar ou apertar "Buscar"
+    abre, clicar fora e `Esc` fecham. A busca continua onde estava — o
+    termo não é perdido ao dispensar a lista.
+
+    PROTEÇÃO DA SELEÇÃO, que é o ponto delicado deste arquivo: o hook
+    fecha no `mousedown` e o `onClick` da opção só dispara no `mouseup`.
+    O ref envolve o campo E a lista (clique na opção é DENTRO, então o
+    hook não fecha), e a opção recebeu `onMouseDown` com `preventDefault`
+    — esta tela tinha zero dessas proteções, e sem elas o clique morreria
+    no meio: a camada fecharia e o credor nunca seria escolhido.
+  */
+  const credorFreteRef = useRef(null);
+  const [listaCredorFreteAberta, setListaCredorFreteAberta] = useState(false);
+  useFecharAoSair(credorFreteRef, listaCredorFreteAberta, () => setListaCredorFreteAberta(false));
   const [buscandoFornecedoresFrete, setBuscandoFornecedoresFrete] = useState(false);
   const buscaItensDeferred = useDeferredValue(buscaItens);
 
@@ -2612,13 +2638,15 @@ export default function PedidoCompraDetalhe() {
                     Pesquise no cadastro de credores ou informe os dados para cadastro rapido.
                   </p>
 
-                  <div className="relative mt-3">
+                  <div className="relative mt-3" ref={credorFreteRef}>
                     <div className="grid gap-2 md:grid-cols-2">
                       <input
                         className="input w-full"
                         value={buscaFornecedorFrete}
                         aria-label="Buscar credor do frete"
+                        onFocus={() => setListaCredorFreteAberta(true)}
                         onChange={(event) => {
+                          setListaCredorFreteAberta(true);
                           setBuscaFornecedorFrete(event.target.value);
                           if (credorFreteSelecionado) {
                             limparCredorFrete();
@@ -2632,7 +2660,10 @@ export default function PedidoCompraDetalhe() {
                       <button
                         type="button"
                         className="btn btn-outline"
-                        onClick={() => handleBuscarFornecedorFrete()}
+                        onClick={() => {
+                          setListaCredorFreteAberta(true);
+                          handleBuscarFornecedorFrete();
+                        }}
                         disabled={buscandoFornecedoresFrete || salvandoFrete}
                       >
                         {buscandoFornecedoresFrete ? 'Buscando...' : 'Buscar'}
@@ -2651,13 +2682,14 @@ export default function PedidoCompraDetalhe() {
                       </div>
                     ) : null}
 
-                    {!credorFreteSelecionado && fornecedoresFrete.length ? (
+                    {!credorFreteSelecionado && listaCredorFreteAberta && fornecedoresFrete.length ? (
                       <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface)] shadow-xl">
                         {fornecedoresFrete.map((credor) => (
                           <button
                             key={`${credor.origem_frete || 'credor'}:${credor.id}`}
                             type="button"
                             className="block w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--c-surface)]"
+                            onMouseDown={(event) => event.preventDefault()}
                             onClick={() => selecionarCredorFrete(credor)}
                             disabled={salvandoFrete}
                           >

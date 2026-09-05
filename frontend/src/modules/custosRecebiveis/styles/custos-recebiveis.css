@@ -189,7 +189,14 @@
   min-width: 0;
 }
 
-.cr-competence-filter > summary {
+/* 05/09 — o "Competências dos cards" deixou de ser `<details>` nativo
+   (não fechava clicando fora nem com Esc) e virou botão + estado. O
+   desenho é o mesmo: só mudou o gancho de `summary` para a classe e de
+   `[open]` para `[data-aberto]`. */
+.cr-competence-filter > .cr-competence-filter__resumo {
+  width: 100%;
+  font: inherit;
+  text-align: left;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: 39px;
@@ -204,28 +211,24 @@
   list-style: none;
 }
 
-.cr-competence-filter > summary::-webkit-details-marker {
-  display: none;
-}
-
-.cr-competence-filter > summary:focus-visible {
+.cr-competence-filter > .cr-competence-filter__resumo:focus-visible {
   border-color: var(--cr-accent);
   outline: 2px solid color-mix(in srgb, var(--cr-accent) 24%, transparent);
   outline-offset: 1px;
 }
 
-.cr-competence-filter > summary strong {
+.cr-competence-filter > .cr-competence-filter__resumo strong {
   overflow: hidden;
   font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cr-competence-filter > summary svg:last-child {
+.cr-competence-filter > .cr-competence-filter__resumo svg:last-child {
   transition: transform 160ms ease;
 }
 
-.cr-competence-filter[open] > summary svg:last-child {
+.cr-competence-filter[data-aberto="true"] > .cr-competence-filter__resumo svg:last-child {
   transform: rotate(180deg);
 }
 

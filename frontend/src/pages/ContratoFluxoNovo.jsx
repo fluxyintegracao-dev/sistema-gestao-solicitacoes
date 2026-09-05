@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Avisos,
   BlocoConteudo,
@@ -16,6 +16,7 @@ import { getMinhasObras } from '../services/obras';
 import { getContratoObraCategorias, getApropriacoesDaObra } from '../services/configuracoesSistema';
 import { criarContratoFluxoNovo, aprovarContratoFluxoNovo, rejeitarContratoFluxoNovo } from '../services/contratos';
 import { buscarParceiros } from '../services/parceiros';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 
 /**
  * Criacao de contrato do fluxo novo (wireframe 1).
@@ -84,6 +85,29 @@ export default function ContratoFluxoNovo() {
   const [credorBusca, setCredorBusca] = useState('');
   const [credorResultados, setCredorResultados] = useState([]);
   const [credorNome, setCredorNome] = useState('');
+  /*
+    A LISTA DE CREDORES NÃO FECHAVA DE JEITO NENHUM (05/09).
+
+    Não havia estado de aberta: a camada existia enquanto
+    `credorResultados` tivesse itens, e essa lista só era esvaziada ao
+    ESCOLHER um credor ou ao digitar menos de dois caracteres. Como é
+    `absolute z-20`, ficava pousada sobre "Referência" e "Categoria
+    financeira" logo abaixo. Clicar fora não fazia nada; `Esc` não fazia
+    nada.
+
+    Agora existe `listaCredorAberta`: digitar ou focar o campo abre,
+    clicar fora e `Esc` fecham — sem apagar o termo buscado.
+
+    PROTEÇÃO DA SELEÇÃO, e esta tela não tinha nenhuma: o hook fecha no
+    `mousedown` e o `onClick` da opção só dispara no `mouseup`. O ref
+    envolve o campo E a lista (clique na opção é DENTRO, o hook não
+    fecha), e a opção ganhou `onMouseDown` com `preventDefault` para o
+    foco não sair do campo antes do `onClick`. Sem as duas coisas o
+    clique morreria no meio e o credor nunca seria escolhido.
+  */
+  const listaCredorRef = useRef(null);
+  const [listaCredorAberta, setListaCredorAberta] = useState(false);
+  useFecharAoSair(listaCredorRef, listaCredorAberta, () => setListaCredorAberta(false));
   const [contratoCriado, setContratoCriado] = useState(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -347,12 +371,14 @@ export default function ContratoFluxoNovo() {
           */}
           <div className="form-group">
             <span className="form-label form-label--required">Credor</span>
-            <div className="relative">
+            <div className="relative" ref={listaCredorRef}>
               <input
                 className="input w-full"
                 value={credorNome || credorBusca}
                 placeholder="Digite para buscar"
+                onFocus={() => setListaCredorAberta(true)}
                 onChange={async (e) => {
+                  setListaCredorAberta(true);
                   const termo = e.target.value;
                   setCredorNome(''); setCredorBusca(termo);
                   setForm((f) => ({ ...f, parceiro_id: '' }));
@@ -361,13 +387,14 @@ export default function ContratoFluxoNovo() {
                   setCredorResultados((Array.isArray(r) ? r : r?.parceiros || []).slice(0, 8));
                 }}
               />
-              {credorResultados.length > 0 && (
+              {listaCredorAberta && credorResultados.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1 shadow-lg">
                   {credorResultados.map((pRes) => (
                     <button
                       key={pRes.id}
                       type="button"
                       className="btn btn-outline btn-sm mb-1 block w-full text-left"
+                      onMouseDown={(event) => event.preventDefault()}
                       onClick={() => {
                         setForm((f) => ({ ...f, parceiro_id: pRes.id }));
                         setCredorNome(pRes.nome);

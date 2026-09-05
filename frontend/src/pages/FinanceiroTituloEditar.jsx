@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
@@ -426,7 +427,37 @@ export default function FinanceiroTituloEditar() {
     return categoriasFiltradas
       .filter((categoria) => categoriaFinanceiraMatchesAutocomplete(categoria, categoriaBusca));
   }, [categoriaBusca, categoriasFiltradas, form?.categoria_financeira_id]);
-  const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form?.categoria_financeira_id && !bloqueio;
+  /*
+    AS DUAS LISTAS DESTA TELA — PARCEIRO E CATEGORIA — NÃO FECHAVAM DE
+    JEITO NENHUM (05/09).
+
+    Nenhuma das duas tinha estado de aberta: existiam enquanto houvesse
+    texto digitado e nenhum item escolhido. Como são `absolute z-20`,
+    ficavam pousadas sobre os campos seguintes ("Apropriação", "Número do
+    documento") e a única saída era escolher um item ou APAGAR a busca.
+    Clicar fora não fazia nada; `Esc` não fazia nada.
+
+    As condições de CONTEÚDO ficam como estavam; o que entra é um estado
+    de ABERTA por lista, que é o que o clique fora e o `Esc` desligam.
+    Digitar ou focar o campo reabre — o termo buscado não se perde.
+
+    PROTEÇÃO DA SELEÇÃO, e esta tela era uma das que não tinham nenhuma:
+    o hook fecha no `mousedown` e o `onClick` da opção só dispara no
+    `mouseup`. Cada ref envolve o campo E a sua lista (clique na opção é
+    DENTRO, o hook não fecha), e as opções ganharam `onMouseDown` com
+    `preventDefault` para o foco não sair do campo antes do `onClick`.
+    Sem isso o clique morreria no meio e a escolha deixaria de funcionar.
+  */
+  const listaCategoriasRef = useRef(null);
+  const [listaCategoriasAberta, setListaCategoriasAberta] = useState(false);
+  useFecharAoSair(listaCategoriasRef, listaCategoriasAberta, () => setListaCategoriasAberta(false));
+  const listaParceirosRef = useRef(null);
+  const [listaParceirosAberta, setListaParceirosAberta] = useState(false);
+  useFecharAoSair(listaParceirosRef, listaParceirosAberta, () => setListaParceirosAberta(false));
+  const mostrarListaCategorias = categoriaBusca.trim().length > 0
+    && !form?.categoria_financeira_id
+    && !bloqueio
+    && listaCategoriasAberta;
   const categoriasModalFiltradas = useMemo(() => {
     if (!categoriaModalBusca.trim()) return categoriasFiltradas;
 
@@ -438,7 +469,7 @@ export default function FinanceiroTituloEditar() {
     () => parceiros.filter((parceiro) => parceiroMatchesSearch(parceiro, parceiroBusca)).slice(0, 8),
     [parceiros, parceiroBusca]
   );
-  const mostrarListaParceiros = parceiroBusca.trim().length >= 2 && !form?.parceiro_id;
+  const mostrarListaParceiros = parceiroBusca.trim().length >= 2 && !form?.parceiro_id && listaParceirosAberta;
   const obraSelecionada = useMemo(
     () => obras.find((obra) => String(obra.id) === String(form?.obra_id)) || null,
     [obras, form?.obra_id]
@@ -953,12 +984,14 @@ export default function FinanceiroTituloEditar() {
                 linha
                 hint={form.parceiro_id ? `Selecionado: ${parceiroBusca || `Parceiro #${form.parceiro_id}`}` : undefined}
               >
-                <div className="relative">
+                <div className="relative" ref={listaParceirosRef}>
                   <div className="flex gap-2">
                     <input
                       className="input w-full"
                       value={parceiroBusca}
+                      onFocus={() => setListaParceirosAberta(true)}
                       onChange={(event) => {
+                        setListaParceirosAberta(true);
                         setParceiroBusca(event.target.value);
                         updateField('parceiro_id', '');
                       }}
@@ -993,6 +1026,7 @@ export default function FinanceiroTituloEditar() {
                           key={parceiro.id}
                           type="button"
                           className="w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--ui-surface-2)]"
+                          onMouseDown={(event) => event.preventDefault()}
                           onClick={() => selecionarParceiro(parceiro)}
                         >
                           <span className="block font-medium text-[var(--c-text)]">{parceiro.nome}</span>
@@ -1012,12 +1046,14 @@ export default function FinanceiroTituloEditar() {
                   ? getCategoriaDreResumo(categoriaSelecionada)
                   : 'A categoria financeira define se o titulo entra na DRE.'}
               >
-                <div className="relative">
+                <div className="relative" ref={listaCategoriasRef}>
                   <div className="flex gap-2">
                     <input
                       className="input w-full"
                       value={categoriaBusca}
+                      onFocus={() => setListaCategoriasAberta(true)}
                       onChange={(event) => {
+                        setListaCategoriasAberta(true);
                         setCategoriaBusca(event.target.value);
                         updateField('categoria_financeira_id', '');
                       }}
@@ -1068,6 +1104,7 @@ export default function FinanceiroTituloEditar() {
                           key={categoria.id}
                           type="button"
                           className="w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--ui-surface-2)]"
+                          onMouseDown={(event) => event.preventDefault()}
                           onClick={() => selecionarCategoriaFinanceira(categoria)}
                         >
                           <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>

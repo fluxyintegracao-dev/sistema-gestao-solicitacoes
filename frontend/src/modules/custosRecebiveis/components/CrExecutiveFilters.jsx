@@ -1,4 +1,6 @@
+import { useRef, useState } from 'react';
 import { HiOutlineCalendarDays, HiOutlineChevronDown } from 'react-icons/hi2';
+import { useFecharAoSair } from '../../../hooks/useFecharAoSair';
 
 const monthFormatter = new Intl.DateTimeFormat('pt-BR', {
   month: 'long',
@@ -56,6 +58,32 @@ export default function CrExecutiveFilters({
   operational = false,
   onPeriodChange
 }) {
+  /*
+    "COMPETÊNCIAS DOS CARDS" NÃO FECHAVA CLICANDO FORA (05/09) — o defeito
+    que o cliente apontou por captura de tela.
+
+    O painel era um `<details>` NATIVO: o navegador só fecha `<details>` se
+    a pessoa clicar de novo no `<summary>`. Clicar em qualquer outro lugar
+    da tela — inclusive nos outros filtros logo ao lado — deixava a camada
+    aberta por cima do conteúdo, e `Esc` não fazia nada. E o painel é
+    `position: absolute` de verdade (custos-recebiveis.css), ou seja, uma
+    camada flutuante legítima: ela TAPA o que está embaixo enquanto fica
+    aberta.
+
+    `<details>` não tem estado em React nem gancho de fechamento, então ele
+    não podia receber o `useFecharAoSair` como estava. Virou botão + estado
+    (`aberto`), com o mesmo desenho: o CSS acompanhou trocando
+    `> summary` por `> .cr-competence-filter__resumo` e `[open]` por
+    `[data-aberto="true"]`.
+
+    O ref envolve o botão E o painel (são irmãos dentro do mesmo `div`),
+    então marcar/desmarcar um mês é clique DENTRO: o hook não fecha no
+    `mousedown` e os checkboxes seguem funcionando.
+  */
+  const competenciasRef = useRef(null);
+  const [competenciasAberto, setCompetenciasAberto] = useState(false);
+  useFecharAoSair(competenciasRef, competenciasAberto, () => setCompetenciasAberto(false));
+
   const selectedMonths = [...new Set(competencias.filter(normalizeMonth))].sort().reverse();
   const monthOptions = availableMonths(competenciaReferencia, selectedMonths);
   const filteredWorks = obras.filter((obra) => (
@@ -143,12 +171,22 @@ export default function CrExecutiveFilters({
       ) : (
         <div className="cr-field">
           <span>Competências dos cards</span>
-          <details className="cr-competence-filter">
-            <summary>
+          <div
+            className="cr-competence-filter"
+            data-aberto={competenciasAberto ? 'true' : 'false'}
+            ref={competenciasRef}
+          >
+            <button
+              type="button"
+              className="cr-competence-filter__resumo"
+              aria-expanded={competenciasAberto}
+              onClick={() => setCompetenciasAberto((aberto) => !aberto)}
+            >
               <HiOutlineCalendarDays className="h-4 w-4" />
               <strong>{competenceLabel}</strong>
               <HiOutlineChevronDown className="h-4 w-4" />
-            </summary>
+            </button>
+            {competenciasAberto && (
             <div className="cr-competence-filter__panel">
               <label className="cr-field">
                 <span>Mês mais recente disponível</span>
@@ -180,7 +218,8 @@ export default function CrExecutiveFilters({
                 ))}
               </div>
             </div>
-          </details>
+            )}
+          </div>
         </div>
       )}
 

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
@@ -713,7 +714,31 @@ export default function FinanceiroTituloNovo() {
       .filter((categoria) => categoriaFinanceiraMatchesAutocomplete(categoria, categoriaBusca));
   }, [categoriaBusca, categoriasFiltradas, form.categoria_financeira_id]);
 
-  const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form.categoria_financeira_id;
+  /*
+    A LISTA DE CATEGORIAS NÃO FECHAVA DE JEITO NENHUM (05/09).
+
+    `mostrarListaCategorias` era só "tem texto digitado e ainda não há
+    categoria escolhida": a camada (`absolute z-20`) ficava pousada sobre
+    a "Descrição" e o "Número do documento" logo abaixo, e a única saída
+    era escolher uma categoria ou APAGAR a busca — quem digitasse e
+    quisesse conferir um campo abaixo perdia o termo para conseguir ver.
+    Clicar fora não fazia nada; `Esc` não fazia nada.
+
+    A condição de CONTEÚDO fica; o que entra é o estado de ABERTA por
+    cima dela, que é o que o clique fora e o `Esc` desligam. Digitar ou
+    focar o campo reabre, sem perder o texto.
+
+    A seleção continua funcionando: o ref envolve o campo E a lista
+    (clique na opção é DENTRO, o hook não fecha no `mousedown`), e a
+    opção ganhou `onMouseDown` com `preventDefault` para o foco não sair
+    do campo antes do `onClick`.
+  */
+  const listaCategoriasRef = useRef(null);
+  const [listaCategoriasAberta, setListaCategoriasAberta] = useState(false);
+  useFecharAoSair(listaCategoriasRef, listaCategoriasAberta, () => setListaCategoriasAberta(false));
+  const mostrarListaCategorias = categoriaBusca.trim().length > 0
+    && !form.categoria_financeira_id
+    && listaCategoriasAberta;
 
   const categoriasModalFiltradas = useMemo(() => {
     if (!categoriaModalBusca.trim()) {
@@ -1663,13 +1688,15 @@ export default function FinanceiroTituloNovo() {
                 {/* Campo composto: entrada + lupa + limpar + sugestões. */}
                 <div className="form-group form-campo--linha">
                   <span className="form-label form-label--required">Categoria financeira</span>
-                  <div className="relative space-y-2">
+                  <div className="relative space-y-2" ref={listaCategoriasRef}>
                     <div className="flex gap-2">
                       <input
                         className="input w-full"
                         placeholder="Digite para buscar a categoria"
                         value={categoriaBusca}
+                        onFocus={() => setListaCategoriasAberta(true)}
                         onChange={(event) => {
+                          setListaCategoriasAberta(true);
                           setCategoriaBusca(event.target.value);
                           setForm((current) => ({
                             ...current,
@@ -1729,6 +1756,7 @@ export default function FinanceiroTituloNovo() {
                             key={categoria.id}
                             type="button"
                             className="w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--ui-surface-2)]"
+                            onMouseDown={(event) => event.preventDefault()}
                             onClick={() => selecionarCategoriaFinanceira(categoria)}
                           >
                             <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>

@@ -30,6 +30,7 @@ import {
 import OverlayModal from '../../../components/ui/OverlayModal';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useFecharAoSair } from '../../../hooks/useFecharAoSair';
 import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
@@ -243,6 +244,26 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [credorAtivoIndex, setCredorAtivoIndex] = useState(0);
   const [erroBuscaCredor, setErroBuscaCredor] = useState('');
   const [modalCredorAberto, setModalCredorAberto] = useState(false);
+  /*
+    "FORMAS DE PAGAMENTO" SÓ FECHAVA CLICANDO DE NOVO NO PRÓPRIO BOTÃO
+    (05/09) — mesmo defeito das "Competências dos cards" do custosRecebiveis,
+    e pela mesma causa: era um `<details>` NATIVO. `<details>` não oferece
+    fechar ao clicar fora e ignora `Esc`, então a lista de marcação ficava
+    aberta por cima do formulário (é `absolute`, `z-[110]`) tapando o campo
+    de credor logo abaixo enquanto a pessoa preenchia o resto.
+
+    Sem estado em React, `<details>` também não tinha onde receber o
+    `useFecharAoSair`. Virou botão + estado, com o mesmo desenho — inclusive
+    a seta que gira, que saiu de `group-open:` para a classe condicional,
+    porque `group-open` só existe quando existe um `<details open>`.
+
+    O ref envolve o botão E o painel: marcar uma forma é clique DENTRO, o
+    hook não fecha no `mousedown` e o checkbox continua alternando. É de
+    propósito que a camada não feche ao marcar — a escolha é múltipla.
+  */
+  const formasPagamentoRef = useRef(null);
+  const [formasPagamentoAberto, setFormasPagamentoAberto] = useState(false);
+  useFecharAoSair(formasPagamentoRef, formasPagamentoAberto, () => setFormasPagamentoAberto(false));
   const { avisos, avisar, fechar } = useAvisos();
   const { confirmar, elementoConfirmacao } = useConfirmacao();
   /*
@@ -1634,13 +1655,19 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                label dentro de label é HTML inválido. Mesmas classes .form-*. */
             <div className="form-group form-campo--linha">
               <span className="form-label form-label--required">Formas de pagamento</span>
-              <details className="group relative">
-                <summary className="input flex cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+              <div className="relative" ref={formasPagamentoRef}>
+                <button
+                  type="button"
+                  className="input flex w-full cursor-pointer items-center justify-between gap-3 text-left"
+                  aria-expanded={formasPagamentoAberto}
+                  onClick={() => setFormasPagamentoAberto((aberto) => !aberto)}
+                >
                   <span className="min-w-0 truncate">{resumoFormasPagamento}</span>
-                  <svg className="h-4 w-4 shrink-0 transition group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <svg className={`h-4 w-4 shrink-0 transition${formasPagamentoAberto ? ' rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                     <path d="m7 10 5 5 5-5" />
                   </svg>
-                </summary>
+                </button>
+                {formasPagamentoAberto && (
                 <div className="absolute left-0 right-0 top-full z-[110] mt-1 max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
                   {formasPagamento.map((forma) => {
                     const selecionada = formaPagamentoIds.includes(String(forma.id));
@@ -1662,7 +1689,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     );
                   })}
                 </div>
-              </details>
+                )}
+              </div>
               <ErroCampo mensagem={errosCampo.forma_pagamento} />
               {formasPagamento.length === 0 && (
                 <div
