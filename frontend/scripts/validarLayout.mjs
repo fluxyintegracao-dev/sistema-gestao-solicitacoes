@@ -84,6 +84,33 @@ export function telasExtraDaLinhaDeComando(argv = process.argv) {
   return extras;
 }
 
+/*
+  O PORTÃO NÃO ERA SEGURO EM PARALELO (05/09).
+
+  A prova de mordida (`scripts/provas/regrasMordem.mjs`) PLANTA um arquivo em
+  `src/pages/__ProvaDeRegra<PID>.jsx` — com `alert()` e hook depois de return,
+  de propósito — roda o validador contra ele e apaga no `finally`. O sufixo por
+  PID já impedia duas provas de colidirem entre si.
+
+  O que ele NÃO impedia: o validador de OUTRO processo varrendo `src/pages`
+  nesse instante e contando o arquivo alheio como tela de verdade. O resultado
+  é vermelho falso, com a assinatura característica de "206 telas" no lugar de
+  205 — e um agente acusado de um defeito que é do ferramental.
+
+  Aconteceu duas vezes hoje, com agentes trabalhando em paralelo. Vermelho
+  falso é pior que vermelho nenhum: ensina a ignorar vermelho.
+
+  A saída não é a prova plantar noutro lugar (ela PRECISA ser lida como tela
+  para a mordida valer), e sim a varredura ignorar o fixture — a menos que ele
+  tenha sido passado de propósito por `--extra`, que é exatamente como a prova
+  o entrega.
+*/
+const EXTRAS_DECLARADOS = new Set(telasExtraDaLinhaDeComando());
+function ehFixtureDeOutraProva(nomeDoArquivo, caminhoRelativo) {
+  if (!nomeDoArquivo.startsWith('__ProvaDeRegra')) return false;
+  return !EXTRAS_DECLARADOS.has(caminhoRelativo);
+}
+
 import { TELAS as TELAS_DO_HARNESS } from './qa-preview/telas.mjs';
 
 /*
@@ -243,6 +270,10 @@ function tokensDeclarados() {
   const declarados = new Set();
   const varreCss = (dir) => {
     for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entrada.isFile() && ehFixtureDeOutraProva(
+        entrada.name,
+        path.relative(frontendRoot, path.join(dir, entrada.name)).split(path.sep).join('/')
+      )) continue;
       const alvo = path.join(dir, entrada.name);
       if (entrada.isDirectory()) varreCss(alvo);
       else if (entrada.name.endsWith('.css')) {
@@ -912,6 +943,10 @@ function validarImportesDeHooks() {
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (item.isFile() && ehFixtureDeOutraProva(
+        item.name,
+        path.relative(frontendRoot, path.join(dir, item.name)).split(path.sep).join('/')
+      )) continue;
       const caminho = path.join(dir, item.name);
       if (item.isDirectory()) {
         if (item.name === 'node_modules' || item.name === 'dist') continue;
@@ -988,6 +1023,10 @@ function validarHooksDepoisDeRetorno() {
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (item.isFile() && ehFixtureDeOutraProva(
+        item.name,
+        path.relative(frontendRoot, path.join(dir, item.name)).split(path.sep).join('/')
+      )) continue;
       const caminho = path.join(dir, item.name);
       if (item.isDirectory()) {
         if (item.name === 'node_modules' || item.name === 'dist') continue;
@@ -1103,6 +1142,10 @@ function validarUsoDaConfirmacao() {
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (item.isFile() && ehFixtureDeOutraProva(
+        item.name,
+        path.relative(frontendRoot, path.join(dir, item.name)).split(path.sep).join('/')
+      )) continue;
       const caminho = path.join(dir, item.name);
       if (item.isDirectory()) {
         if (item.name === 'node_modules' || item.name === 'dist') continue;
@@ -1178,6 +1221,10 @@ function validarDialogosDoNavegador() {
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (item.isFile() && ehFixtureDeOutraProva(
+        item.name,
+        path.relative(frontendRoot, path.join(dir, item.name)).split(path.sep).join('/')
+      )) continue;
       const caminho = path.join(dir, item.name);
       if (item.isDirectory()) {
         if (item.name === 'node_modules' || item.name === 'dist') continue;
@@ -1389,6 +1436,10 @@ function classesDePagina() {
   const varrerJsx = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (item.isFile() && ehFixtureDeOutraProva(
+        item.name,
+        path.relative(frontendRoot, path.join(dir, item.name)).split(path.sep).join('/')
+      )) continue;
       const caminho = path.join(dir, item.name);
       if (item.isDirectory()) { varrerJsx(caminho); continue; }
       if (!item.name.endsWith('.jsx')) continue;
@@ -1444,6 +1495,10 @@ function validarOverflow() {
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (item.isFile() && ehFixtureDeOutraProva(
+        item.name,
+        path.relative(frontendRoot, path.join(dir, item.name)).split(path.sep).join('/')
+      )) continue;
       const caminho = path.join(dir, item.name);
       if (item.isDirectory()) varrer(caminho);
       else if (item.name.endsWith('.css')) {
@@ -1624,6 +1679,10 @@ function validarDeclaracaoColunas() {
   const listarJsx = (dir) => {
     const saida = [];
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (item.isFile() && ehFixtureDeOutraProva(
+        item.name,
+        path.relative(frontendRoot, path.join(dir, item.name)).split(path.sep).join('/')
+      )) continue;
       if (item.name === 'node_modules') continue;
       const caminho = path.join(dir, item.name);
       if (item.isDirectory()) saida.push(...listarJsx(caminho));

@@ -772,6 +772,53 @@ sem ninguém saber dizer por quê.
   linha minha, de hoje, num componente compartilhado. **Antes de acusar o
   código herdado, medir o que eu mesmo mexi por último.**
 
+## R30 — Escala de 5 degraus, e no máximo 4 DEGRAUS por tela (05/09)
+
+- **A escala**, decidida pelo cliente em 05/09:
+
+  | degrau | px | papel |
+  |---|---|---|
+  | D1 apoio | 12 | rótulo de campo e de filtro, cabeçalho de coluna, subtexto de célula, etiqueta de status, contador, legenda |
+  | D2 corpo | 14 | corpo, célula de tabela, texto de botão, campo de formulário, item de menu |
+  | D3 título de bloco | 18 | título de bloco e de seção, apoio da tela no cabeçalho (R5) |
+  | D4 título de tela | 22 | **só** o título no `Pagina`/`PageHeader` |
+  | D5 número de destaque | 30 | o número grande de painel, e só ele |
+
+  O piso de 12px continua valendo, **inclusive no Login**. Nada abaixo disso em
+  conteúdo.
+
+- **A regra de convivência: no máximo 4 degraus por tela.**
+
+- **CONTE O DEGRAU, NÃO O VALOR** — correção do cliente em 05/09, e ela muda o
+  que a regra proíbe. Uma tela que mostra **doze números grandes**, todos no D5,
+  usa **um degrau**, não doze tamanhos. O painel executivo é o exemplo: ele pode
+  encher a tela de números de 30px sem violar nada, porque o 30 é um degrau
+  declarado e **a escala é a hierarquia**.
+
+  O que a regra existe para impedir é outra coisa: **tela que parece cartaz** —
+  aquela que usa cinco ou seis alturas de texto diferentes tentando criar
+  hierarquia com tamanho, quando peso e cor já fazem esse trabalho. Contar valor
+  em vez de degrau puniria a repetição (que é boa: repetir o mesmo degrau é o que
+  torna a tela legível) e deixaria passar a mistura (que é o defeito).
+
+- **O que a medição de 05/09 encontrou**: a escala declarava 4 degraus e o
+  sistema renderizava **92 tamanhos distintos**, com apenas 75% das ocorrências
+  caindo nos degraus e **88% das declarações de CSS escrevendo o valor cru** em
+  vez do token. **213 ocorrências abaixo do piso de 12px**, em 21 tamanhos — a
+  menor com 9px, e o cabeçalho da lista de Solicitações a 11px (10px em
+  notebook).
+
+- **Onde a desordem mora**: quatro folhas de CSS concentram 545 das 591 mudanças
+  necessárias. O JSX está disciplinado — 96,6% das classes de texto usam os
+  degraus autorizados. **A poluição é do CSS, e o verificador nunca olhou lá.**
+
+- **O contraexemplo dentro de casa**: `componentes-padrao.css` tem 28
+  declarações de tamanho, 28 tokens e **três** tamanhos. É a prova de que a
+  escala funciona quando é consultada.
+
+- **O portão faz parte da regra.** Sem o verificador conferindo CSS, e não só
+  JSX, os 92 voltam em três meses. Regra sem portão é intenção.
+
 ## Exceção registrada precisa PROVAR que cobre algo (04/09)
 
 Não é regra nova de layout: é regra do **mecanismo de exceção** das regras
