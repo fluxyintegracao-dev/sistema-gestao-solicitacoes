@@ -57,22 +57,26 @@ function getOptionPayload(config) {
   };
 }
 
-function CategoriaChecklist({ title, description, categorias, selectedIds, onChange }) {
+function CategoriaChecklist({ title, description, categorias, selectedIds, onChange, variante = 'neutro' }) {
   const selected = new Set((selectedIds || []).map(Number));
   const allIds = (categorias || []).map((categoria) => Number(categoria.id)).filter(Number.isFinite);
 
   return (
-    <section className="sol-surface-card rounded-2xl p-4">
-      <div className="sol-filtros-head">
-        <div>
-          <p className="sol-filtros-title">{title}</p>
-          <p className="sol-filtros-subtitle">{description}</p>
-        </div>
-        <span className="sol-filtros-meta">{selected.size} selecionada(s)</span>
-      </div>
-
+    // B1: era `section.sol-surface-card` com `sol-filtros-head/-title/
+    // -subtitle/-meta` — o cartão antigo das telas de solicitação. A migração
+    // de ontem trocou o cabeçalho e a página pelos componentes padrão e
+    // DEIXOU os cartões do corpo como estavam. Agora é `BlocoConteudo`: o
+    // título vai no degrau de bloco (18px), o apoio na prop `descricao` e a
+    // contagem na prop `contagem` (R5) — que é o mesmo "N selecionada(s)"
+    // que o `sol-filtros-meta` mostrava.
+    <BlocoConteudo
+      titulo={title}
+      descricao={description}
+      contagem={`${selected.size} selecionada(s)`}
+      variante={variante}
+    >
       {(categorias || []).length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
           <button type="button" className="btn btn-outline btn-sm" onClick={() => onChange(allIds)}>
             Marcar todos
           </button>
@@ -82,7 +86,7 @@ function CategoriaChecklist({ title, description, categorias, selectedIds, onCha
         </div>
       )}
 
-      <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {(categorias || []).map((categoria) => (
           <label
             key={categoria.id}
@@ -103,9 +107,9 @@ function CategoriaChecklist({ title, description, categorias, selectedIds, onCha
       </div>
 
       {(categorias || []).length === 0 && (
-        <div className="app-empty-card mt-4">Nenhuma categoria financeira compativel encontrada.</div>
+        <div className="app-empty-card">Nenhuma categoria financeira compativel encontrada.</div>
       )}
-    </section>
+    </BlocoConteudo>
   );
 }
 
@@ -113,36 +117,30 @@ function CategoriaSelect({ title, description, categorias, value, onChange }) {
   const selected = Number(value || 0);
 
   return (
-    <section className="sol-surface-card rounded-2xl p-4">
-      <div className="sol-filtros-head">
-        <div>
-          <p className="sol-filtros-title">{title}</p>
-          <p className="sol-filtros-subtitle">{description}</p>
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <label className="sol-filter-field">
-          <span className="sol-filter-label">Categoria financeira</span>
-          <select
-            className="input w-full"
-            value={selected ? String(selected) : ''}
-            onChange={(event) => onChange(event.target.value ? Number(event.target.value) : '')}
-          >
-            <option value="">Selecione uma categoria para comissão</option>
-            {(categorias || []).map((categoria) => (
-              <option key={categoria.id} value={Number(categoria.id)}>
-                {categoria.nome}{categoria.tipo ? ` - ${categoria.tipo}` : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+    // B1: mesmo caso do CategoriaChecklist — cartão legado virou bloco padrão.
+    <BlocoConteudo titulo={title} descricao={description}>
+      {/* R12: seletor de CONTEXTO/formulário (qual categoria recebe a
+          comissão), não filtro de lista — continua sendo select. */}
+      <label className="sol-filter-field">
+        <span className="sol-filter-label">Categoria financeira</span>
+        <select
+          className="input w-full"
+          value={selected ? String(selected) : ''}
+          onChange={(event) => onChange(event.target.value ? Number(event.target.value) : '')}
+        >
+          <option value="">Selecione uma categoria para comissão</option>
+          {(categorias || []).map((categoria) => (
+            <option key={categoria.id} value={Number(categoria.id)}>
+              {categoria.nome}{categoria.tipo ? ` - ${categoria.tipo}` : ''}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {(categorias || []).length === 0 && (
         <div className="app-empty-card mt-4">Nenhuma categoria financeira compatível encontrada.</div>
       )}
-    </section>
+    </BlocoConteudo>
   );
 }
 
@@ -217,17 +215,12 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
   }
 
   return (
-    <section className="sol-surface-card rounded-2xl p-4">
-      <div className="sol-filtros-head">
-        <div>
-          <p className="sol-filtros-title">{title}</p>
-          <p className="sol-filtros-subtitle">{description}</p>
-        </div>
-        <span className="sol-filtros-meta">{ativos} ativa(s)</span>
-      </div>
-
+    // B1: mesmo caso das duas de cima — o cartão legado (`sol-surface-card`)
+    // não é bloco para o harness nem para o sistema. Vira `BlocoConteudo`, e
+    // o "N ativa(s)" do `sol-filtros-meta` vira a prop `contagem` (R5).
+    <BlocoConteudo titulo={title} descricao={description} contagem={`${ativos} ativa(s)`}>
       {(itens || []).length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
           <button type="button" className="btn btn-outline btn-sm" onClick={() => markAll(true)}>
             Marcar todos
           </button>
@@ -237,7 +230,7 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
         </div>
       )}
 
-      <div className="mt-4 space-y-3">
+      <div className="space-y-3">
         {(itens || []).map((item, index) => (
           <div
             key={`${groupKey}-${index}`}
@@ -320,7 +313,7 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
       {/* Cada bloco tem a sua confirmacao; o OverlayModal sai por portal, e so
           uma fica aberta por vez porque so um botao e clicado por vez. */}
       {elementoConfirmacao}
-    </section>
+    </BlocoConteudo>
   );
 }
 
@@ -435,23 +428,27 @@ export default function ConfiguracoesComercialCategorias() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <section className="sol-surface-card rounded-2xl p-4">
-        <div className="sol-filtros-head">
-          <div>
-            <p className="sol-filtros-title">Origem das configuracoes</p>
-            <p className="sol-filtros-subtitle">
-              Cadastre e mantenha as categorias no Financeiro. Aqui o Comercial escolhe quais categorias e quais opcoes aparecem no contrato.
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* B5/B1: o texto de contexto continua com superfície própria — só que
+          agora a superfície é a do sistema. `secundario` porque ele recua:
+          explica de onde vêm os dados, não é o trabalho da tela. */}
+      <BlocoConteudo
+        titulo="Origem das configuracoes"
+        descricao="Cadastre e mantenha as categorias no Financeiro. Aqui o Comercial escolhe quais categorias e quais opcoes aparecem no contrato."
+        variante="secundario"
+      />
 
+      {/* B2: ESTE é o bloco principal da tela carregada — é ele que responde
+          a pergunta que traz alguém aqui ("quais categorias aparecem no
+          contrato de venda?"). O ramo de carregamento já marcava um primário;
+          o ramo carregado ficou sem nenhum quando os cartões legados não
+          eram blocos. UM por tela: os demais seguem neutros/secundários. */}
       <CategoriaChecklist
         title="Contrato de venda"
         description="Categorias de contas a receber exibidas no campo Categoria financeira."
         categorias={config.categorias_contrato || []}
         selectedIds={config.contrato_venda_categoria_ids || []}
         onChange={(ids) => setConfig((current) => ({ ...current, contrato_venda_categoria_ids: ids }))}
+        variante="primario"
       />
 
       <CategoriaSelect

@@ -722,9 +722,28 @@ export default function PermissoesAreas() {
               `input input-sm w-full` cru saiu: `.app-busca` é classe de
               LARGURA, não de papel, e o papel de "caixa de busca" é do
               componente. A contagem da lista é apoio DESTE bloco. */}
+          {/*
+            B2 (medido no preview): a tela abria com ZERO bloco primário. O
+            único `variante="primario"` desta tela é o bloco do usuário
+            selecionado, e ele mora dentro do ramo `usuarioSelecionado` — que
+            só existe DEPOIS de alguém clicar num nome. `usuarioSelecionadoId`
+            nasce `null` e a tela não escolhe ninguém sozinha (nem deve: qual
+            usuário editar é decisão de quem abriu a tela).
+
+            Então o conserto não é inventar uma seleção: é decidir qual bloco
+            é o principal NO ESTADO EM QUE A TELA ABRE. Sem usuário escolhido,
+            o trabalho da tela é escolher um — a lista de usuários é o bloco
+            que responde a pergunta do momento, e é ela que recebe a barra de
+            cor. Assim que a escolha acontece, o principal passa a ser o bloco
+            do usuário e este volta a neutro: continua UM primário por tela
+            (B2) nos dois estados, e a barra de cor sempre aponta para onde o
+            trabalho está agora.
+          */}
           <BlocoConteudo
             titulo="Usuarios"
             contagem={`${usuariosFiltrados.length} usuario(s)`}
+            variante={usuarioSelecionado ? 'neutro' : 'primario'}
+            cor="var(--c-primary)"
             className="self-start lg:col-span-1 lg:sticky lg:top-4"
           >
             <BarraFiltros

@@ -827,3 +827,43 @@ existem no código, nas linhas que a regra cita.
 >   são dois papéis, e ficam os dois.
 
 A pergunta é sobre o trabalho da pessoa, não sobre o número na tela.
+
+## QUANDO C2 E B3 APONTAM PARA LADOS OPOSTOS (05/09)
+
+Decisão do responsável, tomada sobre um caso concreto — a
+`ConfiguracoesVisibilidadeUi`, cuja faixa não trazia contagem porque três
+cartões de resumo já mostravam os números.
+
+As duas regras estavam certas, e brigavam:
+
+- **C2** exige a contagem na faixa fixa.
+- **B3** proíbe a mesma informação duas vezes na tela.
+
+### O critério
+
+> **A faixa fica com o TOTAL. Os blocos ficam com os RECORTES.**
+
+O motivo é o mesmo que dá o desempate em qualquer tela: **a faixa acompanha
+a pessoa ao rolar**, e é onde o número precisa estar na hora de decidir. O
+bloco fica para trás; a faixa não.
+
+### O teste, para não voltar a cada tela
+
+Total repetido é B3. Total ausente da faixa é C2. **A distinção é o que cada
+número RESPONDE, não onde ele está:**
+
+| Onde | Responde | Exemplo |
+|---|---|---|
+| faixa | *quanto existe no total* | "128 componentes" |
+| bloco | *quanto existe NESTE recorte* | "12 ocultos", "3 só para admin" |
+
+Dois números iguais em lugares diferentes é duplicação. Dois números
+**diferentes**, cada um respondendo a sua pergunta, é informação — e cai na
+distinção já registrada na B3: o mesmo dado com papéis diferentes não é
+duplicação.
+
+### O que isso implica na prática
+
+Cartão de resumo que mostra o mesmo total da faixa **muda de conteúdo**, não
+some: passa a mostrar o recorte que só ele sabe. Se um cartão não tem recorte
+próprio para mostrar, aí sim ele era duplicata e sai.

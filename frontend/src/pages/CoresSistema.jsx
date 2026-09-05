@@ -251,14 +251,46 @@ function ColorField({ label, path, value, fallback, onChange }) {
           aria-label={fieldLabel}
           title={fieldLabel}
         />
-        <input
-          type="color"
-          value={safeValue}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-8 w-12 shrink-0 cursor-pointer rounded-lg border border-[var(--c-border)] bg-transparent p-1"
-          aria-label={`Selecionar cor de ${fieldLabel}`}
-          title={`Selecionar cor de ${fieldLabel}`}
-        />
+        {/*
+          X3 (medido no preview, 390px): o seletor de cor ia até 435px numa
+          janela de 390 e o transbordo era RECORTADO por `overflow-x: clip` —
+          o campo sumia SEM deixar rolagem, e ninguém chegava nele.
+
+          A causa NÃO é a grade da seção (em 390px ela já é de uma coluna só,
+          e nenhum ancestral estourava — por isso o harness não nomeou
+          ancestral nenhum na cadeia). A causa é de ESPECIFICIDADE: o
+          `index.css` declara
+
+            .layout-shell input:where(:not([type="checkbox"])…) { width: 100% }
+
+          com especificidade (0,1,1), que VENCE o `.w-12` do Tailwind (0,1,0)
+          — as utilitárias entram no topo do arquivo, em `@tailwind
+          utilities`, e tudo que vem depois com peso igual ou maior ganha.
+          Com `width: 100%` o campo passava a valer a linha inteira e, como
+          ele tinha `shrink-0`, não podia encolher: os 48px do seletor eram
+          empurrados para fora do bloco.
+
+          A prova de que é isto: as telas irmãs que usam o MESMO `w-12 h-8`
+          (`ConfiguracoesStatusPedidoCompra`, `ConfiguracoesContratoAlertasEFormas`)
+          passam no X3 — o seletor delas não tem `shrink-0` e encolhe.
+
+          Conserto sem medida à mão (R10) e sem `overflow-x: auto`: a medida
+          sai do input e vai para um invólucro `w-12` — degrau da escala, e
+          `span` não é alcançado pela regra do sistema. O `width: 100%`
+          herdado passa a resolver DENTRO dele: 48px, e não a linha inteira.
+          A linha volta a caber (32 + 12 + campo + 12 + 48) e o campo de
+          texto, com `flex-1 min-w-0`, absorve a sobra.
+        */}
+        <span className="block w-12 shrink-0">
+          <input
+            type="color"
+            value={safeValue}
+            onChange={(event) => onChange(event.target.value)}
+            className="h-8 w-full cursor-pointer rounded-lg border border-[var(--c-border)] bg-transparent p-1"
+            aria-label={`Selecionar cor de ${fieldLabel}`}
+            title={`Selecionar cor de ${fieldLabel}`}
+          />
+        </span>
       </span>
     </label>
   );
