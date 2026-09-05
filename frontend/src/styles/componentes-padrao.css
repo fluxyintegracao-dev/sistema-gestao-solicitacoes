@@ -18,6 +18,47 @@
   --respiro-topbar: 24px;      /* R4: vão mínimo barra fixa → conteúdo */
   --alvo-clique: 32px;         /* R2: alvo mínimo desktop */
   --campo-moeda-min: 180px;    /* R6: cabe R$ 9.999.999.999,99 */
+  /*
+    PISO E TETO DO CAMPO DE FILTRO, POR TIPO DE DADO (05/09).
+
+    Medido no fonte: 31 telas declaram `campos` na BarraFiltros — 4 com UM
+    campo e 20 com DOIS. Sem `flex` no `.app-filtros-campo` cada campo ficava
+    na largura intrínseca do `<input>` e a sobra da faixa ficava vazia; numa
+    faixa de 1843px, dois campos de data ocupavam ~300px e deixavam ~1540px
+    de vazio à direita.
+
+    A medida vem do TIPO, como já vem na TabelaPadrao (TIPOS_COLUNA): pior
+    caso do DADO no corpo de 14px, mais a casca do input — 2×--esp-2 de
+    padding + 2×1px de borda = 18px — mais o widget nativo do tipo.
+    A estimativa de texto é a mesma da TabelaPadrao (deliberada, e errando
+    para MAIS: sobra, não corta).
+
+      data   "22/08/2026" = 8 dígitos ×8,4 + 2 barras ×4,5 ≈ 76px
+             + 18 de casca + 24 do seletor de calendário  = 118 → piso 120px
+      mês    "mm/aaaa" (pt-BR, <html lang="pt-BR">) ≈ 55px
+             + 18 + 24                                    =  97 → piso 112px
+      número o pior caso é dinheiro sem prefixo, e o piso é o da R6: o mesmo
+             --campo-moeda-min, porque "Valor mínimo/máximo" (Solicitações e
+             Fiscal) É campo de dinheiro e a auditoria runtime reprova <180px
+      texto  pior caso de texto livre da casa: 180px, o mesmo da coluna
+             `texto` da TabelaPadrao (CNPJ formatado, 18 caracteres ≈ 144px
+             + 18 de casca, cabe)
+
+    TETO — decisão registrada: R10 diz que vence a LEITURA, não a densidade.
+    Campo de data esticado a 900px não lê melhor, mente sobre o tamanho do
+    dado e afasta o seletor do dígito. Então o campo cresce até o teto do
+    tipo e o que sobrar da faixa fica vazio de propósito. O teto de texto é
+    o MESMO da `.app-busca` (R3, 480px), que é o teto de conforto que a casa
+    já declarou para campo de texto.
+  */
+  --campo-filtro-texto-min: 180px;
+  --campo-filtro-texto-max: 480px;   /* R3: o mesmo teto da .app-busca */
+  --campo-filtro-data-min: 120px;
+  --campo-filtro-data-max: 240px;
+  --campo-filtro-mes-min: 112px;
+  --campo-filtro-mes-max: 240px;
+  --campo-filtro-numero-min: var(--campo-moeda-min);   /* R6 */
+  --campo-filtro-numero-max: 280px;
 }
 
 /* R2 — alvo de clique: imposto na classe; sair disso exige burlar o sistema. */
@@ -169,6 +210,33 @@
 /* R5 — texto de apoio DENTRO do bloco, ancorado ao título dele (regra do
    cliente, 02/09): contagem forte + apoio muted. Texto solto na faixa entre
    a topbar e o primeiro bloco é reprovado pela auditoria. */
+/*
+  NÃO ALINHADO AO IRMÃO EM 05/09 — E POR QUÊ (registro, não esquecimento).
+
+  Defeito medido: o `max-width: 78ch` abaixo corta em 607px num bloco de
+  1843px, e o texto pede 647px — quebra por 40px e deixa 1236px vazios. Dos
+  427 usos de apoio de bloco (`contagem`/`descricao` do BlocoConteudo, em 144
+  arquivos), 57 já quebram assim em 1920px.
+
+  O irmão `.app-page-lead` resolve isso com UMA linha + reticências + tooltip,
+  e o tooltip é a metade que torna a truncagem honesta: o PageHeader passa
+  `title={textoApoio}`, então o texto inteiro continua alcançável.
+
+  Aqui essa metade NÃO EXISTE, e ela não é escrevível em CSS:
+    - `BlocoConteudo.jsx` renderiza o `<p className="app-bloco-lead">` SEM
+      `title` — falta uma linha de JSX, e aquele arquivo é de outro agente
+      nesta rodada;
+    - e o alcance é maior que ele: 10 `<p className="app-bloco-lead">` são
+      escritos à mão fora do componente (DefinirSenha, RecuperarSenha,
+      RhDpJornada, RhDpPessoal, RhDpPessoalSolicitacoes, SolicitacaoDetalhe,
+      NovaSolicitacaoCompra) e nenhum tem `title`. Um deles é o PASSWORD_HINT
+      — a regra da senha. Truncar a regra da senha em uma linha, sem tooltip,
+      é apagar a informação, não arrumar a largura.
+
+  Pôr só o `white-space: nowrap` daqui REMOVERIA capacidade em 11 lugares.
+  Então fica como está até o `title` existir no JSX; o conserto é de dois
+  arquivos, não de um.
+*/
 .app-bloco-lead {
   margin: var(--esp-1) 0 0;
   font-size: var(--fonte-corpo);
@@ -1010,10 +1078,40 @@ fieldset.form-section {
   próprio bloco; o form não pode ter uma segunda casca por cima.
 
   Especificidade (0,3,1) para vencer a regra do sistema (0,2,1) por peso, e
-  não por ordem de importação. O `:has(> .form-section)` mantém isto uma regra
-  da FormSecao: form que não usa o componente segue como estava.
+  não por ordem de importação.
+
+  ------------------------------------------------------------------------
+  O ESCAPE DEIXA DE EXIGIR A FormSecao (05/09).
+
+  A versão de 02/09 fechou a regra em `:has(> .form-section)` — "regra da
+  FormSecao" — e com isso consertou só metade. Medido no fonte hoje: 124
+  `<form>` no frontend, 66 dentro de um `BlocoConteudo`; desses, 46 abrem com
+  FormSecao e escapavam, e 20 abrem com `div` comum e CONTINUAVAM capados em
+  940px, em 15 telas. É o mesmo defeito, e a única diferença é qual tag o
+  formulário usa por dentro — o que não muda nada para quem olha a tela.
+  Medido na consulta de títulos: o form começa em x=490 com 940px dentro de
+  um bloco de 1843px — 903px não usados, 451px de recuo de cada lado.
+
+  A regra passa a ser a que já estava escrita na primeira linha desta nota:
+  DENTRO DE UM BLOCO, QUEM LIMITA A MEDIDA É O BLOCO.
+
+  O RISCO, avaliado antes de largar (o teto existe por conforto de leitura,
+  não por capricho): o que segura o campo depois que o form solta é a GRADE
+  DE COLUNAS. Conferi os 20 formulários que a mudança liberta, um a um:
+    - 16 declaram grade de colunas (`form-grid`, `grid-cols-2`, `grid-cols-12`
+      com spans de 2 a 6) — num bloco de 1806px, um span de 2 em 12 dá ~290px;
+    -  3 não têm grade, mas prendem o campo em `max-w-*` (`max-w-md` = 448px);
+    -  1 (UploadComprovantes) não tem nem grade nem `max-w`, e o único campo
+      dele é `type="file"` dentro de um botão — não há texto para esticar.
+  Nenhum campo de texto fica sem segurador, então a regra não precisa ser
+  apertada. Se algum dia entrar um form de bloco com campo de texto solto em
+  coluna única, o conserto é dar grade a ELE — não devolver o teto a todos.
+
+  A especificidade (0,3,1) fica, agora pelo `.solicitacoes-page` da frente:
+  é a mesma classe da regra do sistema, e explicita que o escape vale
+  DENTRO da página que carrega o teto.
 */
-.app-bloco .app-bloco-corpo form:has(> .form-section) {
+.solicitacoes-page .app-bloco .app-bloco-corpo form {
   width: 100%;
   max-width: 100%;
   margin-inline: 0;
@@ -1281,9 +1379,42 @@ fieldset.form-section {
   align-items: end;
 }
 
+/*
+  OS CAMPOS DIVIDEM A FAIXA (05/09) — ver os tokens --campo-filtro-* no topo.
+
+  O campo não tinha `flex`, então não crescia: ficava na largura intrínseca do
+  `<input>` e a sobra da faixa ficava vazia. Alcance medido no fonte: 31 telas
+  declaram `campos`, e 24 delas declaram UM ou DOIS — as que mais deixavam
+  faixa vazia à direita.
+
+  O `flex-basis` é o piso do tipo, então todos partem do pior caso do próprio
+  dado e crescem juntos até o teto do tipo. O tipo chega por `data-tipo`, que
+  a BarraFiltros emite a partir do `campo.tipo` que a tela JÁ declarava e o
+  CSS ignorava (a tela não escreve medida — R10/R1: declara o que o campo É).
+*/
 .app-filtros .app-filtros-campo {
   display: grid;
   gap: var(--esp-1);
+  --campo-filtro-min: var(--campo-filtro-texto-min);
+  --campo-filtro-max: var(--campo-filtro-texto-max);
+  flex: 1 1 var(--campo-filtro-min);
+  min-width: var(--campo-filtro-min);
+  max-width: var(--campo-filtro-max);
+}
+
+.app-filtros .app-filtros-campo[data-tipo="date"] {
+  --campo-filtro-min: var(--campo-filtro-data-min);
+  --campo-filtro-max: var(--campo-filtro-data-max);
+}
+
+.app-filtros .app-filtros-campo[data-tipo="month"] {
+  --campo-filtro-min: var(--campo-filtro-mes-min);
+  --campo-filtro-max: var(--campo-filtro-mes-max);
+}
+
+.app-filtros .app-filtros-campo[data-tipo="number"] {
+  --campo-filtro-min: var(--campo-filtro-numero-min);
+  --campo-filtro-max: var(--campo-filtro-numero-max);
 }
 
 .app-filtros .app-filtros-campo-rotulo {
@@ -1294,7 +1425,13 @@ fieldset.form-section {
 
 /* Mesma altura e tratamento dos demais controles da faixa — alvo de clique
    nunca abaixo de 32px (M-alvo). */
+/* O `<label>` passou a crescer (acima); sem largura própria o `<input>` ficava
+   parado na largura intrínseca dentro de um rótulo largo — o vazio só mudava
+   de lugar. `min-width: 0` porque input tem largura intrínseca de `size` e
+   ela impediria o campo de encolher até o piso do tipo em faixa estreita. */
 .app-filtros .app-filtros-campo input {
+  width: 100%;
+  min-width: 0;
   min-height: 32px;
   padding-inline: var(--esp-2);
   font-size: var(--fonte-corpo);

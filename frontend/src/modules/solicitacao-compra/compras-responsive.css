@@ -103,10 +103,41 @@
   o menu aberto. Faixa fixa que funciona vale mais que rearranjo que dispara
   no pixel exato: C1 e X2 sao itens da definicao de pronto, o rearranjo nao.
 */
+/*
+  O TETO DE 94rem SAI DAQUI (05/09) — ele era do CONTAINER, e o container
+  ja foi embora.
+
+  O que o teto custava, medido: 94rem = 1504px. Numa janela de 1920px o
+  conteudo tem 1877px uteis, entao o teto devolvia 373px ao vazio, 186px de
+  cada lado (o `margin-inline: auto` centra). E valia para as 31 rotas do
+  modulo (contadas em App.jsx pelos 13 prefixos de COMPRAS_RESPONSIVE_ROUTES
+  no Layout.jsx), enquanto as outras 174 rotas do sistema usam a largura
+  toda. So mordia acima de ~1548px de janela: por isso o cliente ve em
+  monitor largo e nao ve no notebook.
+
+  TINHA RAZAO DE SER? Tinha, e ela acabou. O teto nasceu em 19/08 na MESMA
+  declaracao que o `container: compras-page / inline-size` (um commit so):
+  ele limitava a caixa que as consultas de container do modulo mediam. Em
+  05/09 o container foi removido daqui mesmo — matava o `position: sticky`
+  da faixa fixa (a nota logo acima) — e as consultas viraram de VIEWPORT, no
+  mesmo limiar de 68rem. Consulta de viewport nao le a largura da pagina:
+  o companheiro do teto foi embora e o teto ficou sozinho, capando 31 rotas
+  por inercia.
+
+  O QUE SOBREVIVE, porque tem contexto: as duas paginas de DIGITACAO do
+  modulo continuam com teto — o declarado POR CONTEXTO em index.css
+  (`.page-compra-nova` em 1380px, 1480px acima de 1536px de janela, e
+  `.cotacao-gestao-page` em 1640px). Essas tres declaracoes ja estavam
+  escritas e nao pegavam: perdiam desta por ordem de importacao, com a mesma
+  especificidade (0,2,0). Escopo apertado, nao teto apagado.
+
+  As outras 29 rotas do modulo — listagens, detalhes e os 12 relatorios — nao
+  sao digitacao: leem tabela larga, e ali largura e informacao. Passam a usar
+  a faixa inteira, como as 174 rotas do resto do sistema ja usam.
+*/
 .compras-responsive-scope .page {
   width: 100%;
   min-width: 0;
-  max-width: 94rem;
   margin-inline: auto;
   gap: 0.9rem;
 }
@@ -444,12 +475,23 @@
   overflow-wrap: anywhere;
 }
 
+/*
+  A SEGUNDA COPIA DO MESMO TETO (05/09) — nasceu no mesmo commit de 19/08 e
+  pelo mesmo motivo (o container). Deixa-la aqui manteria as tres paginas
+  listadas abaixo capadas em 1504px e manteria MORTAS as tres declaracoes de
+  index.css que dizem o teto por contexto (1380px; 1480px acima de 1536px;
+  1640px na gestao de cotacao): elas tem a mesma especificidade (0,2,0) e
+  perdem por ordem de importacao, porque esta folha entra depois de
+  index.css no main.jsx. Tirando o teto daqui, a declaracao por contexto
+  volta a valer — que e onde ela devia estar. A `.compra-detalhe-page` nao
+  tem contraparte em index.css e nao e digitacao: e tela de LEITURA, e passa
+  a usar a faixa inteira como as demais telas de leitura do sistema.
+*/
 .compras-responsive-scope .cotacao-gestao-page,
 .compras-responsive-scope .compra-detalhe-page,
 .compras-responsive-scope .page-compra-nova {
   width: 100%;
   min-width: 0;
-  max-width: 94rem;
   overflow-x: clip;
 }
 

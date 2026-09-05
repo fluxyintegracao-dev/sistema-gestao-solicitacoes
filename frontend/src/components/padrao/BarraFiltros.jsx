@@ -102,8 +102,21 @@ export default function BarraFiltros({
               padroniza: ele apaga. Quem migra fica entre perder a capacidade
               ou não usar o padrão, e as duas saídas são ruins.
           */}
+          {/*
+              `data-tipo` (05/09) — a MEDIDA do campo vem do TIPO, e o tipo
+              já estava aqui.
+
+              `campo.tipo` chegava do JSX, virava o `type` do input e parava
+              aí: o CSS não tinha como saber se aquele campo era uma data de
+              10 caracteres ou um nome livre, então todos ficavam na largura
+              intrínseca do input e a faixa sobrava vazia (medido: 24 das 31
+              telas com `campos` declaram um ou dois). Emitindo o tipo no
+              `<label>`, o piso e o teto saem dos tokens --campo-filtro-*,
+              como a largura de coluna sai do `tipo` na TabelaPadrao — a tela
+              declara o que o campo É, nunca quanto ele mede (R10).
+          */}
           {campos.map((campo) => (
-            <label key={campo.id} className="app-filtros-campo">
+            <label key={campo.id} className="app-filtros-campo" data-tipo={campo.tipo || 'text'}>
               <span className="app-filtros-campo-rotulo">{campo.rotulo}</span>
               <input
                 type={campo.tipo || 'text'}

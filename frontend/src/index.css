@@ -4060,12 +4060,40 @@ a:hover {
   }
 }
 
+/*
+  O TETO DA PAGINA DE DIGITACAO DE COMPRAS VOLTA A VALER (05/09).
+
+  Estas declaracoes existiam e NAO PEGAVAM: `.compras-responsive-scope .page`
+  e `.compras-responsive-scope .page-compra-nova` (compras-responsive.css)
+  impunham 94rem = 1504px com a MESMA especificidade (0,2,0) e ganhavam por
+  ordem de importacao — aquela folha entra depois desta no main.jsx. Ou seja:
+  o teto que valia nas 31 rotas do modulo era o generico, e o escrito por
+  contexto estava morto. As duas coisas foram consertadas juntas (a nota
+  esta la); aqui fica o que TEM contexto.
+
+  Por que estas paginas tem teto e as outras nao: sao as duas de DIGITACAO
+  do modulo. O criterio e o da R10 — vence a leitura, nao a densidade: campo
+  de texto com 1300px+ de largura e desconfortavel de ler e de preencher. As
+  paginas de LEITURA do modulo (listagens, detalhes, relatorios) nao tem
+  teto, porque ali largura e informacao.
+
+  Os numeros ficam em token para nao virar valor solto no meio da folha e
+  para que a escada (normal / janela larga / gestao de cotacao) se leia junta.
+*/
+:root {
+  /* Digitacao de compras: escada por largura de janela. */
+  --pagina-compra-digitacao-max: 1380px;
+  --pagina-compra-digitacao-max-ampla: 1480px;   /* a partir de 1536px de janela */
+  /* Gestao de cotacao compara fornecedores lado a lado: precisa de mais. */
+  --pagina-cotacao-gestao-max: 1640px;
+}
+
 .page.page-compra-nova {
-  max-width: 1380px;
+  max-width: var(--pagina-compra-digitacao-max);
 }
 
 .page.page-compra-nova.cotacao-gestao-page {
-  max-width: min(1640px, calc(100vw - 2rem));
+  max-width: min(var(--pagina-cotacao-gestao-max), calc(100vw - 2rem));
 }
 
 .cotacao-scroll-region {
@@ -4336,8 +4364,9 @@ a:hover {
 }
 
 @media (min-width: 1536px) {
+  /* Degrau largo da escada de digitacao — ver o bloco de tokens acima. */
   .page.page-compra-nova {
-    max-width: 1480px;
+    max-width: var(--pagina-compra-digitacao-max-ampla);
   }
 
   .compra-nova-layout {
