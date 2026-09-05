@@ -239,6 +239,112 @@ for (const d of dinamicas) {
   }
 }
 
+/*
+  PORTA QUE NAO ABRE (05/09) — a terceira pergunta desta varredura.
+
+  Ela media se existe CAMINHO ate a rota. Nunca perguntou se a rota, ao ser
+  aberta, mostra a tela. Sao coisas diferentes, e a diferenca custou uma
+  rodada inteira: 12 telas do SST foram migradas, entraram no manifesto, e a
+  matriz descobriu no preview que TODAS redirecionam para /sst/pgr.
+
+  O mecanismo esta no App.jsx: o componente de guarda faz
+  `if (SST_SIMPLIFIED_MODE) return <Navigate ... />` ANTES de qualquer
+  checagem de permissao, e `SST_SIMPLIFIED_MODE` e `true` por padrao (so e
+  falso quando a variavel de ambiente vale exatamente 'false', e nao ha .env
+  no repositorio). Ou seja: o redirecionamento nao depende do usuario. Ele
+  vale para todo mundo, sempre.
+
+  Guarda que redireciona por PERMISSAO e correta e nao entra aqui — a tela
+  existe, aquele usuario e que nao pode. O que esta varredura acusa e a
+  guarda que redireciona por CONSTANTE: a porta esta no menu, o link
+  funciona, e a tela nunca aparece para ninguem.
+
+  E a mesma familia da licao de 04/09 ("nao precisar de porta e nao ser
+  porta sao coisas diferentes"), agora do outro lado: ter porta e a porta
+  abrir sao coisas diferentes.
+*/
+const guardasQueRedirecionam = new Map();
+for (const m of app.matchAll(/function\s+(\w+)\s*\(\s*\{[^}]*\}\s*\)\s*\{/g)) {
+  const nome = m[1];
+  let i = m.index + m[0].length;
+  let profundidade = 1;
+  while (i < app.length && profundidade > 0) {
+    if (app[i] === '{') profundidade += 1;
+    else if (app[i] === '}') profundidade -= 1;
+    i += 1;
+  }
+  const corpo = app.slice(m.index, i);
+  if (!/<Navigate/.test(corpo)) continue;
+  for (const cond of corpo.matchAll(/if\s*\(\s*([A-Z][A-Z0-9_]{2,})\s*\)\s*\{?\s*return\s*<Navigate\s+to=\{?([^}\n]+)/g)) {
+    guardasQueRedirecionam.set(nome, { constante: cond[1], destino: cond[2].trim().replace(/[>\s]+$/, '') });
+  }
+}
+
+/*
+  SEGUNDA FORMA (05/09, na mesma hora): a guarda nao e a unica que
+  redireciona — a PROPRIA TELA tambem. A SstCrudPage faz
+  `if (!isSstResourceVisible(resource)) return <Navigate to="/sst" />`, e o
+  /sst redireciona de novo: dois saltos encadeados.
+
+  Meu detector, escrito minutos antes, conhecia UMA forma e achou 12 de 13.
+  E a pergunta permanente aplicada a mim mesmo: nao "quantos casos existem?",
+  e sim "de quantos jeitos isso e feito aqui?".
+
+  O criterio para separar redirecionamento de PERMISSAO (legitimo) do
+  redirecionamento por CONFIGURACAO (porta que nao abre) e o mesmo dos dois
+  lados: neste repositorio toda checagem de permissao recebe `user`. Condicao
+  que nao menciona `user` nao esta perguntando quem e a pessoa.
+*/
+function telaRedirecionaSozinha(arquivoRelativo) {
+  const completo = path.join(raiz, arquivoRelativo);
+  if (!fs.existsSync(completo)) return null;
+  const codigo = fs.readFileSync(completo, 'utf8');
+  /*
+    O criterio precisou de uma segunda peneira, e o falso positivo apareceu na
+    primeira corrida: o ModuleHub faz `if (!mod) return <Navigate to="/" />`.
+    Isso e 404 — id de modulo que nao existe —, nao porta fechada: o menu
+    linka `/hub/rhdp`, que tem `mod` e abre normalmente.
+
+    O que separa os dois e a ORIGEM da condicao. Porta fechada e decidida por
+    CONFIGURACAO: um helper vindo de `constants/`, que responde igual para
+    todo mundo e nao depende do que veio na URL. `!mod` e uma busca que falhou
+    para um valor que ninguem linka.
+  */
+  const deConstantes = new Set();
+  for (const imp of codigo.matchAll(/import\s*\{([^}]+)\}\s*from\s*'[^']*constants[^']*'/g)) {
+    imp[1].split(',').forEach((nome) => deConstantes.add(nome.trim().split(/\s+as\s+/).pop()));
+  }
+  if (!deConstantes.size) return null;
+  // `[^)]` nao serve: a condicao real e `!isSstResourceVisible(resource)`, com
+  // parentese aninhado. Quantificador preguicoso, que recua ate fechar certo.
+  for (const m of codigo.matchAll(/if\s*\((.{1,160}?)\)\s*\{?\s*return\s*<Navigate\s+to=\{?([^}\n]+)/g)) {
+    const condicao = m[1];
+    if (/\buser\b|\bperfil\b|\bpermiss/i.test(condicao)) continue;
+    if (![...deConstantes].some((nome) => new RegExp(`\\b${nome}\\b`).test(condicao))) continue;
+    return { condicao: condicao.trim(), destino: m[2].trim().replace(/[>\s]+$/, '') };
+  }
+  return null;
+}
+
+const portasQueNaoAbrem = [];
+for (const m of app.matchAll(/path="([^"]+)"[^\n]*/g)) {
+  if (/<Navigate/.test(m[0])) continue;
+  for (const c of m[0].matchAll(/<(\w+)/g)) {
+    const g = guardasQueRedirecionam.get(c[1]);
+    if (!g) continue;
+    portasQueNaoAbrem.push({ rota: '/' + m[1].replace(/^\//, ''), guarda: c[1], constante: g.constante, destino: g.destino });
+    break;
+  }
+}
+
+for (const r of rotas) {
+  if (portasQueNaoAbrem.some((p) => p.rota === r.rota)) continue;
+  const propria = telaRedirecionaSozinha(r.arquivo);
+  if (propria) {
+    portasQueNaoAbrem.push({ rota: r.rota, guarda: path.basename(r.arquivo, '.jsx') + ' (a propria tela)', constante: propria.condicao, destino: propria.destino });
+  }
+}
+
 const semCaminho = estaticas.filter((r) => !nivel.has(r.rota));
 const porNivel = (n) => estaticas.filter((r) => nivel.get(r.rota) === n);
 const enterradas = estaticas.filter((r) => (nivel.get(r.rota) || 0) >= 3);
@@ -250,6 +356,37 @@ console.log(`          nivel 1 (destino do menu) ......... ${porNivel(1).length}
 console.log(`          nivel 2 (dentro de um hub) ........ ${porNivel(2).length}`);
 console.log(`          nivel 3+ (enterradas) ............. ${enterradas.length}`);
 console.log(`          sem caminho (so pela URL) ......... ${semCaminho.length}`);
+console.log(`          porta que NAO ABRE (redireciona) .. ${portasQueNaoAbrem.length}`);
+
+if (portasQueNaoAbrem.length) {
+  console.log(`\n[alcance] PORTA QUE NAO ABRE — a rota existe, o link funciona, e a guarda`);
+  console.log(`          redireciona por CONSTANTE (nao por permissao): ninguem ve a tela.\n`);
+  for (const p of portasQueNaoAbrem) {
+    console.log(`  ${p.rota.padEnd(40)} ${p.guarda} -> ${p.destino}   (se ${p.constante})`);
+  }
+  console.log(`\n  Migrar uma tela dessas e trabalho que ninguem consegue abrir. Ou a`);
+  console.log(`  constante muda, ou a rota sai do menu e do manifesto — nao as duas coisas.`);
+}
+
+/*
+  TRINCO: o passivo de portas fechadas congela e SO DESCE. Porta nova que nao
+  abre reprova na hora — que e o ponto: o custo desta descoberta foi uma
+  rodada inteira migrando telas que ninguem consegue abrir, e o trinco existe
+  para isso nao se repetir enquanto o cliente decide o que fazer com as 13.
+*/
+const caminhoTrincoPortas = path.join(raiz, 'frontend', 'scripts', 'trinco-portas-fechadas.json');
+if (fs.existsSync(caminhoTrincoPortas)) {
+  const trincoPortas = JSON.parse(fs.readFileSync(caminhoTrincoPortas, 'utf8'));
+  const congeladas = new Set(trincoPortas.rotas || []);
+  const novas = portasQueNaoAbrem.filter((p) => !congeladas.has(p.rota));
+  if (novas.length) {
+    console.error(`\n[alcance] FALHA: ${novas.length} porta(s) NOVA(S) que nao abrem — ${novas.map((p) => p.rota).join(', ')}`);
+    console.error(`          O passivo congelado so desce. Rota que redireciona por configuracao nao entra reformada.`);
+    process.exitCode = 1;
+  } else if (portasQueNaoAbrem.length < congeladas.size) {
+    console.log(`[alcance] AVISO: o passivo de portas fechadas caiu de ${congeladas.size} para ${portasQueNaoAbrem.length} — atualize scripts/trinco-portas-fechadas.json`);
+  }
+}
 
 if (semCaminho.length) {
   console.log(`\n[alcance] SO PELA URL — nenhum caminho a partir do menu:\n`);

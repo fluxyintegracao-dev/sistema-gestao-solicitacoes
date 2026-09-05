@@ -977,7 +977,7 @@ function escreverSaidas(resultados, meta) {
   linhas.push('');
   linhas.push('> **GERADA AUTOMATICAMENTE** pelo harness `frontend/scripts/qa-preview/verificar.mjs`');
   linhas.push('> contra o PREVIEW PUBLICADO. Nunca editar à mão — só verificação na tela real');
-  linhas.push('> altera célula. Legenda: ✅ PASSOU · ❌ FALHOU · ⚠ SEM DADO (a tela tem a');
+  linhas.push('> altera célula. Legenda: ✅ PASSOU · ❌ FALHOU · 🚫 NAO ABRIU · ⚠ SEM DADO (a tela tem a');
   linhas.push('> capacidade, a base do preview não deu registro para exercitá-la — NÃO PROVADA)');
   linhas.push('> · — N/A (a regra não se aplica; motivo registrado).');
   linhas.push('');
@@ -985,6 +985,16 @@ function escreverSaidas(resultados, meta) {
   linhas.push(`- Telas verificadas: ${resultados.length} · Itens: ${ITENS_DOD.join(', ')}`);
   const totalFalhas = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'FALHOU').length, 0);
   const totalSemDado = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'SEM DADO').length, 0);
+  /*
+    A tela que não abriu vem ANTES do resto: é o pior estado possível, porque
+    nada nela foi medido. Escondê-la num rodapé seria o mesmo erro de contar
+    34 falhas por uma.
+  */
+  const naoAbriram = resultados.filter((r) => Object.values(r.itens).some((i) => i.estado === 'NAO ABRIU'));
+  if (naoAbriram.length) {
+    linhas.push(`- **TELAS QUE NÃO ABRIRAM: ${naoAbriram.length}** — nada nelas foi medido, e rodada com tela que não abre NÃO fecha:`);
+    naoAbriram.forEach((r) => linhas.push(`  - \`${r.id}\` — ${r.erro}`));
+  }
   linhas.push(`- **Células FALHOU: ${totalFalhas}**${totalFalhas === 0 ? '' : ' (justificativas abaixo)'}`);
   /*
     SEM DADO ao lado do FALHOU, e não escondido no rodapé: uma matriz sem
@@ -1002,6 +1012,7 @@ function escreverSaidas(resultados, meta) {
       if (!c) return '·';
       if (c.estado === 'PASSOU') return '✅';
       if (c.estado === 'FALHOU') return '❌';
+      if (c.estado === 'NAO ABRIU') return '🚫';
       if (c.estado === 'SEM DADO') return '⚠';
       return '—';
     });
@@ -1513,8 +1524,32 @@ async function main() {
           console.error(`[qa-preview]   ✖ ${tela.id}: ${resultado.erro}`);
           throw new Error(`BLOQUEIO: o navegador morreu durante a varredura (na tela "${tela.id}"). A corrida foi abortada e a matriz NÃO foi regravada — o que estava no disco continua valendo. Rode de novo.`);
         }
-        ITENS_DOD.forEach((item) => {
-          if (!resultado.itens[item]) resultado.itens[item] = { estado: 'FALHOU', motivo: `tela não verificada: ${resultado.erro}` };
+        /*
+          TELA QUE NÃO ABRE TEM **UM** DEFEITO, NÃO TRINTA E QUATRO (05/09).
+
+          O comentário acima está certo: redirect é defeito da tela e é o
+          que se quer ver. Errado era a contabilidade. Escrever FALHOU nos
+          34 itens afirma 34 defeitos medidos quando existe UM — a tela não
+          abriu — e os outros 33 nunca foram medidos.
+
+          O custo apareceu inteiro nesta rodada: 12 telas do SST redirecionam
+          para /sst/pgr e produziram **408 células vermelhas**, que enterraram
+          os 20 defeitos reais das outras telas. Matriz com 428 falhas onde há
+          20 não é rigor, é ruído — e regra que vira ruído deixa de ser lida.
+
+          Isto NÃO é afrouxar: a tela continua com FALHOU, o `NAO ABRIU`
+          aparece no topo da matriz com a lista das telas, e rodada com tela
+          que não abre não fecha. O que muda é parar de fabricar 33
+          afirmações que ninguém verificou.
+        */
+        const [PRIMEIRO, ...DEMAIS] = ITENS_DOD;
+        if (!resultado.itens[PRIMEIRO]) {
+          resultado.itens[PRIMEIRO] = { estado: 'FALHOU', motivo: `a tela NÃO ABRIU: ${resultado.erro}` };
+        }
+        DEMAIS.forEach((item) => {
+          if (!resultado.itens[item]) {
+            resultado.itens[item] = { estado: 'NAO ABRIU', motivo: 'não medido — a tela não abriu (ver o motivo na primeira coluna)' };
+          }
         });
         console.error(`[qa-preview]   ✖ ${tela.id}: ${resultado.erro}`);
       }

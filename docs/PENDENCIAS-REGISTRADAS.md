@@ -2160,3 +2160,100 @@ produto**, e é o item de maior risco de prazo do módulo inteiro.
 **Também medido**: os dez relatórios de Compras não são "parecidos", são
 COPIADOS — `buildSearchParams` com o mesmo md5 nos dez. Ali a economia de
 escala existe de verdade: a primeira custa, as nove seguintes são aplicação.
+
+---
+
+# 05/09 — O achado mais caro do dia: migrei 12 telas que ninguém consegue abrir
+
+A matriz da rodada 5 voltou com **428 células vermelhas**. Não são 428 defeitos:
+**408 são uma causa só.** As 12 telas de SST que acabei de migrar redirecionam
+todas para `/sst/pgr`.
+
+## Por que, e por que isso é pior do que parece
+
+```js
+export const SST_SIMPLIFIED_MODE = import.meta.env.VITE_SST_SIMPLIFIED_MODE !== 'false';
+```
+
+O modo simplificado é **verdadeiro por padrão** — só é falso quando a variável
+vale exatamente a string `'false'`. **Não existe arquivo `.env` no repositório**
+e a variável não aparece em nenhuma configuração.
+
+E a guarda redireciona ANTES de olhar permissão:
+
+```js
+function SstDashboardRoute({ children }) {
+  if (!canAccessSst(user)) return <Navigate to="/" replace />;
+  if (SST_SIMPLIFIED_MODE) return <Navigate to={getSstSimplifiedEntry(user)} replace />;
+  ...
+```
+
+Ou seja: **não é o usuário de QA que não pode. É todo mundo, sempre.** O
+dashboard do SST, as duas telas de observabilidade, o executivo, o mapa de
+calor, a linha do tempo, o eSocial e a configuração do módulo não abrem para
+ninguém nesta configuração.
+
+Eu gastei uma rodada migrando telas que ninguém consegue abrir. As telas estão
+corretas e o trabalho serve no dia em que o modo mudar — mas **não são PRONTO**,
+e a matriz está certa em recusá-las.
+
+## Três consertos, e o primeiro é sobre mim
+
+### 1. A varredura de alcance media a porta, não a abertura
+
+Ela responde "existe caminho do menu até esta rota?" e nunca perguntou "a rota,
+ao abrir, mostra a tela?". São coisas diferentes — e é a lição de 04/09 pelo
+outro lado: *não precisar de porta e não ser porta são coisas diferentes*;
+agora, **ter porta e a porta abrir são coisas diferentes**.
+
+Ganhou a terceira pergunta. E o critério que separa o legítimo do defeito é o
+mesmo dos dois lados: **redirecionamento por PERMISSÃO é correto** (a tela
+existe, aquele usuário é que não pode); **redirecionamento por CONFIGURAÇÃO é
+porta fechada** — vale igual para todo mundo. Neste repositório toda checagem
+de permissão recebe `user`; condição que não menciona `user` não está
+perguntando quem é a pessoa.
+
+**E o detector conhecia UMA forma.** Achou 12 de 13. A décima terceira é a
+`SstCrudPage`, que redireciona **de dentro da própria tela**
+(`if (!isSstResourceVisible(resource)) return <Navigate to="/sst" />`),
+encadeando dois saltos. Escrevi o detector e caí na minha própria armadilha
+minutos depois: a pergunta permanente não é "quantos casos existem?", é **"de
+quantos jeitos isso é feito aqui?"**.
+
+Teve ainda um falso positivo que valeu a peneira: o `ModuleHub` faz
+`if (!mod) return <Navigate to="/" />`. Isso é 404 — id de módulo que não
+existe —, não porta fechada. O que separa os dois é a ORIGEM da condição:
+porta fechada é decidida por configuração (helper vindo de `constants/`), que
+responde igual para todo mundo.
+
+Passivo congelado em `scripts/trinco-portas-fechadas.json`: **13 rotas, e o
+número só desce**. Porta nova que não abre reprova na hora.
+
+### 2. Tela que não abre tem UM defeito, não trinta e quatro
+
+O harness escrevia FALHOU nos 34 itens da DoD. O comentário dele defendia
+isso: "erro de carga é defeito da tela, e é o que se quer ver". A premissa está
+certa; a contabilidade estava errada. Existe **um** defeito — a tela não abriu
+— e 33 itens que **nunca foram medidos**. Afirmar 34 é fabricar 33.
+
+Estado novo: **`NAO ABRIU`** (🚫), com a lista das telas no **topo** da matriz,
+antes das falhas. Não é afrouxamento: a tela continua com FALHOU, e rodada com
+tela que não abre não fecha. O que muda é parar de enterrar 20 defeitos reais
+sob 408 afirmações que ninguém verificou.
+
+### 3. Eu tinha apontado o harness para um recurso escondido
+
+`/sst/colaboradores` não está entre os 9 recursos que o modo simplificado
+mostra. Não é defeito da tela — é escolha minha de rota. Trocado por
+`/sst/pgr`, que está na lista visível e exercita a MESMA tela.
+
+## A decisão que é sua
+
+**O modo simplificado deve mesmo esconder essas 12 telas?**
+
+- Se **sim**: elas saem do menu e do manifesto. Hoje o menu mostra portas que
+  não abrem, o que é pior do que não ter a porta.
+- Se **não**: a constante muda (ou entra um `.env` com
+  `VITE_SST_SIMPLIFIED_MODE=false`), e as 12 passam a valer com a matriz.
+
+Não as duas coisas. Enquanto você não decide, a rodada do SST fica **aberta**.

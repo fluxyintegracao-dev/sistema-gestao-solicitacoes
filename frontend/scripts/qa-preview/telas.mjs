@@ -1439,7 +1439,10 @@ export const TELAS = [
   {
     id: 'sst-crud',
     arquivo: 'src/modules/sst/pages/SstCrudPage.jsx',
-    rota: '/sst/colaboradores',
+    // /sst/colaboradores e escondido pelo modo simplificado — eu tinha apontado
+    // o harness para um recurso que a configuracao nao mostra. /sst/pgr esta na
+    // lista visivel e exercita a MESMA tela (SstCrudPage e uma so, por recurso).
+    rota: '/sst/pgr',
     tipo: 'listagem'
   },
   {
