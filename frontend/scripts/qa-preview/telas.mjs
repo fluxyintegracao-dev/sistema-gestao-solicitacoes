@@ -1374,78 +1374,67 @@ export const TELAS = [
     id: 'sst-dashboard',
     arquivo: 'src/modules/sst/pages/SstDashboard.jsx',
     rota: '/sst',
-    tipo: 'painel',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'painel'
   },
   {
     id: 'sst-rel-operacional',
     arquivo: 'src/modules/sst/pages/SstRelatorioOperacional.jsx',
     rota: '/sst/relatorios/operacional',
-    tipo: 'painel',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'painel'
   },
   {
     id: 'sst-executivo',
     arquivo: 'src/modules/sst/pages/SstExecutivo.jsx',
     rota: '/sst/relatorios/executivo',
-    tipo: 'painel',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'painel'
   },
   {
     id: 'sst-centro-operacional',
     arquivo: 'src/modules/sst/pages/SstCentroOperacional.jsx',
     rota: '/sst/relatorios/centro-operacional',
-    tipo: 'painel',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'painel'
   },
   {
     id: 'sst-heatmap',
     arquivo: 'src/modules/sst/pages/SstHeatmap.jsx',
     rota: '/sst/relatorios/heatmap',
-    tipo: 'painel',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'painel'
   },
   {
     id: 'sst-observabilidade',
     arquivo: 'src/modules/sst/pages/SstObservabilidade.jsx',
     rota: '/sst/observabilidade',
-    tipo: 'painel',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'painel'
   },
   {
     id: 'sst-producao',
     arquivo: 'src/modules/sst/pages/SstProducaoMonitoramento.jsx',
     rota: '/sst/producao',
-    tipo: 'painel',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'painel'
   },
   {
     id: 'sst-observabilidade-avancada',
     arquivo: 'src/modules/sst/pages/SstObservabilidadeAvancada.jsx',
     rota: '/sst/observabilidade-avancada',
-    tipo: 'painel',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'painel'
   },
   {
     id: 'sst-timeline',
     arquivo: 'src/modules/sst/pages/SstTimeline.jsx',
     rota: '/sst/timeline',
-    tipo: 'listagem',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'listagem'
   },
   {
     id: 'sst-esocial',
     arquivo: 'src/modules/sst/pages/SstEsocial.jsx',
     rota: '/sst/esocial',
-    tipo: 'listagem',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' }
+    tipo: 'listagem'
   },
   {
     id: 'sst-configuracoes',
     arquivo: 'src/modules/sst/pages/SstConfiguracoes.jsx',
     rota: '/sst/configuracoes',
     tipo: 'mista',
-    naoAlcancavel: { destino: '/sst/pgr', motivo: 'nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas' },
     cadastroInline: "a tela existe PARA configurar o modulo (R9 revista em 04/09)"
   },
   {

@@ -326,6 +326,61 @@ function telaRedirecionaSozinha(arquivoRelativo) {
   return null;
 }
 
+/*
+  A CONSTANTE VALE O QUE ELA VALE HOJE (05/09).
+
+  Esta varredura acusava as portas do SST como fechadas porque encontrava a
+  guarda `if (SST_SIMPLIFIED_MODE) return <Navigate .../>` no código. Ela
+  nunca perguntou **quanto vale a constante**. Enquanto o modo nasceu ligado
+  isso deu no mesmo; quando o cliente mandou desligá-lo (05/09), as 13
+  portas passaram a abrir e o relatório continuaria dizendo que estão
+  fechadas.
+
+  É o mesmo erro que me custou o dia todo em outros lugares: medir o
+  indicador (existe uma guarda condicional) em vez da coisa (a pessoa
+  consegue abrir a tela?). Passivo que não some quando o defeito some ensina
+  a ignorar o passivo.
+
+  Agora a varredura LÊ o valor padrão de cada constante de modo no
+  código-fonte. Constante desligada → a porta abre e sai da lista, com o
+  motivo dito no relatório. Ligada → continua acusando, como antes.
+*/
+function constantesDeModoDesligadas() {
+  const desligadas = new Set();
+  const arquivos = [path.join(raiz, 'src', 'modules', 'sst', 'constants', 'sstResources.js')];
+  for (const arquivo of arquivos) {
+    if (!fs.existsSync(arquivo)) continue;
+    const codigo = fs.readFileSync(arquivo, 'utf8');
+    for (const m of codigo.matchAll(/export const (\w+) = import\.meta\.env\.\w+ (===|!==) '(\w+)'/g)) {
+      const [, nome, operador, valor] = m;
+      // `=== 'true'` sem .env no repositório significa FALSO por padrão;
+      // `!== 'false'` significa VERDADEIRO por padrão.
+      if (operador === '===' && valor === 'true') desligadas.add(nome);
+    }
+    /*
+      E os AUXILIARES que a constante desliga junto (05/09).
+
+      A guarda de `/sst/:resource` não cita a constante: ela chama
+      `isSstResourceVisible(resource)`, que é `(!SST_SIMPLIFIED_MODE || ...)`.
+      Com o modo desligado, esse `||` é sempre verdadeiro e a porta abre —
+      mas o detector, que procurava o NOME da constante, continuava
+      acusando. É a mesma cegueira de sempre: eu conheço uma forma, o código
+      tem duas.
+
+      A regra é estreita de propósito: só entra o auxiliar cujo corpo começa
+      negando uma constante já reconhecida como desligada (`!CONST ||`),
+      que é o idioma de "sem o modo, tudo é visível". Qualquer outra forma
+      continua sendo acusada — melhor acusar demais que absolver de menos.
+    */
+    for (const m of codigo.matchAll(/export const (\w+) = \([^)]*\) => \(\s*!(\w+) \|\|/g)) {
+      const [, auxiliar, constante] = m;
+      if (desligadas.has(constante)) desligadas.add(auxiliar);
+    }
+  }
+  return desligadas;
+}
+const MODOS_DESLIGADOS = constantesDeModoDesligadas();
+
 const portasQueNaoAbrem = [];
 for (const m of app.matchAll(/path="([^"]+)"[^\n]*/g)) {
   if (/<Navigate/.test(m[0])) continue;
@@ -356,7 +411,27 @@ console.log(`          nivel 1 (destino do menu) ......... ${porNivel(1).length}
 console.log(`          nivel 2 (dentro de um hub) ........ ${porNivel(2).length}`);
 console.log(`          nivel 3+ (enterradas) ............. ${enterradas.length}`);
 console.log(`          sem caminho (so pela URL) ......... ${semCaminho.length}`);
+/*
+  Separa o que a constante REALMENTE fecha hoje do que só fecharia se o modo
+  fosse ligado. As segundas não somem do relatório — aparecem nomeadas, com
+  o motivo — mas não contam como passivo, porque hoje a porta abre.
+*/
+/*
+  A condição vem como TEXTO, e nem sempre é só o nome: pode ser
+  `!isSstResourceVisible(resource)`. Compara-se pelo nome que abre a
+  condição, depois de tirar a negação — nunca por "contém", que casaria
+  `SST_SIMPLIFIED_MODE && outraCoisa` e absolveria porta que continua
+  fechada.
+*/
+const nomeDaCondicao = (condicao) => String(condicao || '').replace(/^\s*!\s*/, '').match(/^\w+/)?.[0] || '';
+const abertasPorModoDesligado = portasQueNaoAbrem.filter((p) => MODOS_DESLIGADOS.has(nomeDaCondicao(p.constante)));
+const fechadasDeVerdade = portasQueNaoAbrem.filter((p) => !MODOS_DESLIGADOS.has(nomeDaCondicao(p.constante)));
+portasQueNaoAbrem.length = 0;
+portasQueNaoAbrem.push(...fechadasDeVerdade);
 console.log(`          porta que NAO ABRE (redireciona) .. ${portasQueNaoAbrem.length}`);
+if (abertasPorModoDesligado.length) {
+  console.log(`          (+${abertasPorModoDesligado.length} que só fechariam com ${[...MODOS_DESLIGADOS].join(', ')} ligado — hoje a constante está DESLIGADA e essas portas ABREM)`);
+}
 
 if (portasQueNaoAbrem.length) {
   console.log(`\n[alcance] PORTA QUE NAO ABRE — a rota existe, o link funciona, e a guarda`);

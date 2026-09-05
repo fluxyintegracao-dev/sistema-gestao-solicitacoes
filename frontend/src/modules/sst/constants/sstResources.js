@@ -1,4 +1,24 @@
-export const SST_SIMPLIFIED_MODE = import.meta.env.VITE_SST_SIMPLIFIED_MODE !== 'false';
+/*
+  MODO SIMPLIFICADO DESLIGADO POR DECISÃO DO CLIENTE (05/09).
+
+  Ele nasceu LIGADO por padrão (`!== 'false'`), e o efeito era que 12 telas
+  do SST existiam, tinham rota e guarda de permissão, e redirecionavam para
+  /sst/pgr — enquanto o menu ainda as oferecia. Menu que mostra porta que
+  não abre é pior que ausência: a pessoa clica, não acontece nada, e não
+  sabe se é permissão, erro ou defeito.
+
+  Numa primeira rodada o cliente mandou tirá-las do menu enquanto o modo
+  estivesse ligado, e a visibilidade passou a sair DESTA MESMA constante,
+  para as duas coisas nunca mais divergirem. Agora ele decidiu o fundo:
+  **as 12 telas voltam**. Com o padrão invertido, o menu volta a oferecê-las
+  e o redirecionamento some — pela mesma constante, sem tocar em mais nada.
+
+  Quem quiser o modo simplificado de volta liga explicitamente, com
+  `VITE_SST_SIMPLIFIED_MODE=true`. Inverter o padrão em vez de apagar a
+  capacidade: o modo continua existindo, só não é mais o comportamento de
+  quem não escolheu nada.
+*/
+export const SST_SIMPLIFIED_MODE = import.meta.env.VITE_SST_SIMPLIFIED_MODE === 'true';
 
 export const SST_SIMPLIFIED_RESOURCES = new Set([
   'pgr',

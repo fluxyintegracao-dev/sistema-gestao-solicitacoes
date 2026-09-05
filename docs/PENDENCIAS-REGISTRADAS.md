@@ -3042,3 +3042,59 @@ o motivo, para ninguém ler depois achando que se mediu build velho.
 Com QUALQUER diferença de aplicativo, a espera continua exatamente como
 antes, e a mensagem de bloqueio agora diz **quais arquivos** diferem, em vez
 de mandar "verificar o deploy".
+
+---
+
+## 05/09 — As treze decisões do cliente, e o que cada uma mudou
+
+Respondidas em lote. Registro o que foi feito em cada uma, para o próximo a
+ler não ter de reconstruir.
+
+| # | Decisão | O que foi feito |
+|---|---|---|
+| D1 | **Desligar o modo simplificado do SST**, devolvendo as 12 telas ao menu | O padrão da constante foi INVERTIDO (`=== 'true'` no lugar de `!== 'false'`): o modo continua existindo, só não é mais o comportamento de quem não escolheu nada. Menu e redirecionamento saem da mesma constante, então voltaram juntos |
+| D2 | Painel de filtros do provisionamento fica reposto | Já estava; nada a fazer |
+| D3 | `Pedido.jsx` fica como está — sem rota e sem remoção | Registrado como achado (N49), com o endpoint auditado e o motivo |
+| D4 | Remover os três componentes mortos | `InfoCard.jsx`, `StatusArea.jsx` e `Pagamentos.jsx` removidos — os três eram subconjunto do que a tela já mostra |
+| D5 | Serviço de backend sem consumidor fica onde está | É o N10; a decisão foi anexada ao achado |
+| D6 | As duas tabelas do comparativo continuam exceção declarada | Nada a fazer |
+| D7 | As duas telas de revisão continuam SEM DADO declarado | Nada a fazer |
+| D8 | Manter a exceção declarada | Nada a fazer |
+| D9/D10 | Trincos congelados, só descem | Nada a fazer |
+| D11 | Documento Word com os achados | `docs/ACHADOS-DE-NEGOCIO.docx` |
+| D12 | Matriz atual aceita como válida | O M2 não será re-rodado |
+| D13 | Roteiro de teste fica para depois | Já está escrito e commitado, parado |
+
+### O que a D1 revelou no meu próprio instrumento
+
+Ao desligar o modo, a varredura de alcance continuou acusando **13 portas
+que não abrem**. Ela encontrava a guarda `if (SST_SIMPLIFIED_MODE) return
+<Navigate/>` no código e concluía que a porta estava fechada — **sem nunca
+perguntar quanto vale a constante**.
+
+Enquanto o modo nasceu ligado, dava no mesmo. Com ele desligado, o passivo
+ficaria mentindo para sempre. É o mesmo erro do dia inteiro, agora na
+varredura: **o indicador no lugar da coisa**.
+
+Agora ela lê o valor padrão da constante no código-fonte e separa o que
+está fechado HOJE do que só fecharia com o modo ligado — estas aparecem
+nomeadas, com o motivo, mas não contam como passivo.
+
+E uma cegueira dentro da cegueira, do mesmo tipo que já me pegou três vezes:
+depois do conserto sobrou **uma** porta, `/sst/:resource`, porque a guarda
+dela não cita a constante — chama `isSstResourceVisible(resource)`, que é
+`(!SST_SIMPLIFIED_MODE || …)` e é sempre verdadeira com o modo desligado. Eu
+conhecia uma forma; o código tinha duas. A varredura passou a reconhecer o
+auxiliar, com regra estreita de propósito: só o idioma `!CONSTANTE ||`, que
+é o "sem o modo, tudo é visível". Qualquer outra forma continua sendo
+acusada — melhor acusar demais que absolver de menos.
+
+**Passivo de portas que não abrem: 13 → 0.**
+
+### As declarações do SST saíram do manifesto
+
+As 11 telas estavam declaradas como "não alcançáveis" no harness, com o
+destino do desvio nomeado. Com o modo desligado elas passam a abrir, e a
+declaração vira **porta para falso negativo**: se um dia um bloqueio de
+acesso REAL mandasse essas telas para `/sst/pgr`, a declaração o
+desculparia. Removidas. As duas de fluxo (revisão de compra) continuam.
