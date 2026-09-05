@@ -777,10 +777,17 @@ ponto que separa este achado dos outros dois estados possíveis:
 | Base sem registro | nada de risco em lugar nenhum | **Não.** 110 scores e 99 pendências críticas na mesma resposta. |
 | Fonte errada | a consulta lê a tabela que ninguém preenche, e a que tem o dado fica de fora | **Sim.** |
 
-**Não é uma tela, são quatro.** A mesma função alimenta o mapa do centro
-operacional, o da inteligência operacional e o do relatório executivo, além
-do heatmap. As quatro carregam os 110 scores e as 99 pendências na mesma
-resposta que não plotam.
+**Não é uma tela, são três** — medidas, uma a uma, no preview:
+
+| tela | rota | o mapa | o que vem junto na mesma resposta |
+|---|---|---|---|
+| Mapa de risco | `/sst/relatorios/heatmap` | vazio | 110 fichas de conformidade |
+| Centro operacional | `/sst/relatorios/centro-operacional` | vazio | 110 fichas + 99 pendências críticas |
+| Relatório executivo | `/sst/relatorios/executivo` | vazio | 99 pendências críticas e `compliance_geral: 75` |
+
+A "inteligência operacional" que aparece nos dados **não é uma quarta tela**:
+é um segundo endpoint que a tela do centro operacional chama junto com o
+primeiro. Contá-la separado inflaria o achado, e ele não precisa disso.
 
 **Efeito prático.** Um diretor abre uma tela chamada "Mapa de risco
 operacional" e vê o mapa limpo. A leitura natural é "nenhuma obra em risco".
