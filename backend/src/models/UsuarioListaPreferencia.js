@@ -1,6 +1,16 @@
-// Preferências de exibição das listas (ListaAvancada), por usuário e por
-// lista: colunas visíveis, larguras, modo tabela/cards, paginação,
-// agrupamento. JSON serializado em `preferencias`.
+// Preferências de exibição das listas (ListaAvancada), por usuário,
+// por lista e POR TIPO: colunas visíveis, larguras, filtros de tela,
+// arranjo de blocos, modo de visualização. JSON serializado em
+// `preferencias`, uma linha por (usuario_id, lista, tipo).
+//
+// Por que separado por tipo, e não um JSON só: o reset precisa apagar um
+// tipo sem levar os outros junto, e com JSON único duas abas abertas se
+// sobrescrevem — arrastar uma coluna reescreveria blocos e filtros.
+//
+// `lista` cabe 160 caracteres porque as chaves de tabela do frontend são
+// hierárquicas (`tabela:auditoria-operacional:produtividade-financeira`).
+// Os valores aceitos em `tipo` são validados em
+// src/validators/listaPreferenciasValidators.js.
 module.exports = (sequelize, DataTypes) => {
   return sequelize.define('UsuarioListaPreferencia', {
     id: {
@@ -13,8 +23,13 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     lista: {
-      type: DataTypes.STRING(80),
+      type: DataTypes.STRING(160),
       allowNull: false
+    },
+    tipo: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'geral'
     },
     preferencias: {
       type: DataTypes.TEXT,

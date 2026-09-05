@@ -2287,11 +2287,34 @@ router.patch('/configuracoes/automacao-status-setor', allowConfiguracoesStatusVi
 // Preferencias e filtros salvos das listas (ListaAvancada) — sempre do
 // proprio usuario autenticado; nao ha como ler ou escrever registro de
 // outra pessoa (pacote B1 de docs/PROPOSTA-BACKEND.md).
+// Rotas legadas (sem tipo no caminho): continuam valendo e caem no tipo
+// 'geral', que e onde as linhas ja gravadas estao. Aceitam ?tipo= para o
+// front migrar sem trocar de caminho.
 router.get('/listas/:lista/preferencias', ListaPreferenciasController.getPreferencias);
 router.put('/listas/:lista/preferencias', ListaPreferenciasController.putPreferencias);
+// Reset da tela inteira (todos os tipos da lista). 204 mesmo sem linha.
+router.delete('/listas/:lista/preferencias', ListaPreferenciasController.resetPreferenciasLista);
+// Um tipo por vez: colunas, larguras, filtros, blocos, visual, geral.
+router.get('/listas/:lista/preferencias/:tipo', ListaPreferenciasController.getPreferencias);
+router.put('/listas/:lista/preferencias/:tipo', ListaPreferenciasController.putPreferencias);
+router.delete('/listas/:lista/preferencias/:tipo', ListaPreferenciasController.resetPreferenciaTipo);
 router.get('/listas/:lista/filtros', ListaPreferenciasController.listarFiltros);
 router.post('/listas/:lista/filtros', ListaPreferenciasController.salvarFiltro);
 router.delete('/listas/:lista/filtros/:id', ListaPreferenciasController.excluirFiltro);
+
+// Preferencias do PROPRIO usuario, em bloco. Nenhuma destas rotas aceita
+// id de usuario no caminho, na query ou no corpo — o dono e sempre
+// req.user.id. Nao existe rota administrativa para resetar preferencia
+// de terceiro; se um dia for pedida, nasce com gate de permissao.
+//
+// GET: carga unica, todas as listas do usuario numa consulta so, para a
+// tela com varias tabelas nao fazer uma chamada de rede por tabela.
+router.get('/me/preferencias', ListaPreferenciasController.getMinhasPreferencias);
+// DELETE: reset de tudo. 204 mesmo quando nao havia linha.
+router.delete('/me/preferencias', ListaPreferenciasController.resetMinhasPreferencias);
+// POST: adocao em lote do que hoje esta no localStorage do usuario; cada
+// entrada passa pela MESMA validacao do caminho unitario.
+router.post('/me/preferencias/adotar', ListaPreferenciasController.adotarPreferencias);
 
 // Busca universal (Ctrl+K): grupos gateados pela permissao da tela
 // correspondente; grupo sem permissao nem e consultado (pacote B2).

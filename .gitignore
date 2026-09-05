@@ -95,3 +95,4 @@ frontend/qa-temp.html
 frontend/__qa_visit_tmp.mjs
 frontend/src/__qaTempMain.jsx
 frontend/src/__qaTemp*.jsx
+frontend/src/**/__Prova*.jsx
