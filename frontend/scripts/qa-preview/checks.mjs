@@ -338,7 +338,27 @@ export function checksEstaticos({ tipo }) {
       .filter((el) => !naLinha(el))
       .filter((el) => !el.classList.contains('app-voltar'))
       .filter((el) => {
-        const destino = new URL(el.getAttribute('href'), location.origin).pathname.replace(/\/$/, '');
+        const url = new URL(el.getAttribute('href'), location.origin);
+        /*
+          LINK EXTERNO NAO E NAVEGACAO DO SISTEMA (05/09).
+
+          O check comparava so o `pathname` e ignorava a ORIGEM. Entao
+          `https://wa.me/5528...` era lido como a rota interna `/5528...` e
+          reprovava: o "Testar WhatsApp" da ConfiguracoesSuporte apareceu
+          vermelho na matriz.
+
+          E acao, nao caminho. A C6 existe para tirar da barra de acoes o
+          atalho que leva a OUTRA TELA do sistema — e a regra de 04/09 diz
+          onde esse caminho mora: hub, breadcrumb e Ctrl+K. Nenhum dos tres
+          consegue hospedar um link externo, entao aplicar a C6 aqui nao
+          moveria o link para o lugar certo: apagaria a capacidade.
+
+          Abrir o WhatsApp no numero configurado e como baixar um arquivo:
+          sai do sistema, faz uma coisa SOBRE esta tela, e devolve a pessoa
+          onde ela estava (`target="_blank"`).
+        */
+        if (url.origin !== location.origin) return false;      // externo = ação, não navegação
+        const destino = url.pathname.replace(/\/$/, '');
         if (destino === rotaAtual) return false;               // mesma rota
         if (destino.startsWith(`${rotaAtual}/`)) return false; // sub-rota do registro (editar, novo…)
         return true;                                           // OUTRA rota = navegação

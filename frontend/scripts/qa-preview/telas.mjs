@@ -960,7 +960,25 @@ export const TELAS = [
     id: 'config-nova-solicitacao-destino',
     arquivo: 'src/pages/NovaSolicitacaoAutomacaoDestinoConfig.jsx',
     rota: '/nova-solicitacao-automacao-destino',
-    tipo: 'mista',
+    /*
+      TIPO CORRIGIDO EM 05/09 — `mista` -> `form`.
+
+      Eu classifiquei o tipo destas telas MECANICAMENTE ao promove-las:
+      "tem TabelaPadrao e contagem -> listagem; tem contagem sem tabela ->
+      mista". O criterio certo e o que a tela E, nao quais props ela passa.
+
+      Esta e um painel de UMA regra por tipo de solicitacao — a contagem dela
+      e textual de proposito ("Regra ativa neste tipo" / "Sem regra neste
+      tipo"), porque nao ha o que contar. Declarada `mista`, o check de C2
+      exigia digito no apoio e a celula reprovava por uma classificacao
+      minha, nao por defeito da tela.
+
+      Reclassificar para fazer vermelho virar verde e o movimento que este
+      projeto mais desconfia — entao o teste foi outro: esta tela lista
+      registros? Nao. Lista uma regra so, do tipo escolhido no seletor de
+      contexto. E formulario.
+    */
+    tipo: 'form',
     naoAplica: {
       F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
       F2: "idem F1: não há recorte de lista por filtro",
@@ -1036,7 +1054,10 @@ export const TELAS = [
     id: 'config-permissoes-areas-padroes',
     arquivo: 'src/pages/PermissoesAreasPadroes.jsx',
     rota: '/permissoes-areas-padroes',
-    tipo: 'mista',
+    // Mesma correcao de 05/09: e a MATRIZ de marcacao de um par
+    // setor+perfil, escolhido em dois seletores de contexto — nao uma
+    // listagem de registros. Ver o comentario na config-nova-solicitacao-destino.
+    tipo: 'form',
     naoAplica: {
       F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
       F2: "idem F1: não há recorte de lista por filtro",
