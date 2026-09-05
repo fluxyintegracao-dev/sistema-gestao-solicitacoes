@@ -39,12 +39,47 @@ function th(coluna, d) {
     Agora a fixture é uma listagem de títulos estáticos (o caso mais comum)
     e quem precisa do botão ordenável liga por defeito. Fixture que não
     reproduz o defeito prova o contrário do que se quer provar.
+
+    O `<svg>` chegou a desviar 7.0px por conta própria (o botão ordenável
+    contra o título estático ao lado), e por algumas horas ESTE foi o
+    plantio do T8. Deixou de ser: `.app-th-botao` ganhou
+    `line-height: var(--alvo-clique)` e a caixa de linha passou a nascer
+    alta o bastante para absorver qualquer elemento inline mais alto que o
+    texto — medido de novo, 0.0px. O arranjo ficou como CONTROLE NEGATIVO
+    (`tituloOrdenavelComIcone`), que é o papel certo dele agora: guarda do
+    conserto. Se alguém tirar aquela linha, o controle volta a ser acusado
+    e diz onde foi.
   */
-  const ordenavel = coluna.ordenavel === true || Boolean(d.ordenavelSemIndicador && coluna.id === 'usuario');
+  const ordenavel = coluna.ordenavel === true
+    || Boolean(d.ordenavelSemIndicador && coluna.id === 'usuario')
+    || Boolean(d.tituloOrdenavelComIcone && coluna.id === 'usuario');
   const indicador = d.ordenavelSemIndicador && coluna.id === 'usuario' ? '' : ICONE_ORDEM;
+  /*
+    T8 — O TÍTULO COMO ELEMENTO DE DUAS LINHAS (05/09, terceira geração do
+    plantio).
+
+    `coluna.titulo` aceita ELEMENTO, não só texto: a própria TabelaPadrao
+    guarda `typeof coluna.titulo === 'string'` antes de usá-lo como
+    tooltip, justamente porque uma tela pode passar um nó. Um título de
+    duas linhas ("VALOR" com a unidade embaixo) é o uso natural disso — e
+    duas linhas ao lado de uma NÃO assentam na mesma base, por definição:
+    a primeira linha sobe para caber a segunda.
+
+    É o único mecanismo desta família que a linha de base do componente não
+    consegue absorver, e por isso ele é o plantio: 9.7px medidos com o CSS
+    de agora. Ver a nota longa em `itensDaDoDMordem.mjs` sobre as duas
+    gerações anteriores que os consertos do dia comeram.
+  */
+  const tituloDuasLinhas = d.tituloEmDuasLinhas && coluna.id === 'valor';
+  const conteudoTitulo = tituloDuasLinhas
+    ? '<span class="app-celula-dupla">'
+      + `<span class="app-celula-dupla-principal">${esc(coluna.titulo)}</span>`
+      + '<span class="app-celula-dupla-sub">em R$</span>'
+      + '</span>'
+    : esc(coluna.titulo);
   const botaoTitulo = ordenavel
-    ? `<button type="button" class="app-th-botao app-th-botao--ordenavel" title="Ordenar por ${esc(coluna.titulo)}">${esc(coluna.titulo)}${indicador}</button>`
-    : `<span class="app-th-botao app-th-botao--estatico">${esc(coluna.titulo)}</span>`;
+    ? `<button type="button" class="app-th-botao app-th-botao--ordenavel" title="Ordenar por ${esc(coluna.titulo)}">${conteudoTitulo}${indicador}</button>`
+    : `<span class="app-th-botao app-th-botao--estatico">${conteudoTitulo}</span>`;
   // T2: o controle de alinhamento é obrigatório em TODA coluna.
   const semControle = d.semControleAlinhar && coluna.id === 'status';
   const tooltipErrado = d.alinharSemTooltip && coluna.id === 'status';
@@ -70,21 +105,35 @@ function th(coluna, d) {
 }
 
 /*
-  COLUNA DE AÇÕES — a única que a TabelaPadrao renderiza como TEXTO CRU
-  (05/09, item T8).
+  COLUNA DE AÇÕES — DE DEFEITO A CONTROLE NEGATIVO, NO MESMO DIA (05/09).
 
-  Na tela de Obras o cliente mediu: "AÇÕES" assenta numa linha de base
-  diferente das outras colunas. A causa está no componente:
-  `<ResizableTh columnKey="__acoes">Ações</ResizableTh>` entrega o título
-  como texto solto dentro do `th`, enquanto TODAS as outras passam pelo
-  `CabecalhoColuna`, que embrulha em `.app-th-alinhavel` > `.app-th-botao`
-  — e esse embrulho, sendo `display: block`, tem caixa de linha própria.
+  Na tela de Obras o cliente mediu: "AÇÕES" assentava numa linha de base
+  diferente das outras colunas. A causa era o cabeçalho de ações ser o
+  único que a TabelaPadrao entregava como TEXTO CRU dentro do `th`
+  (`<ResizableTh columnKey="__acoes">Ações</ResizableTh>`), enquanto as
+  demais passavam pelo `CabecalhoColuna` e ganhavam
+  `.app-th-alinhavel` > `.app-th-botao` — que, sendo `display: block` com
+  `min-height`, encostava o texto no TOPO da caixa enquanto o texto cru
+  ficava centralizado pelo `vertical-align: middle` da célula.
 
-  As duas formas estão aqui: o defeito (texto cru, como está hoje) e o
-  controle negativo (o mesmo título embrulhado como os vizinhos). O
-  `resizable-th-label` aparece nas duas porque é o que o `ResizableTh` real
-  põe em volta de qualquer filho — sem ele, a fixture provaria uma árvore
-  que não existe.
+  O CSS mudou no mesmo dia — duas vezes, e a segunda é a que está de pé:
+  `.app-th-botao` recebeu `line-height: var(--alvo-clique)`. Com a caixa de
+  linha do título nascendo do tamanho do alvo de clique, o texto embrulhado
+  passou a assentar exatamente onde o texto cru já assentava. Medido aqui:
+  0.0px de desvio, nas duas formas.
+
+  Ou seja: este plantio deixou de ser um defeito. Manter como "defeito
+  plantado" seria pedir ao check que acusasse o que está certo — o pior
+  tipo de prova, a que exige o falso positivo. As duas formas ficam, então,
+  como CONTROLES NEGATIVOS: nenhuma pode ser acusada, e se alguém desfizer
+  a linha padronizada do `.app-th-botao`, o controle do texto cru volta a
+  falhar e diz por quê. Os defeitos do T8 passaram a ser plantados pelos
+  dois mecanismos que a linha do componente NÃO absorve
+  (`tituloEmDuasLinhas`, `tituloComLinhaPropria`).
+
+  O `resizable-th-label` aparece nas duas porque é o que o `ResizableTh`
+  real põe em volta de qualquer filho — sem ele, a fixture provaria uma
+  árvore que não existe.
 */
 function thAcoes(d) {
   const titulo = d.acoesEnvelopada
@@ -385,7 +434,27 @@ export function montarPagina(defeitos = {}, opcoes = {}) {
     ? '<div style="width:900px;height:24px;background:#ddd">largura demais</div>'
     : '';
 
-  const corpoPagina = cabecalho(d, tipo)
+  /*
+    T8 — A FOLHA DA TELA VENCE A LINHA DO COMPONENTE (05/09).
+
+    Segundo plantio, e o mais comum na vida real: uma tela escreve CSS
+    próprio para o cabeçalho da tabela e derruba, sem perceber, a linha de
+    base que o componente padroniza. Aqui a regra é escrita como uma tela
+    escreveria — escopada na página e numa coluna —, e por especificidade
+    ela ganha do `.app-th-botao` do sistema.
+
+    Medido: com `line-height: 1.2` naquele título, ele assenta 9.0px acima
+    dos vizinhos. E fica registrado o que NÃO funciona, porque isso custou
+    medição: a mesma declaração no `th` (em vez de no `.app-th-botao`) dá
+    0.0px de desvio — o botão define a própria linha e não herda a do `th`.
+    Quem for consertar precisa olhar o botão, não a célula.
+  */
+  const folhaDaTela = d.tituloComLinhaPropria
+    ? '<style>.solicitacoes-page .resizable-table thead th:nth-child(3) .app-th-botao { line-height: 1.2; }</style>'
+    : '';
+
+  const corpoPagina = folhaDaTela
+    + cabecalho(d, tipo)
     + textoSolto
     + filtros(d)
     + blocos(d)

@@ -551,10 +551,15 @@ export function checksEstaticos({ tipo }) {
                 const metrica = ctx.measureText(conteudo);
                 if (Number.isFinite(metrica.fontBoundingBoxDescent)) descida = metrica.fontBoundingBoxDescent;
               } catch (_) { /* fica o fallback proporcional */ }
+              const caixaDoPai = no.parentElement.getBoundingClientRect();
               return {
                 base: caixa.bottom - descida,
                 texto: conteudo.replace(/\s+/g, ' ').slice(0, 24),
-                fonte: estilo.fontSize
+                fonte: estilo.fontSize,
+                // A CAIXA DE LINHA de quem segura o texto: é ela que
+                // explica o desvio, e sem ela o motivo manda adivinhar.
+                pai: no.parentElement.getAttribute('class') || no.parentElement.tagName.toLowerCase(),
+                caixa: `${caixaDoPai.top.toFixed(1)}→${caixaDoPai.bottom.toFixed(1)}px`
               };
             }
           }
@@ -592,12 +597,26 @@ export function checksEstaticos({ tipo }) {
       const maioria = grupos.reduce((a, b) => (b.itens.length > a.itens.length ? b : a));
       const fora = grupos.filter((g) => g !== maioria).flatMap((g) => g.itens);
       const desvio = fora[0].base - maioria.base;
+      /*
+        O MOTIVO DIZ A MEDIDA, NÃO A CAUSA PRESUMIDA (05/09).
+
+        A primeira versão terminava com uma frase fixa — "título fora de
+        .app-th-alinhavel/.app-th-botao ganha caixa de linha própria" —
+        porque essa era a causa do defeito que originou o item. No mesmo
+        dia o CSS do `.app-th-botao` mudou duas vezes atrás dessa linha de
+        base (e parou em `line-height: var(--alvo-clique)`), aquela causa
+        deixou de valer e o desvio passou a vir de outro lugar — título de
+        duas linhas, folha da tela com linha própria. Motivo que
+        descreve a causa de ontem manda consertar onde não está quebrado.
+        Agora ele entrega a CAIXA DE LINHA medida dos dois lados, que é o
+        que se vê no navegador e o que leva ao conserto.
+      */
       t8.push({
         motivo: `"${fora[0].texto}" assenta ${Math.abs(desvio).toFixed(1)}px `
           + `${desvio > 0 ? 'ABAIXO' : 'ACIMA'} da linha de base das outras ${maioria.itens.length} coluna(s) `
           + `(base ${fora[0].base.toFixed(1)}px contra ${maioria.base.toFixed(1)}px de "${maioria.itens[0].texto}")`
           + `${fora.length > 1 ? ` — e mais ${fora.length - 1} título(s) fora da linha` : ''}`
-          + '; título fora de .app-th-alinhavel/.app-th-botao ganha caixa de linha própria',
+          + ` — a caixa de linha desse título é outra: "${fora[0].pai}" ${fora[0].caixa} contra "${maioria.itens[0].pai}" ${maioria.itens[0].caixa}`,
         seletor: cssPath(fora[0].th)
       });
     });

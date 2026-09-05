@@ -102,10 +102,46 @@ const CASOS = [
   { item: 'T2', defeito: 'semControleAlinhar', planta: 'coluna sem o controle de alinhamento', ramo: 'sem o controle de alinhamento' },
   { item: 'T2', defeito: 'alinharSemTooltip', planta: 'controle de alinhamento sem o tooltip "Alinhar"', ramo: 'sem tooltip' },
   { item: 'T2', defeito: 'ordenavelSemIndicador', planta: 'título ordenável sem indicador de ordem', ramo: 'sem indicador de ordem' },
+  /*
+    T8 — TRÊS GERAÇÕES DE PLANTIO NO MESMO DIA, E O QUE ISSO ENSINA (05/09).
+
+    O plantio original era o cabeçalho de AÇÕES em texto cru, o defeito que
+    o cliente achou na Obras. Ele morreu no primeiro conserto do
+    `.app-th-botao` (grid centrado) e segue morto no atual (`line-height`
+    do tamanho do alvo de clique) — medido nos dois. O segundo par —
+    título ordenável com o ícone ao lado, e
+    título com selo de contagem — morreu no conserto seguinte, quando o
+    botão ganhou `line-height: var(--alvo-clique)`: uma caixa de linha alta
+    o bastante ABSORVE qualquer elemento inline mais alto que o texto.
+    Medi as duas mortes antes de aceitá-las: 0.0px nos quatro arranjos.
+
+    Isso não é a prova ficando frágil — é o conserto ficando melhor. Cada
+    geração de plantio que morre é uma família inteira de defeitos que o
+    componente deixou de conseguir ter. O que a prova precisa é acompanhar:
+    plantar o mecanismo que AINDA desalinha, e guardar os que morreram como
+    controle negativo, para saber na hora se alguém desfizer o conserto.
+
+    Os dois plantios de agora são os que a linha de base do componente NÃO
+    absorve, e os dois são arranjos que uma tela de verdade tem:
+
+      - DUAS LINHAS no título (`coluna.titulo` aceita elemento — a própria
+        TabelaPadrao testa `typeof coluna.titulo === 'string'` antes de
+        usá-lo como tooltip). Duas linhas não podem assentar na mesma base
+        que uma: a primeira sobe para caber a segunda. Nenhum
+        `line-height` conserta isso, porque é o próprio defeito.
+      - LINHA PRÓPRIA na folha da tela: a tela escreve CSS para o cabeçalho
+        e, por especificidade, derruba a linha que o componente padroniza.
+    */
   {
     item: 'T8',
-    defeito: 'acoesTextoCru',
-    planta: 'coluna "Ações" com o título em TEXTO CRU no th (como a TabelaPadrao renderiza hoje), enquanto as vizinhas embrulham em .app-th-alinhavel/.app-th-botao',
+    defeito: 'tituloEmDuasLinhas',
+    planta: 'título passado como ELEMENTO de duas linhas ("VALOR" com "em R$" embaixo) numa coluna, ao lado de títulos de uma linha',
+    ramo: 'da linha de base das outras'
+  },
+  {
+    item: 'T8',
+    defeito: 'tituloComLinhaPropria',
+    planta: 'a folha da TELA dá `line-height: 1.2` ao título de uma coluna e vence a linha padronizada pelo componente',
     ramo: 'da linha de base das outras'
   },
   { item: 'T4', defeito: 'sobraNaoDistribuida', planta: 'tabela deixando ~1400px de sobra parada à direita', ramo: 'de sobra não distribuída' },
@@ -161,7 +197,17 @@ const NEGATIVOS = [
   {
     item: 'T8',
     defeito: 'acoesEnvelopada',
-    planta: 'a MESMA coluna "Ações", com o título embrulhado como o das vizinhas — a forma consertada não pode ser acusada'
+    planta: 'coluna "Ações" com o título embrulhado como o das vizinhas — a forma que a TabelaPadrao renderiza hoje'
+  },
+  {
+    item: 'T8',
+    defeito: 'acoesTextoCru',
+    planta: 'coluna "Ações" com o título em TEXTO CRU no th — a forma ANTIGA, que era o defeito da Obras e hoje assenta na mesma linha (0.0px medidos): acusá-la seria falso positivo'
+  },
+  {
+    item: 'T8',
+    defeito: 'tituloOrdenavelComIcone',
+    planta: 'coluna ordenável com o indicador de ordem ao lado do título — desviava 7.0px até o `.app-th-botao` ganhar `line-height: var(--alvo-clique)`; é a guarda desse conserto'
   },
   {
     item: 'C6',
