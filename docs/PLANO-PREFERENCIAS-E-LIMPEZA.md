@@ -220,7 +220,72 @@ coluna travada é a de identidade.
 
 ## ITEM 5 — ESPAÇO HORIZONTAL
 
-*(frente ainda em medição — entra aqui quando fechar)*
+**A hipótese de que os três sintomas são o mesmo problema não se sustentou.**
+São **três causas distintas, em três arquivos distintos**, cada uma provada por
+isolamento: remover UMA propriedade faz o sintoma sumir, e essa propriedade não
+afeta os outros dois.
+
+| | a propriedade | onde | prova por isolamento |
+|---|---|---|---|
+| (a) cabeçalho espremido | `max-width: 94rem` na casca da página | `compras-responsive.css:106` | 1504 → 1877px |
+| (b) apoio quebrando | `max-width: 78ch` no parágrafo | `componentes-padrao.css:177` | 2 linhas → 1 linha |
+| (c) faixa vazia na consulta | `width: min(100%, 940px)` + `margin-inline:auto` no `<form>` | `index.css:2866` | x=490/940px → x=39/1843px |
+
+### (a) — e uma correção ao que eu ia procurar
+
+O texto do cabeçalho **não está sendo comprimido**. Medido em sete larguras de
+janela: o bloco de título e apoio ocupa **100% da linha, sempre**. O que
+acontece é outra coisa, e são dois fatos somados:
+
+1. **A página inteira está capada em 94rem e centralizada** — mas só nas 31
+   rotas do escopo de Compras, e só acima de ~1548px de janela. Em 1920 isso
+   custa **373px de largura útil**, com 208px de vazio de cada lado. As outras
+   167 rotas usam a largura toda. Por isso "espremida em algumas telas e não em
+   outras": é literalmente um teto que vale para um módulo só.
+2. **A barra de ações vazia.** O `PageHeader` sempre desenha a barra de ações; a
+   Nova Solicitação de Compra não declara ação nenhuma, então a barra mede 0px
+   e o `space-between` deixa **814px de faixa vazia** à direita. Medido: **77
+   dos 209 cabeçalhos do sistema** não declaram ação nenhuma.
+
+### (b) — o irmão já faz certo
+
+O apoio do **bloco** quebra em 78 caracteres, sem reticências e sem tooltip. O
+apoio da **faixa** já faz exatamente o que o cliente pediu: uma linha, reticências
+e o texto inteiro no tooltip. **São dois componentes irmãos com contratos
+diferentes para o mesmo texto.** A correção é alinhar o do bloco ao do irmão.
+
+Alcance medido: 427 usos do apoio de bloco; dos 283 com texto literal, **57 já
+quebram com espaço sobrando em 1920px**.
+
+### (c) — o conserto existe e não pega esta tela
+
+O recuo de 451px do formulário já foi diagnosticado e **parcialmente corrigido**
+antes: há uma regra de escape em `componentes-padrao.css:1016`. Mas ela exige
+que o formulário abra com `<FormSecao>`, e o desta tela abre com uma `div`
+comum. Medido: **69 formulários vivem dentro de blocos; 46 escapam e 23
+continuam capados** em 940px centrados.
+
+Somando com a faixa vazia do cabeçalho do bloco e o título duplicado (a faixa da
+página já diz "Contas a Pagar · 0 título(s) · Consulte, baixe e acompanhe…", e o
+bloco repete "Consulta de títulos a pagar"), são **60px de altura em duas linhas
+quase vazias e 903px de largura não usados.**
+
+### A família que vale atacar de vez
+
+O que os três têm em comum não é a causa — é o **padrão**: em todos, um elemento
+que já era limitado pelo pai **ganhou uma segunda casca de medida por cima**. A
+página já era limitada pela janela e ganhou 94rem; o parágrafo já era limitado
+pelo bloco e ganhou 78ch; o formulário já era limitado pelo bloco e ganhou 940px.
+
+Os três tetos foram escritos por um motivo legítimo — conforto de leitura — e
+**aplicados num escopo largo demais**: `.compras-responsive-scope .page` pega 31
+rotas, `.app-bloco-lead` pega 427 instâncias, e a regra do formulário pega
+**todo `<form>` do sistema**, porque a classe que a dispara está em toda página.
+
+O repositório já reconheceu essa família duas vezes e nas duas consertou com
+escopo apertado, o que deixou o resto do sistema com o defeito. **Proponho
+tratá-la como regra: teto de medida se declara por contexto de uso, não por
+seletor de escopo.**
 
 ---
 
