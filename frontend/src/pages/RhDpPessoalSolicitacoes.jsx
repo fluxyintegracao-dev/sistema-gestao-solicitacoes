@@ -570,7 +570,12 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
                 mesma que o `BlocoConteudo` aplica em `descricao`), ancorada ao titulo a que
                 pertence. O texto e o mesmo.
               */}
-              <p className="app-bloco-lead">
+              {/* 05/09 — a justificativa é livre e pode ser longa: uma linha
+                  com reticências, texto inteiro no `title`. */}
+              <p
+                className="app-bloco-lead"
+                title={`${aberta.colaborador?.nome || aberta.dados_json?.nome || 'Colaborador a admitir'}${aberta.justificativa ? ` — ${aberta.justificativa}` : ''}`}
+              >
                 {aberta.colaborador?.nome || aberta.dados_json?.nome || 'Colaborador a admitir'}
                 {aberta.justificativa ? ` — ${aberta.justificativa}` : ''}
               </p>

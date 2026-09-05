@@ -211,39 +211,58 @@
    cliente, 02/09): contagem forte + apoio muted. Texto solto na faixa entre
    a topbar e o primeiro bloco é reprovado pela auditoria. */
 /*
-  NÃO ALINHADO AO IRMÃO EM 05/09 — E POR QUÊ (registro, não esquecimento).
+  ALINHADO AO IRMÃO EM 05/09 — e o que faltava era JSX, não CSS.
 
-  Defeito medido: o `max-width: 78ch` abaixo corta em 607px num bloco de
-  1843px, e o texto pede 647px — quebra por 40px e deixa 1236px vazios. Dos
-  427 usos de apoio de bloco (`contagem`/`descricao` do BlocoConteudo, em 144
-  arquivos), 57 já quebram assim em 1920px.
+  Defeito medido: o `max-width: 78ch` daqui cortava em 607px num bloco de
+  1843px, e o texto pede 647px — quebrava por 40px e deixava 1236px de linha
+  vazios ("… e ainda sem titulo financeiro vinculado." com "vinculado."
+  sozinho embaixo). Dos 427 usos de apoio de bloco (`contagem`/`descricao` do
+  BlocoConteudo, em 144 arquivos), 57 quebravam assim em 1920px.
 
-  O irmão `.app-page-lead` resolve isso com UMA linha + reticências + tooltip,
-  e o tooltip é a metade que torna a truncagem honesta: o PageHeader passa
-  `title={textoApoio}`, então o texto inteiro continua alcançável.
+  O irmão `.app-page-lead` (acima) resolve com UMA linha + reticências +
+  tooltip, e o tooltip é a metade que torna a truncagem honesta: o texto
+  inteiro continua alcançável. Essa metade agora EXISTE dos dois lados:
+    - `BlocoConteudo.jsx` emite `title` com contagem + descrição;
+    - os 9 `<p className="app-bloco-lead">` escritos à mão fora do componente
+      (NovaSolicitacaoCompra, RhDpJornada ×2, RhDpPessoal, SolicitacaoDetalhe
+      ×2, RecuperarSenha, DefinirSenha, RhDpPessoalSolicitacoes) foram
+      conferidos um a um.
 
-  Aqui essa metade NÃO EXISTE, e ela não é escrevível em CSS:
-    - `BlocoConteudo.jsx` renderiza o `<p className="app-bloco-lead">` SEM
-      `title` — falta uma linha de JSX, e aquele arquivo é de outro agente
-      nesta rodada;
-    - e o alcance é maior que ele: 10 `<p className="app-bloco-lead">` são
-      escritos à mão fora do componente (DefinirSenha, RecuperarSenha,
-      RhDpJornada, RhDpPessoal, RhDpPessoalSolicitacoes, SolicitacaoDetalhe,
-      NovaSolicitacaoCompra) e nenhum tem `title`. Um deles é o PASSWORD_HINT
-      — a regra da senha. Truncar a regra da senha em uma linha, sem tooltip,
-      é apagar a informação, não arrumar a largura.
-
-  Pôr só o `white-space: nowrap` daqui REMOVERIA capacidade em 11 lugares.
-  Então fica como está até o `title` existir no JSX; o conserto é de dois
-  arquivos, não de um.
+  A EXCEÇÃO É DECLARADA, não esquecida — `.app-bloco-lead--integral`.
+  Três desses textos NÃO podem truncar de jeito nenhum, porque a informação é
+  o texto inteiro e o tooltip não os cobre (as duas telas de senha ficam fora
+  do shell, em cartão estreito, e são as mais usadas no celular, onde hover
+  não existe):
+    - `DefinirSenha` — PASSWORD_HINT, a regra da senha;
+    - `RecuperarSenha` — a instrução do que fazer com o e-mail;
+    - `RhDpJornada` — o aviso de que os eventos recorrentes NÃO devem ser
+      digitados ali (instrução de três orações; truncada vira o oposto).
+  Esses usam `--integral`: quebram em linhas e mantêm a medida de leitura de
+  78ch (R10 — a medida mora na classe). Os demais truncam COM tooltip.
 */
 .app-bloco-lead {
   margin: var(--esp-1) 0 0;
   font-size: var(--fonte-corpo);
   font-weight: 500;
   color: var(--c-muted);
-  max-width: 78ch;
   line-height: var(--lh-corpo);
+  /* UMA linha + reticências, como o irmão. Sem `max-width` aqui: com
+     `nowrap` o teto de 78ch vira o próprio corte de 607px que causou o
+     defeito — quem manda na largura é o bloco. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* EXCEÇÃO DECLARADA (05/09) — texto que a pessoa precisa ler INTEIRO e que o
+   tooltip não alcança (telas de senha, no celular). Volta a quebrar em
+   linhas, com a medida de leitura de 78ch. */
+.app-bloco-lead--integral {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: 78ch;
 }
 
 .app-bloco-lead strong {
@@ -374,6 +393,15 @@
   justify-content: space-between;
   gap: var(--esp-2);
   flex-wrap: wrap;
+}
+
+/* 05/09 — cabeçalho de bloco que agrupa título + apoio num <div> (os modais
+   escritos à mão): esse <div> é item flex e, com o apoio agora em UMA linha,
+   sem `min-width: 0` o texto vira largura mínima e empurra as ações para a
+   linha de baixo (a faixa tem flex-wrap). Mesma medida que o irmão já toma em
+   `.app-page-header-row > div:first-of-type`. */
+.app-bloco-head > div {
+  min-width: 0;
 }
 
 /* Título de bloco no degrau 18px: a hierarquia da página é visível de longe

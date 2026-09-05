@@ -1210,7 +1210,7 @@ export default function RhDpPessoal() {
                     `page-subtitle` e do cabecalho de PAGINA, que nao existe dentro
                     de um modal. */}
                 {formulario.nomeDoColaborador ? (
-                  <p className="app-bloco-lead">{formulario.nomeDoColaborador}</p>
+                  <p className="app-bloco-lead" title={formulario.nomeDoColaborador}>{formulario.nomeDoColaborador}</p>
                 ) : null}
               </div>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormulario(null)}>

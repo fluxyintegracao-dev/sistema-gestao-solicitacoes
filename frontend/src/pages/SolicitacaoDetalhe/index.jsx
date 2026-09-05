@@ -1662,7 +1662,7 @@ export default function SolicitacaoDetalhe() {
               </button>
             </span>
           </div>
-          <p className="app-bloco-lead">
+          <p className="app-bloco-lead" title="A alteracao nao muda a visibilidade da solicitacao e fica registrada no historico.">
             A alteracao nao muda a visibilidade da solicitacao e fica registrada no historico.
           </p>
 
@@ -1776,7 +1776,7 @@ export default function SolicitacaoDetalhe() {
               </button>
             </span>
           </div>
-          <p className="app-bloco-lead">
+          <p className="app-bloco-lead" title="Selecione um item manual para catalogar ou corrigir seu vínculo oficial.">
             Selecione um item manual para catalogar ou corrigir seu vínculo oficial.
           </p>
 

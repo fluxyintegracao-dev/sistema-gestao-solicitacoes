@@ -90,7 +90,11 @@ export default function RecuperarSenha() {
           Acesso seguro
         </p>
         <h1 className="page-title">Recuperar senha</h1>
-        <p className="app-bloco-lead">
+        {/* EXCEÇÃO DECLARADA à truncagem de 05/09 (`--integral`): tela fora
+            do shell, cartão estreito (max-w-xl) e muito usada no celular, onde
+            não há hover — o tooltip não alcançaria o que a truncagem esconde,
+            e o texto É a instrução da tela. */}
+        <p className="app-bloco-lead app-bloco-lead--integral">
           Informe o e-mail cadastrado. Enviamos um link para você definir uma nova senha.
         </p>
 

@@ -140,7 +140,11 @@ export default function DefinirSenha() {
           Senha de acesso
         </p>
         <h1 className="page-title">Definir senha</h1>
-        <p className="app-bloco-lead">{PASSWORD_HINT}</p>
+        {/* EXCEÇÃO DECLARADA à truncagem de 05/09 (`--integral`): é a REGRA
+            DA SENHA. Cortar em uma linha esconde exatamente o que a pessoa
+            precisa ler para conseguir cadastrar, e no celular (onde esta tela
+            mais roda) não há hover para o tooltip. */}
+        <p className="app-bloco-lead app-bloco-lead--integral">{PASSWORD_HINT}</p>
 
         {/*
           LACUNA DO PADRÃO (mesma achada na Cotação Pública, registrada no

@@ -341,7 +341,11 @@ export default function RhDpJornada() {
           {/* Estava solto no rodape da tela como `page-subtitle`, que o
               validador reprova (R5). E informacao util e continua visivel,
               agora ancorada ao bloco a que pertence e com token de cor. */}
-          <p className="app-bloco-lead">
+          {/* EXCEÇÃO DECLARADA à truncagem de 05/09 (`--integral`): é
+              instrução, e a oração que importa ("Não precisam ser digitados
+              aqui") é a última — truncar em uma linha inverteria o sentido do
+              aviso. Fica em várias linhas, com a medida de leitura de 78ch. */}
+          <p className="app-bloco-lead app-bloco-lead--integral">
             Os eventos recorrentes — vale alimentação, desconto de adiantamento, pensão — são
             aplicados sozinhos quando o Departamento Pessoal gerar a apuração. Não precisam ser
             digitados aqui.
@@ -508,7 +512,7 @@ export default function RhDpJornada() {
                 {salvando ? 'Enviando...' : 'Enviar jornada'}
               </button>
             ) : (
-              <p className="app-bloco-lead">Voce nao tem permissao para enviar jornada.</p>
+              <p className="app-bloco-lead" title="Voce nao tem permissao para enviar jornada.">Voce nao tem permissao para enviar jornada.</p>
             )}
           </div>
         </form>

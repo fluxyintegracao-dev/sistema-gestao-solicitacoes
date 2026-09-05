@@ -2585,7 +2585,13 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         <div data-modal="cabecalho" className="app-bloco-head">
           <div>
             <h2 className="app-bloco-titulo">Apropriar item</h2>
-            <p className="app-bloco-lead">
+            {/* 05/09 — apoio de bloco agora é UMA linha com reticências; o
+                `title` é a metade que torna a truncagem honesta (nome de
+                insumo é longo e o texto inteiro fica no tooltip). */}
+            <p
+              className="app-bloco-lead"
+              title={`${itemModalAtual?.insumo_nome || ''} · Quantidade total ${formatarQuantidade(itemModalAtual?.quantidade)}`}
+            >
               {itemModalAtual?.insumo_nome} · Quantidade total {formatarQuantidade(itemModalAtual?.quantidade)}
             </p>
           </div>
