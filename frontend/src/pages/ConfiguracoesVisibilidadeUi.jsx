@@ -105,6 +105,17 @@ export default function ConfiguracoesVisibilidadeUi() {
 
   const visibleCount = allKeys.filter((key) => !hiddenSet.has(key)).length;
   const hiddenCount = allKeys.length - visibleCount;
+
+  // RECORTE do cartão que antes repetia o total (ver o comentário C2 × B3 na
+  // faixa, abaixo): em quantos módulos a ocultação está em vigor. Sai do
+  // mesmo registry já carregado — não é número novo, é corte novo do mesmo
+  // dado, e é o único dos três que a faixa não tem como responder.
+  const modulosComOculto = useMemo(() => registry.filter((group) =>
+    (group.pages || []).some((page) =>
+      (page.components || []).some((component) => hiddenSet.has(normalizeKey(component.key)))
+    )
+  ).length, [registry, hiddenSet]);
+
   const filtroNormalizado = filtro.trim().toLowerCase();
 
   const filteredRegistry = useMemo(() => {
@@ -171,11 +182,42 @@ export default function ConfiguracoesVisibilidadeUi() {
 
   return (
     <Pagina>
-      {/* B3: a contagem NÃO sobe para a faixa aqui — os três cartões de
-          resumo abaixo já são os donos dela (mapeados / visíveis / ocultos).
-          Repetir o número na faixa seria a mesma informação duas vezes. */}
+      {/*
+        C2 × B3 — DECISÃO DO RESPONSÁVEL DE 05/09, registrada em
+        `docs/DEFINICAO-DE-PRONTO.md`, seção "QUANDO C2 E B3 APONTAM PARA
+        LADOS OPOSTOS (05/09)". NÃO desfaça isto sem ler a seção.
+
+        A versão anterior desta tela omitia a contagem da faixa de propósito,
+        alegando B3: três cartões de resumo já mostravam os números. A matriz
+        reprovou (`config-visibilidade-ui · C2`, "contagem ausente no apoio"),
+        e o conflito entre as duas regras foi desempatado assim:
+
+        > A FAIXA FICA COM O TOTAL. OS BLOCOS FICAM COM OS RECORTES.
+
+        O motivo: a faixa acompanha a pessoa ao rolar, e esta tela é longa por
+        construção — o total precisa estar onde se decide, não num bloco que
+        ficou 2000px acima. E o teste que evita voltar a discutir a cada tela:
+        a distinção é o que cada número RESPONDE, não onde ele está.
+
+          faixa → "quanto existe no total"      → allKeys.length componente(s)
+          bloco → "quanto existe NESTE recorte" → visíveis / ocultos / módulos
+
+        Total repetido é B3; total ausente da faixa é C2. Dois números
+        DIFERENTES, cada um respondendo à sua pergunta, é informação — e é o
+        mesmo dado com papéis diferentes que a própria B3 já ressalva.
+
+        Por isso o cartão "Componentes mapeados" saiu do jeito que estava: ele
+        mostrava `allKeys.length`, exatamente o número que agora vive na
+        faixa. Não foi removido — trocou de conteúdo pelo recorte que só ele
+        sabe (módulos com bloco oculto), como manda a seção.
+
+        Carregamento: `contagem` é NULA enquanto carrega, nunca `0` — `0`
+        afirmaria "nenhum componente mapeado", que é o oposto do que a tela
+        sabe nesse instante. Mesmo padrão de `src/pages/PermissoesSetor.jsx`.
+      */}
       <PageHeader
         titulo="Visibilidade de Dashboards e Tabelas"
+        contagem={loading ? null : `${allKeys.length} componente(s)`}
         descricao="Controle quais blocos aparecem nas telas sem alterar a permissao de acesso dos usuarios."
         acaoPrincipal={{
           rotulo: saving ? 'Salvando...' : 'Salvar visibilidade',
@@ -186,21 +228,43 @@ export default function ConfiguracoesVisibilidadeUi() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
+      {/*
+        Os três RECORTES (05/09). Nenhum deles repete o total da faixa:
+
+          Visiveis  → quantos, dos mapeados, aparecem hoje
+          Ocultos   → quantos estao suprimidos hoje
+          Modulos   → em quantos modulos a ocultacao esta em vigor
+
+        O terceiro é o antigo "Componentes mapeados", que era o total da faixa
+        e nada mais. Ele tinha recorte próprio para mostrar, então mudou de
+        conteúdo em vez de sair.
+
+        Um recorte que a tela NÃO tem: "visíveis só para certo perfil". O
+        registry (`backend/src/constants/uiVisibilityRegistry.js`) não carrega
+        perfil nenhum — e o próprio texto de governança abaixo diz que esta
+        configuração não concede acesso. Número que a tela não tem não vira
+        cartão.
+
+        Enquanto carrega, os três mostram "—" pelo mesmo motivo da faixa: `0`
+        seria uma afirmação sobre dado que ainda não chegou.
+      */}
       <section className="grid gap-3 md:grid-cols-3">
         <div className="app-summary-card">
-          <span className="app-summary-label">Componentes mapeados</span>
-          <strong className="app-summary-value">{allKeys.length}</strong>
-          <span className="app-summary-subvalue">Dashboards, tabelas e cards</span>
-        </div>
-        <div className="app-summary-card">
           <span className="app-summary-label">Visiveis</span>
-          <strong className="app-summary-value text-[var(--sem-success)]">{visibleCount}</strong>
-          <span className="app-summary-subvalue">Aparecem para usuarios autorizados</span>
+          <strong className="app-summary-value text-[var(--sem-success)]">{loading ? '—' : visibleCount}</strong>
+          <span className="app-summary-subvalue">Aparecem para quem ja tem permissao no modulo</span>
         </div>
         <div className="app-summary-card">
           <span className="app-summary-label">Ocultos</span>
-          <strong className="app-summary-value text-[var(--sem-warning)]">{hiddenCount}</strong>
+          <strong className="app-summary-value text-[var(--sem-warning)]">{loading ? '—' : hiddenCount}</strong>
           <span className="app-summary-subvalue">Nao aparecem nas telas configuradas</span>
+        </div>
+        <div className="app-summary-card">
+          <span className="app-summary-label">Modulos com bloco oculto</span>
+          <strong className="app-summary-value">{loading ? '—' : modulosComOculto}</strong>
+          <span className="app-summary-subvalue">
+            {loading ? 'Carregando modulos...' : `de ${registry.length} modulo(s) mapeado(s)`}
+          </span>
         </div>
       </section>
 

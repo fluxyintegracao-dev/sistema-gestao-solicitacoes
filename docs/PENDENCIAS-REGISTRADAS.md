@@ -1772,3 +1772,79 @@ a lista que eu pretendia**. Se divergir, `git reset` e recomeçar. Verificar o
 Não reescrevi o histórico: `ac71f68` já estava empurrado, e reescrever branch
 publicada troca um registro impreciso por um registro quebrado. Fica esta
 anotação, que é o que os dois commits deveriam ter dito.
+
+## LEVA DE COMPONENTE: o hub de Configurações precisa renderizar a partir da FONTE ÚNICA (05/09)
+
+Entra na fila junto das outras duas de componente — `TabelaPadrao` e a R28
+(aviso de sucesso persistente).
+
+### O problema, no argumento do responsável
+
+O `Configuracoes.jsx` monta seus **45 destinos à mão**, sem passar pelo
+`navigationConfig`. Enquanto for assim:
+
+> **Toda porta nova aumenta a dívida da fonte única — e cada uma delas é uma
+> decisão do responsável sendo punida por uma limitação de arquitetura.**
+
+Foi exatamente o que aconteceu. Na rodada 1 ele mandou abrir porta para duas
+telas que existiam, tinham rota, tinham guarda de permissão e **não tinham
+link em lugar nenhum**. A decisão estava certa; abrir as portas subiu o
+trinco de 43 para 45 e deixou um portão vermelho por dois dias.
+
+### O que o trinco existe para evitar, e por que ele estava certo
+
+Lista de destino escrita à mão é a família "existia e ninguém sabia": a
+permissão é reavaliada com regra própria, destino renomeado na fonte única
+continua velho ali, e ninguém sabe que a lista existe. O trinco só desce.
+
+**Ele subiu uma vez, em 05/09, por decisão registrada.** É a única exceção, e
+está anotada no próprio `scripts/trinco-navegacao.json`.
+
+### O conserto de raiz
+
+O hub passa a renderizar suas seções **a partir do `navigationConfig`**, com
+o agrupamento por seção declarado lá. Resolve os 45 de uma vez, e porta nova
+deixa de custar dívida.
+
+Não é emenda de rodada: muda a fonte da navegação de uma tela que 45 destinos
+atravessam, e precisa de regressão própria — a mesma razão pela qual a R28 e
+a leva do `TabelaPadrao` esperam.
+
+---
+
+## O QUE NÃO É CONFERIDO POR ROTINA NÃO É CONFERIDO — a lição aplicada a mim (05/09)
+
+Em um só dia, **dois portões diferentes ficaram vermelhos por dias sem que eu
+visse**:
+
+1. `validarResponsividadeFrontend.mjs` — quebrado por um commit meu, três
+   commits atrás;
+2. `validarNavegacao.mjs` — vermelho desde a rodada 1, quando abri duas
+   portas.
+
+**Quem achou os dois foram agentes**, em arquivos que não eram deles,
+rodando checks que eu não estava rodando.
+
+### A causa não foi distração
+
+Eu rodava `validarLayout.mjs` e `npm run build`. Os dois passavam. E
+`validarLayout` **não está** dentro do `test:responsive` — são dois conjuntos
+disjuntos, e eu só conhecia um. O `test:responsive` roda outros quatro
+verificadores (responsividade, navegação, cancelamento e as sete provas).
+
+Confiar em "rodar os checks" quando os checks são duas listas separadas é o
+mesmo defeito que este projeto registra desde o começo: **o check existia e
+não estava ligado a nada que alguém executasse** (é a segunda lição da R20,
+com outro sujeito — antes era o repositório, agora era eu).
+
+### O conserto, que não é lembrar melhor
+
+`npm run verificar` — um comando só:
+
+```
+node scripts/validarLayout.mjs && npm run test:responsive && npm run build
+```
+
+Hábito que depende de memória para incluir uma lista falha do mesmo jeito que
+regra sem check. O ciclo de verificação passa a ser **um** comando, e o que
+ele não cobrir precisa entrar nele, não na minha lembrança.
