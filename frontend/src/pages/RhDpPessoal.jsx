@@ -278,7 +278,29 @@ export default function RhDpPessoal() {
    * colaborador (regra da Fase 3). Por isso o campo de tipo nao e opcional na linha de anexo.
    */
   const [checklistDoTipo, setChecklistDoTipo] = useState([]);
-  const [carregando, setCarregando] = useState(false);
+  /*
+    NASCE CARREGANDO, E ISSO NÃO É DETALHE (05/09).
+
+    Começava `false`, e o `carregar()` só dispara depois dos 350ms de espera
+    da busca. Nessa janela a tela renderiza com `carregando=false` e lista
+    vazia — e a `TabelaPadrao` mostra o estado vazio, que aqui diz
+    "Nenhum colaborador nesta obra."
+
+    Ou seja: a tela AFIRMA que a obra não tem colaborador antes de ter
+    perguntado. Medido no preview: a chamada devolve 200 com 99
+    colaboradores, e mesmo assim a frase aparece no caminho. Quem recarrega
+    a página lê uma informação falsa por um instante — e quem recarrega numa
+    conexão lenta lê por mais tempo.
+
+    É a mesma família do N52 e do erro que eu mesmo cometi hoje ao chamar de
+    "base vazia" uma resposta com 110 registros: afirmar AUSÊNCIA quando a
+    verdade é "ainda não medi". Vazio e não-perguntado são estados
+    diferentes, e a tela só pode dizer o primeiro depois de descartar o
+    segundo.
+
+    Nascendo `true`, o primeiro quadro é "Carregando…" — que é verdade.
+  */
+  const [carregando, setCarregando] = useState(true);
   /**
    * R3/R16: aviso e confirmacao tem UM dono.
    *

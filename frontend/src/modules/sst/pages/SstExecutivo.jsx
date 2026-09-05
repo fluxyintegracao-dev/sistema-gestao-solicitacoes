@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
   Pagina,
@@ -88,7 +89,6 @@ export default function SstExecutivo() {
         titulo="Inteligencia operacional SST"
         contagem={loading ? 'Carregando' : `${obras.length} obra(s) critica(s)`}
         descricao="Score, pendencias, bloqueios, obras criticas e prontidao preditiva sem transmissao real ao eSocial."
-        acaoPrincipal={{ rotulo: 'Heatmap', to: '/sst/relatorios/heatmap' }}
         secundarias={[{ rotulo: 'Sincronizar notificacoes', onClick: syncNotifications }]}
       />
 
@@ -121,10 +121,19 @@ export default function SstExecutivo() {
         a "linha, card, bloco") e a etiqueta de criticidade — cor, ícone e
         texto juntos, porque cor sozinha não comunica.
       */}
+      {/*
+        C6: o "Heatmap" era a AÇÃO PRINCIPAL desta tela e não é ação nenhuma —
+        é caminho para outra rota. Barra de ações é para o que se faz AQUI; o
+        caminho mora no hub, na trilha e no Ctrl+K, e o atalho fica junto do
+        conteúdo a que ele se refere. É o mesmo arranjo da SstCentroOperacional
+        (linha 211). Nada some: o mapa continua a um clique, do lado das obras
+        críticas que ele desenha.
+      */}
       <BlocoConteudo
         titulo="Obras criticas"
         contagem={`${obras.length} item(ns)`}
         descricao="Ordenadas pelo indice de risco calculado no backend."
+        acoes={<Link to="/sst/relatorios/heatmap" className="btn btn-outline btn-sm">Abrir mapa</Link>}
       >
         <div className="grid gap-3 md:grid-cols-2">
           {obras.map((item) => (

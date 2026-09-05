@@ -3141,3 +3141,62 @@ explicação na frase de apoio — custo baixo, sem componente novo, e funciona
 no mouse, no toque e no leitor de tela.
 
 **Não é urgente e não foi feita.** Espera a decisão dele.
+
+## A TELA QUE DIZ "NENHUM" ANTES DE PERGUNTAR (05/09)
+
+**Medido, não suposto.** A matriz final reprovou a T3 da `rhdp-pessoal` com
+"a tabela não voltou a aparecer em 15s". Eu levantei duas hipóteses — base
+vazia e lentidão — e **as duas estavam erradas**. A medição no preview:
+
+- a aba de colaboradores devolve **200 com 99 colaboradores**, na primeira
+  visita E depois de recarregar, e a tabela volta com 50 linhas;
+- mas, no instante seguinte ao recarregamento, a tela mostra
+  **"Nenhum colaborador nesta obra."**
+
+**A causa.** Em `RhDpPessoal.jsx`, `carregando` nascia `false` e o
+carregamento só dispara depois dos **350ms** de espera da busca. Nessa
+janela a `TabelaPadrao` recebe `carregando=false` com lista vazia e faz o
+que foi mandada fazer: mostra o estado vazio — que nesta tela diz que a
+obra não tem colaborador.
+
+A tela **afirma ausência antes de ter perguntado**. É a mesma família do
+N52 (mapa limpo lido como "nenhuma obra em risco") e do erro que eu mesmo
+cometi ao chamar de "base vazia" uma resposta com 110 registros. Vazio e
+não-perguntado são estados diferentes, e a tela só pode dizer o primeiro
+depois de descartar o segundo.
+
+**Corrigido onde foi medido:** `RhDpPessoal.jsx` nasce `carregando=true`, e
+o primeiro quadro passa a ser "Carregando…", que é verdade.
+
+### As outras 11 — lista para conferir, NÃO para mudar em lote
+
+Outros 11 arquivos começam com `carregando = useState(false)`. **Não os
+alterei**, e o motivo importa: o indicador que eu tinha para separar "busca
+ao montar" de "espera a pessoa consultar" é um grep de duas linhas depois do
+`useEffect` — indicador grosseiro. Mexer em 11 arquivos com base nele
+repetiria exatamente o erro que este documento registra.
+
+Há telas em que começar `false` está **certo**: a `financeiro-titulos` diz
+"Nenhum filtro aplicado — a tabela fica vazia até você consultar os títulos",
+e ali a lista vazia é verdade, porque ninguém pediu nada ainda.
+
+Para conferir uma a uma, com medição:
+
+| arquivo | passa `carregando` à tabela | frase do estado vazio |
+|---|---|---|
+| `src/pages/RhDpJornada.jsx` | não | "Nenhum colaborador nesta obra e competencia." |
+| `src/pages/RhDpDocumentos.jsx` | sim | "Nenhum documento localizado" |
+| `src/pages/RhDpPessoalSolicitacoes.jsx` | sim | "Nenhuma solicitacao neste filtro." |
+| `src/pages/RhDpColaboradores.jsx` | sim | "Nenhum colaborador cadastrado" |
+| `src/pages/EmpresasGrupo.jsx` | sim | (sem `vazio` declarado) |
+| `src/components/NotificacoesBell.jsx` | — | componente |
+| `src/components/ParceiroBuscaRemota.jsx` | — | componente |
+| `src/components/RecargaCartaoFields.jsx` | — | componente |
+| `src/components/contratos/BlocoMedicaoContrato.jsx` | — | componente |
+| `src/components/ModalConferenciaCredores.jsx` | — | componente |
+| `src/components/ModalAditivoContrato.jsx` | — | componente |
+
+**O critério para a passada:** a tela que busca sozinha ao montar nasce
+`carregando=true`; a que espera a pessoa consultar nasce `false` E diz isso
+na frase do vazio. As duas são corretas — o que não pode existir é a
+terceira, que busca sozinha e afirma "nenhum" no caminho.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import { ResizableTable, ResizableTh } from '../ResizableTable';
 import { createPortal } from 'react-dom';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
@@ -259,14 +259,58 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
   useFecharAoSair(dentroDoMenuOuDoCabecalho, aberto, () => setAberto(false));
   const direcao = ordem?.coluna === coluna.id ? ordem.direcao : null;
 
-  // A coordenada é medida na hora de abrir e ao rolar/redimensionar: o menu
-  // é `fixed`, então ele não acompanha a rolagem sozinho.
+  /*
+    O MENU ABRIA FORA DA JANELA (05/09) — defeito meu, do mesmo dia do portal.
+
+    Medido pela matriz em quatro telas: o menu da coluna abria com o centro
+    em y=1111, y=1116, y=1124 e y=1143, numa janela de 1080px de altura. E
+    como ele é `fixed`, ROLAR NÃO O TRAZ DE VOLTA — o menu fica inalcançável
+    até a pessoa fechar e reabrir com a tabela em outra posição.
+
+    A causa é simples e é a mesma de todo posicionamento por portal feito
+    pela metade: eu colava o menu embaixo do botão (`base + 4`) e não
+    perguntava se cabia. Enquanto a tabela estava no alto da tela, cabia.
+
+    Agora a posição é decidida com o TAMANHO REAL do menu, não com uma
+    estimativa: se não cabe embaixo, o menu vira para cima do botão; se não
+    cabe nem de um lado nem do outro (janela muito baixa), encosta na borda
+    com folga. A largura recebe o mesmo tratamento na horizontal.
+
+    A primeira medição acontece antes de o menu existir no DOM, então ela
+    posiciona embaixo; o `useLayoutEffect` logo abaixo remede com o menu já
+    montado e corrige ANTES da pintura — o usuário não vê o salto.
+  */
+  const FOLGA = 8;
+  const medir = useCallback(() => {
+    const r = botaoRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const menu = menuRef.current?.getBoundingClientRect();
+    const alturaMenu = menu?.height || 0;
+    const larguraMenu = menu?.width || 0;
+    const alturaJanela = window.innerHeight;
+    const larguraJanela = window.innerWidth;
+
+    let topo = r.bottom + 4;
+    if (alturaMenu) {
+      if (topo + alturaMenu > alturaJanela - FOLGA) {
+        const acima = r.top - 4 - alturaMenu;
+        topo = acima >= FOLGA
+          ? acima                                                   // vira para cima
+          : Math.max(FOLGA, alturaJanela - alturaMenu - FOLGA);     // encosta na borda
+      }
+    }
+
+    let esquerda = r.left;
+    if (larguraMenu && esquerda + larguraMenu > larguraJanela - FOLGA) {
+      esquerda = Math.max(FOLGA, larguraJanela - larguraMenu - FOLGA);
+    }
+
+    setCaixaDoBotao({ esquerda, base: topo });
+  }, []);
+
+  // Abrir, rolar e redimensionar: o menu é `fixed` e não acompanha sozinho.
   useEffect(() => {
     if (!aberto) return undefined;
-    const medir = () => {
-      const r = botaoRef.current?.getBoundingClientRect();
-      if (r) setCaixaDoBotao({ esquerda: r.left, base: r.bottom });
-    };
     medir();
     window.addEventListener('scroll', medir, true);
     window.addEventListener('resize', medir);
@@ -274,7 +318,16 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
       window.removeEventListener('scroll', medir, true);
       window.removeEventListener('resize', medir);
     };
-  }, [aberto]);
+  }, [aberto, medir]);
+
+  // Segunda medição, com o menu já no DOM: é esta que sabe se ele cabe.
+  useLayoutEffect(() => {
+    if (aberto && caixaDoBotao && menuRef.current) medir();
+    // `caixaDoBotao` fora das dependências de propósito: ele é o RESULTADO
+    // desta medição, e realimentá-lo aqui criaria laço. O que precisa
+    // disparar a remedição é o menu passar a existir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, Boolean(menuRef.current), medir]);
 
   return (
     <span
