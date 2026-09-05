@@ -7,6 +7,39 @@ function getColumnKey(column) {
 }
 
 /*
+  A LARGURA CONTINUA NO localStorage — E ISSO É DELIBERADO (05/09)
+
+  Em 05/09 as preferências de tabela passaram para o banco, por usuário:
+  colunas visíveis, ordem das colunas, alinhamento e modo de lista agora
+  vivem em `usuario_lista_preferencias` e viajam com a pessoa
+  (`contexts/PreferenciasContext.jsx`). A LARGURA NÃO FOI JUNTO.
+
+  O motivo é o que está gravado aqui embaixo, no comentário de 03/09: a
+  largura é guardada em PIXEL ABSOLUTO (`stored[key]`, um número). Hoje o
+  dano é contido porque a chave é POR NAVEGADOR — quem arrasta no monitor
+  de 27" estraga no máximo o próprio monitor de 27". Levar pixel absoluto
+  ao banco POR USUÁRIO faz o monitor de 1920 estragar o notebook de 1366, e
+  esse defeito já aconteceu neste projeto: tabela ajustada em 1920 e aberta
+  em 1366 ficou com 1805px num contêiner de 1239px — coluna NOME com 813px
+  e quatro colunas (OBRA, VÍNCULO, STATUS, AÇÕES) fora da borda do cartão,
+  sem nunca remedir.
+
+  Existem três formas de guardar largura por usuário e as três mudam o que
+  o cliente vê: (a) por faixa de largura de janela — cada tela mantém o seu
+  ajuste, mas ele ajusta duas vezes; (b) proporção em vez de pixel —
+  funciona em qualquer tela, perde o ajuste fino; (c) pixel com teto pelo
+  contêiner — migração direta, mas em tela menor a coluna encolhe sem ele
+  pedir. A ESCOLHA É DO CLIENTE e ainda não foi feita
+  (`docs/PLANO-PREFERENCIAS-E-LIMPEZA.md`, item 1). Escolher por ele aqui
+  seria trocar um defeito contido por um defeito distribuído.
+
+  Enquanto a decisão não vem: chave `:v3` no localStorage, por navegador,
+  exatamente como está. Quando vier, o ponto de corte é este arquivo —
+  `getInitialWidths` e o efeito de gravação abaixo — e o tipo `larguras` já
+  existe no backend, esperando.
+*/
+
+/*
   DE QUEM É CADA LARGURA (03/09)
 
   Duas fontes disputam a mesma propriedade e a diferença precisa ser

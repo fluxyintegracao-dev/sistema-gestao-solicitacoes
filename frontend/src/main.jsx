@@ -4,6 +4,7 @@ import App from './App';
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { LiveUpdatesProvider } from './contexts/LiveUpdatesContext';
+import { PreferenciasProvider } from './contexts/PreferenciasContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import { applyNativeDocumentAttributes } from './mobile/runtime';
@@ -30,11 +31,21 @@ function AppShell() {
   return (
     <AppErrorBoundary resetKey={location.pathname}>
       <AuthProvider>
-        <LiveUpdatesProvider>
-          <ThemeProvider>
-            <App />
-          </ThemeProvider>
-        </LiveUpdatesProvider>
+        {/*
+          DENTRO do AuthProvider, e não fora: a carga única
+          (GET /me/preferencias) só faz sentido com sessão, e o dono do
+          registro é sempre o usuário autenticado. Sem sessão — a tela de
+          login e a cotação pública do fornecedor — este provedor não
+          carrega nem grava nada, e as tabelas seguem no localStorage
+          exatamente como antes de 05/09.
+        */}
+        <PreferenciasProvider>
+          <LiveUpdatesProvider>
+            <ThemeProvider>
+              <App />
+            </ThemeProvider>
+          </LiveUpdatesProvider>
+        </PreferenciasProvider>
       </AuthProvider>
     </AppErrorBoundary>
   );

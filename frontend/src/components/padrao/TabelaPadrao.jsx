@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } fr
 import { ResizableTable, ResizableTh } from '../ResizableTable';
 import { createPortal } from 'react-dom';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
+import { TIPO_COLUNAS, TIPO_VISUAL, usePreferenciaDeLista } from '../../contexts/PreferenciasContext';
 import EmptyState from '../ui/EmptyState';
 
 function useEhMovel() {
@@ -151,20 +152,31 @@ function normalizarColuna(coluna) {
   };
 }
 
-function lerJson(chave, padrao) {
-  if (!chave || typeof window === 'undefined') return padrao;
-  try {
-    const cru = window.localStorage.getItem(chave);
-    return cru ? JSON.parse(cru) : padrao;
-  } catch {
-    return padrao;
-  }
-}
+/*
+  ONDE A PREFERÊNCIA DESTA TABELA MORA (05/09)
 
-function gravarJson(chave, valor) {
-  if (!chave || typeof window === 'undefined') return;
-  try { window.localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem storage */ }
-}
+  Até hoje eram duas funções aqui — `lerJson`/`gravarJson` — e o
+  localStorage era a verdade. Elas eram as ÚNICAS funções que este
+  componente usava para persistir, então foram o ponto de corte: o MEIO
+  trocou, o CONTRATO não. Quem lia síncrono no `useState` inicial continua
+  lendo síncrono; quem gravava numa linha continua gravando numa linha.
+
+  Agora quem responde é o `PreferenciasContext`: uma carga única
+  (`GET /me/preferencias`) na abertura do app, guardada em memória, com o
+  localStorage rebaixado a espelho — semente síncrona do primeiro desenho e
+  rede de rollback. Colunas (`:colunas`) viram o tipo `colunas`;
+  alinhamento (`:alinhar`) e modo de lista (`:modo-lista`) viram os dois
+  campos do tipo `visual`.
+
+  A LARGURA (`:v3`) NÃO veio junto, de propósito — ela está em pixel
+  absoluto e a forma de guardá-la por usuário ainda é decisão do cliente.
+  O comentário datado está em `ResizableTable.jsx`.
+*/
+
+/* Referência estável para "nenhum alinhamento salvo": objeto literal novo a
+   cada render entraria como dependência sempre diferente nos `useMemo` que
+   leem daqui. */
+const SEM_ALINHAMENTOS = Object.freeze({});
 
 /* ---------------------------------------------------------------- ícones */
 
@@ -558,11 +570,14 @@ export default function TabelaPadrao({
   const colunasDeclaradas = colunas.map(normalizarColuna);
 
   /* ---- Colunas escolhidas pelo usuário (visibilidade + ordem) --------- */
-  const chaveColunas = storageKey ? `${storageKey}:colunas` : null;
   const idsPadrao = colunasDeclaradas.map((c) => c.id);
-  const [prefColunas, setPrefColunas] = useState(
-    () => lerJson(chaveColunas, null)
-  );
+  /*
+    Leitura SÍNCRONA, como sempre foi: o valor sai do contexto já no
+    primeiro render, então a tabela nasce com a escolha do usuário em vez
+    de piscar do padrão para ela. A diferença é que agora a escolha veio do
+    banco (ou do espelho local, enquanto a carga única não respondeu).
+  */
+  const [prefColunas, definirPrefColunas] = usePreferenciaDeLista(storageKey, TIPO_COLUNAS);
 
   // Colunas novas/removidas pela tela não podem sumir nem sobrar por causa
   // de preferência antiga: a ordem salva é reconciliada com a declarada.
@@ -581,8 +596,7 @@ export default function TabelaPadrao({
   }, [prefColunas, idsPadrao.join('|')]);
 
   const salvarPrefColunas = (proxima) => {
-    setPrefColunas(proxima);
-    gravarJson(chaveColunas, proxima);
+    definirPrefColunas(proxima);
     // A tela precisa da escolha para agir sobre ela (exportar CSV só das
     // colunas à vista, por exemplo). Sem isso ela teria que ler o
     // localStorage do componente — acoplamento que já apareceu na prática.
@@ -612,11 +626,16 @@ export default function TabelaPadrao({
     salvarPrefColunas({ ordem: atual, visiveis: visiveisColunas, ocultas: prefColunas?.ocultas || [] });
   };
 
+  /*
+    "Restaurar padrão" APAGA — e é a única coisa aqui que apaga. É ATO
+    EXPLÍCITO do usuário, pedido no painel de colunas. O que nunca se apaga
+    é a preferência de quem só perdeu uma coluna do padrão da tela: essa se
+    filtra na LEITURA (logo acima, em `ordemColunas`/`visiveisColunas`),
+    porque filtrar é reversível — a coluna volta num rollback e a escolha
+    dele volta junto — e apagar não é.
+  */
   const restaurarColunas = () => {
-    setPrefColunas(null);
-    if (chaveColunas && typeof window !== 'undefined') {
-      try { window.localStorage.removeItem(chaveColunas); } catch { /* sem storage */ }
-    }
+    definirPrefColunas(null);
     if (aoMudarColunas) aoMudarColunas(idsPadrao);
   };
 
@@ -627,25 +646,42 @@ export default function TabelaPadrao({
       .filter((c) => c && visiveisColunas.includes(c.id));
   }, [colunasConfiguraveis, ordemColunas, visiveisColunas, colunas]);
 
-  // Escolha inicial (vinda do storage) também precisa chegar à tela: sem
-  // isto, depois de um F5 a tela agiria sobre as colunas padrão enquanto a
-  // tabela mostra outras.
-  const avisouInicial = useRef(false);
+  /*
+    A escolha também precisa CHEGAR À TELA: sem isto, depois de um F5 a tela
+    agiria sobre as colunas padrão (exportar CSV, por exemplo) enquanto a
+    tabela mostra outras.
+
+    Antes de 05/09 bastava avisar UMA vez, porque a escolha vinha do
+    localStorage e não mudava mais depois da montagem. Com a carga única do
+    banco ela pode chegar DEPOIS do primeiro desenho (usuário abrindo numa
+    máquina nova), e um aviso único deixaria a tela presa na lista antiga.
+
+    O guarda deixa de ser "já avisei" e passa a ser "avisei ISTO": só
+    dispara quando o conjunto muda de verdade. Comparar o conteúdo, e não a
+    identidade do callback, é o que impede o laço com as telas que passam
+    `aoMudarColunas` como função inline.
+  */
+  const ultimoAvisoColunas = useRef(null);
   useEffect(() => {
-    if (!colunasConfiguraveis || !aoMudarColunas || avisouInicial.current) return;
-    avisouInicial.current = true;
-    aoMudarColunas(ordemColunas.filter((id) => visiveisColunas.includes(id)));
+    if (!colunasConfiguraveis || !aoMudarColunas) return;
+    const visiveis = ordemColunas.filter((id) => visiveisColunas.includes(id));
+    const assinatura = visiveis.join('|');
+    if (ultimoAvisoColunas.current === assinatura) return;
+    ultimoAvisoColunas.current = assinatura;
+    aoMudarColunas(visiveis);
   }, [colunasConfiguraveis, aoMudarColunas, ordemColunas, visiveisColunas]);
 
   /* ---- R14 — alinhamento escolhido pelo usuário, salvo por lista ------ */
-  const chaveAlinhar = storageKey ? `${storageKey}:alinhar` : null;
-  const [alinhamentos, setAlinhamentos] = useState(() => lerJson(chaveAlinhar, {}));
+  /*
+    Alinhamento e modo de lista compartilham o tipo `visual` do backend —
+    são a mesma pergunta ("como esta tabela se parece para mim") e um
+    registro por sufixo dobraria as linhas sem dobrar o significado. O
+    `remendarVisual` mescla, então gravar um não apaga o outro.
+  */
+  const [visual, , remendarVisual] = usePreferenciaDeLista(storageKey, TIPO_VISUAL);
+  const alinhamentos = visual?.alinhamentos || SEM_ALINHAMENTOS;
   const definirAlinhamento = (colunaId, valor) => {
-    setAlinhamentos((atuais) => {
-      const proximos = { ...atuais, [colunaId]: valor };
-      gravarJson(chaveAlinhar, proximos);
-      return proximos;
-    });
+    remendarVisual({ alinhamentos: { ...alinhamentos, [colunaId]: valor } });
   };
   const alinhamentoDe = (coluna) => alinhamentos[coluna.id]
     || coluna.alinhar
@@ -913,10 +949,7 @@ export default function TabelaPadrao({
     de ordenar mostraria as 50 primeiras da ordem antiga, e cortar depois de
     agrupar deixaria um grupo pela metade sem dizer.
   */
-  const chaveModoLista = storageKey ? `${storageKey}:modo-lista` : null;
-  const [paginacaoNumerada, setPaginacaoNumerada] = useState(
-    () => Boolean(lerJson(chaveModoLista, { numerada: false }).numerada)
-  );
+  const paginacaoNumerada = Boolean(visual?.numerada);
   const rolagemLocalPossivel = paginaLocal > 0 && itensOrdenados.length > paginaLocal;
   const [fatia, setFatia] = useState(paginaLocal);
   // Lista nova (filtro, busca, outra consulta) volta ao começo: continuar
@@ -1331,14 +1364,11 @@ export default function TabelaPadrao({
               type="button"
               className="btn btn-outline btn-sm app-tabela-modo"
               onClick={() => {
-                setPaginacaoNumerada((atual) => {
-                  const proximo = !atual;
-                  gravarJson(chaveModoLista, { numerada: proximo });
-                  // Voltar para a rolagem recomeça a fatia: manter a fatia
-                  // esticada deixaria a pessoa sem saber onde parou.
-                  if (!proximo) setFatia(paginaLocal);
-                  return proximo;
-                });
+                const proximo = !paginacaoNumerada;
+                remendarVisual({ numerada: proximo });
+                // Voltar para a rolagem recomeça a fatia: manter a fatia
+                // esticada deixaria a pessoa sem saber onde parou.
+                if (!proximo) setFatia(paginaLocal);
               }}
               title={paginacaoNumerada ? 'Alternar para rolagem infinita' : 'Alternar para lista inteira'}
               aria-label={paginacaoNumerada
