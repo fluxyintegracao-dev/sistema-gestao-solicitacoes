@@ -2589,3 +2589,78 @@ As pílulas de pendência (`fx-badge`) do relatório operacional de contratos s�
 rótulo mais largo que ~156px, a célula pode cortar sem tooltip. Não foi
 consertado porque envolver pílula em `CelulaDupla` seria usar o componente
 fora do que ele é — fica registrado para quando (e se) o rótulo mudar.
+
+---
+
+## 05/09 — O cliente perguntou se havia uma terceira forma. Havia quatro.
+
+Consertei de manhã uma cegueira do inventário de rotas (pasta com
+`index.jsx`) e reportei o passivo como "4 rotas sem medição". O cliente
+respondeu com a pergunta certa: *"isso é uma forma que o detector não
+conhecia — confirme que não há uma terceira, e me diga quantas rotas
+existem hoje que nenhuma das duas listas enxerga. Prefiro o número medido a
+supor que fechou."*
+
+Medi com um leitor independente, escrito do zero, e comparei com o detector
+que estava no repositório. **O detector era o problema.**
+
+Ele lia **uma linha por rota**: casava `path="..."` e procurava, naquela
+mesma linha, o primeiro componente importado. Resultado medido:
+
+| | |
+|---|---|
+| telas de rota que ele enxergava | **181** |
+| telas de rota que existem | **187** |
+| telas a que ele era CEGO | **8** |
+| arquivos que ele apontava e não existem | **2** |
+
+As quatro formas que ele não conhecia:
+
+- **A — pasta com `index.jsx`.** `import './Solicitacoes'` não é
+  `src/pages/Solicitacoes.jsx`. Perdia `Solicitacoes`, `SolicitacaoDetalhe`
+  e `Login`, e ainda **inventava dois arquivos fantasmas** com o nome
+  errado, que inflavam o passivo. (Esta eu já tinha consertado de manhã.)
+- **B — `<Route index element={...} />`, rota sem `path`.** É a rota `/` do
+  shell: a **TELA INICIAL do sistema**. Ela não ficou fora do manifesto por
+  descuido de quem listou — ficou porque o detector não tinha como vê-la. A
+  minha explicação anterior ("a varredura filtrava por padrão de nome de
+  arquivo") estava incompleta: o filtro de nome foi o segundo motivo, não o
+  primeiro.
+- **C — guarda LOCAL que renderiza a tela.**
+  `element={<DashboardRoute />}`, com `function DashboardRoute()` no próprio
+  `App.jsx` devolvendo `<Dashboard />`. O nome da tela não aparece na linha
+  da rota. O Dashboard executivo estava coberto por sorte, não por medição.
+- **D — `<Route>` quebrado em várias linhas**, com `path=` numa e
+  `element=` na seguinte. São as quatro telas **públicas**: Login,
+  Recuperar Senha, Definir Senha e Cotação do Fornecedor — justamente as
+  que qualquer pessoa alcança sem estar logada.
+
+### O que mudou
+
+O inventário passou a ler o `<Route>` **inteiro** (contando chaves e
+parênteses), aceitar `index`, resolver guarda local pelo que ela renderiza,
+preferir o componente **mais interno** (a tela dentro dos guardas) e
+resolver pasta com `index.jsx`. Rota-mãe (a que tem rotas filhas) é casca e
+fica de fora, como `<Navigate>`.
+
+**Número medido hoje: 187 telas de rota, ZERO que nenhuma das duas listas
+enxergue.**
+
+### E duas travas sobre o próprio inventário, porque zero é o número em que eu já me enganei
+
+Em 04/09 eu quase entreguei um "zero" que vinha de uma varredura que não
+varreu. Então o zero agora tem de se provar:
+
+1. **Arquivo que não existe é defeito DO INVENTÁRIO**, não tela faltando —
+   reprova nomeando os arquivos. (Foi o que produziu os dois fantasmas.)
+2. **Piso de 180 rotas lidas.** Se o `App.jsx` mudar de forma e a leitura
+   parar de casar, o resultado não é "nenhuma rota sem medição": é "não li
+   rota nenhuma". As duas coisas são verdes para quem não pergunta.
+
+As duas foram testadas com controle negativo: quebrei o resolvedor e a
+leitura, uma de cada vez, e as duas reprovaram com o motivo certo.
+
+**A regra que fica:** quando um detector acha um caso que ele não conhecia,
+a pergunta seguinte nunca é "consertei?" — é "**quantas formas existem, e
+qual é o número medido agora?**". Detector que acerta o caso que você
+mostrou e erra os outros três continua parecendo certo.

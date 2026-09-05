@@ -114,45 +114,102 @@ import { TELAS as TELAS_DO_HARNESS } from './qa-preview/telas.mjs';
 */
 function inventariarRotasDoApp() {
   /*
-    So conta o que o usuario consegue ABRIR: rota com elemento de tela.
-    `<Navigate>` e redirecionamento, nao tela — contar redirecionamento
-    inflaria o passivo com coisa que nao tem o que medir.
+    QUATRO FORMAS QUE ESTE INVENTARIO NAO CONHECIA (05/09).
+
+    A versao anterior lia UMA LINHA por rota: casava `path="..."` e
+    procurava, naquela mesma linha, o primeiro componente importado. Isso
+    parecia bastar e nao bastava. Medido, ele enxergava 181 telas de rota,
+    era CEGO a 8 e ainda apontava 2 arquivos que nao existem:
+
+    A) pasta com `index.jsx` — `import './Solicitacoes'` nao e
+       `src/pages/Solicitacoes.jsx`, e a tela mora em `.../index.jsx`.
+       Perdia Solicitacoes, SolicitacaoDetalhe e Login, e inventava dois
+       arquivos fantasmas com o nome errado.
+    B) `<Route index element={...} />` — rota sem `path`. E a rota "/" do
+       shell: a TELA INICIAL do sistema. Ela nao ficou de fora do manifesto
+       por descuido de quem listou; ficou porque o detector nao tinha como
+       ve-la.
+    C) guarda LOCAL que renderiza a tela: `element={<DashboardRoute />}`,
+       com `function DashboardRoute()` no proprio App.jsx devolvendo
+       `<Dashboard />`. O nome da tela nao aparece na linha da rota.
+    D) `<Route>` quebrado em varias linhas — `path=` numa, `element=` na
+       seguinte. Sao as quatro telas publicas (Login, Recuperar Senha,
+       Definir Senha, Cotacao do Fornecedor).
+
+    A licao ja tinha nome nesta casa ("de quantos jeitos isso e feito
+    aqui?") e ja tinha cobrado o preco duas vezes na mesma semana, nos
+    redirecionamentos e nas formas de abrir um registro. Aqui ela cobrou
+    caro: o passivo de cobertura dizia 4 quando o detector nem conseguia
+    fazer a pergunta sobre 8 telas.
+
+    Agora le o `<Route>` INTEIRO (contando chaves e parenteses), aceita
+    `index`, resolve guarda local pelo que ela renderiza, prefere o
+    componente MAIS INTERNO (o ultimo `<Nome`, que e a tela dentro dos
+    guardas) e resolve pasta com `index.jsx`. Rota-mae (a que tem rotas
+    filhas dentro) e casca, nao tela, e fica de fora — assim como
+    `<Navigate>`, que e redirecionamento.
   */
   const app = fs.readFileSync(path.join(frontendRoot, 'src', 'App.jsx'), 'utf8');
+
   const imports = new Map();
-  for (const m of app.matchAll(/(?:const|let)\s+(\w+)\s*=\s*(?:React\.)?lazy\(\s*\(\)\s*=>\s*import\(\s*'([^']+)'/g)) {
+  for (const m of app.matchAll(/(?:const|let)\s+(\w+)\s*=\s*(?:React\.)?lazy\(\s*\(\)\s*=>\s*import\(\s*['"]([^'"]+)['"]/g)) {
     imports.set(m[1], m[2]);
   }
-  for (const m of app.matchAll(/^import\s+(\w+)\s+from\s+'(\.[^']+)'/gm)) imports.set(m[1], m[2]);
+  for (const m of app.matchAll(/^import\s+(\w+)\s+from\s+['"](\.[^'"]+)['"]/gm)) imports.set(m[1], m[2]);
+
+  const resolverArquivo = (especificador) => {
+    const bruto = especificador.replace(/^\.\//, 'src/');
+    if (bruto.endsWith('.jsx')) return bruto;
+    for (const tentativa of [`${bruto}.jsx`, `${bruto}/index.jsx`]) {
+      if (fs.existsSync(path.join(frontendRoot, tentativa))) return tentativa;
+    }
+    return `${bruto}.jsx`;
+  };
+
+  // Guardas locais: `function X() { ... return <Tela /> }` no proprio App.
+  const guardasLocais = new Map();
+  for (const m of app.matchAll(/function\s+(\w+)\s*\([^)]*\)\s*\{/g)) {
+    const inicio = m.index + m[0].length - 1;
+    let chaves = 0;
+    let fim = -1;
+    for (let i = inicio; i < app.length; i += 1) {
+      if (app[i] === '{') chaves += 1;
+      else if (app[i] === '}') { chaves -= 1; if (chaves === 0) { fim = i; break; } }
+    }
+    if (fim < 0) continue;
+    const rendidos = [...app.slice(inicio, fim).matchAll(/<(\w+)/g)]
+      .map((x) => x[1]).filter((n) => imports.has(n));
+    if (rendidos.length) guardasLocais.set(m[1], rendidos[rendidos.length - 1]);
+  }
+
   const encontradas = new Set();
-  for (const m of app.matchAll(/path="([^"]+)"[^\n]*/g)) {
-    const linha = m[0];
-    if (/<Navigate/.test(linha)) continue;
-    for (const c of linha.matchAll(/<(\w+)/g)) {
-      if (!imports.has(c[1])) continue;
-      /*
-        PASTA COM `index.jsx` TAMBEM E TELA (05/09).
-
-        O inventario colava `.jsx` no caminho do import e pronto: `'./
-        Solicitacoes'` virava `src/pages/Solicitacoes.jsx`, arquivo que NAO
-        EXISTE — a tela mora em `src/pages/Solicitacoes/index.jsx`. As duas
-        maiores telas de Solicitacoes ficaram anos-luz do manifesto na conta
-        do passivo, contadas como "nunca medidas", quando estao medidas.
-
-        Passivo inflado por caminho errado nao e conservador: e ruido que
-        esconde as rotas que REALMENTE nao sao medidas por ninguem.
-      */
-      const bruto = imports.get(c[1]).replace('./', 'src/');
-      let f = bruto;
-      if (!f.endsWith('.jsx')) {
-        const comExtensao = `${bruto}.jsx`;
-        const comIndice = `${bruto}/index.jsx`;
-        if (fs.existsSync(path.join(frontendRoot, comExtensao))) f = comExtensao;
-        else if (fs.existsSync(path.join(frontendRoot, comIndice))) f = comIndice;
-        else f = comExtensao;
+  for (let i = 0; i < app.length; i += 1) {
+    if (!app.startsWith('<Route', i)) continue;
+    let chaves = 0;
+    let parens = 0;
+    let fim = -1;
+    for (let j = i; j < app.length; j += 1) {
+      const c = app[j];
+      if (c === '{') chaves += 1;
+      else if (c === '}') chaves -= 1;
+      else if (c === '(') parens += 1;
+      else if (c === ')') parens -= 1;
+      else if (c === '>' && chaves === 0 && parens === 0) { fim = j; break; }
+    }
+    if (fim < 0) continue;
+    const rota = app.slice(i, fim + 1);
+    if (!rota.endsWith('/>')) continue;          // rota-mae: casca, nao tela
+    if (!/element=/.test(rota)) continue;
+    if (/<Navigate/.test(rota)) continue;        // redirecionamento, nao tela
+    const nomes = [...rota.matchAll(/<(\w+)/g)].map((x) => x[1])
+      .filter((n) => n !== 'Route' && n !== 'Navigate');
+    for (let k = nomes.length - 1; k >= 0; k -= 1) {
+      const nome = nomes[k];
+      if (imports.has(nome)) { encontradas.add(resolverArquivo(imports.get(nome))); break; }
+      if (guardasLocais.has(nome)) {
+        encontradas.add(resolverArquivo(imports.get(guardasLocais.get(nome))));
+        break;
       }
-      encontradas.add(f);
-      break;
     }
   }
   return [...encontradas].sort();
@@ -625,6 +682,33 @@ export function validarLayout() {
     "adiciono depois".
   */
   const rotasDeclaradas = inventariarRotasDoApp();
+  /*
+    DUAS TRAVAS SOBRE O PROPRIO INVENTARIO (05/09).
+
+    O passivo de cobertura chegou a zero, e zero e exatamente o numero em
+    que eu ja me enganei antes: uma varredura que nao varreu devolve zero
+    sem erro nenhum. Entao o inventario passa a ter de se provar:
+
+    1. ARQUIVO QUE NAO EXISTE e defeito DELE, nao tela faltando. Foi assim
+       que ele apontou `src/pages/Solicitacoes.jsx` por dois dias — nome
+       montado colando `.jsx` num caminho de pasta. Fantasma no inventario
+       inflava o passivo e escondia o que faltava de verdade.
+    2. PISO DE ROTAS LIDAS. Se um dia o App mudar de forma e a leitura parar
+       de casar, o resultado nao e "nenhuma rota sem medicao": e "nao li
+       rota nenhuma". As duas coisas sao verdes se ninguem perguntar.
+  */
+  const inventarioFantasma = rotasDeclaradas.filter((t) => !fs.existsSync(path.join(frontendRoot, t)));
+  if (inventarioFantasma.length) {
+    falhas.push(
+      `${inventarioFantasma[0]}:0 [COBERTURA] o inventario de rotas apontou ${inventarioFantasma.length} arquivo(s) que NAO EXISTEM — o defeito e do inventario (caminho montado errado), nao das telas. Arquivos: ${inventarioFantasma.join(', ')}`
+    );
+  }
+  const PISO_DE_ROTAS = 180;
+  if (rotasDeclaradas.length < PISO_DE_ROTAS) {
+    falhas.push(
+      `src/App.jsx:0 [COBERTURA] o inventario leu apenas ${rotasDeclaradas.length} tela(s) de rota, abaixo do piso de ${PISO_DE_ROTAS} — o App mudou de forma e a leitura parou de casar. Sem isto, "nenhuma rota sem medicao" seria so o silencio de quem nao olhou.`
+    );
+  }
   const cobertas = new Set([...manifesto.telas, ...noHarness]);
   const semMedicao = rotasDeclaradas.filter((t) => !cobertas.has(t));
   const trincoRotas = lerTrincoRotas();
