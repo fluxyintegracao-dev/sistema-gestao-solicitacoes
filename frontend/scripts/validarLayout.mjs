@@ -429,6 +429,22 @@ export function validarLayout() {
       aumentam. A decisao sobre corrigi-las e do responsavel, porque mexer
       nelas reabre uma leva fechada.
     */
+    /*
+      FALSO POSITIVO DO PROPRIO CHECK, achado em 05/09 por um agente da
+      rodada 3 — e a forma como ele reagiu importa tanto quanto o defeito.
+
+      `<select value={form.situacao}>` num FORMULARIO casa o vocabulario
+      `situacao` e reprovava. E campo de entrada de dado, legitimo pela
+      propria R12. O agente registrou a recusa no codigo em vez de renomear
+      o campo: "renomear para escapar do detector seria enganar o
+      instrumento, nao corrigir a tela".
+
+      O contra-sinal e ESTRUTURAL, nao vocabular: o `value` amarrado ao
+      objeto do formulario (`form.`, `rascunho.`, `draft.`…) diz que aquele
+      select ESCREVE um registro, nao RECORTA uma lista. E ele so vale fora
+      da faixa de filtros — dentro dela, a faixa manda.
+    */
+    const LIGADO_A_FORMULARIO = /value=\{[^}]*\b(form|rascunho|draft|novo|edicao|registro)\b\s*[.?]/;
     const VOCAB_FILTRO = /filtr|filter|situacao|situação|recorte/i;
     const FAIXA_FILTRO = /app-filter-field|app-filter-label|app-filters-grid|solicitacoes-filtros/;
     let r12Vistos = 0;
@@ -436,6 +452,7 @@ export function validarLayout() {
     for (const sel of codigo.matchAll(/<select[\s\S]{0,260}?>/g)) {
       const entorno = codigo.slice(Math.max(0, sel.index - 260), sel.index + sel[0].length);
       if (!VOCAB_FILTRO.test(sel[0]) && !FAIXA_FILTRO.test(entorno)) continue;
+      if (LIGADO_A_FORMULARIO.test(sel[0]) && !FAIXA_FILTRO.test(entorno)) continue;
       const msg = 'select usado como FILTRO — filtros são marcáveis (BarraFiltros: busca larga em cima, botões de marcação, etiquetas removíveis), nunca lista suspensa de escolha única.';
       if (r12Vistos < r12Permitido) avisos.push(`${tela}:${linhaDe(sel.index) - 1} [R12] ${msg} (congelado no trinco)`);
       else aponta(linhaDe(sel.index) - 1, 'R12', msg);

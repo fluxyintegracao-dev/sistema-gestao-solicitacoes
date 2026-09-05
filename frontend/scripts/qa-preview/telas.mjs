@@ -722,6 +722,7 @@ export const TELAS = [
 
   {
     id: 'config-hub-status-setor',
+    cadastroInline: 'a tela existe PARA cadastrar status por setor: tirando o formulário sobra uma fila que ninguém abriria por si só (R9 revista em 04/09)',
     arquivo: 'src/pages/StatusSetor.jsx',
     rota: '/status-setor',
     tipo: 'listagem',
@@ -900,6 +901,7 @@ export const TELAS = [
   },
   {
     id: 'config-status-pedido-compra',
+    cadastroInline: 'a tela existe PARA cadastrar os status do pedido de compra (R9 revista em 04/09)',
     arquivo: 'src/pages/ConfiguracoesStatusPedidoCompra.jsx',
     rota: '/configuracoes-status-pedidos-compra',
     tipo: 'listagem',
@@ -1071,6 +1073,7 @@ export const TELAS = [
   },
   {
     id: 'config-cartoes-recarga',
+    cadastroInline: "ninguém abre 'Cartões de recarga' para consultar quantos existem — abre para cadastrar um ou mudar quem pode usá-lo (R9 revista em 04/09)",
     arquivo: 'src/pages/CartoesRecarga.jsx',
     rota: '/configuracoes-cartoes-recarga',
     tipo: 'listagem',

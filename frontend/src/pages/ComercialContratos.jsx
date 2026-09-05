@@ -5,7 +5,19 @@ import { useAuth } from '../contexts/AuthContext';
 import ComercialContratoImportacaoPanel from '../components/comercial/ComercialContratoImportacaoPanel';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
-import { TabelaPadrao, CelulaDupla } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  BarraFiltros,
+  alternarValorFiltro,
+  TabelaPadrao,
+  CelulaDupla,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 import { canImportComercialContratos } from '../utils/acessoProduto';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
@@ -54,6 +66,9 @@ const PERIODICIDADES = [
   { value: 'PERSONALIZADA', label: 'Datas pre-definidas', intervalMonths: null }
 ];
 const CONTRATO_COMERCIAL_DRAFT_KEY = 'fluxy:comercial:contrato-venda:draft';
+// R5: o apoio da TELA mora no cabecalho (prop `descricao` do PageHeader),
+// nunca num paragrafo solto sobre o canvas.
+const DESCRICAO_TELA = 'Contratos, agenda financeira e titulos a receber integrados ao modulo financeiro.';
 
 function getOptionValue(option) {
   return String(option?.value || option || '').trim();
@@ -487,19 +502,36 @@ function buildObservacoesParcela(observacoes, detalheFormaRecebimento) {
   return partes.join('\n');
 }
 
-function statusClass(status) {
+/*
+  R25: o `statusClass()` desta tela devolvia paleta crua do Tailwind
+  (`bg-emerald-100 text-emerald-700` e irmas) — o mesmo copiar-colar que
+  aparece em outras telas do modulo. Paleta crua nao tem par no tema escuro
+  e nao passa pelo piso de contraste do ThemeContext (R24).
+
+  A pilula agora e o `StatusBadge` (fx-badge + tokens --sem-*), que traz
+  icone junto da cor (cor sozinha nao comunica para daltonico).
+
+  O que sobra aqui e so a CLASSIFICACAO SEMANTICA do status de contrato, que
+  o classificador generico do StatusBadge nao acerta sozinho: "DISTRATADO"
+  nao casa com nenhum dos padroes dele e cairia em `info`, quando nesta tela
+  ele sempre foi vermelho. Entao a familia vai explicita, no `kind`, e as
+  cores continuam significando o mesmo de antes:
+  ATIVO=sucesso, QUITADO=informacao, INADIMPLENTE=atencao,
+  DISTRATADO/CANCELADO=perigo, o resto (RASCUNHO) neutro.
+*/
+function familiaStatusContrato(status) {
   switch (String(status || '').toUpperCase()) {
     case 'ATIVO':
-      return 'bg-emerald-100 text-emerald-700';
+      return 'success';
     case 'QUITADO':
-      return 'bg-blue-100 text-blue-700';
+      return 'info';
     case 'INADIMPLENTE':
-      return 'bg-amber-100 text-amber-700';
+      return 'warning';
     case 'DISTRATADO':
     case 'CANCELADO':
-      return 'bg-rose-100 text-rose-700';
+      return 'danger';
     default:
-      return 'bg-slate-100 text-slate-600';
+      return 'neutral';
   }
 }
 
@@ -745,7 +777,9 @@ export default function ComercialContratos() {
     Array.isArray(draftLoaded?.paymentPlans) ? draftLoaded.paymentPlans : []
   ));
   const [busca, setBusca] = useState('');
-  const [statusFiltro, setStatusFiltro] = useState('');
+  // R12: o recorte de status e um CONJUNTO (marcacao multipla, conjunto
+  // vazio = todos), nao a escolha unica de um select.
+  const [statusFiltro, setStatusFiltro] = useState(() => new Set());
   const [empreendimentos, setEmpreendimentos] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -778,12 +812,38 @@ export default function ComercialContratos() {
   const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
   const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
   const [contratoAssinadoArquivo, setContratoAssinadoArquivo] = useState(null);
-  const [error, setError] = useState('');
+
+  /*
+    R3/R19: a tela tinha DUAS familias de caixa. O erro ja morava numa faixa
+    do sistema (`app-alert--error`) via estado proprio; o SUCESSO ("Contrato
+    excluido com sucesso") saia num `window.alert` do Chrome — caixa que
+    ignora tema e tokens, bloqueia a pagina, nao existe no DOM (o harness nao
+    a mede) e some sem rastro.
+
+    R16 (UM dono por responsabilidade): acrescentar a faixa de avisos ao lado
+    da faixa de erro deixaria dois lugares dizendo a mesma coisa no mesmo
+    contexto. Entao o estado `error` inteiro passou para o `useAvisos` — erro
+    e sucesso na MESMA faixa, com o tom semantico de cada um.
+  */
+  const { avisos, avisar, fechar, limpar: limparAvisos } = useAvisos();
+
+  /*
+    R19: `window.confirm` some das tres acoes destrutivas desta tela.
+    R26 (leitura obrigatoria): o confirm do navegador BLOQUEAVA a pagina —
+    nada podia mudar entre a pergunta e a acao, e o defeito era impossivel. O
+    modal do sistema nao bloqueia, e trocar a caixa pelo componente muda o
+    MODELO DE CONCORRENCIA da acao: onde o handler relesse o estado depois do
+    await, a tela perguntaria sobre o contrato A e agiria sobre o B, com a
+    trilha registrando consentimento VALIDO para o alvo errado.
+    Por isso os tres handlers abaixo fixam o alvo numa const ANTES do `await`
+    e a acao usa essa const.
+  */
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   async function carregar() {
     try {
       setLoading(true);
-      setError('');
+      limparAvisos();
       const [empreData, unidData, clientesData, corretoresData, testemunhasData, obrasData, categoriasData, contratosData, modelosData] = await Promise.all([
         getEmpreendimentosComerciais({ ativo: 1 }),
         getUnidadesComerciais({ ativo: 1 }),
@@ -823,7 +883,7 @@ export default function ComercialContratos() {
       setContratos(Array.isArray(contratosData) ? contratosData : []);
       setModelosContrato(Array.isArray(modelosData) ? modelosData : []);
     } catch (err) {
-      setError(err?.message || 'Erro ao carregar contratos comerciais');
+      avisar.erro(err?.message || 'Erro ao carregar contratos comerciais');
     } finally {
       setLoading(false);
     }
@@ -973,7 +1033,7 @@ export default function ComercialContratos() {
   const contratosFiltrados = useMemo(() => {
     const termo = normalizeSearch(busca);
     return contratos.filter((item) => {
-      if (statusFiltro && String(item.status) !== statusFiltro) return false;
+      if (statusFiltro.size && !statusFiltro.has(String(item.status))) return false;
       if (!termo) return true;
       const blob = normalizeSearch([
         item.numero,
@@ -1152,14 +1212,14 @@ export default function ComercialContratos() {
 
   function adicionarFormaPagamento() {
     if (isFormaComDetalhe(generator.forma_recebimento_prevista) && !String(generator.detalhe_forma_recebimento || '').trim()) {
-      setError('Descreva o bem, a permuta ou o outro recebimento antes de adicionar a forma de pagamento.');
+      avisar.erro('Descreva o bem, a permuta ou o outro recebimento antes de adicionar a forma de pagamento.');
       return;
     }
 
     const planoId = `${Date.now()}-${Math.random()}`;
     const resultado = gerarParcelasDoBloco(generator, planoId, periodicidades, form.data_assinatura);
     if (resultado.error) {
-      setError(resultado.error);
+      avisar.erro(resultado.error);
       return;
     }
 
@@ -1171,7 +1231,7 @@ export default function ComercialContratos() {
     };
     const proximosPlanos = [...paymentPlans, proximoPlano];
 
-    setError('');
+    limparAvisos();
     setPaymentPlans(proximosPlanos);
     aplicarPlanosAoContrato(proximosPlanos);
     setGenerator(defaultGenerator());
@@ -1273,7 +1333,7 @@ export default function ComercialContratos() {
     if (!parcela) return;
 
     if (Math.abs(diferencaComposicao) <= 0.009) {
-      setError('As formas de pagamento ja fecham o valor total do contrato.');
+      avisar.erro('As formas de pagamento ja fecham o valor total do contrato.');
       return;
     }
 
@@ -1281,17 +1341,17 @@ export default function ComercialContratos() {
     const novoValor = roundCurrency(valorAtual + diferencaComposicao);
 
     if (novoValor < 0) {
-      setError('A diferenca e maior que o valor desta parcela. Escolha outra parcela para ajustar o fechamento.');
+      avisar.erro('A diferenca e maior que o valor desta parcela. Escolha outra parcela para ajustar o fechamento.');
       return;
     }
 
-    setError('');
+    limparAvisos();
     setParcelaEditandoIndex(index);
     updateParcela(index, 'valor', formatCurrencyInput(novoValor));
   }
 
   function limparFormasPagamentoContrato() {
-    setError('');
+    limparAvisos();
     setParcelaEditandoIndex(null);
     setGenerator(defaultGenerator());
     setPaymentPlans([]);
@@ -1302,18 +1362,51 @@ export default function ComercialContratos() {
     }));
   }
 
-  function limparDadosContrato({ confirmar = true } = {}) {
-    if (confirmar) {
-      const confirmado = window.confirm('Limpar todos os dados preenchidos deste contrato? Esta acao tambem apaga as formas de pagamento do rascunho.');
-      if (!confirmado) return;
-    }
-
+  // Descarte SEM pergunta: usado depois de salvar e depois de excluir, quando
+  // o formulario ja cumpriu o que estava ali para fazer.
+  function limparDadosContrato() {
     clearStoredContratoDraft();
-    setError('');
+    limparAvisos();
     setParcelaEditandoIndex(null);
     setForm(defaultForm());
     setGenerator(defaultGenerator());
     setPaymentPlans([]);
+  }
+
+  async function confirmarLimparDadosContrato() {
+    /*
+      R26: a identificacao do rascunho sai em consts ANTES do await, e e o que
+      a mensagem cita.
+
+      Registro honesto de onde a R26 encosta no limite aqui: a acao nao e
+      "apagar o registro X" — e devolver o `form` ao padrao. Nao existe id
+      para levar do outro lado do await. O que fixa a referencia neste caso e
+      a propria clausura do React: `form` aqui e o valor do render em que o
+      botao foi clicado, e ele nao muda no meio do `await`. Nao inventei um
+      "confira se mudou" depois da confirmacao porque, pela mesma clausura,
+      esse check compararia o valor consigo mesmo — seria um check que nunca
+      morde, que e justamente o que a DoD manda nao escrever.
+    */
+    const alvoCodigo = form.numero || numeroContratoCalculado || '';
+    const alvoEmpreendimento = empreendimentoSelecionado?.nome || '';
+    const alvoFormas = (form.parcelas || []).length;
+    const identificacao = [alvoCodigo, alvoEmpreendimento].filter(Boolean).join(' · ')
+      || 'o rascunho em preenchimento';
+
+    const { ok } = await confirmar({
+      titulo: 'Limpar dados do contrato',
+      mensagem: `Limpar todos os dados preenchidos de ${identificacao}`
+        + `${alvoFormas ? `, incluindo as ${alvoFormas} parcela(s) ja montadas` : ''}?`
+        + ' O rascunho gravado no navegador tambem e apagado.'
+        + ' Esta acao nao pode ser desfeita: para recuperar, sera preciso preencher tudo de novo.',
+      rotuloConfirmar: 'Limpar dados',
+      destrutiva: true
+    });
+    // R21: `confirmar()` devolve { ok, texto } e objeto e SEMPRE truthy — lido
+    // como booleano, "Cancelar" seguiria com a limpeza.
+    if (!ok) return;
+
+    limparDadosContrato();
   }
 
   async function carregarDocumentosContrato(contratoId) {
@@ -1342,7 +1435,7 @@ export default function ComercialContratos() {
       }));
       return detalhe;
     } catch (err) {
-      setError(err?.message || 'Erro ao carregar detalhe do contrato');
+      avisar.erro(err?.message || 'Erro ao carregar detalhe do contrato');
       return null;
     }
   }
@@ -1357,12 +1450,12 @@ export default function ComercialContratos() {
   async function handleSincronizarStatusFinanceiro(id) {
     try {
       setProcessingAction('sync');
-      setError('');
+      limparAvisos();
       const data = await sincronizarStatusFinanceiroContratoComercial(id);
       setContratoSelecionado(data);
       await carregar();
     } catch (err) {
-      setError(err?.message || 'Erro ao sincronizar status financeiro do contrato');
+      avisar.erro(err?.message || 'Erro ao sincronizar status financeiro do contrato');
     } finally {
       setProcessingAction('');
     }
@@ -1372,14 +1465,14 @@ export default function ComercialContratos() {
     if (!contratoSelecionado?.id) return;
     try {
       setProcessingAction('distrato');
-      setError('');
+      limparAvisos();
       const data = await distratarContratoComercial(contratoSelecionado.id, distratoForm);
       setContratoSelecionado(data);
       setShowDistrato(false);
       setDistratoForm(defaultDistratoForm());
       await carregar();
     } catch (err) {
-      setError(err?.message || 'Erro ao distratar contrato');
+      avisar.erro(err?.message || 'Erro ao distratar contrato');
     } finally {
       setProcessingAction('');
     }
@@ -1388,22 +1481,22 @@ export default function ComercialContratos() {
   async function handleTrocaUnidadeContrato() {
     if (!contratoSelecionado?.id) return;
     if ((contratoSelecionado.unidades || []).length > 1 && !trocaForm.unidade_comercial_origem_id) {
-      setError('Selecione qual unidade do contrato sera trocada.');
+      avisar.erro('Selecione qual unidade do contrato sera trocada.');
       return;
     }
     if (!trocaForm.unidade_comercial_destino_id) {
-      setError('Selecione a nova unidade.');
+      avisar.erro('Selecione a nova unidade.');
       return;
     }
     const novoValor = toNumber(trocaForm.novo_valor_total);
     const valorAtual = toNumber(contratoSelecionado.valor_total);
     if (novoValor > valorAtual && !hasText(trocaForm.competencia_data)) {
-      setError('Informe a competencia DRE do ajuste quando a troca aumentar o valor do contrato.');
+      avisar.erro('Informe a competencia DRE do ajuste quando a troca aumentar o valor do contrato.');
       return;
     }
     try {
       setProcessingAction('troca');
-      setError('');
+      limparAvisos();
       const data = await trocarUnidadeContratoComercial(contratoSelecionado.id, trocaForm);
       setContratoSelecionado(data);
       setShowTroca(false);
@@ -1413,35 +1506,62 @@ export default function ComercialContratos() {
       });
       await carregar();
     } catch (err) {
-      setError(err?.message || 'Erro ao trocar unidade do contrato');
+      avisar.erro(err?.message || 'Erro ao trocar unidade do contrato');
     } finally {
       setProcessingAction('');
     }
   }
 
   async function handleExcluirContrato() {
-    if (!contratoSelecionado?.id) return;
+    /*
+      R26: o contrato sai numa const ANTES do await e TUDO daqui pra baixo usa
+      `alvo` — a mensagem cita `alvo.numero` e a exclusao manda `alvo.id`.
 
-    const confirmado = window.confirm(
-      'Excluir este contrato comercial? Esta acao cancela os titulos ainda sem baixa, libera a unidade e nao pode ser desfeita.'
-    );
-    if (!confirmado) return;
+      Por que a regra existe: com `window.confirm` a pagina ficava BLOQUEADA e
+      nada podia mudar entre a pergunta e a acao; o modal do sistema nao
+      bloqueia. Se este handler relesse o estado depois do await — por ref,
+      por variavel de modulo ou por um getter —, trocar de contrato com a
+      pergunta aberta faria a tela perguntar sobre o contrato A e EXCLUIR o B,
+      com a trilha registrando um consentimento valido para o alvo errado
+      (classe CONSENTIMENTO da DoD, que nenhum check pega).
+
+      O que este arquivo tem a mais, e nao substitui a const: sendo componente
+      de funcao, `contratoSelecionado` ja e o valor do render do clique. A
+      const torna isso EXPLICITO e sobrevive a qualquer refatoracao que troque
+      o estado por ref ou por leitura tardia — que e quando a janela abre de
+      verdade.
+    */
+    const alvo = contratoSelecionado;
+    if (!alvo?.id) return;
+
+    const { ok } = await confirmar({
+      titulo: 'Excluir contrato comercial',
+      mensagem: `Excluir o contrato ${alvo.numero || alvo.id}`
+        + `${alvo.cliente?.nome ? ` de ${alvo.cliente.nome}` : ''}?`
+        + ' Os titulos ainda sem baixa sao cancelados e a unidade e liberada.'
+        + ' Esta acao nao pode ser desfeita.',
+      rotuloConfirmar: 'Excluir contrato',
+      destrutiva: true
+    });
+    // R21: retorno desestruturado — `const ok = await confirmar(...)` compila
+    // e faz o "Cancelar" excluir o contrato, porque objeto e sempre truthy.
+    if (!ok) return;
 
     try {
       setProcessingAction('excluir');
-      setError('');
-      await excluirContratoComercial(contratoSelecionado.id);
+      limparAvisos();
+      await excluirContratoComercial(alvo.id);
       setContratoSelecionado(null);
       setDocumentosContrato([]);
       setShowDistrato(false);
       setShowTroca(false);
-      if (String(form.id || '') === String(contratoSelecionado.id)) {
-        limparDadosContrato({ confirmar: false });
+      if (String(form.id || '') === String(alvo.id)) {
+        limparDadosContrato();
       }
       await carregar();
-      window.alert('Contrato excluido com sucesso.');
+      avisar.sucesso(`Contrato ${alvo.numero || alvo.id} excluido com sucesso.`);
     } catch (err) {
-      setError(err?.message || 'Erro ao excluir contrato comercial');
+      avisar.erro(err?.message || 'Erro ao excluir contrato comercial');
     } finally {
       setProcessingAction('');
     }
@@ -1451,7 +1571,7 @@ export default function ComercialContratos() {
     if (!contratoSelecionado?.id) return;
     try {
       setProcessingAction('gerar-documento');
-      setError('');
+      limparAvisos();
       const payload = {
         tipo_documento: 'CONTRATO'
       };
@@ -1461,7 +1581,7 @@ export default function ComercialContratos() {
         await abrirDocumentoContrato(documentoGerado.id, 'pdf');
       }
     } catch (err) {
-      setError(err?.message || 'Erro ao gerar documento do contrato');
+      avisar.erro(err?.message || 'Erro ao gerar documento do contrato');
     } finally {
       setProcessingAction('');
     }
@@ -1469,30 +1589,44 @@ export default function ComercialContratos() {
 
   async function abrirDocumentoContrato(documentoId, tipo = 'pdf') {
     try {
-      setError('');
+      limparAvisos();
       const data = await getLinkDocumentoContratoComercial(documentoId, tipo);
       if (data?.url) window.open(data.url, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      setError(err?.message || 'Erro ao abrir documento');
+      avisar.erro(err?.message || 'Erro ao abrir documento');
     }
   }
 
   async function handleExcluirDocumentoContrato(documento) {
-    if (!documento?.id || !contratoSelecionado?.id) return;
+    // R26: DOIS alvos fixados antes do await, e nao um. O documento ja chega
+    // por parametro; o CONTRATO nao chegava — a recarga da lista depois da
+    // exclusao lia `contratoSelecionado.id`, que e outro alvo, lido em outro
+    // momento. Mensagem e acao agora citam e usam os mesmos dois.
+    const alvoDocumento = documento;
+    const alvoContratoId = contratoSelecionado?.id;
+    const alvoContratoNumero = contratoSelecionado?.numero;
+    if (!alvoDocumento?.id || !alvoContratoId) return;
 
-    const confirmado = window.confirm(
-      'Excluir este PDF gerado? O contrato comercial continua cadastrado, mas este documento sai da lista.'
-    );
-    if (!confirmado) return;
+    const { ok } = await confirmar({
+      titulo: 'Excluir PDF gerado',
+      mensagem: `Excluir o PDF "${alvoDocumento.nome || documentoTipoLabel(alvoDocumento.tipo_documento)}"`
+        + ` do contrato ${alvoContratoNumero || alvoContratoId}?`
+        + ' O contrato comercial continua cadastrado, mas este arquivo sai da lista.'
+        + ' Esta acao nao pode ser desfeita: para ter o PDF de volta sera preciso gera-lo outra vez.',
+      rotuloConfirmar: 'Excluir PDF',
+      destrutiva: true
+    });
+    // R21: desestruturado — sem isto o "Cancelar" apagaria o documento.
+    if (!ok) return;
 
     try {
-      setProcessingAction(`excluir-doc-${documento.id}`);
-      setError('');
-      await excluirDocumentoContratoComercial(documento.id);
-      await carregarDocumentosContrato(contratoSelecionado.id);
-      window.alert('Documento gerado excluido com sucesso.');
+      setProcessingAction(`excluir-doc-${alvoDocumento.id}`);
+      limparAvisos();
+      await excluirDocumentoContratoComercial(alvoDocumento.id);
+      await carregarDocumentosContrato(alvoContratoId);
+      avisar.sucesso(`PDF "${alvoDocumento.nome || 'gerado'}" excluido com sucesso.`);
     } catch (err) {
-      setError(err?.message || 'Erro ao excluir documento do contrato');
+      avisar.erro(err?.message || 'Erro ao excluir documento do contrato');
     } finally {
       setProcessingAction('');
     }
@@ -1502,12 +1636,12 @@ export default function ComercialContratos() {
     if (!contratoSelecionado?.id || !contratoAssinadoArquivo) return;
     try {
       setProcessingAction('anexar-assinado');
-      setError('');
+      limparAvisos();
       await anexarContratoAssinadoComercial(contratoSelecionado.id, contratoAssinadoArquivo);
       setContratoAssinadoArquivo(null);
       await carregarDocumentosContrato(contratoSelecionado.id);
     } catch (err) {
-      setError(err?.message || 'Erro ao anexar contrato assinado');
+      avisar.erro(err?.message || 'Erro ao anexar contrato assinado');
     } finally {
       setProcessingAction('');
     }
@@ -1591,11 +1725,11 @@ export default function ComercialContratos() {
       const tipo = pessoaRapidaModal || pessoaRapidaForm.tipo || 'cliente';
 
       if (!isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
-        setError('Informe um CPF/CNPJ valido no cadastro rapido.');
+        avisar.erro('Informe um CPF/CNPJ valido no cadastro rapido.');
         return;
       }
       if (tipo === 'testemunha' && onlyDigits(pessoaRapidaForm.cpf_cnpj).length !== 11) {
-        setError('Informe um CPF valido para a testemunha.');
+        avisar.erro('Informe um CPF valido para a testemunha.');
         return;
       }
 
@@ -1603,15 +1737,15 @@ export default function ComercialContratos() {
 
       if (tipo === 'cliente' && pessoaRapidaForm.possui_conjuge) {
         if (!isValidCpfCnpj(pessoaRapidaForm.conjuge.cpf_cnpj)) {
-          setError('Informe um CPF/CNPJ valido para o conjuge.');
+          avisar.erro('Informe um CPF/CNPJ valido para o conjuge.');
           return;
         }
         if (!String(pessoaRapidaForm.conjuge.nome || '').trim()) {
-          setError('Informe o nome do conjuge.');
+          avisar.erro('Informe o nome do conjuge.');
           return;
         }
         if (!String(pessoaRapidaForm.conjuge.telefone || '').trim()) {
-          setError('Informe o telefone do conjuge.');
+          avisar.erro('Informe o telefone do conjuge.');
           return;
         }
 
@@ -1663,7 +1797,7 @@ export default function ComercialContratos() {
       setTestemunhaRapidaSlot(null);
       setPessoaRapidaForm(defaultPessoaRapidaForm());
     } catch (err) {
-      setError(err?.message || 'Erro ao cadastrar pessoa');
+      avisar.erro(err?.message || 'Erro ao cadastrar pessoa');
     }
   }
 
@@ -1750,7 +1884,7 @@ export default function ComercialContratos() {
     {
       const validationMessage = form.id ? validarUnidadesContrato() : validarCriacaoContrato();
       if (validationMessage) {
-        setError(validationMessage);
+        avisar.erro(validationMessage);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -1758,7 +1892,7 @@ export default function ComercialContratos() {
     submitInFlightRef.current = true;
     try {
       setSaving(true);
-      setError('');
+      limparAvisos();
       const corretorSelecionado = corretores.find((item) => String(item.id) === String(form.corretor_parceiro_id));
       const possuiCorretor = Boolean(form.corretor_parceiro_id);
       const dadosComissao = possuiCorretor
@@ -1861,46 +1995,78 @@ export default function ComercialContratos() {
         });
       }
 
-      limparDadosContrato({ confirmar: false });
+      limparDadosContrato();
       await carregar();
     } catch (err) {
-      setError(err?.message || 'Erro ao salvar contrato comercial');
+      avisar.erro(err?.message || 'Erro ao salvar contrato comercial');
     } finally {
       submitInFlightRef.current = false;
       setSaving(false);
     }
   }
 
+  // A MESMA faixa, renderizada em um lugar por vez (ver R16 abaixo).
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+
   if (loading) {
-    return <div className="page solicitacoes-page"><div className="app-empty-card">Carregando contratos comerciais...</div></div>;
+    // B5: o texto de carregamento tambem tem superficie e cabecalho — a faixa
+    // fixa (e o --pos-cabecalho-fixo do Pagina) ja existem antes do dado.
+    return (
+      <Pagina>
+        <PageHeader titulo="Contratos de venda" descricao={DESCRICAO_TELA} />
+        <BlocoConteudo titulo="Carteira comercial">
+          <p className="app-note">Carregando contratos comerciais...</p>
+        </BlocoConteudo>
+      </Pagina>
+    );
   }
 
   return (
-    <div className="page solicitacoes-page space-y-5 md:space-y-6">
-      <header className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Contratos de venda</h1>
-            <p className="page-subtitle">
-              Contratos, agenda financeira e titulos a receber integrados ao modulo financeiro.
-            </p>
-          </div>
-        </div>
-      </header>
+    <Pagina>
+      {/*
+        R13/C1: o cabecalho era um `<header className="app-page-header">` CRU.
+        A classe traz o sticky, mas a COMPACTACAO e estado do PageHeader e o
+        `--pos-cabecalho-fixo` (altura real da topbar) so e publicado pelo
+        `Pagina` — sem ele a faixa grudava no fallback fixo de 96px, que e a
+        origem conhecida do vao transparente entre a topbar e a faixa.
+        R5/C2: o `page-subtitle` solto virou a prop `descricao`, com escala de
+        titulo e superficie propria, em uma linha so.
+        R10: o ritmo vertical (o `space-y-5 md:space-y-6` da raiz) e do Pagina.
+      */}
+      <PageHeader
+        titulo="Contratos de venda"
+        contagem={contratosFiltrados.length === contratos.length
+          ? `${contratos.length} contrato(s)`
+          : `${contratosFiltrados.length} de ${contratos.length} contrato(s)`}
+        descricao={DESCRICAO_TELA}
+      />
 
-      {error && <div className="app-alert app-alert--error">{error}</div>}
+      {/*
+        R16: UM dono para o aviso — erro e sucesso na MESMA faixa.
+        Com o cadastro rapido aberto ela muda de lugar em vez de duplicar: o
+        modal cobre a pagina inteira, e as validacoes do cadastro rapido
+        ("Informe um CPF valido para a testemunha") disparam com ele aberto —
+        na posicao da pagina a pessoa nao veria a mensagem que explica por que
+        o salvar nao andou. Sao contextos independentes, com no maximo um
+        dono cada (e o mesmo arranjo da EmpresasGrupo, o molde).
+      */}
+      {!pessoaRapidaModal && faixaAvisos}
 
       {podeImportarSienge && <ComercialContratoImportacaoPanel onImported={carregar} />}
 
-      <section className="sol-surface-card rounded-2xl p-4 md:p-5 space-y-4">
-        <div className="sol-filtros-head">
-          <div>
-            <p className="sol-filtros-title">{form.id ? 'Editar resumo do contrato' : 'Novo contrato comercial'}</p>
-            <p className="sol-filtros-subtitle">
-              {form.id ? 'A edicao inicial ajusta status e dados complementares.' : 'A criacao gera as parcelas e os titulos financeiros.'}
-            </p>
-          </div>
-        </div>
+      {/*
+        R9 (revista em 04/09): o formulario fica INLINE. A tela anuncia
+        "Contratos de venda" e cadastrar contrato de venda e o que ela existe
+        para fazer — tirando o formulario sobra uma lista que ninguem abriria
+        por si so. Modal aqui atrapalharia (abrir e fechar para fazer aquilo
+        que se veio fazer), nao protegeria trabalho nenhum.
+      */}
+      <BlocoConteudo
+        titulo={form.id ? 'Editar resumo do contrato' : 'Novo contrato comercial'}
+        descricao={form.id ? 'A edicao inicial ajusta status e dados complementares.' : 'A criacao gera as parcelas e os titulos financeiros.'}
+        variante="primario"
+        cor="var(--module-comercial)"
+      >
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <label className="sol-filter-field">
@@ -1926,9 +2092,15 @@ export default function ComercialContratos() {
                   const selecionadasEmOutrasLinhas = new Set((form.unidades || [])
                     .filter((_, itemIndex) => itemIndex !== index)
                     .map((item) => String(item.unidade_comercial_id)));
+                  // R10: a linha era
+                  // `md:grid-cols-[minmax(190px,1fr)_150px_170px_auto_auto]` —
+                  // medida escrita na tela. As colunas do formulario vem da
+                  // escala; os campos de dinheiro trazem o proprio piso pela
+                  // `.input-moeda` (R6), que e o que garantia os 150px do
+                  // antigo valor fixo.
                   return (
-                    <div key={`${index}-${linha.unidade_comercial_id}`} className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-2 md:grid-cols-[minmax(190px,1fr)_150px_170px_auto_auto] md:items-end">
-                      <label className="sol-filter-field">
+                    <div key={`${index}-${linha.unidade_comercial_id}`} className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-2 sm:grid-cols-2 xl:grid-cols-5 md:items-end">
+                      <label className="sol-filter-field xl:col-span-2">
                         <span className="sol-filter-label">Unidade</span>
                         <select className="input w-full" value={linha.unidade_comercial_id} onChange={(event) => atualizarUnidadeContrato(index, event.target.value)} required>
                           <option value="">Selecione</option>
@@ -1939,12 +2111,14 @@ export default function ComercialContratos() {
                       </label>
                       <label className="sol-filter-field">
                         <span className="sol-filter-label">Valor cadastrado</span>
-                        <input className="input w-full" value={linha.valor_cadastro_referencia || (unidade ? formatCurrencyInput(getUnidadeValorReferencia(unidade)) : '')} disabled />
+                        {/* R6: campo de dinheiro com `.input-moeda` — 180px de
+                            piso, alinhado a direita e tabular-nums. */}
+                        <input className="input input-moeda w-full" value={linha.valor_cadastro_referencia || (unidade ? formatCurrencyInput(getUnidadeValorReferencia(unidade)) : '')} disabled />
                       </label>
                       <label className="sol-filter-field">
                         <span className="sol-filter-label">Valor real *</span>
                         <input
-                          className="input w-full"
+                          className="input input-moeda w-full"
                           inputMode="decimal"
                           value={linha.valor_atribuido}
                           onChange={(event) => setForm((current) => ({
@@ -1958,17 +2132,22 @@ export default function ComercialContratos() {
                           placeholder="R$ 0,00"
                         />
                       </label>
-                      <label className="inline-flex h-10 items-center gap-2 text-xs text-[var(--c-text)]">
+                      {/* R10: `h-10` (40px) nao e degrau da escala; a altura de
+                          campo/controle e do componente (.input/.btn, 44px de
+                          piso pela R7/R2). */}
+                      <label className="inline-flex items-center gap-2 text-xs text-[var(--c-text)]">
                         <input type="radio" name="unidade-principal" checked={Boolean(linha.principal)} onChange={() => definirUnidadePrincipal(index)} /> Principal
                       </label>
-                      <button type="button" className="btn btn-outline btn-sm h-10" onClick={() => removerUnidadeContrato(index)} disabled={(form.unidades || []).length === 1} title="Remover unidade">
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => removerUnidadeContrato(index)} disabled={(form.unidades || []).length === 1} title="Remover unidade">
                         <HiXMark className="h-4 w-4" />
                       </button>
                     </div>
                   );
                 })}
               </div>
-              <div className={`mt-2 text-xs font-medium ${Math.abs(totalValorUnidades - valorTotalContrato) <= 0.02 ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {/* R25: paleta crua (emerald/amber) trocada por token semantico
+                  — a mesma cor no claro e no escuro, com piso de contraste. */}
+              <div className={`mt-2 text-xs font-medium ${Math.abs(totalValorUnidades - valorTotalContrato) <= 0.02 ? 'text-[var(--sem-success)]' : 'text-[var(--sem-warning)]'}`}>
                 Soma das unidades: {formatCurrency(totalValorUnidades)} · Valor do contrato: {formatCurrency(valorTotalContrato)}
               </div>
               {form.empreendimento_id && unidadesDoEmpreendimento.length === 0 && (
@@ -2013,7 +2192,7 @@ export default function ComercialContratos() {
             </div>
           </div>
           {!form.id && mostrarCompradorAdicional && (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
+            <div className="rounded-2xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="sol-filter-label">Comprador adicional</span>
                   <button
@@ -2066,7 +2245,7 @@ export default function ComercialContratos() {
                 required
               />
               {!form.id && form.empreendimento_id && !empreendimentoSelecionado?.obra_id && (
-                <span className="mt-1 text-xs text-amber-600">
+                <span className="mt-1 text-xs text-[var(--sem-warning)]">
                   Vincule uma obra no cadastro do empreendimento antes de criar o contrato.
                 </span>
               )}
@@ -2105,11 +2284,11 @@ export default function ComercialContratos() {
                 {categoriasCompativeis.map((item) => <option key={item.id} value={item.id}>{item.nome}{item.dre_grupo ? ` - ${item.dre_grupo}` : ''}</option>)}
               </select>
               {!categoriasCompativeis.length ? (
-                <span className="mt-1 text-xs text-amber-600">Cadastre/libere uma categoria RECEBER/AMBOS marcada para DRE e com grupo DRE.</span>
+                <span className="mt-1 text-xs text-[var(--sem-warning)]">Cadastre/libere uma categoria RECEBER/AMBOS marcada para DRE e com grupo DRE.</span>
               ) : null}
             </label>
-            <label className="sol-filter-field"><span className="sol-filter-label">Desconto</span><input className="input w-full" inputMode="decimal" value={form.desconto_concedido} onChange={(e) => setForm((c) => ({ ...c, desconto_concedido: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, desconto_concedido: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
-            <label className="sol-filter-field"><span className="sol-filter-label">Valor total</span><input className="input w-full" inputMode="decimal" value={form.valor_total} onChange={(e) => setForm((c) => ({ ...c, valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
+            <label className="sol-filter-field"><span className="sol-filter-label">Desconto</span><input className="input input-moeda w-full" inputMode="decimal" value={form.desconto_concedido} onChange={(e) => setForm((c) => ({ ...c, desconto_concedido: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, desconto_concedido: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
+            <label className="sol-filter-field"><span className="sol-filter-label">Valor total</span><input className="input input-moeda w-full" inputMode="decimal" value={form.valor_total} onChange={(e) => setForm((c) => ({ ...c, valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
           </div>
           <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <label className="sol-filter-field">
@@ -2282,9 +2461,13 @@ export default function ComercialContratos() {
                           <p className="mt-1 text-xs text-[var(--c-muted)]">Conjuge: {item.parceiro.conjuge_nome}</p>
                         )}
                       </div>
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.principal ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {item.principal ? 'Principal' : `Comprador ${item.ordem}`}
-                      </span>
+                      {/* R25: a pilula crua (blue-100/slate-100) virou a
+                          etiqueta do sistema — fx-badge + tokens --sem-*,
+                          com icone junto da cor. */}
+                      <StatusBadge
+                        status={item.principal ? 'Principal' : `Comprador ${item.ordem}`}
+                        kind={item.principal ? 'info' : 'neutral'}
+                      />
                     </div>
                     {!item.principal && !form.id && (
                       <button type="button" className="btn btn-outline btn-sm mt-3" onClick={() => removerComprador(item.parceiro_id)}>
@@ -2296,7 +2479,7 @@ export default function ComercialContratos() {
               </div>
             </section>
           )}
-          <label className="sol-filter-field"><span className="sol-filter-label">Observacoes</span><textarea className="input min-h-[92px] w-full" value={form.observacoes} onChange={(e) => setForm((c) => ({ ...c, observacoes: e.target.value }))} /></label>
+          <label className="sol-filter-field"><span className="sol-filter-label">Observacoes</span><textarea className="input w-full" rows={3} value={form.observacoes} onChange={(e) => setForm((c) => ({ ...c, observacoes: e.target.value }))} /></label>
 
           {!form.id && (
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 space-y-4">
@@ -2320,7 +2503,9 @@ export default function ComercialContratos() {
                   <span className="inline-flex items-center rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-[var(--c-text)]">
                     Entrada: <strong className="ml-1">{formatCurrency(valorEntradaComposicao)}</strong>
                   </span>
-                  <span className={`inline-flex items-center rounded-full border px-3 py-2 ${Math.abs(diferencaComposicao) <= 0.009 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : diferencaComposicao > 0 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+                  {/* R25: as tres familias cruas (emerald/amber/rose) viraram
+                      os tokens semanticos correspondentes. */}
+                  <span className={`inline-flex items-center rounded-full border px-3 py-2 ${Math.abs(diferencaComposicao) <= 0.009 ? 'border-[var(--sem-success-border)] bg-[var(--sem-success-bg)] text-[var(--sem-success)]' : diferencaComposicao > 0 ? 'border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] text-[var(--sem-warning)]' : 'border-[var(--sem-danger-border)] bg-[var(--sem-danger-bg)] text-[var(--sem-danger)]'}`}>
                     {Math.abs(diferencaComposicao) <= 0.009
                       ? 'Fechado'
                       : diferencaComposicao > 0
@@ -2330,7 +2515,7 @@ export default function ComercialContratos() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              <div className="rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] px-3 py-2 text-xs text-[var(--sem-info)]">
                 <strong>Competencia DRE:</strong> {form.data_assinatura ? formatDate(form.data_assinatura) : 'informe a data de assinatura'}.
                 Todas as formas de pagamento usam automaticamente a assinatura do contrato como competencia.
               </div>
@@ -2386,7 +2571,7 @@ export default function ComercialContratos() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Valor da entrada</span>
-                    <input className="input w-full" inputMode="decimal" value={generator.valor_parcela} onChange={(e) => setGenerator((c) => ({ ...c, valor_parcela: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setGenerator((c) => ({ ...c, valor_parcela: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
+                    <input className="input input-moeda w-full" inputMode="decimal" value={generator.valor_parcela} onChange={(e) => setGenerator((c) => ({ ...c, valor_parcela: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setGenerator((c) => ({ ...c, valor_parcela: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
                   </label>
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Vencimento da entrada</span>
@@ -2407,7 +2592,7 @@ export default function ComercialContratos() {
                 </label>
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Valor parcela</span>
-                    <input className="input w-full" inputMode="decimal" value={generator.valor_parcela} onChange={(e) => setGenerator((c) => ({ ...c, valor_parcela: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setGenerator((c) => ({ ...c, valor_parcela: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
+                    <input className="input input-moeda w-full" inputMode="decimal" value={generator.valor_parcela} onChange={(e) => setGenerator((c) => ({ ...c, valor_parcela: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setGenerator((c) => ({ ...c, valor_parcela: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
                   </label>
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Primeiro vencimento</span>
@@ -2428,10 +2613,14 @@ export default function ComercialContratos() {
                     </button>
                   </div>
 
+                  {/* R10: a linha era
+                      `xl:grid-cols-[minmax(0,1.4fr)_150px_150px_160px_150px_auto]`.
+                      Colunas em degraus; o piso do campo de valor vem da
+                      `.input-moeda` (R6), nao de um px escrito aqui. */}
                   <div className="space-y-3">
                     {(generator.parcelas_personalizadas || []).map((item, index) => (
-                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_150px_150px_160px_150px_auto]">
-                        <label className="sol-filter-field">
+                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 sm:grid-cols-2 xl:grid-cols-6">
+                        <label className="sol-filter-field xl:col-span-2">
                           <span className="sol-filter-label">Descricao</span>
                           <input className="input w-full" value={item.descricao} onChange={(e) => updateParcelaCustomizada(index, 'descricao', e.target.value)} />
                         </label>
@@ -2453,7 +2642,7 @@ export default function ComercialContratos() {
                         </label>
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Valor</span>
-                          <input className="input w-full" inputMode="decimal" value={item.valor} onChange={(e) => updateParcelaCustomizada(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcelaCustomizada(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
+                          <input className="input input-moeda w-full" inputMode="decimal" value={item.valor} onChange={(e) => updateParcelaCustomizada(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcelaCustomizada(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
                         </label>
                         <div className="flex items-end">
                           <button type="button" className="btn btn-outline w-full" onClick={() => removerParcelaCustomizada(index)}>
@@ -2484,20 +2673,15 @@ export default function ComercialContratos() {
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                           <div className="space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                Forma {index + 1}
-                              </span>
-                              <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                                {getModoComposicaoLabel(plano.modo, modosComposicao)}
-                              </span>
+                              {/* R25/R10: quatro pilulas de paleta crua com
+                                  `px-2.5` (10px, fora da escala) viraram a
+                                  etiqueta do sistema — medida e cor sao dela. */}
+                              <StatusBadge status={`Forma ${index + 1}`} kind="neutral" />
+                              <StatusBadge status={getModoComposicaoLabel(plano.modo, modosComposicao)} kind="info" />
                               {plano.forma_recebimento_prevista && (
-                                <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                  {plano.forma_recebimento_prevista}
-                                </span>
+                                <StatusBadge status={plano.forma_recebimento_prevista} kind="success" />
                               )}
-                              <span className="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700">
-                                {plano.reajuste_tipo === 'REAJUSTAVEL' ? 'Reajustavel (R)' : 'Fixa (F)'}
-                              </span>
+                              <StatusBadge status={plano.reajuste_tipo === 'REAJUSTAVEL' ? 'Reajustavel (R)' : 'Fixa (F)'} kind="info" />
                             </div>
                             <div className="text-sm font-semibold text-[var(--c-text)]">
                               {plano.titulo_bloco || 'Composicao sem descricao'}
@@ -2539,7 +2723,7 @@ export default function ComercialContratos() {
                           </div>
                           <button
                             type="button"
-                            className="btn btn-outline btn-sm inline-flex shrink-0 items-center gap-1.5"
+                            className="btn btn-outline btn-sm inline-flex shrink-0 items-center gap-2"
                             onClick={() => setParcelaEditandoIndex(isEditing ? null : index)}
                             title={isEditing ? 'Concluir edicao da parcela' : 'Editar parcela'}
                           >
@@ -2596,7 +2780,7 @@ export default function ComercialContratos() {
                           <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
                             Valor
                             {isEditing ? (
-                              <input className="input w-full text-right" inputMode="decimal" value={item.valor || formatCurrencyInput(item.valor_original)} onChange={(e) => updateParcela(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcela(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
+                              <input className="input input-moeda w-full" inputMode="decimal" value={item.valor || formatCurrencyInput(item.valor_original)} onChange={(e) => updateParcela(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcela(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
                             ) : <span className="block text-sm font-semibold text-[var(--c-text)]">{formatCurrency(item.valor || item.valor_original)}</span>}
                           </label>
                           <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)] sm:col-span-2">
@@ -2723,7 +2907,7 @@ export default function ComercialContratos() {
                         render: (item) => (
                           parcelaEditandoIndex === item.__indice ? (
                             <input
-                              className="input w-full text-right"
+                              className="input input-moeda w-full"
                               inputMode="decimal"
                               value={item.valor || formatCurrencyInput(item.valor_original)}
                               onChange={(e) => updateParcela(item.__indice, 'valor', normalizeCurrencyTyping(e.target.value))}
@@ -2753,7 +2937,7 @@ export default function ComercialContratos() {
                         <>
                           <button
                             type="button"
-                            className="btn btn-outline btn-sm inline-flex items-center gap-1.5"
+                            className="btn btn-outline btn-sm inline-flex items-center gap-2"
                             onClick={() => setParcelaEditandoIndex(isEditing ? null : item.__indice)}
                             title={isEditing ? 'Concluir edicao da parcela' : 'Editar parcela'}
                           >
@@ -2832,38 +3016,49 @@ export default function ComercialContratos() {
               </button>
             )}
             {!form.id && (
-              <button type="button" className="btn btn-outline border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => limparDadosContrato()} disabled={saving}>
+              // C5/R25: a destrutiva fica apartada e em vermelho SUAVE do
+              // sistema (btn-perigo-suave), nao em paleta crua rose-*.
+              <button type="button" className="btn btn-outline btn-perigo-suave" onClick={confirmarLimparDadosContrato} disabled={saving}>
                 Limpar dados do contrato
               </button>
             )}
           </div>
         </form>
-      </section>
+      </BlocoConteudo>
 
-      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
-        <div className="sol-filtros-head">
-          <div>
-            <p className="sol-filtros-title">Carteira comercial</p>
-            <p className="sol-filtros-subtitle">Contratos de venda com acesso rapido ao financeiro.</p>
-          </div>
-          <div className="sol-filtros-meta">
-            <span>Total listado {contratosFiltrados.length}</span>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Status</span>
-            <select className="input w-full" value={statusFiltro} onChange={(e) => setStatusFiltro(e.target.value)}>
-              <option value="">Todos</option>
-              {STATUS_CONTRATO.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Busca</span>
-            <input className="input w-full" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Contrato, cliente ou unidade" />
-          </label>
-        </div>
+      <BlocoConteudo
+        titulo="Carteira comercial"
+        descricao="Contratos de venda com acesso rapido ao financeiro."
+      >
+        {/*
+          R12: o recorte era um `<select>` de Status com a busca solta ao lado
+          — as duas coisas que a regra proibe. Agora e a BarraFiltros: busca
+          unica em cima ocupando a faixa e, abaixo, o filtro por MARCACAO com
+          etiquetas removiveis.
+          R23/F3: o recorte e em memoria (`contratosFiltrados` e um useMemo
+          sobre a lista ja carregada), entao marcar APLICA na hora — nao ha
+          botao "Atualizar" nem requisicao por dimensao, e a etiqueta nunca
+          aparece antes de a lista mudar.
+          B3: a contagem do recorte mora no cabecalho fixo (uma vez so); o
+          "Total listado" que ficava aqui era o MESMO numero repetido.
+        */}
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: setBusca,
+            placeholder: 'Buscar contrato, cliente, unidade, empreendimento ou corretor'
+          }}
+          filtros={[{
+            id: 'status',
+            rotulo: 'Status',
+            opcoes: STATUS_CONTRATO.map((item) => ({ valor: item, rotulo: item }))
+          }]}
+          ativos={{ status: statusFiltro }}
+          aoAlternar={(dim, valor, opcoes) => setStatusFiltro(
+            alternarValorFiltro({ status: statusFiltro }, dim, valor, opcoes).status
+          )}
+          aoLimpar={() => setStatusFiltro(new Set())}
+        />
 
         {/* R18: o container antes tinha `overflow-hidden`, que cria contexto de
             rolagem e mata o sticky do cabecalho e da coluna fixa da tabela.
@@ -2888,11 +3083,15 @@ export default function ComercialContratos() {
                 ordenavel: true,
                 valorOrdenacao: (item) => item.status || '',
                 render: (item) => (
-                  <div className="flex flex-col items-start gap-1.5">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
+                  <div className="flex flex-col items-start gap-2">
+                    {/* R25: a pilula crua do statusClass() virou StatusBadge;
+                        a familia semantica vai explicita no `kind` para a cor
+                        continuar significando o mesmo (DISTRATADO segue
+                        vermelho, que o classificador generico nao acerta). */}
+                    <StatusBadge status={item.status} kind={familiaStatusContrato(item.status)} />
                     {item.indicadoresFinanceiros?.status_sugerido && item.indicadoresFinanceiros.status_sugerido !== item.status && (
-                      <span className="inline-flex max-w-full rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700" title={`Financeiro sugere ${item.indicadoresFinanceiros.status_sugerido}`}>
-                        Sugere {item.indicadoresFinanceiros.status_sugerido}
+                      <span title={`Financeiro sugere ${item.indicadoresFinanceiros.status_sugerido}`}>
+                        <StatusBadge status={`Sugere ${item.indicadoresFinanceiros.status_sugerido}`} kind="warning" />
                       </span>
                     )}
                   </div>
@@ -2982,9 +3181,12 @@ export default function ComercialContratos() {
             larguraAcoes={140}
             acoesLinha={(item) => (
               <>
+                {/* R10: `h-9 w-9` (36px) nao e degrau da escala. O alvo de
+                    clique minimo (32px no mouse, 44px no toque) ja e imposto
+                    pelo `.btn` (R2) — a tela nao escreve a medida. */}
                 <button
                   type="button"
-                  className="btn btn-outline btn-sm inline-flex h-9 w-9 items-center justify-center p-0"
+                  className="btn btn-outline btn-sm btn-icon inline-flex items-center justify-center"
                   onClick={() => selecionarContrato(item.id)}
                   title="Abrir detalhes"
                   aria-label={`Abrir detalhes do contrato ${item.numero}`}
@@ -2993,7 +3195,7 @@ export default function ComercialContratos() {
                 </button>
                 <button
                   type="button"
-                  className="btn btn-outline btn-sm inline-flex h-9 w-9 items-center justify-center p-0"
+                  className="btn btn-outline btn-sm btn-icon inline-flex items-center justify-center"
                   onClick={() => editarContrato(item.id)}
                   title="Editar resumo"
                   aria-label={`Editar resumo do contrato ${item.numero}`}
@@ -3004,25 +3206,25 @@ export default function ComercialContratos() {
             )}
           />
         </div>
-      </section>
+      </BlocoConteudo>
 
       {contratoSelecionado && (
-        <section className="sol-surface-card rounded-2xl p-4 md:p-5">
-          <div className="sol-filtros-head">
-            <div>
-              <p className="sol-filtros-title">Detalhe do contrato {contratoSelecionado.numero}</p>
-              <p className="sol-filtros-subtitle">Parcelas geradas e acesso aos titulos do financeiro.</p>
-            </div>
-          </div>
+        <BlocoConteudo
+          titulo={`Detalhe do contrato ${contratoSelecionado.numero}`}
+          descricao="Parcelas geradas e acesso aos titulos do financeiro."
+        >
 
           <div className="mt-4 overflow-hidden rounded-xl border border-[var(--c-border)]">
             <div className="bg-[var(--c-bg)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">Unidades vinculadas</div>
+            {/* R10: a linha era `md:grid-cols-[minmax(0,1fr)_170px_170px_auto]`
+                — largura de coluna escrita na tela. Os dois valores usam
+                `tabular-nums` (R6) para alinhar entre as linhas. */}
             <div className="divide-y divide-[var(--c-border)]">
               {(contratoSelecionado.unidades || []).map((item) => (
-                <div key={item.unidade_comercial_id} className="grid gap-1 px-3 py-2 text-sm md:grid-cols-[minmax(0,1fr)_170px_170px_auto]">
+                <div key={item.unidade_comercial_id} className="grid gap-1 px-3 py-2 text-sm md:grid-cols-4">
                   <span className="font-medium text-[var(--c-text)]">{buildUnidadeOptionLabel(item.unidade)}</span>
-                  <span className="text-[var(--c-muted)]">Cadastro: {formatCurrency(item.valor_cadastro_referencia)}</span>
-                  <span className="text-[var(--c-text)]">Real: {formatCurrency(item.valor_atribuido)}</span>
+                  <span className="text-[var(--c-muted)] tabular-nums">Cadastro: {formatCurrency(item.valor_cadastro_referencia)}</span>
+                  <span className="text-[var(--c-text)] tabular-nums">Real: {formatCurrency(item.valor_atribuido)}</span>
                   <span className="text-xs text-[var(--c-muted)]">{item.principal ? 'Principal' : ''}</span>
                 </div>
               ))}
@@ -3079,7 +3281,7 @@ export default function ComercialContratos() {
           </div>
 
           {(contratoSelecionado.data_distrato || contratoSelecionado.motivo_distrato) && (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+            <div className="mt-4 rounded-2xl border border-[var(--sem-danger-border)] bg-[var(--sem-danger-bg)] p-4 text-sm text-[var(--sem-danger)]">
               <strong>Distrato registrado.</strong> Data: {formatDate(contratoSelecionado.data_distrato)}. Motivo: {contratoSelecionado.motivo_distrato || '-'}
             </div>
           )}
@@ -3107,7 +3309,7 @@ export default function ComercialContratos() {
                 {isSuperadmin && (
                   <button
                     type="button"
-                    className="btn btn-outline border-rose-200 text-rose-700 hover:bg-rose-50"
+                    className="btn btn-outline btn-perigo-suave"
                     onClick={handleExcluirContrato}
                     disabled={processingAction === 'excluir' || possuiContratoAssinado}
                     title={possuiContratoAssinado ? 'Contratos assinados nao podem ser excluidos.' : 'Excluir contrato nao assinado'}
@@ -3138,7 +3340,7 @@ export default function ComercialContratos() {
                 </label>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Novo valor total</span>
-                  <input className="input w-full" inputMode="decimal" value={trocaForm.novo_valor_total} onChange={(e) => setTrocaForm((current) => ({ ...current, novo_valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setTrocaForm((current) => ({ ...current, novo_valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
+                  <input className="input input-moeda w-full" inputMode="decimal" value={trocaForm.novo_valor_total} onChange={(e) => setTrocaForm((current) => ({ ...current, novo_valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setTrocaForm((current) => ({ ...current, novo_valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
                 </label>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Data efetiva</span>
@@ -3161,7 +3363,7 @@ export default function ComercialContratos() {
             )}
 
             {showDistrato && (
-              <div className="grid gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 md:grid-cols-3">
+              <div className="grid gap-3 rounded-2xl border border-[var(--sem-danger-border)] bg-[var(--sem-danger-bg)] p-4 md:grid-cols-3">
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Data do distrato</span>
                   <input className="input w-full" type="date" value={distratoForm.data_distrato} onChange={(e) => setDistratoForm((current) => ({ ...current, data_distrato: e.target.value }))} />
@@ -3172,7 +3374,7 @@ export default function ComercialContratos() {
                 </label>
                 <label className="sol-filter-field md:col-span-3">
                   <span className="sol-filter-label">Observacoes</span>
-                  <textarea className="input min-h-[92px] w-full" value={distratoForm.observacoes} onChange={(e) => setDistratoForm((current) => ({ ...current, observacoes: e.target.value }))} />
+                  <textarea className="input w-full" rows={3} value={distratoForm.observacoes} onChange={(e) => setDistratoForm((current) => ({ ...current, observacoes: e.target.value }))} />
                 </label>
                 <div className="md:col-span-3">
                   <button type="button" className="btn btn-primary" onClick={handleDistratarContrato} disabled={processingAction === 'distrato'}>
@@ -3227,7 +3429,7 @@ export default function ComercialContratos() {
             </div>
 
             {modelosDoContratoSelecionado.length === 0 && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="rounded-2xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] p-3 text-sm text-[var(--sem-warning)]">
                 Cadastre um modelo DOCX para este empreendimento e tipo de documento antes de gerar o PDF.
                 <Link className="btn btn-outline btn-sm ml-2" to="/comercial/modelos-contrato">
                   Abrir modelos
@@ -3236,13 +3438,13 @@ export default function ComercialContratos() {
             )}
 
             {!possuiModeloQuadroResumoSelecionado && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="rounded-2xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] p-3 text-sm text-[var(--sem-warning)]">
                 Para gerar o contrato completo, cadastre tambem um modelo ativo de Quadro Resumo para este empreendimento.
               </div>
             )}
 
             {possuiContratoAssinado && (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <div className="rounded-2xl border border-[var(--sem-success-border)] bg-[var(--sem-success-bg)] p-3 text-sm text-[var(--sem-success)]">
                 Este contrato ja possui documento assinado digitalmente. Uma nova geracao fica bloqueada para preservar o arquivo assinado.
               </div>
             )}
@@ -3262,11 +3464,13 @@ export default function ComercialContratos() {
                         <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">{documentoTipoLabel(documento.tipo_documento)}</div>
                         <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{documento.nome}</div>
                         <div className="mt-1 text-xs text-[var(--c-muted)]">Status: {documento.status}</div>
-                        {documento.erro && <div className="mt-2 text-xs text-rose-600">{documento.erro}</div>}
+                        {documento.erro && <div className="mt-2 text-xs text-[var(--sem-danger)]">{documento.erro}</div>}
                       </div>
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(documento.status)}`}>
-                        {documento.status}
-                      </span>
+                      {/* R25: o statusClass() so conhecia status de CONTRATO —
+                          status de documento (GERADO, ASSINADO, ERRO) caia no
+                          cinza padrao. O StatusBadge classifica pelo texto e
+                          da a cor certa a cada um. */}
+                      <StatusBadge status={documento.status} />
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <button type="button" className="btn btn-outline" onClick={() => abrirDocumentoContrato(documento.id, 'pdf')}>
@@ -3275,7 +3479,7 @@ export default function ComercialContratos() {
                       {isSuperadmin && (
                         <button
                           type="button"
-                          className="btn btn-outline border-rose-200 text-rose-700 hover:bg-rose-50"
+                          className="btn btn-outline btn-perigo-suave"
                           onClick={() => handleExcluirDocumentoContrato(documento)}
                           disabled={processingAction === `excluir-doc-${documento.id}` || documentoAssinado}
                           title={documentoAssinado ? 'Documentos assinados nao podem ser excluidos.' : 'Excluir PDF gerado'}
@@ -3366,9 +3570,7 @@ export default function ComercialContratos() {
                   titulo: 'Status financeiro',
                   tipo: 'status',
                   render: (parcela) => (
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(parcela.tituloFinanceiro?.status || 'ABERTO')}`}>
-                      {parcela.tituloFinanceiro?.status || 'ABERTO'}
-                    </span>
+                    <StatusBadge status={parcela.tituloFinanceiro?.status || 'ABERTO'} />
                   )
                 }
               ]}
@@ -3399,20 +3601,23 @@ export default function ComercialContratos() {
                 (contratoSelecionado.eventos || []).map((evento) => (
                   <article key={`${evento.id}-${evento.data_evento}`} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
                     <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{evento.tipo_evento}</span>
+                      <StatusBadge status={evento.tipo_evento} kind="neutral" />
                       <span className="text-[var(--c-muted)]">{formatDate(evento.data_evento)}</span>
                       <span className="text-[var(--c-muted)]">{evento.criadoPor?.nome || '-'}</span>
                     </div>
                     <div className="mt-2 text-sm font-medium text-[var(--c-text)]">{evento.descricao}</div>
+                    {/* R25: o bloco era `bg-slate-950/90 text-slate-100` —
+                        preto fixo que no tema escuro some no fundo. Agora e a
+                        superficie rebaixada do sistema. */}
                     {evento.metadata && (
-                      <pre className="mt-2 overflow-x-auto rounded-xl bg-slate-950/90 p-3 text-xs text-slate-100">{JSON.stringify(evento.metadata, null, 2)}</pre>
+                      <pre className="mt-2 overflow-x-auto rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface-2)] p-3 text-xs text-[var(--c-text)]">{JSON.stringify(evento.metadata, null, 2)}</pre>
                     )}
                   </article>
                 ))
               )}
             </div>
           </div>
-        </section>
+        </BlocoConteudo>
       )}
 
       {pessoaRapidaModal && (
@@ -3434,6 +3639,7 @@ export default function ComercialContratos() {
             </div>
 
             <div className="quick-person-body">
+              {faixaAvisos}
               <section className="quick-person-section">
                 <div className="quick-person-section-head">
                   <h3>Identificacao</h3>
@@ -3448,11 +3654,11 @@ export default function ComercialContratos() {
                   onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, cpf_cnpj: maskCpfCnpj(e.target.value) }))}
                   onBlur={() => {
                     if (pessoaRapidaModal === 'testemunha' && pessoaRapidaForm.cpf_cnpj && onlyDigits(pessoaRapidaForm.cpf_cnpj).length !== 11) {
-                      setError('Informe um CPF valido para a testemunha.');
+                      avisar.erro('Informe um CPF valido para a testemunha.');
                       return;
                     }
                     if (pessoaRapidaForm.cpf_cnpj && !isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
-                      setError('Informe um CPF/CNPJ valido no cadastro rapido.');
+                      avisar.erro('Informe um CPF/CNPJ valido no cadastro rapido.');
                     }
                   }}
                   required
@@ -3652,7 +3858,7 @@ export default function ComercialContratos() {
                           onChange={(e) => atualizarConjugeRapido('cpf_cnpj', maskCpfCnpj(e.target.value))}
                           onBlur={() => {
                             if (pessoaRapidaForm.conjuge.cpf_cnpj && !isValidCpfCnpj(pessoaRapidaForm.conjuge.cpf_cnpj)) {
-                              setError('Informe um CPF/CNPJ valido para o conjuge.');
+                              avisar.erro('Informe um CPF/CNPJ valido para o conjuge.');
                             }
                           }}
                         />
@@ -3818,6 +4024,10 @@ export default function ComercialContratos() {
           </div>
         </div>
       )}
-    </div>
+
+      {/* R19/R21/R26: o modal de confirmacao do sistema, no lugar das tres
+          caixas `window.confirm`. */}
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

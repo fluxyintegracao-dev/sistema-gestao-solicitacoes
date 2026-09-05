@@ -1,5 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { TabelaPadrao } from '../components/padrao';
+import { useEffect, useState } from 'react';
+import {
+  Avisos,
+  BlocoConteudo,
+  CampoForm,
+  FormSecao,
+  Pagina,
+  PageHeader,
+  TabelaPadrao,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
+import { formatCurrencyBRL } from '../utils/formatters';
 import { getMinhasObras } from '../services/obras';
 import { getContratoObraCategorias, getApropriacoesDaObra } from '../services/configuracoesSistema';
 import { criarContratoFluxoNovo, aprovarContratoFluxoNovo, rejeitarContratoFluxoNovo } from '../services/contratos';
@@ -15,6 +27,18 @@ import { buscarParceiros } from '../services/parceiros';
  */
 
 const LIMITE_DETALHES = 50000;
+
+// Para onde a seta do cabecalho devolve (R11/C3): a listagem de onde os contratos vivem.
+const CAMINHO_GESTAO_CONTRATOS = '/gestao-contratos';
+
+// O status do backend em texto de gente — o `StatusBadge` imprime o que recebe, e
+// AGUARDANDO_APROVACAO com sublinhado nao e rotulo. "Aprovado" para ATIVO preserva o
+// que a tela ja dizia antes da reforma.
+const ROTULO_STATUS_CONTRATO = {
+  AGUARDANDO_APROVACAO: 'Aguardando aprovacao',
+  ATIVO: 'Aprovado',
+  REJEITADO: 'Rejeitado'
+};
 
 // Conversao por DIGITOS, igual ao backend: toFixed arredonda o binario e divergia do
 // DECIMAL do MySQL (8333.335 -> tela 8333,33 x banco 8333,34 — F2 da auditoria).
@@ -60,9 +84,13 @@ export default function ContratoFluxoNovo() {
   const [credorBusca, setCredorBusca] = useState('');
   const [credorResultados, setCredorResultados] = useState([]);
   const [credorNome, setCredorNome] = useState('');
-  const [erro, setErro] = useState('');
-  const [sucesso, setSucesso] = useState(null);
+  const [contratoCriado, setContratoCriado] = useState(null);
   const [salvando, setSalvando] = useState(false);
+
+  // R3/R19 — erro e sucesso na faixa do sistema, dentro da pagina, com o tom
+  // semantico e fechavel pelo usuario. Nada de caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   useEffect(() => {
     (async () => {
@@ -104,13 +132,19 @@ export default function ContratoFluxoNovo() {
       if (diferenca > 0) { const c = Math.min(p.cent, diferenca); p.cent -= c; diferenca -= c; }
       else { p.cent += -diferenca; diferenca = 0; }
     }
-    if (diferenca !== 0) { setErro('O valor excede o saldo do contrato.'); return; }
-    setErro('');
+    if (diferenca !== 0) {
+      avisar.erro(
+        `A parcela ${numero} nao cabe: o valor excede o saldo do contrato (${formatCurrencyBRL(totalCent / 100)}). `
+        + 'Reduza o valor desta parcela ou aumente o valor total do contrato.',
+        'Valor acima do total do contrato'
+      );
+      return;
+    }
     setParcelas(lista.map(({ cent, ...p }) => ({ ...p, valor: cent / 100 })));
   }
 
   async function salvar() {
-    setSalvando(true); setErro(''); setSucesso(null);
+    setSalvando(true); setContratoCriado(null);
     try {
       const r = await criarContratoFluxoNovo({
         obra_id: Number(form.obra_id),
@@ -128,102 +162,309 @@ export default function ContratoFluxoNovo() {
         forma_pagamento_id: Number(form.forma_pagamento_id),
         apropriacoes: [{ apropriacao_id: Number(form.apropriacao_id), percentual: 100 }]
       });
-      setSucesso(r.contrato);
-    } catch (e) { setErro(e.message); } finally { setSalvando(false); }
+      setContratoCriado(r.contrato);
+    } catch (e) {
+      avisar.erro(
+        `${e?.message || 'Falha ao falar com o servidor.'} O contrato NAO foi criado — o que voce digitou continua na tela. `
+        + 'Corrija o que a mensagem aponta e clique de novo em criar; nao recarregue a pagina.',
+        'Nao foi possivel criar o contrato'
+      );
+    } finally { setSalvando(false); }
+  }
+
+  async function aprovar() {
+    // R26 — o contrato e FIXADO antes do `await`: a tela segue montada e clicavel
+    // enquanto a requisicao corre, e ler `contratoCriado` de novo depois dela faria a
+    // mensagem nomear um contrato e a acao ter tocado outro. (Aqui nao ha confirmacao:
+    // aprovar segue o fluxo e nao destroi nada — a rejeicao, sim, confirma e pede motivo.)
+    const contrato = contratoCriado;
+    if (!contrato) return;
+    try {
+      const r = await aprovarContratoFluxoNovo(contrato.id);
+      setContratoCriado({ ...contrato, status_contrato: r.contrato.status_contrato });
+      avisar.sucesso(
+        `Contrato ${contrato.codigo} aprovado. As parcelas previstas passam a valer no financeiro.`,
+        'Contrato aprovado'
+      );
+    } catch (e) {
+      avisar.erro(
+        `${e?.message || 'Falha ao falar com o servidor.'} O contrato ${contrato.codigo} continua aguardando aprovacao.`,
+        'Nao foi possivel aprovar'
+      );
+    }
+  }
+
+  async function rejeitar() {
+    /*
+      R19/R3 — era `window.prompt('Motivo da rejeicao:')`: a caixa do Chrome,
+      que ignora tema e tokens, nao existe no DOM e some sem rastro. O
+      substituto do sistema para "confirmar PEDINDO UM TEXTO" e o `campo` do
+      `useConfirmacao`, que devolve o texto junto com o `ok`.
+
+      R21 — o retorno e OBJETO e vai DESESTRUTURADO. `const ok = await
+      confirmar(...)` compila, roda, e faz o "Cancelar" seguir com a acao,
+      porque objeto e sempre truthy.
+
+      R26 — o contrato e fixado numa `const` ANTES do `await`, e a acao usa
+      essa `const`. Com o `prompt` a pagina ficava bloqueada e nada podia
+      mudar entre a pergunta e a acao; com o modal do sistema a tela segue
+      montada e clicavel, e reler o estado depois do `await` faria a tela
+      perguntar sobre um contrato e rejeitar outro.
+
+      O texto diz QUAL contrato e o que acontece depois: pelo backend
+      (`rejeitarContrato`), rejeitar NAO e terminal — as parcelas em previsao
+      passam a REJEITADA, a solicitacao volta como PENDENTE DE AJUSTE e o
+      motivo fica registrado no historico do contrato.
+    */
+    const contrato = contratoCriado;
+    if (!contrato) return;
+    const { ok, texto } = await confirmar({
+      titulo: 'Rejeitar contrato',
+      mensagem: `Rejeitar o contrato ${contrato.codigo}? As parcelas em previsao passam a rejeitadas e a `
+        + 'solicitacao volta para ajuste — o contrato nao e excluido, e o motivo fica no historico dele.',
+      campo: { rotulo: 'Motivo da rejeicao', obrigatorio: true, multilinha: true },
+      rotuloConfirmar: 'Rejeitar contrato',
+      rotuloCancelar: 'Manter aguardando aprovacao',
+      destrutiva: true
+    });
+    if (!ok) return;
+    try {
+      const r = await rejeitarContratoFluxoNovo(contrato.id, String(texto || '').trim());
+      setContratoCriado({ ...contrato, status_contrato: r.contrato.status_contrato });
+      // O numero vem da RESPOSTA do servidor, nunca de uma contagem paralela da tela.
+      const rejeitadas = Number(r.parcelas_rejeitadas || 0);
+      avisar.sucesso(
+        `Contrato ${contrato.codigo} rejeitado e devolvido para ajuste`
+        + (rejeitadas ? `; ${rejeitadas} parcela(s) em previsao foram rejeitadas.` : '.'),
+        'Contrato devolvido para ajuste'
+      );
+    } catch (e) {
+      avisar.erro(
+        `${e?.message || 'Falha ao falar com o servidor.'} O contrato ${contrato.codigo} continua aguardando aprovacao.`,
+        'Nao foi possivel rejeitar'
+      );
+    }
   }
 
   const campo = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const exigeDetalhes = Number(form.valor_total) > LIMITE_DETALHES;
+  const aguardandoAprovacao = contratoCriado?.status_contrato === 'AGUARDANDO_APROVACAO';
 
+  /*
+    ESTRUTURA DA TELA (reforma 05/09).
+
+    Antes: `div.page.solicitacoes-page` cru, sem faixa fixa nenhuma (R13/C1) —
+    ao rolar a previa de parcelas, o unico botao "Criar contrato" saia da tela;
+    `<h1 class="page-title">` com um `<p>` de apoio solto embaixo, colorido por
+    style inline (R5/C2); rotulo como texto solto dentro do `<label>` (R7); e
+    medidas em px escritas a mao (R10).
+
+    Agora: `Pagina` (ritmo vertical e posicao da faixa fixa), `PageHeader`
+    (faixa fixa R13, apoio na prop `descricao` R5, seta de voltar R11/C3 e a
+    acao principal na faixa, que e o que a mantem a um clique em pagina longa),
+    `BlocoConteudo` primario com a cor do modulo de contratos, `FormSecao` +
+    `CampoForm` (R7: mesma altura, rotulo sempre acima do campo) e
+    `.input-moeda` em todo campo de dinheiro (R6).
+  */
   return (
-    <div className="page solicitacoes-page">
-      <h1 className="page-title">Novo contrato</h1>
-      <p className="text-sm mt-1" style={{ color: 'var(--c-muted)' }}>
-        O contrato e criado aguardando aprovacao; as parcelas so entram no financeiro quando aprovado.
-      </p>
+    <Pagina>
+      <PageHeader
+        titulo="Novo contrato"
+        descricao="O contrato e criado aguardando aprovacao; as parcelas so entram no financeiro quando aprovado."
+        voltar={{ to: CAMINHO_GESTAO_CONTRATOS, title: 'Voltar para a gestao de contratos' }}
+        acaoPrincipal={{
+          rotulo: salvando ? 'Criando...' : 'Criar contrato',
+          onClick: salvar,
+          desabilitada: salvando
+        }}
+      />
 
-      <div className="card space-y-3">
-        {erro && <div className="app-alert app-alert--error">{erro}</div>}
-        {sucesso && (
-          <div className="app-alert app-alert--success">
-            Contrato {sucesso.codigo} criado — aguardando aprovacao.
-            {sucesso.status_contrato === 'AGUARDANDO_APROVACAO' && (
-              <span style={{ marginLeft: 12 }}>
-                <button type="button" className="btn btn-outline btn-sm" onClick={async () => {
-                  try { const r = await aprovarContratoFluxoNovo(sucesso.id); setSucesso({ ...sucesso, status_contrato: r.contrato.status_contrato }); setErro(''); }
-                  catch (e) { setErro(e.message); }
-                }}>Aprovar</button>
-                <button type="button" className="btn btn-outline btn-sm" style={{ marginLeft: 6 }} onClick={async () => {
-                  const motivo = window.prompt('Motivo da rejeicao:');
-                  if (!motivo) return;
-                  try { const r = await rejeitarContratoFluxoNovo(sucesso.id, motivo); setSucesso({ ...sucesso, status_contrato: r.contrato.status_contrato }); setErro(''); }
-                  catch (e) { setErro(e.message); }
-                }}>Rejeitar</button>
-              </span>
-            )}
-            {sucesso.status_contrato === 'ATIVO' && <strong style={{ marginLeft: 8 }}>APROVADO</strong>}
-            {sucesso.status_contrato === 'REJEITADO' && <strong style={{ marginLeft: 8 }}>REJEITADO</strong>}
-          </div>
-        )}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <label className="text-sm">Obra
-            <select className="input" value={form.obra_id} onChange={campo('obra_id')}>
+      {contratoCriado && (
+        /* B5: o resultado tem superficie propria, e o codigo do contrato e o
+           titulo do bloco — numero sem contexto era o que o `app-alert` dava. */
+        <BlocoConteudo
+          titulo={`Contrato ${contratoCriado.codigo}`}
+          descricao="Criado por este formulario."
+          acoes={(
+            <StatusBadge
+              status={ROTULO_STATUS_CONTRATO[contratoCriado.status_contrato] || contratoCriado.status_contrato}
+            />
+          )}
+        >
+          {aguardandoAprovacao ? (
+            <>
+              <p className="app-note">
+                As parcelas ficam em previsao ate a aprovacao. Rejeitar devolve o contrato para
+                ajuste — nao o exclui.
+              </p>
+              {/* C5: primario solido para a acao que segue o fluxo; a destrutiva
+                  em vermelho suave e APARTADA. */}
+              <div className="app-actionbar">
+                <button type="button" className="btn btn-primary" onClick={aprovar}>
+                  Aprovar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-perigo-suave app-actionbar-apartada"
+                  onClick={rejeitar}
+                >
+                  Rejeitar
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="app-note">
+              {contratoCriado.status_contrato === 'ATIVO'
+                ? 'Contrato aprovado: as parcelas valem no financeiro.'
+                : 'Contrato rejeitado e devolvido para ajuste. O motivo esta no historico do contrato.'}
+            </p>
+          )}
+        </BlocoConteudo>
+      )}
+
+      <BlocoConteudo
+        variante="primario"
+        cor="var(--module-contratos)"
+        descricao="Acima do limite do Juridico a negociacao detalhada e obrigatoria e vira documento anexado depois da criacao."
+      >
+        <FormSecao legenda="Identificacao do contrato" colunas={3}>
+          <CampoForm label="Obra" obrigatorio>
+            <select className="input w-full" value={form.obra_id} onChange={campo('obra_id')}>
               <option value="">Selecione</option>
               {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
             </select>
-          </label>
-          <label className="text-sm" style={{ position: 'relative' }}>Credor
-            <input className="input" value={credorNome || credorBusca}
-              placeholder="Digite para buscar"
-              onChange={async (e) => {
-                const termo = e.target.value;
-                setCredorNome(''); setCredorBusca(termo);
-                setForm((f) => ({ ...f, parceiro_id: '' }));
-                if (termo.length < 2) { setCredorResultados([]); return; }
-                const r = await buscarParceiros({ q: termo }).catch(() => []);
-                setCredorResultados((Array.isArray(r) ? r : r?.parceiros || []).slice(0, 8));
-              }} />
-            {credorResultados.length > 0 && (
-              <div className="card" style={{ position: 'absolute', zIndex: 10, width: '100%', padding: 4 }}>
-                {credorResultados.map((pRes) => (
-                  <button key={pRes.id} type="button" className="btn btn-outline btn-sm"
-                    style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 2 }}
-                    onClick={() => { setForm((f) => ({ ...f, parceiro_id: pRes.id })); setCredorNome(pRes.nome); setCredorResultados([]); }}>
-                    {pRes.nome} {pRes.cpf_cnpj ? '(' + pRes.cpf_cnpj + ')' : ''}
-                  </button>
-                ))}
-              </div>
-            )}
-          </label>
-          <label className="text-sm">Referencia
-            <input className="input" value={form.ref_contrato} onChange={campo('ref_contrato')} />
-          </label>
-          <label className="text-sm">Categoria financeira
-            <select className="input" value={form.categoria_financeira_id} onChange={campo('categoria_financeira_id')}>
+          </CampoForm>
+
+          {/*
+            Campo COMPOSTO (entrada + lista de resultados). Usa as classes do
+            CampoForm mas num `div`, nao num `label`: o `CampoForm` sempre
+            envolve num `<label>`, e um `<label>` em volta de varios controles
+            rouba o clique dos botoes para o primeiro campo. Mesma lacuna ja
+            registrada na FinanceiroTituloNovo — R21: nao se muda o contrato do
+            componente padrao por causa de uma tela.
+          */}
+          <div className="form-group">
+            <span className="form-label form-label--required">Credor</span>
+            <div className="relative">
+              <input
+                className="input w-full"
+                value={credorNome || credorBusca}
+                placeholder="Digite para buscar"
+                onChange={async (e) => {
+                  const termo = e.target.value;
+                  setCredorNome(''); setCredorBusca(termo);
+                  setForm((f) => ({ ...f, parceiro_id: '' }));
+                  if (termo.length < 2) { setCredorResultados([]); return; }
+                  const r = await buscarParceiros({ q: termo }).catch(() => []);
+                  setCredorResultados((Array.isArray(r) ? r : r?.parceiros || []).slice(0, 8));
+                }}
+              />
+              {credorResultados.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1 shadow-lg">
+                  {credorResultados.map((pRes) => (
+                    <button
+                      key={pRes.id}
+                      type="button"
+                      className="btn btn-outline btn-sm mb-1 block w-full text-left"
+                      onClick={() => {
+                        setForm((f) => ({ ...f, parceiro_id: pRes.id }));
+                        setCredorNome(pRes.nome);
+                        setCredorResultados([]);
+                      }}
+                    >
+                      {pRes.nome} {pRes.cpf_cnpj ? '(' + pRes.cpf_cnpj + ')' : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="form-hint">
+              {form.parceiro_id ? `Credor selecionado: ${credorNome}` : 'Busque por nome ou CPF/CNPJ e escolha na lista.'}
+            </span>
+          </div>
+
+          <CampoForm label="Referencia">
+            <input className="input w-full" value={form.ref_contrato} onChange={campo('ref_contrato')} />
+          </CampoForm>
+
+          {/*
+            SEM asterisco de obrigatorio, e a diferenca e do backend, nao de estilo:
+            `criarContrato` NAO exige a categoria (PI-16 — quem abre o contrato e o
+            usuario da obra, que nao conhece o plano de contas). Quem a exige e a
+            APROVACAO (`garantirCategoriaParaTitulos`). Marcar como obrigatoria aqui
+            seria a tela afirmando uma regra que o servidor nao tem.
+          */}
+          <CampoForm
+            label="Categoria financeira"
+            hint="Nao e exigida para criar; sem ela, porem, a aprovacao do contrato e barrada."
+          >
+            <select className="input w-full" value={form.categoria_financeira_id} onChange={campo('categoria_financeira_id')}>
               <option value="">Selecione</option>
               {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
-          </label>
-          <label className="text-sm">Apropriacao
-            <select className="input" value={form.apropriacao_id} onChange={campo('apropriacao_id')}>
+          </CampoForm>
+
+          <CampoForm label="Apropriacao" obrigatorio hint="A lista depende da obra escolhida.">
+            <select className="input w-full" value={form.apropriacao_id} onChange={campo('apropriacao_id')}>
               <option value="">Selecione</option>
               {apropriacoesObra.map((a) => <option key={a.id} value={a.id}>{a.codigo} — {a.descricao}</option>)}
             </select>
-          </label>
-          <label className="text-sm">Valor total
-            <input className="input" type="number" step="0.01" value={form.valor_total} onChange={campo('valor_total')} />
-          </label>
-          <label className="text-sm">Qtde parcelas
-            <input className="input" type="number" min="1" value={form.qtde_parcelas} onChange={campo('qtde_parcelas')} />
-          </label>
-          <label className="text-sm">1º vencimento
-            <input className="input" type="date" value={form.primeiro_vencimento} onChange={campo('primeiro_vencimento')} />
-          </label>
-          <div className="text-sm" style={{ alignSelf: 'end' }}>
-            <strong>Saldo:</strong> R$ {(saldoCent / 100).toFixed(2)}
+          </CampoForm>
+        </FormSecao>
+
+        <FormSecao legenda="Valores e parcelas" colunas={3}>
+          <CampoForm label="Valor total" obrigatorio>
+            <input
+              className="input input-moeda w-full"
+              type="number"
+              step="0.01"
+              value={form.valor_total}
+              onChange={campo('valor_total')}
+            />
+          </CampoForm>
+
+          <CampoForm label="Qtde parcelas" obrigatorio>
+            <input className="input w-full" type="number" min="1" value={form.qtde_parcelas} onChange={campo('qtde_parcelas')} />
+          </CampoForm>
+
+          <CampoForm label="1º vencimento" obrigatorio>
+            <input className="input w-full" type="date" value={form.primeiro_vencimento} onChange={campo('primeiro_vencimento')} />
+          </CampoForm>
+
+          {/*
+            R6: valor em pt-BR, com separador de milhar e `tabular-nums` —
+            `R$ 1234.56` nao e moeda brasileira.
+
+            E o SALDO ZERO ganha frase, nao numero: "Saldo: R$ 0,00" confundiu o
+            cliente no bloco irmao (BlocoContratoFluxoNovo, 20/08) porque zero
+            sem contexto parece campo vazio ou erro, quando e exatamente o estado
+            CERTO — as parcelas fecham o contrato.
+          */}
+          <div className="form-group form-campo--linha">
+            <span className="form-label">Saldo a distribuir</span>
+            <div
+              className={`valor-tabular flex min-h-12 flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${
+                saldoCent === 0
+                  ? 'border-[var(--sem-success-border)] bg-[var(--sem-success-bg)] text-[var(--sem-success)]'
+                  : 'border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] text-[var(--sem-warning)]'
+              }`}
+            >
+              <span className="font-semibold">{formatCurrencyBRL(Math.abs(saldoCent) / 100)}</span>
+              <span className="text-xs">
+                {saldoCent === 0
+                  ? 'As parcelas fecham o valor do contrato.'
+                  : saldoCent > 0
+                    ? 'Falta distribuir — ajuste as parcelas ate fechar o total.'
+                    : 'Passou do valor do contrato — reduza as parcelas ate fechar o total.'}
+              </span>
+            </div>
+            <span className="form-hint">
+              Diferenca entre o valor total do contrato e a soma das parcelas previstas abaixo.
+            </span>
           </div>
-        </div>
+        </FormSecao>
 
         {/* A negociacao detalhada virou DOCUMENTO (20/08). Esta tela nao tem o campo de anexo — ela
             cria o contrato antes de existir um contrato a que anexar —, entao aqui fica o aviso.
@@ -251,8 +492,11 @@ export default function ContratoFluxoNovo() {
                 id: 'valor',
                 titulo: 'Valor',
                 tipo: 'valor',
+                /* R6 — dinheiro editavel tambem e campo de dinheiro: `.input-moeda`
+                   (180px, a direita, tabular-nums). `w-full` para acompanhar a coluna
+                   quando o usuario a alarga; abaixo disso vale o piso da classe. */
                 render: (p) => (
-                  <input className="input" type="number" step="0.01"
+                  <input className="input input-moeda w-full" type="number" step="0.01"
                     value={p.valor}
                     onChange={(e) => editarParcela(p.numero, e.target.value)} />
                 )
@@ -280,13 +524,9 @@ export default function ContratoFluxoNovo() {
             semIdentidade
           />
         )}
+      </BlocoConteudo>
 
-        <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" onClick={salvar} disabled={salvando}>
-            {salvando ? 'Criando...' : 'Criar contrato'}
-          </button>
-        </div>
-      </div>
-    </div>
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

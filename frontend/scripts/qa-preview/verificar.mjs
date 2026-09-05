@@ -782,8 +782,33 @@ async function checarModalCadastro(page, tela, resultado) {
     if (await page.locator('[role="dialog"]').count()) {
       await page.locator('[role="dialog"] button:has-text("Fechar"), [role="dialog"] [aria-label*="echar"]').first().click().catch(() => {});
     }
+  } else if (tela.cadastroInline) {
+    /*
+      A R9 FOI REVISTA EM 04/09 E O CHECK MEDIA A VERSAO VELHA (05/09).
+
+      A regra antiga usava FREQUENCIA como criterio ("cadastro esporadico
+      abre em modal"), e este check a codificava: form sem [role=dialog]
+      reprovava. A regra nova usa INTERRUPCAO — tela que existe PARA
+      cadastrar mantem o formulario inline, e o modal e para o cadastro que
+      interrompe outro trabalho.
+
+      Tres telas cujo arranjo o responsavel decidiu ontem apareceram
+      vermelhas na matriz de hoje por causa disso. Nao era defeito das telas:
+      era o check medindo uma regra que nao existe mais.
+
+      POR QUE NAO USEI `naoAplica`, que ja existe e seria mais barato: N/A
+      quer dizer "nao medido", e essas telas PRECISAM ser medidas — o
+      formulario declarado como inline tem de estar mesmo inline. Declarar
+      N/A trocaria um vermelho errado por um cinza que nao verifica nada, e
+      no dia em que alguem mover o cadastro para modal ninguem ficaria
+      sabendo.
+
+      Entao a tela DECLARA o arranjo com o motivo, e o check verifica a
+      declaracao contra o que a tela faz. Declaracao velha reprova.
+    */
+    resultado.R1 = { estado: 'PASSOU', motivo: `cadastro inline declarado (R9): ${tela.cadastroInline}` };
   } else {
-    resultado.R1 = { estado: 'FALHOU', motivo: `"${rotulo}" abriu formulário INLINE, não em modal (R9)` };
+    resultado.R1 = { estado: 'FALHOU', motivo: `"${rotulo}" abriu formulário INLINE sem declarar \`cadastroInline\` — pela R9 revista (04/09) inline é o arranjo certo em tela que existe PARA cadastrar, mas a decisão precisa estar escrita: declare o motivo em telas.mjs, ou mova o cadastro para modal.` };
   }
 }
 
