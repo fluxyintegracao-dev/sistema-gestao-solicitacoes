@@ -53,7 +53,14 @@ export default function BarraFiltros({
     const selecionados = ativos[dim.id] || new Set();
     (dim.opcoes || []).forEach((opcao) => {
       if (selecionados.has(String(opcao.valor))) {
-        etiquetas.push({ dimensao: dim.id, dimensaoRotulo: dim.rotulo, unico: Boolean(dim.unico), valor: String(opcao.valor), rotulo: opcao.rotulo });
+        etiquetas.push({
+          dimensao: dim.id,
+          dimensaoRotulo: dim.rotulo,
+          unico: Boolean(dim.unico),
+          obrigatorio: Boolean(dim.obrigatorio),
+          valor: String(opcao.valor),
+          rotulo: opcao.rotulo
+        });
       }
     });
   });
@@ -113,19 +120,40 @@ export default function BarraFiltros({
         <div className="la-etiquetas" aria-label="Filtros ativos">
           <span className="la-filtros-rotulo">Filtrando:</span>
           {etiquetas.map((etiqueta) => (
-            <span key={`${etiqueta.dimensao}:${etiqueta.valor}`} className="la-etiqueta">
+            <span
+              key={`${etiqueta.dimensao}:${etiqueta.valor}`}
+              className="la-etiqueta"
+              data-obrigatorio={etiqueta.obrigatorio ? 'sim' : undefined}
+            >
               <span className="la-etiqueta-dim">{etiqueta.dimensaoRotulo}:</span>
               {etiqueta.rotulo}
-              <button
-                type="button"
-                onClick={() => aoAlternar(etiqueta.dimensao, etiqueta.valor, { unico: Boolean(etiqueta.unico) })}
-                aria-label={`Remover filtro ${etiqueta.dimensaoRotulo} ${etiqueta.rotulo}`}
-              >
-                <HiOutlineXMark aria-hidden="true" />
-              </button>
+              {/*
+                `obrigatorio`: dimensão que a tela NÃO consegue não ter (05/09).
+
+                Achado na matriz do CRM: o período de um relatório é sempre
+                algum período. A etiqueta trazia um "×" que, ao ser clicado,
+                voltava ao padrão — e o padrão gera OUTRA etiqueta na hora.
+                O botão prometia remover e trocava. Capacidade aparente sem
+                efeito, que é a família da R15.
+
+                Sem o "×", a etiqueta volta a ser o que é: o estado atual do
+                recorte, mudado pelo menu de marcação, não removível.
+              */}
+              {etiqueta.obrigatorio ? null : (
+                <button
+                  type="button"
+                  onClick={() => aoAlternar(etiqueta.dimensao, etiqueta.valor, { unico: Boolean(etiqueta.unico) })}
+                  aria-label={`Remover filtro ${etiqueta.dimensaoRotulo} ${etiqueta.rotulo}`}
+                >
+                  <HiOutlineXMark aria-hidden="true" />
+                </button>
+              )}
             </span>
           ))}
-          {aoLimpar ? (
+          {/* "Limpar tudo" só aparece se houver algo que de fato sai. Numa
+              faixa só de recortes obrigatórios ele seria a mesma promessa
+              vazia do "×" que voltava ao padrão. */}
+          {aoLimpar && etiquetas.some((e) => !e.obrigatorio) ? (
             <button type="button" className="la-link" onClick={aoLimpar}>Limpar tudo</button>
           ) : null}
         </div>

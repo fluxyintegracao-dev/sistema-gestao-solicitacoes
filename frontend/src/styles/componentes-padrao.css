@@ -430,6 +430,23 @@
    engolindo a distincao em silencio. O token ja existia. */
 .app-stat--info .app-stat-valor { color: var(--sem-info); }
 
+/* Ícone do ladrilho: decorativo, alinhado ao rótulo, nunca maior que ele. */
+.app-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+.app-stat-icone {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.app-stat-icone svg {
+  width: 16px;
+  height: 16px;
+}
+
 .app-stat--vazio .app-stat-valor {
   color: var(--c-muted);
   font-weight: 500;
@@ -559,6 +576,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+  NO CARTÃO, O NOME QUEBRA — NÃO É TRUNCADO NEM RECORTADO (05/09).
+
+  Achado pela X3 na matriz do CRM: um link de lead media 497px numa viewport
+  de 390px e SUMIA, sem reticências e sem rolagem. O motivo é que `nowrap` +
+  `text-overflow` só produzem reticências quando a caixa tem largura definida.
+  Na tabela ela tem — a coluna. No modo CARTÃO, não: a caixa cresce com o
+  conteúdo, nada estoura em relação a ela, a reticência nunca aparece, e quem
+  recorta é o cartão lá em cima, em silêncio.
+
+  Em cartão sobra espaço vertical e falta horizontal, então a resposta certa
+  é quebrar. `anywhere` porque o pior caso aqui é código e e-mail, que não
+  têm ponto de quebra natural.
+*/
+@media (max-width: 767px) {
+  .app-celula-dupla-principal,
+  .app-celula-dupla-sub {
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* ---- TabelaPadrao ------------------------------------------------------ */

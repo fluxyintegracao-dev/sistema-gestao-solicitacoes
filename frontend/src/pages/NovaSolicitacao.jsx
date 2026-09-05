@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Avisos, Pagina, PageHeader, useAvisos } from '../components/padrao';
+import {
+  Avisos,
+  BlocoConteudo,
+  CampoForm,
+  FormSecao,
+  Pagina,
+  PageHeader,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 import { getMinhasObras } from '../services/obras';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
@@ -18,6 +27,7 @@ import { getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitaca
 import { useAuth } from '../contexts/AuthContext';
 import { HiOutlineArrowUturnLeft, HiOutlineClock, HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
+import OverlayModal from '../components/ui/OverlayModal';
 import ParceiroBuscaRemota from '../components/solicitacoes/ParceiroBuscaRemota';
 import CadastroRapidoFavorecidoButton from '../components/solicitacoes/CadastroRapidoFavorecidoButton';
 import RateioApropriacoesContrato, { numeroDoCampo } from '../components/contratos/RateioApropriacoesContrato';
@@ -186,6 +196,23 @@ export default function NovaSolicitacao() {
   const [parceiroBuscaExecutada, setParceiroBuscaExecutada] = useState(false);
   const [modalParceiroAberto, setModalParceiroAberto] = useState(false);
   const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
+  /*
+    VALIDAÇÃO CAMPO A CAMPO (R3 da DoD, item 5 do contrato desta rodada).
+
+    As 60+ validações do envio diziam o que faltava numa caixa do navegador,
+    longe do campo que faltava preencher. Trocar `alert` por `Avisos` moveria
+    a mesma frase para o topo da página — continuaria longe. O erro passa a
+    morar NO CAMPO (`erro` do `CampoForm`), com a MESMA condição e a MESMA
+    mensagem de antes: nada foi afrouxado nem endurecido.
+
+    Fica em `Avisos` só o que não tem campo nesta tela para receber a
+    mensagem — condição de contexto (contrato em outro setor, saldo ainda
+    calculando) e campo que pertence a um componente compartilhado
+    (BlocoContratoFluxoNovo, BlocoMedicaoContrato, RecargaCartaoFields,
+    RateioApropriacoesContrato), que não tem entrada de erro.
+  */
+  const [errosCampo, setErrosCampo] = useState({});
   const [modalCredoresContratoAberto, setModalCredoresContratoAberto] = useState(false);
   const [credorContratoSugestoesAbertas, setCredorContratoSugestoesAbertas] = useState(false);
   const [credorContratoModalBusca, setCredorContratoModalBusca] = useState('');
@@ -384,8 +411,38 @@ export default function NovaSolicitacao() {
     loadDependenciasObra();
   }, [form.obra_id, obraSelecionadaEhObra, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
 
+  // O erro do campo sai assim que a pessoa mexe nele — mensagem de validação
+  // que sobrevive à correção vira ruído e ensina a ignorar a próxima.
+  function limparErroCampo(campo) {
+    setErrosCampo((atual) => (atual[campo] ? { ...atual, [campo]: '' } : atual));
+  }
+
+  // Uma reprovação por envio, como sempre foi: a validação é uma cadeia de
+  // `return` e para no primeiro problema. O que muda é ONDE a frase aparece.
+  function reprovarCampo(campo, mensagem) {
+    setErrosCampo({ [campo]: mensagem });
+  }
+
+  /*
+    MENSAGEM QUE PRECEDE UMA SAÍDA DA TELA.
+
+    A faixa de avisos morre junto com a tela: `avisar.erro(...)` seguido de
+    `navigate(...)` mostra a mensagem por um quadro e some. Estes casos —
+    "o contrato foi criado MAS o anexo não subiu" — são exatamente os que a
+    pessoa precisa ler, porque instruem uma correção na outra tela.
+
+    A caixa do navegador dava isso de graça, bloqueando. O equivalente do
+    sistema é o modal: ele espera a leitura e a navegação acontece depois.
+    Os dois botões significam a mesma coisa (ciente) — não há consentimento
+    em jogo aqui, só leitura, então o retorno não é lido.
+  */
+  async function avisarAntesDeSair(titulo, mensagem) {
+    await confirmar({ titulo, mensagem, rotuloConfirmar: 'Entendi', rotuloCancelar: 'Fechar' });
+  }
+
   function handleChange(e) {
     const { name, value } = e.target;
+    limparErroCampo(name);
     if (name === 'tipo_solicitacao_id') {
       // Um subtipo pertence ao tipo anterior. Limpar no mesmo evento evita que a regra
       // `tipo:subtipo` antiga continue controlando os campos enquanto a nova lista carrega.
@@ -449,7 +506,7 @@ export default function NovaSolicitacao() {
       console.error(error);
       // Busca automatica nao interrompe a digitacao com alerta: quem esta escrevendo nao pediu
       // esta busca, e um popup a cada tecla seria pior que o erro.
-      if (!automatico) alert(error.message || 'Erro ao buscar credores');
+      if (!automatico) avisar.erro(error.message || 'Erro ao buscar credores');
     } finally {
       setParceiroBuscando(false);
     }
@@ -466,7 +523,7 @@ export default function NovaSolicitacao() {
       ].filter(([campo]) => !String(novoParceiro[campo] || '').trim()).map(([, rotulo]) => rotulo);
 
       if (faltando.length > 0) {
-        alert(`Complete o cadastro do credor. Falta: ${faltando.join(', ')}.`);
+        avisar.alerta(`Complete o cadastro do credor. Falta: ${faltando.join(', ')}.`);
         return;
       }
       const documentoErro = getCpfCnpjError(novoParceiro.cpf_cnpj, { required: true });
@@ -502,7 +559,7 @@ export default function NovaSolicitacao() {
       setModalParceiroAberto(false);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao cadastrar credor');
+      avisar.erro(error.message || 'Erro ao cadastrar credor');
     }
   }
 
@@ -535,7 +592,31 @@ export default function NovaSolicitacao() {
     if (boletoRef.current) boletoRef.current.value = '';
   }
 
-  function limparBuscaObra() {
+  /*
+    R21/R26 — LIMPAR A OBRA APAGA A SOLICITAÇÃO INTEIRA.
+
+    `limparSelecaoObraERegras` zera obra, setor, tipo, subtipo, contrato,
+    credor, favorecido, forma de pagamento, justificativa e o boleto anexado:
+    é o botão de maior perda desta tela, e não perguntava nada. Como a
+    confirmação do sistema NÃO congela a página (ao contrário do `confirm` do
+    navegador), o alvo é fixado numa `const` ANTES do `await` e a mensagem
+    nomeia a obra que a pessoa está vendo — não a que estiver selecionada
+    quando ela responder.
+
+    A limpeza AUTOMÁTICA (quando o texto digitado deixa de bater com a obra
+    escolhida, em `handleChangeBuscaObra`) continua sem pergunta: ali quem
+    está desfazendo a escolha é a própria digitação.
+  */
+  async function limparBuscaObra() {
+    const obraAlvo = obraSelecionada;
+    const rotuloAlvo = formatarRotuloBuscaObra(obraAlvo) || 'a obra/centro de custo selecionada';
+    const { ok } = await confirmar({
+      titulo: 'Limpar a solicitação',
+      mensagem: `Limpar ${rotuloAlvo} apaga também setor, tipo, contrato, credor, favorecido, forma de pagamento e justificativa já preenchidos aqui.`,
+      rotuloConfirmar: 'Limpar',
+      destrutiva: true
+    });
+    if (!ok) return;
     limparSelecaoObraERegras();
     setObraBusca('');
     setObraBuscaAtiva(false);
@@ -1097,7 +1178,7 @@ export default function NovaSolicitacao() {
   async function buscarRefContrato() {
     try {
       if (!form.obra_id) {
-        alert(`Selecione uma obra antes de buscar ${tipoEhDeMedicao ? 'o título do contrato' : 'a ref. do contrato'}.`);
+        reprovarCampo('ref_contrato', `Selecione uma obra antes de buscar ${tipoEhDeMedicao ? 'o título do contrato' : 'a ref. do contrato'}.`);
         setRefResultados([]);
         setContratosRef([]);
         return;
@@ -1120,7 +1201,7 @@ export default function NovaSolicitacao() {
       });
 
       if (lista.length === 0) {
-        alert('Nenhuma referencia encontrada');
+        reprovarCampo('ref_contrato', 'Nenhuma referencia encontrada');
         setRefResultados([]);
         setContratosRef([]);
         return;
@@ -1132,7 +1213,7 @@ export default function NovaSolicitacao() {
       }
     } catch (error) {
       console.error(error);
-      alert('Erro ao buscar referencia de contrato');
+      avisar.erro('Erro ao buscar referencia de contrato');
     }
   }
 
@@ -1149,8 +1230,41 @@ export default function NovaSolicitacao() {
     limparParceiroSelecionado();
   }
 
-  function removerArquivo(index) {
-    setArquivos(prev => prev.filter((_, i) => i !== index));
+  /*
+    R26 — o arquivo é fixado numa `const` ANTES do `await` e a remoção é feita
+    PELA REFERÊNCIA, não pelo índice: com o modal aberto a lista continua
+    clicável, e um anexo adicionado nesse meio-tempo deslocaria o índice —
+    a pessoa confirmaria a remoção de um arquivo e o sistema removeria outro.
+  */
+  async function removerArquivo(index) {
+    const arquivoAlvo = arquivos[index];
+    if (!arquivoAlvo) return;
+    const { ok } = await confirmar({
+      titulo: 'Remover anexo',
+      mensagem: `Remover "${arquivoAlvo.nome || 'este arquivo'}" da lista de anexos desta solicitação?`,
+      rotuloConfirmar: 'Remover',
+      destrutiva: true
+    });
+    if (!ok) return;
+    setArquivos((prev) => prev.filter((item) => item !== arquivoAlvo));
+    limparErroCampo('anexos');
+  }
+
+  // Mesma classe de ação (remover item já anexado), mesmo cuidado da R26:
+  // o boleto é UM só, mas a referência é fixada antes da pergunta.
+  async function removerArquivoBoleto() {
+    const boletoAlvo = boletoArquivos[0];
+    if (!boletoAlvo) return;
+    const { ok } = await confirmar({
+      titulo: 'Remover boleto',
+      mensagem: `Remover "${boletoAlvo.nome || 'o boleto'}" desta solicitação?`,
+      rotuloConfirmar: 'Remover',
+      destrutiva: true
+    });
+    if (!ok) return;
+    setBoletoArquivos((prev) => prev.filter((item) => item !== boletoAlvo));
+    if (boletoRef.current) boletoRef.current.value = '';
+    limparErroCampo('boleto');
   }
 
   function adicionarArquivos(files) {
@@ -1162,10 +1276,10 @@ export default function NovaSolicitacao() {
     });
     setArquivos(proximoEstado);
     if (tiposInvalidos.length > 0) {
-      alert(montarMensagemTiposArquivoNaoPermitidos(tiposInvalidos));
+      avisar.alerta(montarMensagemTiposArquivoNaoPermitidos(tiposInvalidos));
     }
     if (rejeitados.length > 0) {
-      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+      avisar.alerta(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
     }
   }
 
@@ -1176,10 +1290,10 @@ export default function NovaSolicitacao() {
     });
     setBoletoArquivos(aceitos);
     if (lista.length > 1) {
-      alert('Selecione somente um arquivo de boleto.');
+      avisar.alerta('Selecione somente um arquivo de boleto.');
     }
     if (rejeitados.length > 0) {
-      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+      avisar.alerta(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
     }
   }
 
@@ -1259,34 +1373,44 @@ export default function NovaSolicitacao() {
   async function handleSubmit(e, { confirmadoNaConferencia = false } = {}) {
     e?.preventDefault?.();
 
+    // Cada envio recomeça a conversa: o erro que sobrou do envio anterior não
+    // pode ficar colado num campo que já foi corrigido.
+    setErrosCampo({});
+
     if (!form.obra_id) {
-      alert('Selecione uma obra/centro de custo');
+      reprovarCampo('obra_id', 'Selecione uma obra/centro de custo');
       return;
     }
 
+    // Condição de CONTEXTO, não de campo: o contrato está noutro setor. Já
+    // aparece na faixa do bloco do contrato; aqui vai para Avisos porque não
+    // há campo desta tela para receber a frase.
     if (tipoEhDeMedicao && contratoSelecionadoMedicaoBloqueada) {
-      alert(
+      avisar.alerta(
         `A solicitacao deste contrato esta no setor ${contratoSelecionado?.contexto_interacao?.setor_atual || 'responsavel atual'}. `
         + 'Solicite o retorno antes de registrar a medicao.'
       );
       return;
     }
 
+    // Campo do RecargaCartaoFields (componente compartilhado, sem entrada de erro).
     if (usaFluxoRecargaCartao && !cartaoRecargaId) {
-      alert('Selecione o cartão que receberá a recarga.');
+      avisar.alerta('Selecione o cartão que receberá a recarga.');
       return;
     }
     if (usaFluxoRecargaCartao && recargaCartaoContexto?.bloqueado) {
-      alert(recargaCartaoContexto.motivo_bloqueio || 'Conclua a recarga anterior antes de solicitar uma nova.');
+      avisar.alerta(recargaCartaoContexto.motivo_bloqueio || 'Conclua a recarga anterior antes de solicitar uma nova.');
       return;
     }
 
+    // Apropriação automática da obra: não há campo na tela (ela é resolvida
+    // pelo servidor a partir da obra + tipo).
     if (usaApropriacaoAutomaticaObra && apropriacaoAutomatica.status === 'loading') {
-      alert('Aguarde a conferencia da apropriacao automatica da obra.');
+      avisar.alerta('Aguarde a conferencia da apropriacao automatica da obra.');
       return;
     }
     if (usaApropriacaoAutomaticaObra && !apropriacaoAutomatica.apropriacao) {
-      alert(apropriacaoAutomatica.erro || 'Configure a apropriacao padrao desta obra antes de criar a solicitacao.');
+      avisar.alerta(apropriacaoAutomatica.erro || 'Configure a apropriacao padrao desta obra antes de criar a solicitacao.');
       return;
     }
 
@@ -1297,109 +1421,115 @@ export default function NovaSolicitacao() {
       ? rateioContrato.some((l) => l.apropriacao_id)
       : Boolean(form.apropriacao_id);
     if (exigeApropriacaoPrincipal && !temApropriacao) {
-      alert(usaFluxoContratoNovo
+      reprovarCampo('apropriacao', usaFluxoContratoNovo
         ? 'Informe ao menos uma apropriacao no rateio do contrato.'
         : 'Selecione a apropriação principal da solicitação.');
       return;
     }
 
     if (subtipoObrigatorio && exibirCampoSubtipo && !form.tipo_sub_id) {
-      alert('Para continuar, selecione o subtipo.');
+      reprovarCampo('tipo_sub_id', 'Para continuar, selecione o subtipo.');
       return;
     }
     if (valorObrigatorio && (form.valor === '' || form.valor === null || form.valor === undefined)) {
-      alert('Informe o valor da solicitação.');
+      reprovarCampo('valor', 'Informe o valor da solicitação.');
       return;
     }
     if (medicaoObrigatoria && (!form.data_inicio_medicao || !form.data_fim_medicao)) {
-      alert('Para Medicao, informe data inicial e data final.');
+      // O par de datas mora nesta tela no fluxo antigo e dentro do
+      // BlocoMedicaoContrato no fluxo novo — lá não há entrada de erro.
+      const mensagemPeriodo = 'Para Medicao, informe data inicial e data final.';
+      if (exibirPeriodoMedicaoSolto) reprovarCampo('periodo_medicao', mensagemPeriodo);
+      else avisar.alerta(mensagemPeriodo);
       return;
     }
     if (dataVencimentoExigida && !form.data_vencimento) {
-      alert(`Informe a ${rotuloDataSolicitacao.toLocaleLowerCase('pt-BR')}.`);
+      reprovarCampo('data_vencimento', `Informe a ${rotuloDataSolicitacao.toLocaleLowerCase('pt-BR')}.`);
       return;
     }
     if (dataDemissaoObrigatoria && !form.data_demissao) {
-      alert('Informe a data de demissao.');
+      reprovarCampo('data_demissao', 'Informe a data de demissao.');
       return;
     }
     if (camposContratoObrigatorios && !form.contrato_id) {
-      alert('Selecione um contrato.');
+      reprovarCampo('contrato_id', 'Selecione um contrato.');
       return;
     }
     if (camposContratoObrigatorios && !refContratoBusca.trim()) {
-      alert(`Informe ${tipoEhDeMedicao ? 'o título do contrato' : 'a ref. do contrato'}.`);
+      reprovarCampo('ref_contrato', `Informe ${tipoEhDeMedicao ? 'o título do contrato' : 'a ref. do contrato'}.`);
       return;
     }
     if (itensApropriacaoObrigatorio && !form.itens_apropriacao && apropriacoesRateioSelecionadas.length === 0) {
-      alert('Para Abertura de Contrato, informe os itens de apropriacao ou selecione as apropriacoes do contrato.');
+      reprovarCampo('itens_apropriacao', 'Para Abertura de Contrato, informe os itens de apropriacao ou selecione as apropriacoes do contrato.');
       return;
     }
     if (apropriacoesContratoExigidas && apropriacoesRateioSelecionadas.length === 0) {
-      alert('Selecione ao menos uma apropriacao do contrato para esta solicitacao.');
+      reprovarCampo('apropriacoes_contrato', 'Selecione ao menos uma apropriacao do contrato para esta solicitacao.');
       return;
     }
     if (refContratoAberturaObrigatoria && !form.ref_contrato_abertura) {
-      alert('Para Abertura de Contrato, informe a ref do contrato.');
+      reprovarCampo('ref_contrato_abertura', 'Para Abertura de Contrato, informe a ref do contrato.');
       return;
     }
     if (campoObrigatorio('credor') && !form.parceiro_id) {
-      alert('Selecione o credor da solicitação.');
+      reprovarCampo('credor', 'Selecione o credor da solicitação.');
       return;
     }
     if (formaPagamentoObrigatoria && !form.forma_pagamento_id) {
-      alert('Selecione a forma de pagamento.');
+      reprovarCampo('forma_pagamento_id', 'Selecione a forma de pagamento.');
       return;
     }
     if (favorecidoObrigatorio && !form.favorecido_id) {
-      alert('Selecione o favorecido do pagamento.');
+      reprovarCampo('favorecido', 'Selecione o favorecido do pagamento.');
       return;
     }
     if (pagamentoViaPix && !String(form.favorecido_chave_pix || '').trim()) {
-      alert('Informe a chave PIX do favorecido.');
+      reprovarCampo('favorecido_chave_pix', 'Informe a chave PIX do favorecido.');
       return;
     }
     if (pagamentoViaBoleto && boletoArquivos.length === 0) {
-      alert('Anexe o boleto para usar esta forma de pagamento.');
+      reprovarCampo('boleto', 'Anexe o boleto para usar esta forma de pagamento.');
       return;
     }
     if (justificativaObrigatoria && !form.justificativa.trim()) {
-      alert('Informe a justificativa da solicitação.');
+      reprovarCampo('justificativa', 'Informe a justificativa da solicitação.');
       return;
     }
 
     if (exibirCampoDataVencimento && form.data_vencimento && String(form.data_vencimento) < String(hojeInput)) {
-      alert(`${rotuloDataSolicitacao} não pode ser menor que a data atual.`);
+      reprovarCampo('data_vencimento', `${rotuloDataSolicitacao} não pode ser menor que a data atual.`);
       return;
     }
 
     // Medicao de contrato do fluxo novo: sem parcela marcada nao ha o que medir, e o saldo
     // e conferido aqui so para avisar antes de enviar — quem decide e o backend.
     if (usaMedicaoFluxoNovo) {
+      // Estes campos vivem dentro do BlocoMedicaoContrato (componente
+      // compartilhado, sem entrada de erro): a mensagem fica em Avisos.
       if (!(medicaoContratoDados?.itens || []).length) {
-        alert('Selecione ao menos uma parcela do contrato para medir.');
+        avisar.alerta('Selecione ao menos uma parcela do contrato para medir.');
         return;
       }
       if (medicaoContratoDados?.excedeSaldo) {
-        alert('O total selecionado passa do saldo do contrato.');
+        avisar.alerta('O total selecionado passa do saldo do contrato.');
         return;
       }
       // Os dados de pagamento sao cobrados aqui tambem para a pessoa nao descobrir depois de montar
       // a medicao inteira. Quem recusa de verdade e o servidor.
       const pgto = medicaoContratoDados?.pagamento || {};
-      if (!pgto.forma_pagamento_id) { alert('Informe a forma de pagamento da medicao.'); return; }
-      if (!pgto.favorecido_id) { alert('Informe o favorecido desta medicao.'); return; }
+      if (!pgto.forma_pagamento_id) { avisar.alerta('Informe a forma de pagamento da medicao.'); return; }
+      if (!pgto.favorecido_id) { avisar.alerta('Informe o favorecido desta medicao.'); return; }
       if (pgto.via_pix && !String(pgto.favorecido_chave_pix || '').trim()) {
-        alert('Informe a chave PIX do favorecido.'); return;
+        avisar.alerta('Informe a chave PIX do favorecido.'); return;
       }
       if (pgto.via_boleto && !String(pgto.boleto_anexo_nome || '').trim()) {
-        alert('Anexe o boleto desta medicao.'); return;
+        avisar.alerta('Anexe o boleto desta medicao.'); return;
       }
       if (!pgto.via_pix && !pgto.via_boleto && !String(pgto.favorecido_contato || '').trim()) {
-        alert('Informe os dados para pagamento desta medicao.'); return;
+        avisar.alerta('Informe os dados para pagamento desta medicao.'); return;
       }
       if (!pgto.dados_confirmados) {
-        alert('Confirme que os dados de pagamento estao corretos antes de enviar a medicao.'); return;
+        avisar.alerta('Confirme que os dados de pagamento estao corretos antes de enviar a medicao.'); return;
       }
     }
 
@@ -1407,36 +1537,37 @@ export default function NovaSolicitacao() {
     // obrigatorio; nas demais formas, ao menos um arquivo deve estar no campo unico de anexos.
     const anexosPendentesMedicao = [...arquivos, ...boletoArquivos];
     if (tipoEhDeMedicao && anexosPendentesMedicao.length === 0) {
-      alert('Anexe ao menos um arquivo para enviar a solicitacao de medicao.');
+      reprovarCampo('anexos', 'Anexe ao menos um arquivo para enviar a solicitacao de medicao.');
       return;
     }
     if (!tipoEhDeMedicao && anexosObrigatorios && arquivos.length === 0) {
-      alert('Anexe ao menos um comprovante da despesa.');
+      reprovarCampo('anexos', 'Anexe ao menos um comprovante da despesa.');
       return;
     }
 
     if (usaFluxoDespesaEventual) {
+      // Estado do cálculo do saldo: não é campo, é condição da obra.
       if (despesaEventualSaldo.status !== 'success' || !despesaEventualSaldo.dados) {
-        alert(despesaEventualSaldo.erro || 'Aguarde o cálculo do saldo de Despesa Eventual da obra.');
+        avisar.alerta(despesaEventualSaldo.erro || 'Aguarde o cálculo do saldo de Despesa Eventual da obra.');
         return;
       }
       const valorDespesa = Number(form.valor || 0);
       if (valorDespesa > Number(despesaEventualSaldo.dados.limite_solicitacao || 0)) {
-        alert('O valor informado ultrapassa o limite por solicitação.');
+        reprovarCampo('valor', 'O valor informado ultrapassa o limite por solicitação.');
         return;
       }
       if (valorDespesa > Number(despesaEventualSaldo.dados.saldo_obra || 0)) {
-        alert('O valor informado ultrapassa o saldo de Despesa Eventual desta obra.');
+        reprovarCampo('valor', 'O valor informado ultrapassa o saldo de Despesa Eventual desta obra.');
         return;
       }
       if (Object.values(despesaEventualDeclaracoes).some((confirmado) => confirmado !== true)) {
-        alert('Confirme todas as declarações obrigatórias da Despesa Eventual.');
+        reprovarCampo('despesa_declaracoes', 'Confirme todas as declarações obrigatórias da Despesa Eventual.');
         return;
       }
     }
 
     if (descricaoExigida && !form.descricao.trim()) {
-      alert('Informe o título da solicitação.');
+      reprovarCampo('descricao', 'Informe o título da solicitação.');
       return;
     }
 
@@ -1445,7 +1576,7 @@ export default function NovaSolicitacao() {
     if (!usaMedicaoFluxoNovo && apropriacoesRateioSelecionadas.length > 0) {
       const valorTotalSolicitacao = arredondarCentavos(parseDecimalRateio(form.valor));
       if (!valorTotalSolicitacao || valorTotalSolicitacao <= 0) {
-        alert('Informe o valor total da solicitacao para validar o rateio das apropriacoes.');
+        reprovarCampo('valor', 'Informe o valor total da solicitacao para validar o rateio das apropriacoes.');
         return;
       }
 
@@ -1457,24 +1588,24 @@ export default function NovaSolicitacao() {
       ));
 
       if (possuiDoisCriterios) {
-        alert('Informe o rateio usando apenas percentual ou apenas valor em R$ por apropriacao.');
+        reprovarCampo('apropriacoes_contrato', 'Informe o rateio usando apenas percentual ou apenas valor em R$ por apropriacao.');
         return;
       }
 
       if (comPercentual.length === apropriacoesRateioSelecionadas.length) {
         const totalPercentual = comPercentual.reduce((acc, item) => acc + Number(parseDecimalRateio(item.percentual) || 0), 0);
         if (comPercentual.some(item => Number(parseDecimalRateio(item.percentual) || 0) <= 0) || Math.abs(totalPercentual - 100) > 0.0001) {
-          alert('A soma dos percentuais do rateio deve ser exatamente 100%.');
+          reprovarCampo('apropriacoes_contrato', 'A soma dos percentuais do rateio deve ser exatamente 100%.');
           return;
         }
       } else if (comValor.length === apropriacoesRateioSelecionadas.length) {
         const totalValorRateio = arredondarCentavos(comValor.reduce((acc, item) => acc + Number(parseDecimalRateio(item.valor_rateio) || 0), 0));
         if (comValor.some(item => Number(parseDecimalRateio(item.valor_rateio) || 0) <= 0) || totalValorRateio !== valorTotalSolicitacao) {
-          alert('A soma dos valores em R$ do rateio deve ser igual ao valor total da solicitacao.');
+          reprovarCampo('apropriacoes_contrato', 'A soma dos valores em R$ do rateio deve ser igual ao valor total da solicitacao.');
           return;
         }
       } else {
-        alert('Todas as apropriacoes selecionadas devem usar o mesmo criterio de rateio: percentual ou valor em R$.');
+        reprovarCampo('apropriacoes_contrato', 'Todas as apropriacoes selecionadas devem usar o mesmo criterio de rateio: percentual ou valor em R$.');
         return;
       }
     }
@@ -1487,7 +1618,7 @@ export default function NovaSolicitacao() {
     // formulario; o bloco fornece categoria, condicao, parcelas e detalhes.
     if (usaFluxoContratoNovo) {
       const d = contratoNovoDados || {};
-      if (!form.parceiro_id) { alert('Selecione o credor do contrato.'); return; }
+      if (!form.parceiro_id) { reprovarCampo('credor', 'Selecione o credor do contrato.'); return; }
       const camposObrigatoriosContrato = [
         ['contrato_objeto', d.objeto, 'Informe o objeto do contrato.'],
         ['contrato_justificativa', d.justificativa, 'Informe a justificativa da contratacao.'],
@@ -1498,22 +1629,24 @@ export default function NovaSolicitacao() {
       const campoContratoPendente = camposObrigatoriosContrato.find(
         ([campoId, valor]) => campoObrigatorio(campoId) && !String(valor || '').trim()
       );
-      if (campoContratoPendente) { alert(campoContratoPendente[2]); return; }
+      // Os campos abaixo pertencem ao BlocoContratoFluxoNovo (compartilhado):
+      // sem entrada de erro por campo, a mensagem vai para a faixa de avisos.
+      if (campoContratoPendente) { avisar.alerta(campoContratoPendente[2]); return; }
       // O rateio precisa fechar ANTES de enviar: o backend recusaria, mas a pessoa perderia o
       // formulario inteiro para descobrir um erro de digitacao.
       const linhasRateio = rateioContrato.filter((l) => l.apropriacao_id);
-      if (linhasRateio.length === 0) { alert('Informe ao menos uma apropriacao para o contrato.'); return; }
+      if (linhasRateio.length === 0) { reprovarCampo('apropriacao', 'Informe ao menos uma apropriacao para o contrato.'); return; }
       // As duas colunas (% e R$) ficam em sincronia na tela, entao basta conferir uma. O
       // percentual e a que vale, porque e ele que vai gravado.
       const somaPercentual = linhasRateio.reduce((acc, l) => acc + (numeroDoCampo(l.percentual) || 0), 0);
       if (Math.abs(somaPercentual - 100) >= 0.001) {
-        alert('O rateio da apropriacao deve fechar 100% (ou o valor total do contrato).');
+        reprovarCampo('apropriacao', 'O rateio da apropriacao deve fechar 100% (ou o valor total do contrato).');
         return;
       }
-      if (!d.qtde_parcelas || !d.primeiro_vencimento) { alert('Informe a quantidade de parcelas e o 1o vencimento.'); return; }
+      if (!d.qtde_parcelas || !d.primeiro_vencimento) { avisar.alerta('Informe a quantidade de parcelas e o 1o vencimento.'); return; }
       const qtde = Number(d.qtde_parcelas);
       if (!Number.isInteger(qtde) || qtde < 1 || qtde > MAXIMO_PARCELAS_CONTRATO) {
-        alert(`A quantidade de parcelas deve ser um numero inteiro de 1 a ${MAXIMO_PARCELAS_CONTRATO}.`); return;
+        avisar.alerta(`A quantidade de parcelas deve ser um numero inteiro de 1 a ${MAXIMO_PARCELAS_CONTRATO}.`); return;
       }
       // Continua valendo para a CONFERENCIA de cadastro logo abaixo, que so acontece acima do
       // limite — a negociacao e que deixou de olhar o valor.
@@ -1523,7 +1656,7 @@ export default function NovaSolicitacao() {
       // backend cobra de novo na aprovacao — este aviso existe para a pessoa nao descobrir depois
       // de o contrato ja estar criado.
       if (!d.negociacao_arquivo) {
-        alert('Anexe o documento da negociacao detalhada: ele e obrigatorio em todo contrato.'); return;
+        avisar.alerta('Anexe o documento da negociacao detalhada: ele e obrigatorio em todo contrato.'); return;
       }
       if (acimaDoLimite) {
         const documentosObrigatorios = [
@@ -1533,7 +1666,7 @@ export default function NovaSolicitacao() {
         ];
         const documentosFaltantes = documentosObrigatorios.filter(([, arquivo]) => !arquivo).map(([nome]) => nome);
         if (documentosFaltantes.length > 0) {
-          alert(`Anexe a documentacao juridica obrigatoria: ${documentosFaltantes.join(', ')}.`); return;
+          avisar.alerta(`Anexe a documentacao juridica obrigatoria: ${documentosFaltantes.join(', ')}.`); return;
         }
 
         const qualificacao = d.representante_legal_qualificacao || {};
@@ -1550,7 +1683,7 @@ export default function NovaSolicitacao() {
           .filter(([, valor]) => !String(valor || '').trim())
           .map(([nome]) => nome);
         if (qualificacaoFaltante.length > 0) {
-          alert(`Complete a qualificacao do representante legal: ${qualificacaoFaltante.join(', ')}.`); return;
+          avisar.alerta(`Complete a qualificacao do representante legal: ${qualificacaoFaltante.join(', ')}.`); return;
         }
         const cpfRepresentanteErro = getCpfCnpjError(qualificacao.cpf, {
           required: true,
@@ -1574,7 +1707,7 @@ export default function NovaSolicitacao() {
             .filter(([, valor]) => !String(valor || '').trim())
             .map(([nome]) => nome);
           if (dadosConjugeFaltantes.length > 0) {
-            alert(`Complete os dados do conjuge: ${dadosConjugeFaltantes.join(', ')}.`); return;
+            avisar.alerta(`Complete os dados do conjuge: ${dadosConjugeFaltantes.join(', ')}.`); return;
           }
           const cpfConjugeErro = getCpfCnpjError(conjuge.cpf, {
             required: true,
@@ -1590,7 +1723,7 @@ export default function NovaSolicitacao() {
       // para escrever "0,50"), entao a cobranca acontece aqui, antes de enviar.
       const parcelaInvalida = (d.parcelas || []).find((pc) => !(Number(pc.valor) > 0));
       if (parcelaInvalida) {
-        alert(`A parcela ${parcelaInvalida.numero} deve ser de no minimo R$ 0,01.`); return;
+        avisar.alerta(`A parcela ${parcelaInvalida.numero} deve ser de no minimo R$ 0,01.`); return;
       }
 
       // Acima do limite o contrato vai ao Juridico, que monta a minuta a partir do cadastro do
@@ -1672,7 +1805,10 @@ export default function NovaSolicitacao() {
             await uploadNegociacaoContrato(idContrato, d.negociacao_arquivo);
           } catch (erroNegociacao) {
             console.error(erroNegociacao);
-            alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas a negociacao detalhada NAO foi enviada (${erroNegociacao.message}). Sem ela o contrato nao pode ser aprovado: abra o contrato e envie o documento.`);
+            await avisarAntesDeSair(
+              'Contrato criado sem a negociacao detalhada',
+              `O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas a negociacao detalhada NAO foi enviada (${erroNegociacao.message}). Sem ela o contrato nao pode ser aprovado: abra o contrato e envie o documento.`
+            );
             navigate('/gestao-contratos', { replace: true });
             return;
           }
@@ -1687,7 +1823,10 @@ export default function NovaSolicitacao() {
             ]);
           } catch (erroDocumentacao) {
             console.error(erroDocumentacao);
-            alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas a documentacao juridica nao foi enviada por completo (${erroDocumentacao.message}). O contrato permanecera bloqueado para aprovacao ate o dossie ser completado.`);
+            await avisarAntesDeSair(
+              'Contrato criado sem a documentacao juridica completa',
+              `O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas a documentacao juridica nao foi enviada por completo (${erroDocumentacao.message}). O contrato permanecera bloqueado para aprovacao ate o dossie ser completado.`
+            );
             navigate('/gestao-contratos', { replace: true });
             return;
           }
@@ -1698,18 +1837,24 @@ export default function NovaSolicitacao() {
             await uploadContratoAnexos(idContrato, extrairFilesAnexosPendentes(arquivos));
           } catch (uploadError) {
             console.error(uploadError);
-            alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas os anexos nao foram enviados. Abra o contrato em Gestao de Contratos e envie os anexos novamente.`);
+            await avisarAntesDeSair(
+              'Contrato criado sem os anexos',
+              `O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas os anexos nao foram enviados. Abra o contrato em Gestao de Contratos e envie os anexos novamente.`
+            );
             navigate('/gestao-contratos', { replace: true });
             return;
           }
         }
 
-        alert(`Contrato ${r?.contrato?.codigo || ''} criado — aguardando aprovacao.`);
+        await avisarAntesDeSair(
+          'Contrato criado',
+          `Contrato ${r?.contrato?.codigo || ''} criado — aguardando aprovacao.`
+        );
         // O contrato do fluxo novo nao aparece na lista de solicitacoes: mandar para la
         // deixava a instrucao de "abra o contrato" sem alvo (N5).
         navigate('/gestao-contratos', { replace: true });
       } catch (error) {
-        alert(error?.message || 'Erro ao criar contrato.');
+        avisar.erro(error?.message || 'Erro ao criar contrato.');
       } finally {
         criandoSolicitacaoRef.current = false;
         setCriandoSolicitacao(false);
@@ -1784,7 +1929,10 @@ export default function NovaSolicitacao() {
           });
         } catch (uploadError) {
           console.error(uploadError);
-          alert(`A solicitacao ${solicitacao.codigo || solicitacao.id} foi criada, mas o boleto nao foi enviado. Abra a solicitacao e anexe o boleto novamente.`);
+          await avisarAntesDeSair(
+            'Solicitacao criada sem o boleto',
+            `A solicitacao ${solicitacao.codigo || solicitacao.id} foi criada, mas o boleto nao foi enviado. Abra a solicitacao e anexe o boleto novamente.`
+          );
           navigate(`/solicitacoes/${solicitacao.id}`, { replace: true });
           return;
         }
@@ -1801,7 +1949,10 @@ export default function NovaSolicitacao() {
           });
         } catch (uploadError) {
           console.error(uploadError);
-          alert(`A solicitacao ${solicitacao.codigo || solicitacao.id} foi criada, mas os anexos nao foram enviados. Abra a solicitacao e envie os anexos novamente.`);
+          await avisarAntesDeSair(
+            'Solicitacao criada sem os anexos',
+            `A solicitacao ${solicitacao.codigo || solicitacao.id} foi criada, mas os anexos nao foram enviados. Abra a solicitacao e envie os anexos novamente.`
+          );
           navigate(`/solicitacoes/${solicitacao.id}`, { replace: true });
           return;
         }
@@ -1810,7 +1961,7 @@ export default function NovaSolicitacao() {
       navigate(`/solicitacoes/${solicitacao.id}`, { replace: true });
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao criar solicitação');
+      avisar.erro(error?.message || 'Erro ao criar solicitação');
     } finally {
       criandoSolicitacaoRef.current = false;
       setCriandoSolicitacao(false);
@@ -1915,13 +2066,17 @@ export default function NovaSolicitacao() {
     });
   }, [credoresContratoDisponiveis, credorContratoModalBusca]);
 
-  function renderCampoCredor(className = 'grid gap-1 text-sm lg:col-span-6') {
+  /*
+    CAMPO CREDOR — três formas do MESMO campo (só cadastro, preso ao contrato,
+    busca livre), agora dentro do `CampoForm`: rótulo, hint e erro saem das
+    classes `.form-*` do sistema em vez de spans soltos com cor crua.
+  */
+  function renderCampoCredor() {
     if (!permitirVinculoCredor) return null;
 
     if (!exibirCampoCredor && exibirCadastroCredor) {
       return (
-        <div className={className}>
-          <span className="font-medium text-[var(--c-text)]">Credor</span>
+        <CampoForm label="Credor" erro={errosCampo.credor}>
           {parceiroSelecionado ? (
             <div className="flex flex-wrap items-center gap-2 rounded border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm">
               <span className="min-w-0 flex-1">
@@ -1945,7 +2100,7 @@ export default function NovaSolicitacao() {
               Cadastrar novo credor
             </button>
           )}
-        </div>
+        </CampoForm>
       );
     }
 
@@ -1958,9 +2113,21 @@ export default function NovaSolicitacao() {
     const credoresContratoSugestoes = credoresContratoFiltrados.slice(0, 8);
     const inputCredorContratoDesabilitado = !form.contrato_id && credoresContratoCampo.length === 0;
 
+    const hintCredor = restringirCredorAoContrato
+      ? (exibirCadastroCredor
+        ? 'O credor e carregado a partir do contrato. Se necessario, cadastre um novo credor para vincular nesta solicitacao.'
+        : 'O credor e carregado a partir do contrato. Para pagar um credor diferente, solicite ao setor de Gerencia de Processo o cadastro ou vinculo no contrato.')
+      : (exibirCamposContrato && permitirCredorAvulsoComContrato
+        ? 'Credor livre para este tipo de solicitacao; o contrato permanece vinculado para referencia e apropriacao.'
+        : undefined);
+
     return (
-      <label className={className}>
-        Credor
+      <CampoForm
+        label="Credor"
+        obrigatorio={campoObrigatorio('credor')}
+        hint={hintCredor}
+        erro={errosCampo.credor}
+      >
         {restringirCredorAoContrato ? (
           <>
             <div className="relative">
@@ -1982,6 +2149,7 @@ export default function NovaSolicitacao() {
                   onChange={(e) => {
                     setParceiroBusca(e.target.value);
                     setParceiroBuscaExecutada(false);
+                    limparErroCampo('credor');
                     if (parceiroSelecionado) {
                       setParceiroSelecionado(null);
                       setForm(prev => ({ ...prev, parceiro_id: '' }));
@@ -2023,13 +2191,13 @@ export default function NovaSolicitacao() {
               </div>
 
               {credorContratoSugestoesAbertas && !parceiroSelecionado && !inputCredorContratoDesabilitado && (
-                <div className="absolute left-0 right-0 z-20 mt-1 max-h-52 overflow-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-lg">
+                <div className="nova-solicitacao-results-list absolute left-0 right-0 z-20 mt-1 max-h-48 overflow-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-lg">
                   {credoresContratoSugestoes.length > 0 ? (
                     credoresContratoSugestoes.map((credor) => (
                       <button
                         key={credor.id}
                         type="button"
-                        className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-slate-50"
+                        className="nova-solicitacao-result-item block w-full rounded px-3 py-2 text-left text-sm hover:bg-[var(--ui-surface-2)]"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => selecionarParceiro(credor)}
                       >
@@ -2037,18 +2205,13 @@ export default function NovaSolicitacao() {
                       </button>
                     ))
                   ) : (
-                    <div className="px-3 py-2 text-xs text-[var(--c-muted)]">
+                    <div className="px-3 py-2 text-xs text-muted">
                       Nenhum Contratado vinculado ao contrato corresponde a busca.
                     </div>
                   )}
                 </div>
               )}
             </div>
-            <span className="text-xs text-gray-500">
-              {exibirCadastroCredor
-                ? 'O credor e carregado a partir do contrato. Se necessario, cadastre um novo credor para vincular nesta solicitacao.'
-                : 'O credor e carregado a partir do contrato. Para pagar um credor diferente, solicite ao setor de Gerencia de Processo o cadastro ou vinculo no contrato.'}
-            </span>
             {exibirCadastroCredor && (
               <button
                 type="button"
@@ -2070,6 +2233,7 @@ export default function NovaSolicitacao() {
                   setParceiroBusca(e.target.value);
                   setParceiroBuscaExecutada(false);
                   setParceiroResultados([]);
+                  limparErroCampo('credor');
                   if (parceiroSelecionado) {
                     setParceiroSelecionado(null);
                     setForm(prev => ({ ...prev, parceiro_id: '' }));
@@ -2096,13 +2260,13 @@ export default function NovaSolicitacao() {
             </div>
 
             {parceiroResultados.length > 1 && !parceiroSelecionado && (
-              <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
+              <div className="nova-solicitacao-results-list mt-2 max-h-40 overflow-auto rounded border p-2">
                 {parceiroResultados.map(item => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => selecionarParceiro(item)}
-                    className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
+                    className="nova-solicitacao-result-item block w-full rounded p-2 text-left text-sm hover:bg-[var(--ui-surface-2)]"
                   >
                     {item.nome} - {item.cpf_cnpj}
                   </button>
@@ -2111,7 +2275,7 @@ export default function NovaSolicitacao() {
             )}
 
             {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
-              <div className="mt-2 flex flex-col gap-2 rounded border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-xs text-gray-500">
+              <div className="mt-2 flex flex-col gap-2 rounded border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-xs text-muted">
                 <span>
                   Nenhum credor encontrado.
                 </span>
@@ -2138,14 +2302,9 @@ export default function NovaSolicitacao() {
                 Cadastrar novo credor
               </button>
             )}
-            {exibirCamposContrato && permitirCredorAvulsoComContrato && (
-              <span className="mt-2 block text-xs text-gray-500">
-                Credor livre para este tipo de solicitacao; o contrato permanece vinculado para referencia e apropriacao.
-              </span>
-            )}
           </>
         )}
-      </label>
+      </CampoForm>
     );
   }
   const hoje = new Date();
@@ -2305,181 +2464,133 @@ export default function NovaSolicitacao() {
 
       {!(exibirCadastroCredor && modalParceiroAberto) && faixaAvisos}
 
-      <form
-        onSubmit={handleSubmit}
-        className="card nova-solicitacao-form space-y-3"
-      >
-        <div className="nova-solicitacao-body">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 nova-solicitacao-grid-principal">
-          <label className="grid gap-1 text-sm lg:col-span-12">
-            Obra/Centro de Custo
-            <div className="relative nova-solicitacao-obra-field">
-              <input
-                className="input input-sm nova-solicitacao-obra-input"
-                placeholder="Digite o código ou nome da obra/centro de custo"
-                value={obraBusca}
-                onChange={e => handleChangeBuscaObra(e.target.value)}
-                onFocus={handleFocusBuscaObra}
-                onBlur={handleBlurBuscaObra}
-                onKeyDown={handleKeyDownBuscaObra}
-              />
+      <form onSubmit={handleSubmit} className="nova-solicitacao-form-padrao space-y-4">
+        {/*
+          R9 (revista em 04/09) — FORMULÁRIO INLINE. Esta tela EXISTE para
+          abrir a solicitação: tirando o formulário não sobra tela nenhuma.
+          Modal aqui seria atrito puro. Os blocos abaixo são os MESMOS grupos
+          que a tela já tinha, na MESMA ordem — cada um ganhou superfície
+          própria (B5) em vez de viver dentro de um card único; nada foi
+          reagrupado, nada nasce recolhido.
+        */}
 
-              {obraSelecionada && (
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm nova-solicitacao-obra-clear"
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={limparBuscaObra}
-                >
-                  Limpar
-                </button>
-              )}
+        <BlocoConteudo
+          titulo="Dados da solicitação"
+          variante="primario"
+          cor="var(--sem-info)"
+          descricao="A obra libera o setor, o setor libera o tipo, e o tipo define quais campos aparecem abaixo."
+        >
+          <FormSecao legenda="Origem" colunas={2}>
+            <CampoForm
+              label="Obra/Centro de Custo"
+              obrigatorio
+              linha
+              erro={errosCampo.obra_id}
+              hint={`Digite parte do nome ou do código para filtrar obras e centros de custo enquanto você preenche.${obrasFiltradas.length === 1 && mostrarSugestoesObra ? ' Pressione Enter para selecionar o único resultado.' : ''}`}
+            >
+              <div className="relative nova-solicitacao-obra-field">
+                <input
+                  className="input input-sm nova-solicitacao-obra-input"
+                  placeholder="Digite o código ou nome da obra/centro de custo"
+                  value={obraBusca}
+                  onChange={e => handleChangeBuscaObra(e.target.value)}
+                  onFocus={handleFocusBuscaObra}
+                  onBlur={handleBlurBuscaObra}
+                  onKeyDown={handleKeyDownBuscaObra}
+                />
 
-              {mostrarSugestoesObra && (
-                <div className="nova-solicitacao-results-list nova-solicitacao-obra-results absolute left-0 right-0 top-full mt-2 max-h-72 overflow-auto border rounded p-2">
-                  {obrasFiltradas.map((obra) => (
-                    <button
-                      key={obra.id}
-                      type="button"
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => selecionarObra(obra)}
-                      className="block w-full text-left rounded nova-solicitacao-result-item nova-solicitacao-obra-result"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate font-semibold text-[var(--c-text)]">{obra.nome || 'Obra sem nome'}</div>
-                          <div className="text-xs text-[var(--c-muted)]">{formatarLocalidadeObra(obra)}</div>
+                {obraSelecionada && (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm nova-solicitacao-obra-clear"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={limparBuscaObra}
+                  >
+                    Limpar
+                  </button>
+                )}
+
+                {mostrarSugestoesObra && (
+                  <div className="nova-solicitacao-results-list nova-solicitacao-obra-results absolute left-0 right-0 top-full mt-2 max-h-72 overflow-auto rounded border p-2">
+                    {obrasFiltradas.map((obra) => (
+                      <button
+                        key={obra.id}
+                        type="button"
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => selecionarObra(obra)}
+                        className="nova-solicitacao-result-item nova-solicitacao-obra-result block w-full rounded text-left"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-semibold text-[var(--c-text)]">{obra.nome || 'Obra sem nome'}</div>
+                            <div className="text-xs text-[var(--c-muted)]">{formatarLocalidadeObra(obra)}</div>
+                          </div>
+                          <span className="nova-solicitacao-obra-badge">
+                            {getTipoCentroCustoLabel(obra)} - {obra.codigo || 'Sem código'}
+                          </span>
                         </div>
-                        <span className="nova-solicitacao-obra-badge">
-                          {getTipoCentroCustoLabel(obra)} - {obra.codigo || 'Sem código'}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Segunda linha de apoio: convive com o hint do campo, como na
+                  tela antiga (as duas apareciam juntas). */}
+              {mostrarSugestoesObra && obrasFiltradas.length === 0 && (
+                <span className="form-hint">Nenhuma obra/centro de custo encontrada com esse termo.</span>
               )}
-            </div>
-            <span className="text-xs text-gray-500">
-              Digite parte do nome ou do código para filtrar obras e centros de custo enquanto você preenche.
-              {obrasFiltradas.length === 1 && mostrarSugestoesObra ? ' Pressione Enter para selecionar o único resultado.' : ''}
-            </span>
-            {mostrarSugestoesObra && obrasFiltradas.length === 0 && (
-              <span className="text-xs text-gray-500">
-                Nenhuma obra/centro de custo encontrada com esse termo.
-              </span>
-            )}
-          </label>
-          {false && (
-          <>
-          <label className="grid gap-1 text-sm lg:col-span-5">
-            Código da obra
-            <div className="flex gap-2 nova-solicitacao-inline-actions">
-              <input
-                className="input input-sm"
-                placeholder="Ex: OBRA123"
-                value=""
-                onChange={e => {
-                  const novoCodigo = e.target.value;
-                  if (!form.obra_id) return;
-                  const obraSelecionada = obras.find(o => String(o.id) === String(form.obra_id));
-                  if (!obraSelecionada) {
-                    limparSelecaoObraERegras();
-                    return;
-                  }
+            </CampoForm>
 
-                  const codigoAtual = String(obraSelecionada.codigo || '');
-                  if (String(novoCodigo) !== codigoAtual) {
-                    limparSelecaoObraERegras();
-                  }
-                }}
-              />
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => {}}>
-                Buscar
-              </button>
-            </div>
-          </label>
-
-          {exibirCampoCredor && (
-          <label className="grid gap-1 text-sm lg:col-span-6">
-            Descrição da obra
-            <div className="flex gap-2 nova-solicitacao-inline-actions">
-              <input
-                className="input input-sm"
-                placeholder="Buscar por descrição"
-                value=""
-                onChange={e => {
-                  const novaDescricao = e.target.value;
-                  if (!form.obra_id) return;
-                  const obraSelecionada = obras.find(o => String(o.id) === String(form.obra_id));
-                  if (!obraSelecionada) {
-                    limparSelecaoObraERegras();
-                    return;
-                  }
-
-                  const descricaoAtual = String(obraSelecionada.nome || '');
-                  if (String(novaDescricao) !== descricaoAtual) {
-                    limparSelecaoObraERegras();
-                  }
-                }}
-              />
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => {}}>
-                Buscar
-              </button>
-            </div>
-          </label>
-          )}
-          </>
-          )}
-
-          <label className="grid gap-1 text-sm lg:col-span-6">
-            Para qual setor deseja enviar?
-            <select
-              name="area_responsavel"
-              onChange={handleChange}
-              className="input input-sm"
-              required
-              value={form.area_responsavel}
-              disabled={!form.obra_id}
+            <CampoForm
+              label="Para qual setor deseja enviar?"
+              obrigatorio
+              hint={!form.obra_id ? 'Selecione a obra/centro de custo para habilitar a área responsável.' : undefined}
             >
-              <option value="">
-                {form.obra_id ? 'Selecione' : 'Selecione a obra/centro de custo primeiro'}
-              </option>
-              {setoresFiltrados.map(s => (
-                <option key={s.id} value={s.codigo}>
-                  {s.nome}
+              {/* R12: select de FORMULÁRIO (entrada de dado da solicitação),
+                  não de filtro — continua legítimo pela própria regra. */}
+              <select
+                name="area_responsavel"
+                onChange={handleChange}
+                className="input input-sm"
+                required
+                value={form.area_responsavel}
+                disabled={!form.obra_id}
+              >
+                <option value="">
+                  {form.obra_id ? 'Selecione' : 'Selecione a obra/centro de custo primeiro'}
                 </option>
-              ))}
-            </select>
-            {!form.obra_id && (
-              <span className="text-xs text-gray-500">
-                Selecione a obra/centro de custo para habilitar a área responsável.
-              </span>
+                {setoresFiltrados.map(s => (
+                  <option key={s.id} value={s.codigo}>
+                    {s.nome}
+                  </option>
+                ))}
+              </select>
+            </CampoForm>
+
+            <CampoForm label="Tipo de Solicitação" obrigatorio>
+              <select
+                name="tipo_solicitacao_id"
+                onChange={handleChange}
+                className="input input-sm"
+                required
+                value={form.tipo_solicitacao_id}
+                disabled={!form.area_responsavel}
+              >
+                <option value="">{form.area_responsavel ? 'Selecione' : 'Selecione o setor primeiro'}</option>
+                {tiposFiltradosPorSetor.map(t => (
+                  <option key={t.id} value={t.id}>{t.nome}</option>
+                ))}
+              </select>
+            </CampoForm>
+
+            {form.area_responsavel && !tipoSolicitacaoEscolhido && (
+              <p className="form-campo--linha form-hint">
+                Selecione o tipo de solicitação para carregar somente os campos necessários.
+              </p>
             )}
-          </label>
+          </FormSecao>
 
-          <label className="grid gap-1 text-sm lg:col-span-6">
-            Tipo de Solicitação
-            <select
-              name="tipo_solicitacao_id"
-              onChange={handleChange}
-              className="input input-sm"
-              required
-              value={form.tipo_solicitacao_id}
-              disabled={!form.area_responsavel}
-            >
-              <option value="">{form.area_responsavel ? 'Selecione' : 'Selecione o setor primeiro'}</option>
-              {tiposFiltradosPorSetor.map(t => (
-                <option key={t.id} value={t.id}>{t.nome}</option>
-              ))}
-            </select>
-          </label>
-
-          {form.area_responsavel && !tipoSolicitacaoEscolhido && (
-            <div className="lg:col-span-12 border-t border-[var(--c-border)] pt-3 text-sm text-[var(--c-muted)]">
-              Selecione o tipo de solicitação para carregar somente os campos necessários.
-            </div>
-          )}
-
+          {/* Campos da recarga de cartão: componente próprio, largura inteira. */}
           <RecargaCartaoFields
             ativo={usaFluxoRecargaCartao}
             value={cartaoRecargaId}
@@ -2488,365 +2599,304 @@ export default function NovaSolicitacao() {
             onSolicitacaoAnteriorEnviada={limparCamposNovaRecargaAposReenvio}
           />
 
-          {false && exibirCampoCredor && (
-            <label className="grid gap-1 text-sm lg:col-span-6">
-              Credor
-              {exibirCamposContrato ? (
-                <>
-                  <select
-                    className="input input-sm"
-                    value={form.parceiro_id}
-                    disabled={!form.contrato_id || credoresContratoSelecionado.length === 0}
-                    required={campoObrigatorio('credor')}
-                    onChange={(e) => {
-                      const credor = credoresContratoSelecionado.find(item => String(item.id) === String(e.target.value));
-                      if (credor) {
-                        selecionarParceiro(credor);
-                      } else {
-                        limparParceiroSelecionado();
-                      }
-                    }}
-                  >
-                    <option value="">
-                      {!form.contrato_id
-                        ? 'Selecione o contrato primeiro'
-                        : credoresContratoSelecionado.length === 0
-                          ? 'Contrato sem credor vinculado'
-                          : 'Selecione o credor'}
-                    </option>
-                    {credoresContratoSelecionado.map(credor => (
-                      <option key={credor.id} value={credor.id}>
-                        {credor.nome || credor.cpf_cnpj || `Credor ${credor.id}`}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-xs text-gray-500">
-                    O credor e carregado a partir do contrato. Para pagar um credor diferente, solicite ao setor de Gerencia de Processo o cadastro ou vinculo no contrato.
-                  </span>
-                </>
-              ) : (
-                <>
+          {(exibirCamposContrato || exibirCampoSubtipo || exibirCampoCredor
+            || exibirFormaPagamento || exibirFavorecidoPagamento) && (
+            <FormSecao legenda="Vínculo e pagamento" colunas={2}>
+              {exibirCamposContrato && (
+                <CampoForm
+                  label={rotuloContratoVinculado}
+                  obrigatorio={camposContratoObrigatorios}
+                  linha
+                  erro={errosCampo.ref_contrato}
+                  hint={!form.obra_id ? 'Selecione a obra para habilitar a busca de referências de contrato.' : undefined}
+                >
                   <div className="flex gap-2 nova-solicitacao-inline-actions">
                     <input
                       className="input input-sm"
-                      placeholder="Buscar credor por nome ou CPF/CNPJ"
-                      value={parceiroBusca}
-                      onChange={e => {
-                        setParceiroBusca(e.target.value);
-                        setParceiroBuscaExecutada(false);
-                        setParceiroResultados([]);
-                        if (parceiroSelecionado) {
-                          setParceiroSelecionado(null);
-                          setForm(prev => ({ ...prev, parceiro_id: '' }));
-                        }
-                      }}
+                      placeholder={placeholderContratoVinculado}
+                      value={refContratoBusca}
+                      onChange={e => { setRefContratoBusca(e.target.value); limparErroCampo('ref_contrato'); }}
+                      required={camposContratoObrigatorios}
+                      disabled={!form.obra_id}
                     />
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      onClick={() => buscarParceirosRelacionados()}
-                      disabled={parceiroBuscando}
-                    >
-                      {parceiroBuscando ? 'Buscando...' : 'Buscar'}
+                    <button type="button" className="btn btn-outline btn-sm" onClick={buscarRefContrato}>
+                      Buscar
                     </button>
-                    {form.parceiro_id && (
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        onClick={limparParceiroSelecionado}
-                      >
-                        Limpar
-                      </button>
-                    )}
+                    <button type="button" className="btn btn-outline btn-sm" onClick={limparRefContrato}>
+                      Limpar
+                    </button>
                   </div>
-
-                  {parceiroResultados.length > 1 && !parceiroSelecionado && (
-                    <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
-                      {parceiroResultados.map(item => (
+                  {refResultados.length > 1 && (
+                    <div className="nova-solicitacao-results-list mt-2 max-h-40 overflow-auto rounded border p-2">
+                      {refResultados.map(item => (
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() => selecionarParceiro(item)}
-                          className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
+                          onClick={() => selecionarContratoRef(item)}
+                          className="nova-solicitacao-result-item block w-full rounded p-2 text-left text-sm hover:bg-[var(--ui-surface-2)]"
                         >
-                          {item.nome} - {item.cpf_cnpj}
+                          {item.codigo} - {item.ref_contrato || '-'}
                         </button>
                       ))}
                     </div>
                   )}
-
-                  {parceiroBuscaExecutada && parceiroBusca.trim() && parceiroResultados.length === 0 && !parceiroBuscando && !parceiroSelecionado && (
-                    <span className="text-xs text-gray-500">
-                      Nenhum credor encontrado. Solicite ao setor de Gerencia de Processo o cadastro do credor.
-                    </span>
-                  )}
-                </>
+                </CampoForm>
               )}
-            </label>
-          )}
 
-
-          {exibirCamposContrato && (
-            <label className="grid gap-1 text-sm lg:col-span-12">
-              {rotuloContratoVinculado}
-              <div className="flex gap-2 nova-solicitacao-inline-actions">
-                <input
-                  className="input input-sm"
-                  placeholder={placeholderContratoVinculado}
-                  value={refContratoBusca}
-                  onChange={e => setRefContratoBusca(e.target.value)}
-                  required={camposContratoObrigatorios}
-                  disabled={!form.obra_id}
-                />
-                <button type="button" className="btn btn-outline btn-sm" onClick={buscarRefContrato}>
-                  Buscar
-                </button>
-                <button type="button" className="btn btn-outline btn-sm" onClick={limparRefContrato}>
-                  Limpar
-                </button>
-              </div>
-              {!form.obra_id && (
-                <span className="text-xs text-gray-500">
-                  Selecione a obra para habilitar a busca de referências de contrato.
-                </span>
+              {/* Ordem pedida pelo cliente (19/08): Subtipo e Credor lado a lado; a Apropriacao
+                  desce para a faixa inteira, porque agora ela rateia o contrato entre varias. */}
+              {exibirCampoSubtipo && (
+                <CampoForm
+                  label="Subtipo"
+                  obrigatorio={subtipoObrigatorio}
+                  erro={errosCampo.tipo_sub_id}
+                  hint={subtipoObrigatorio ? 'Obrigatório para este tipo de solicitação.' : undefined}
+                >
+                  <select
+                    name="tipo_sub_id"
+                    onChange={handleChange}
+                    className="input input-sm"
+                    required={subtipoObrigatorio}
+                    disabled={!form.tipo_solicitacao_id}
+                    value={form.tipo_sub_id}
+                  >
+                    <option value="">Selecione</option>
+                    {tiposSub.map(t => (
+                      <option key={t.id} value={t.id}>{t.nome}</option>
+                    ))}
+                  </select>
+                </CampoForm>
               )}
-              {refResultados.length > 1 && (
-                <div className="nova-solicitacao-results-list mt-2 border rounded p-2 max-h-40 overflow-auto">
-                  {refResultados.map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => selecionarContratoRef(item)}
-                      className="block w-full text-left text-sm p-2 hover:bg-gray-50 rounded nova-solicitacao-result-item"
-                    >
-                      {item.codigo} - {item.ref_contrato || '-'}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </label>
-          )}
 
-          {/* Ordem pedida pelo cliente (19/08): Subtipo e Credor lado a lado; a Apropriacao
-              desce para a faixa inteira, porque agora ela rateia o contrato entre varias. */}
-          {exibirCampoSubtipo && (
-            <label className="grid gap-1 text-sm lg:col-span-6">
-              Subtipo
-              <select
-                name="tipo_sub_id"
-                onChange={handleChange}
-                className="input input-sm"
-                required={subtipoObrigatorio}
-                disabled={!form.tipo_solicitacao_id}
-                value={form.tipo_sub_id}
-              >
-                <option value="">Selecione</option>
-                {tiposSub.map(t => (
-                  <option key={t.id} value={t.id}>{t.nome}</option>
-                ))}
-              </select>
-              {subtipoObrigatorio && (
-                <span className="text-xs text-gray-500">
-                  Obrigatório para este tipo de solicitação.
-                </span>
-              )}
-            </label>
-          )}
+              {exibirCampoCredor && renderCampoCredor()}
 
-          {exibirCampoCredor && renderCampoCredor('grid gap-1 text-sm lg:col-span-6')}
-
-          {/* Padrao dos fluxos de pagamento: primeiro a forma; somente depois aparecem os dados
-              que ela realmente exige. Assim boleto nunca pede PIX e PIX nunca pede boleto. */}
-          {exibirFormaPagamento && (
-            <label className="grid gap-1 text-sm lg:col-span-6">
-              Forma de pagamento{formaPagamentoObrigatoria ? ' *' : ''}
-              <select
-                className="input input-sm"
-                name="forma_pagamento_id"
-                value={form.forma_pagamento_id}
-                required={formaPagamentoObrigatoria}
-                onChange={(event) => {
-                  const formaId = event.target.value;
-                  const forma = formasPagamentoDisponiveis
-                    .find((item) => String(item.id) === String(formaId)) || null;
-                  setForm((prev) => ({
-                    ...prev,
-                    forma_pagamento_id: formaId,
-                    favorecido_chave_pix: formaPagamentoEhPix(forma)
-                      ? chavePixPreferencial(favorecidoSelecionado)
-                      : ''
-                  }));
-                }}
-              >
-                <option value="">Selecione</option>
-                {formasPagamentoDisponiveis.map((forma) => (
-                  <option key={forma.id} value={forma.id}>{forma.nome}</option>
-                ))}
-              </select>
-              {erroFormasPagamento && <span className="text-xs text-red-700">{erroFormasPagamento}</span>}
-              {!erroFormasPagamento && formasPagamentoDisponiveis.length === 0 && (
-                <span className="text-xs text-[var(--c-muted)]">
-                  Nenhuma forma de pagamento compatível está ativa e liberada.
-                </span>
-              )}
-            </label>
-          )}
-
-          {exibirFavorecidoPagamento && exibirCampoCredor && (
-            <label className="flex items-center gap-2 text-sm lg:col-span-12">
-              <input
-                type="checkbox"
-                checked={usarCredorComoFavorecido}
-                disabled={!parceiroSelecionado}
-                onChange={(event) => {
-                  const marcado = event.target.checked;
-                  setUsarCredorComoFavorecido(marcado);
-                  if (marcado) {
-                    setFavorecidoSelecionado(parceiroSelecionado);
-                    setForm((prev) => ({
-                      ...prev,
-                      favorecido_id: parceiroSelecionado?.id ? String(parceiroSelecionado.id) : '',
-                      favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiroSelecionado) : ''
-                    }));
-                  } else {
-                    setFavorecidoSelecionado(null);
-                    setForm((prev) => ({ ...prev, favorecido_id: '', favorecido_chave_pix: '' }));
-                  }
-                }}
-              />
-              <span>Usar o credor como favorecido do pagamento</span>
-            </label>
-          )}
-
-          {exibirFavorecidoPagamento && !usarCredorComoFavorecido && (
-            <div className="grid gap-2 lg:col-span-6">
-              <ParceiroBuscaRemota
-                label="Favorecido do pagamento"
-                selecionado={favorecidoSelecionado}
-                obrigatorio={favorecidoObrigatorio}
-                placeholder="Buscar por nome, telefone, CPF/CNPJ ou PIX"
-                onSelecionar={(parceiro) => {
-                  setFavorecidoSelecionado(parceiro);
-                  setForm((prev) => ({
-                    ...prev,
-                    favorecido_id: parceiro ? String(parceiro.id) : '',
-                    favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiro) : ''
-                  }));
-                }}
-              />
-              <CadastroRapidoFavorecidoButton
-                tipoSolicitacaoId={form.tipo_solicitacao_id}
-                tipoSubId={form.tipo_sub_id}
-                areaResponsavel={form.area_responsavel}
-                onCadastrado={(parceiro) => {
-                  setFavorecidoSelecionado(parceiro);
-                  setForm((prev) => ({
-                    ...prev,
-                    favorecido_id: String(parceiro.id),
-                    favorecido_chave_pix: pagamentoViaPix
-                      ? (parceiro.chave_pix_selecionada || chavePixPreferencial(parceiro))
-                      : ''
-                  }));
-                }}
-              />
-            </div>
-          )}
-
-          {exibirFormaPagamento && pagamentoViaPix && (
-            <label className="grid gap-1 text-sm lg:col-span-6">
-              Chave PIX do favorecido *
-              <input
-                className="input input-sm"
-                name="favorecido_chave_pix"
-                value={form.favorecido_chave_pix}
-                required
-                onChange={handleChange}
-                placeholder="Informe ou altere a chave PIX"
-              />
-              <span className="text-xs text-[var(--c-muted)]">
-                Sugerida pelas chaves 1, 2 e 3 do cadastro, nesta ordem. O valor pode ser alterado.
-              </span>
-            </label>
-          )}
-
-          {exibirFormaPagamento && pagamentoViaBoleto && (
-            <div className="grid gap-1 text-sm lg:col-span-6">
-              <span>Boleto *</span>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="btn btn-outline btn-sm inline-flex cursor-pointer items-center gap-2">
-                  <HiPaperClip className="h-4 w-4" />
-                  <span>Selecionar boleto</span>
-                  <input
-                    ref={boletoRef}
-                    type="file"
-                    className="hidden"
-                    accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+              {/* Padrao dos fluxos de pagamento: primeiro a forma; somente depois aparecem os dados
+                  que ela realmente exige. Assim boleto nunca pede PIX e PIX nunca pede boleto. */}
+              {exibirFormaPagamento && (
+                <CampoForm
+                  label="Forma de pagamento"
+                  obrigatorio={formaPagamentoObrigatoria}
+                  erro={errosCampo.forma_pagamento_id || erroFormasPagamento || undefined}
+                  hint={!erroFormasPagamento && formasPagamentoDisponiveis.length === 0
+                    ? 'Nenhuma forma de pagamento compatível está ativa e liberada.'
+                    : undefined}
+                >
+                  <select
+                    className="input input-sm"
+                    name="forma_pagamento_id"
+                    value={form.forma_pagamento_id}
+                    required={formaPagamentoObrigatoria}
                     onChange={(event) => {
-                      selecionarArquivoBoleto(event.target.files);
-                      event.target.value = '';
+                      const formaId = event.target.value;
+                      const forma = formasPagamentoDisponiveis
+                        .find((item) => String(item.id) === String(formaId)) || null;
+                      limparErroCampo('forma_pagamento_id');
+                      setForm((prev) => ({
+                        ...prev,
+                        forma_pagamento_id: formaId,
+                        favorecido_chave_pix: formaPagamentoEhPix(forma)
+                          ? chavePixPreferencial(favorecidoSelecionado)
+                          : ''
+                      }));
+                    }}
+                  >
+                    <option value="">Selecione</option>
+                    {formasPagamentoDisponiveis.map((forma) => (
+                      <option key={forma.id} value={forma.id}>{forma.nome}</option>
+                    ))}
+                  </select>
+                </CampoForm>
+              )}
+
+              {exibirFavorecidoPagamento && exibirCampoCredor && (
+                <label className="form-campo--linha flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={usarCredorComoFavorecido}
+                    disabled={!parceiroSelecionado}
+                    onChange={(event) => {
+                      const marcado = event.target.checked;
+                      setUsarCredorComoFavorecido(marcado);
+                      limparErroCampo('favorecido');
+                      if (marcado) {
+                        setFavorecidoSelecionado(parceiroSelecionado);
+                        setForm((prev) => ({
+                          ...prev,
+                          favorecido_id: parceiroSelecionado?.id ? String(parceiroSelecionado.id) : '',
+                          favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiroSelecionado) : ''
+                        }));
+                      } else {
+                        setFavorecidoSelecionado(null);
+                        setForm((prev) => ({ ...prev, favorecido_id: '', favorecido_chave_pix: '' }));
+                      }
                     }}
                   />
+                  <span>Usar o credor como favorecido do pagamento</span>
                 </label>
-                <span className="text-xs text-[var(--c-muted)]">
-                  {boletoArquivos[0]?.nome || 'Nenhum boleto selecionado'}
-                </span>
-                {boletoArquivos.length > 0 && (
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => setBoletoArquivos([])}
-                  >
-                    Remover
-                  </button>
-                )}
-              </div>
-            </div>
+              )}
+
+              {exibirFavorecidoPagamento && !usarCredorComoFavorecido && (
+                /* O ParceiroBuscaRemota traz o próprio rótulo e o próprio
+                   input; envolvê-lo num CampoForm criaria um <label> dentro
+                   de outro. Fica a casca `.form-group` do sistema, com a
+                   mesma linha de erro (.form-error) dos demais campos. */
+                <div className="form-group">
+                  <ParceiroBuscaRemota
+                    label="Favorecido do pagamento"
+                    selecionado={favorecidoSelecionado}
+                    obrigatorio={favorecidoObrigatorio}
+                    placeholder="Buscar por nome, telefone, CPF/CNPJ ou PIX"
+                    onSelecionar={(parceiro) => {
+                      limparErroCampo('favorecido');
+                      setFavorecidoSelecionado(parceiro);
+                      setForm((prev) => ({
+                        ...prev,
+                        favorecido_id: parceiro ? String(parceiro.id) : '',
+                        favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiro) : ''
+                      }));
+                    }}
+                  />
+                  <CadastroRapidoFavorecidoButton
+                    tipoSolicitacaoId={form.tipo_solicitacao_id}
+                    tipoSubId={form.tipo_sub_id}
+                    areaResponsavel={form.area_responsavel}
+                    onCadastrado={(parceiro) => {
+                      limparErroCampo('favorecido');
+                      setFavorecidoSelecionado(parceiro);
+                      setForm((prev) => ({
+                        ...prev,
+                        favorecido_id: String(parceiro.id),
+                        favorecido_chave_pix: pagamentoViaPix
+                          ? (parceiro.chave_pix_selecionada || chavePixPreferencial(parceiro))
+                          : ''
+                      }));
+                    }}
+                  />
+                  {errosCampo.favorecido ? <span className="form-error">{errosCampo.favorecido}</span> : null}
+                </div>
+              )}
+
+              {exibirFormaPagamento && pagamentoViaPix && (
+                <CampoForm
+                  label="Chave PIX do favorecido"
+                  obrigatorio
+                  erro={errosCampo.favorecido_chave_pix}
+                  hint="Sugerida pelas chaves 1, 2 e 3 do cadastro, nesta ordem. O valor pode ser alterado."
+                >
+                  <input
+                    className="input input-sm"
+                    name="favorecido_chave_pix"
+                    value={form.favorecido_chave_pix}
+                    required
+                    onChange={handleChange}
+                    placeholder="Informe ou altere a chave PIX"
+                  />
+                </CampoForm>
+              )}
+
+              {/* Campo de ARQUIVO não usa `CampoForm`: o gatilho do seletor já é
+                  um <label>, e label dentro de label é HTML inválido (o clique
+                  dispara duas vezes). Mesmas classes `.form-*` do sistema —
+                  rótulo, obrigatoriedade e linha de erro idênticos. */}
+              {exibirFormaPagamento && pagamentoViaBoleto && (
+                <div className="form-group">
+                  <span className="form-label form-label--required">Boleto</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="btn btn-outline btn-sm inline-flex cursor-pointer items-center gap-2">
+                      <HiPaperClip className="h-4 w-4" />
+                      <span>Selecionar boleto</span>
+                      <input
+                        ref={boletoRef}
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                        onChange={(event) => {
+                          selecionarArquivoBoleto(event.target.files);
+                          event.target.value = '';
+                        }}
+                      />
+                    </label>
+                    <span className="text-xs text-[var(--c-muted)]">
+                      {boletoArquivos[0]?.nome || 'Nenhum boleto selecionado'}
+                    </span>
+                    {boletoArquivos.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={removerArquivoBoleto}
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                  {errosCampo.boleto ? <span className="form-error">{errosCampo.boleto}</span> : null}
+                </div>
+              )}
+            </FormSecao>
           )}
-        </div>
+        </BlocoConteudo>
 
         {exibirCamposContrato && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-secundaria">
-            <label className="grid gap-1 text-sm">
-              Contrato
-              <select
-                name="contrato_id"
-                onChange={e => {
-                  const contratoId = e.target.value;
-                  const contrato = contratosDisponiveis.find(c => String(c.id) === String(contratoId));
-                  aplicarContratoSelecionado(contrato || null);
-                  if (!contratoId) {
-                    setContratosRef([]);
-                  }
-                }}
-                className="input input-sm"
-                disabled={!form.obra_id && contratosDisponiveis.length === 0}
-                value={form.contrato_id}
-                required={camposContratoObrigatorios}
+          <BlocoConteudo
+            titulo="Contrato"
+            descricao="Contrato ao qual esta solicitação se vincula e a divisão dela entre as apropriações do contrato."
+          >
+            <FormSecao colunas={2}>
+              <CampoForm
+                label="Contrato"
+                obrigatorio={camposContratoObrigatorios}
+                erro={errosCampo.contrato_id}
               >
-                <option value="">Não vincular</option>
-                {contratosDisponiveis.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.codigo} - {c.ref_contrato || '-'}
-                    {c.disponivel_medicao === false ? ' — retorno necessario' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <select
+                  name="contrato_id"
+                  onChange={e => {
+                    const contratoId = e.target.value;
+                    const contrato = contratosDisponiveis.find(c => String(c.id) === String(contratoId));
+                    limparErroCampo('contrato_id');
+                    aplicarContratoSelecionado(contrato || null);
+                    if (!contratoId) {
+                      setContratosRef([]);
+                    }
+                  }}
+                  className="input input-sm"
+                  disabled={!form.obra_id && contratosDisponiveis.length === 0}
+                  value={form.contrato_id}
+                  required={camposContratoObrigatorios}
+                >
+                  <option value="">Não vincular</option>
+                  {contratosDisponiveis.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.codigo} - {c.ref_contrato || '-'}
+                      {c.disponivel_medicao === false ? ' — retorno necessario' : ''}
+                    </option>
+                  ))}
+                </select>
+              </CampoForm>
+            </FormSecao>
 
             {tipoEhDeMedicao && contratoSelecionadoMedicaoBloqueada && (
+              /* CONDIÇÃO derivada do conteúdo, não evento: fecha e o problema
+                 continua. Por isso segue como faixa fixa no fluxo (e não em
+                 `Avisos`), agora com os tokens semânticos de alerta no lugar
+                 da paleta crua âmbar (R25). */
               <section
-                className="md:col-span-2 border-l-4 border-amber-500 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/25 dark:text-amber-100"
+                className="tarja tarja--warning mt-4 rounded-lg border px-4 py-3 text-sm"
+                style={{
+                  borderColor: 'var(--sem-warning-border)',
+                  background: 'var(--sem-warning-bg)',
+                  color: 'var(--c-text)'
+                }}
                 aria-label="Medicao aguardando retorno da solicitacao"
                 data-testid="contrato-medicao-fora-setor"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <HiOutlineArrowUturnLeft className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                    <HiOutlineArrowUturnLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <div>
                       <p className="font-semibold">
                         Contrato visivel · medicao temporariamente bloqueada
                       </p>
-                      <p className="mt-0.5 text-xs leading-5 text-amber-800 dark:text-amber-200">
+                      <p className="text-xs leading-5 text-[var(--c-muted)]">
                         A solicitacao {contratoSelecionado?.solicitacaoContrato?.codigo || contratoSelecionado?.codigo || ''}
                         {' '}esta no setor {contratoSelecionado?.contexto_interacao?.setor_atual || 'responsavel atual'}.
                         Ela precisa voltar para {contratoSelecionado?.contexto_interacao?.setor_usuario || 'seu setor'} antes de registrar a medicao.
@@ -2855,7 +2905,10 @@ export default function NovaSolicitacao() {
                   </div>
 
                   {contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold dark:bg-transparent">
+                    <span
+                      className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+                      style={{ borderColor: 'var(--sem-warning-border)' }}
+                    >
                       <HiOutlineClock className="h-4 w-4" /> Retorno solicitado
                     </span>
                   ) : contratoSelecionado?.contexto_interacao?.pode_solicitar_retorno ? (
@@ -2870,7 +2923,7 @@ export default function NovaSolicitacao() {
                 </div>
 
                 {contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente && (
-                  <p className="mt-2 border-t border-amber-200 pt-2 text-xs">
+                  <p className="mt-2 border-t pt-2 text-xs" style={{ borderColor: 'var(--sem-warning-border)' }}>
                     <span className="font-semibold">Motivo enviado:</span>{' '}
                     {contratoSelecionado.contexto_interacao.pedido_retorno_pendente.motivo}
                   </p>
@@ -2878,18 +2931,18 @@ export default function NovaSolicitacao() {
 
                 {!contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente
                   && !contratoSelecionado?.contexto_interacao?.pode_solicitar_retorno && (
-                  <p className="mt-2 border-t border-amber-200 pt-2 text-xs">
+                  <p className="mt-2 border-t pt-2 text-xs" style={{ borderColor: 'var(--sem-warning-border)' }}>
                     Seu usuario pode visualizar o contrato, mas nao possui permissao para solicitar o retorno.
                   </p>
                 )}
 
                 {retornoContrato.aberto
                   && !contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente && (
-                  <div className="mt-3 grid gap-2 border-t border-amber-200 pt-3 md:grid-cols-[1fr_auto]">
-                    <label className="min-w-0">
-                      <span className="mb-1 block text-xs font-semibold">Por que precisa do retorno? *</span>
+                  <div className="mt-3 grid gap-2 border-t pt-3" style={{ borderColor: 'var(--sem-warning-border)' }}>
+                    <label className="form-group min-w-0">
+                      <span className="form-label form-label--required">Por que precisa do retorno?</span>
                       <textarea
-                        className="input min-h-20 w-full resize-y bg-white dark:bg-gray-950"
+                        className="input w-full resize-y nova-solicitacao-textarea"
                         value={retornoContrato.motivo}
                         onChange={(event) => setRetornoContrato((atual) => ({
                           ...atual,
@@ -2901,23 +2954,23 @@ export default function NovaSolicitacao() {
                         autoFocus
                       />
                     </label>
-                    <div className="flex items-end justify-end gap-2">
-                      <button type="button" className="btn btn-ghost btn-sm"
-                        onClick={() => setRetornoContrato({ aberto: false, motivo: '', processando: false, erro: '' })}
-                        disabled={retornoContrato.processando}>
-                        Fechar
-                      </button>
+                    <div className="app-actionbar">
                       <button type="button" className="btn btn-primary btn-sm"
                         onClick={solicitarRetornoDoContrato}
                         disabled={retornoContrato.processando || !retornoContrato.motivo.trim()}>
                         {retornoContrato.processando ? 'Enviando...' : 'Enviar pedido'}
+                      </button>
+                      <button type="button" className="btn btn-outline btn-sm"
+                        onClick={() => setRetornoContrato({ aberto: false, motivo: '', processando: false, erro: '' })}
+                        disabled={retornoContrato.processando}>
+                        Fechar
                       </button>
                     </div>
                   </div>
                 )}
 
                 {retornoContrato.erro && (
-                  <p className="mt-2 text-xs font-medium text-red-700 dark:text-red-300" role="alert">
+                  <p className="form-error mt-2" role="alert">
                     {retornoContrato.erro}
                   </p>
                 )}
@@ -2931,12 +2984,12 @@ export default function NovaSolicitacao() {
                 divisao que ja esta feita. Ele so ficou de pe ate agora porque o campo Valor
                 existia. */}
             {form.contrato_id && !usaMedicaoFluxoNovo && (
-              <div className="md:col-span-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 space-y-2">
+              <div className="mt-4 space-y-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-[var(--c-text)]">
                       Apropriacoes do contrato
-                      {apropriacoesContratoObrigatorias ? <span className="text-red-600"> *</span> : null}
+                      {apropriacoesContratoObrigatorias ? <span className="text-[var(--c-danger)]"> *</span> : null}
                     </p>
                     <p className="text-xs text-[var(--c-muted)]">
                       {apropriacoesContratoObrigatorias
@@ -2944,7 +2997,7 @@ export default function NovaSolicitacao() {
                         : 'Marque os itens que receberao esta solicitacao e informe o rateio por percentual ou valor em R$.'}
                     </p>
                   </div>
-                  <span className="rounded-full bg-[var(--c-surface-alt)] px-2 py-1 text-xs font-semibold text-[var(--c-muted)]">
+                  <span className="rounded-full bg-[var(--ui-surface-2)] px-2 py-1 text-xs font-semibold text-[var(--c-muted)]">
                     {apropriacoesRateioSelecionadas.length}/{apropriacoesContratoRateio.length} selecionada(s)
                   </span>
                 </div>
@@ -2958,14 +3011,16 @@ export default function NovaSolicitacao() {
                     {apropriacoesContratoRateio.map((item, index) => (
                       <div
                         key={`${item.apropriacao_id}-${index}`}
-                        className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 md:grid-cols-[minmax(240px,1fr)_96px_132px]"
+                        className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-2 md:grid-cols-3"
                       >
                         <label className="flex items-start gap-2 text-sm">
                           <input
                             type="checkbox"
-                            className="mt-1"
                             checked={Boolean(item.selecionado)}
-                            onChange={e => alternarApropriacaoContratoRateio(index, e.target.checked)}
+                            onChange={e => {
+                              limparErroCampo('apropriacoes_contrato');
+                              alternarApropriacaoContratoRateio(index, e.target.checked);
+                            }}
                           />
                           <span>
                             <span className="font-semibold text-[var(--c-text)]">
@@ -2979,24 +3034,36 @@ export default function NovaSolicitacao() {
                         <input
                           className="input input-sm"
                           value={item.percentual}
-                          onChange={e => alterarApropriacaoContratoRateio(index, 'percentual', e.target.value)}
+                          onChange={e => {
+                            limparErroCampo('apropriacoes_contrato');
+                            alterarApropriacaoContratoRateio(index, 'percentual', e.target.value);
+                          }}
                           placeholder="%"
+                          aria-label={`Percentual da apropriacao ${item.codigo || item.apropriacao_id}`}
                           disabled={!item.selecionado}
                         />
                         <input
                           className="input input-sm"
                           value={item.valor_rateio}
-                          onChange={e => atualizarValorRateioContrato(index, e.target.value)}
+                          onChange={e => {
+                            limparErroCampo('apropriacoes_contrato');
+                            atualizarValorRateioContrato(index, e.target.value);
+                          }}
                           placeholder="Valor R$"
+                          aria-label={`Valor em reais da apropriacao ${item.codigo || item.apropriacao_id}`}
                           disabled={!item.selecionado}
                         />
                       </div>
                     ))}
                   </div>
                 )}
+
+                {errosCampo.apropriacoes_contrato ? (
+                  <p className="form-error" role="alert">{errosCampo.apropriacoes_contrato}</p>
+                ) : null}
               </div>
             )}
-          </div>
+          </BlocoConteudo>
         )}
 
         {usaMedicaoFluxoNovo && !contratoSelecionadoMedicaoBloqueada && (
@@ -3011,6 +3078,10 @@ export default function NovaSolicitacao() {
             onPeriodoChange={handleChange}
             boletoArquivo={boletoArquivos[0] || null}
             onSelecionarBoleto={selecionarArquivoBoleto}
+            /* Este `onRemoverBoleto` tambem e disparado AUTOMATICAMENTE pelo bloco
+               quando a forma de pagamento deixa de ser boleto — por isso ele nao
+               pergunta nada: confirmacao aqui perguntaria por uma limpeza que a
+               pessoa nao pediu. A remocao pelo botao da tela (acima) confirma. */
             onRemoverBoleto={() => setBoletoArquivos([])}
           />
         )}
@@ -3019,216 +3090,263 @@ export default function NovaSolicitacao() {
             fecha e a medicao continua exatamente como estava. Serve contrato legado e do fluxo
             novo, por isso nao ha condicao de `fluxo_novo` aqui. */}
         {podeSolicitarAditivo && (
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              data-testid="botao-solicitar-aditivo"
-              onClick={() => setModalAditivoAberto(true)}
-            >
-              Solicitar termo aditivo
-            </button>
-            <span className="text-xs text-[var(--c-muted)]">
-              Acrescenta valor ao contrato selecionado, com limite de 25% do valor original.
-              Entra como pendente e nao interfere nesta medicao.
-            </span>
-          </div>
+          <BlocoConteudo
+            titulo="Termo aditivo"
+            descricao="Acrescenta valor ao contrato selecionado, com limite de 25% do valor original. Entra como pendente e nao interfere nesta medicao."
+          >
+            <div className="app-actionbar">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                data-testid="botao-solicitar-aditivo"
+                onClick={() => setModalAditivoAberto(true)}
+              >
+                Solicitar termo aditivo
+              </button>
+            </div>
+          </BlocoConteudo>
         )}
-
 
         {/* O VALOR VEM ANTES DA APROPRIACAO (item 2 do lote de 23/08). E o valor que a apropriacao
             reparte: pedir o rateio antes do numero a repartir obrigava a pessoa a voltar. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
-          {exibirValor && (
-            <label className="grid gap-1 text-sm">
-              Valor
-              <input
-                name="valor"
-                type="text"
-                className="input input-sm"
-                value={valorTexto}
-                onChange={e => atualizarValor(e.target.value)}
-                placeholder="R$ 0,00"
-                required={valorObrigatorio && campoObrigatorio('valor')}
-              />
-            </label>
-          )}
+        {(exibirValor || usaFluxoDespesaEventual || exibirCampoApropriacao) && (
+          <BlocoConteudo
+            titulo="Valor e apropriação"
+            descricao="O valor é o número que a apropriação reparte — por isso ele vem primeiro."
+          >
+            <FormSecao colunas={2}>
+              {exibirValor && (
+                <CampoForm
+                  label="Valor"
+                  obrigatorio={valorObrigatorio && campoObrigatorio('valor')}
+                  erro={errosCampo.valor}
+                >
+                  {/* R6: campo de dinheiro dimensionado pelo pior caso —
+                      `.input-moeda` garante 180px, alinhamento à direita e
+                      tabular-nums. */}
+                  <input
+                    name="valor"
+                    type="text"
+                    className="input input-sm input-moeda"
+                    value={valorTexto}
+                    onChange={e => { limparErroCampo('valor'); atualizarValor(e.target.value); }}
+                    placeholder="R$ 0,00"
+                    required={valorObrigatorio && campoObrigatorio('valor')}
+                  />
+                </CampoForm>
+              )}
 
-          {usaFluxoDespesaEventual && (
-            <div
-              className={`md:col-span-2 rounded-lg border px-3 py-2 text-sm ${
-                despesaExcedeLimite
-                  ? 'border-red-300 bg-red-50 text-red-800'
-                  : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
-              }`}
-              aria-live="polite"
-            >
-              {despesaEventualSaldo.status === 'loading' && 'Calculando o saldo da obra...'}
-              {despesaEventualSaldo.status === 'error' && despesaEventualSaldo.erro}
-              {despesaEventualSaldo.status === 'success' && saldoDespesaDados && (
-                <div className="flex flex-wrap gap-x-5 gap-y-1">
-                  <span><strong>Limite por solicitação:</strong> {formatarMoeda(Number(saldoDespesaDados.limite_solicitacao || 0))}</span>
-                  <span><strong>Comprometido na obra:</strong> {formatarMoeda(Number(saldoDespesaDados.comprometido_obra || 0))}</span>
-                  <span><strong>Saldo disponível na obra:</strong> {formatarMoeda(Number(saldoDespesaDados.saldo_obra || 0))}</span>
-                  <span><strong>Saldo após esta solicitação:</strong> {formatarMoeda(saldoDespesaAposSolicitacao)}</span>
+              {usaFluxoDespesaEventual && (
+                <div
+                  className="form-campo--linha rounded-lg border px-3 py-2 text-sm"
+                  style={despesaExcedeLimite
+                    ? {
+                      borderColor: 'var(--sem-danger-border)',
+                      background: 'var(--sem-danger-bg)',
+                      color: 'var(--sem-danger)'
+                    }
+                    : {
+                      borderColor: 'var(--c-border)',
+                      background: 'var(--c-bg)',
+                      color: 'var(--c-text)'
+                    }}
+                  aria-live="polite"
+                >
+                  {despesaEventualSaldo.status === 'loading' && 'Calculando o saldo da obra...'}
+                  {despesaEventualSaldo.status === 'error' && despesaEventualSaldo.erro}
+                  {despesaEventualSaldo.status === 'success' && saldoDespesaDados && (
+                    <div className="flex flex-wrap gap-x-6 gap-y-1">
+                      <span><strong>Limite por solicitação:</strong> {formatarMoeda(Number(saldoDespesaDados.limite_solicitacao || 0))}</span>
+                      <span><strong>Comprometido na obra:</strong> {formatarMoeda(Number(saldoDespesaDados.comprometido_obra || 0))}</span>
+                      <span><strong>Saldo disponível na obra:</strong> {formatarMoeda(Number(saldoDespesaDados.saldo_obra || 0))}</span>
+                      <span><strong>Saldo após esta solicitação:</strong> {formatarMoeda(saldoDespesaAposSolicitacao)}</span>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-        </div>
-
-        {exibirCampoApropriacao && (
-          <div className="grid gap-1 text-sm w-full">
-            Apropriacao da Solicitacao na Obra
-            {/* No fluxo novo de contrato a apropriacao deixou de ser UMA: o cliente pediu ratear o
-                valor do contrato entre varias, por % ou por R$ (19/08). No fluxo padrao continua
-                sendo uma so — nada muda para as 665 solicitacoes historicas. */}
-            {usaFluxoContratoNovo ? (
-              <RateioApropriacoesContrato
-                linhas={rateioContrato}
-                apropriacoes={apropriacoes}
-                valorTotal={form.valor}
-                onChange={setRateioContrato}
-                desabilitado={!form.obra_id}
-              />
-            ) : (
-              <ApropriacaoAutocomplete
-                value={form.apropriacao_id}
-                options={apropriacoes}
-                onChange={(id) => setForm({ ...form, apropriacao_id: id })}
-                disabled={!form.obra_id}
-                required={exigeApropriacaoPrincipal}
-                inputClassName="input input-sm w-full"
-                disabledPlaceholder="Selecione a obra primeiro"
-              />
-            )}
-            {exigeApropriacaoPrincipal ? (
-              <span className="text-xs text-gray-500">
-                Campo obrigatorio conforme configuracao da nova solicitacao.
-              </span>
-            ) : (
-              <span className="text-xs text-gray-500">
-                Campo opcional. Use quando a solicitacao precisar nascer vinculada a uma apropriacao da obra.
-              </span>
-            )}
-            {form.obra_id && apropriacoes.length === 0 && (
-              <span className="text-xs text-gray-500">
-                Nenhuma apropriacao ativa encontrada para esta obra.
-              </span>
-            )}
-          </div>
+              {exibirCampoApropriacao && (
+                <CampoForm
+                  label="Apropriacao da Solicitacao na Obra"
+                  obrigatorio={exigeApropriacaoPrincipal}
+                  linha
+                  erro={errosCampo.apropriacao}
+                  hint={exigeApropriacaoPrincipal
+                    ? 'Campo obrigatorio conforme configuracao da nova solicitacao.'
+                    : 'Campo opcional. Use quando a solicitacao precisar nascer vinculada a uma apropriacao da obra.'}
+                >
+                  {/* No fluxo novo de contrato a apropriacao deixou de ser UMA: o cliente pediu ratear o
+                      valor do contrato entre varias, por % ou por R$ (19/08). No fluxo padrao continua
+                      sendo uma so — nada muda para as 665 solicitacoes historicas. */}
+                  {usaFluxoContratoNovo ? (
+                    <RateioApropriacoesContrato
+                      linhas={rateioContrato}
+                      apropriacoes={apropriacoes}
+                      valorTotal={form.valor}
+                      onChange={(linhas) => { limparErroCampo('apropriacao'); setRateioContrato(linhas); }}
+                      desabilitado={!form.obra_id}
+                    />
+                  ) : (
+                    <ApropriacaoAutocomplete
+                      value={form.apropriacao_id}
+                      options={apropriacoes}
+                      onChange={(id) => { limparErroCampo('apropriacao'); setForm({ ...form, apropriacao_id: id }); }}
+                      disabled={!form.obra_id}
+                      required={exigeApropriacaoPrincipal}
+                      inputClassName="input input-sm w-full"
+                      disabledPlaceholder="Selecione a obra primeiro"
+                    />
+                  )}
+                  {form.obra_id && apropriacoes.length === 0 && (
+                    <span className="form-hint">Nenhuma apropriacao ativa encontrada para esta obra.</span>
+                  )}
+                </CampoForm>
+              )}
+            </FormSecao>
+          </BlocoConteudo>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
-          {/* Titulo do contrato ABAIXO do Valor (ordem pedida em 19/08), e nao ao lado: ocupa a
-              faixa inteira para cair na linha de baixo. Antes ele ficava depois do bloco do
-              contrato, longe do valor que ele identifica. */}
-          {exibirCampoDescricao && (
-            <label className="grid gap-1 text-sm md:col-span-2">
-              {usaFluxoContratoNovo ? 'Título do contrato' : 'Título da solicitação'}
-              <textarea
-                name="descricao"
-                onChange={e =>
-                  setForm(prev => ({
-                    ...prev,
-                    descricao: e.target.value.slice(0, 50)
-                  }))
-                }
-                maxLength={50}
-                className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
-                required={descricaoExigida}
-                value={form.descricao}
-              />
-            </label>
-          )}
+        {(exibirCampoDescricao || exibirJustificativa || usaFluxoDespesaEventual
+          || exibirCampoDataVencimento || exibirDataDemissao) && (
+          <BlocoConteudo
+            titulo="Identificação e prazos"
+            descricao="O que a solicitação diz de si e as datas que ela precisa cumprir."
+          >
+            <FormSecao colunas={2}>
+              {/* Titulo do contrato ABAIXO do Valor (ordem pedida em 19/08), e nao ao lado: ocupa a
+                  faixa inteira para cair na linha de baixo. Antes ele ficava depois do bloco do
+                  contrato, longe do valor que ele identifica. */}
+              {exibirCampoDescricao && (
+                <CampoForm
+                  label={usaFluxoContratoNovo ? 'Título do contrato' : 'Título da solicitação'}
+                  obrigatorio={descricaoExigida}
+                  tipo="texto-longo"
+                  erro={errosCampo.descricao}
+                >
+                  <textarea
+                    name="descricao"
+                    onChange={e => {
+                      limparErroCampo('descricao');
+                      setForm(prev => ({
+                        ...prev,
+                        descricao: e.target.value.slice(0, 50)
+                      }));
+                    }}
+                    maxLength={50}
+                    className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
+                    required={descricaoExigida}
+                    value={form.descricao}
+                  />
+                </CampoForm>
+              )}
 
-          {exibirJustificativa && (
-            <label className="grid gap-1 text-sm md:col-span-2">
-              Justificativa{justificativaObrigatoria ? ' *' : ''}
-              <textarea
-                name="justificativa"
-                onChange={handleChange}
-                className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
-                required={justificativaObrigatoria}
-                value={form.justificativa}
-                rows={3}
-                placeholder="Explique a necessidade desta solicitação"
-              />
-            </label>
-          )}
+              {exibirJustificativa && (
+                <CampoForm
+                  label="Justificativa"
+                  obrigatorio={justificativaObrigatoria}
+                  tipo="texto-longo"
+                  erro={errosCampo.justificativa}
+                >
+                  <textarea
+                    name="justificativa"
+                    onChange={handleChange}
+                    className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
+                    required={justificativaObrigatoria}
+                    value={form.justificativa}
+                    rows={3}
+                    placeholder="Explique a necessidade desta solicitação"
+                  />
+                </CampoForm>
+              )}
 
-          {usaFluxoDespesaEventual && (
-            <fieldset className="md:col-span-2 grid gap-2 rounded-lg border border-[var(--c-border)] p-3">
-              <legend className="px-1 text-sm font-semibold text-[var(--c-text)]">Declarações obrigatórias</legend>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={despesaEventualDeclaracoes.despesa_pontual_nao_recorrente}
-                  onChange={(event) => setDespesaEventualDeclaracoes((atual) => ({
-                    ...atual,
-                    despesa_pontual_nao_recorrente: event.target.checked
-                  }))}
-                />
-                <span>Confirmo que esta e uma despesa pontual, esporadica e nao recorrente.</span>
-              </label>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={despesaEventualDeclaracoes.sem_vinculo_contratual}
-                  onChange={(event) => setDespesaEventualDeclaracoes((atual) => ({
-                    ...atual,
-                    sem_vinculo_contratual: event.target.checked
-                  }))}
-                />
-                <span>Confirmo que a despesa nao caracteriza vinculo ou necessidade de contrato.</span>
-              </label>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={despesaEventualDeclaracoes.nao_fracionada}
-                  onChange={(event) => setDespesaEventualDeclaracoes((atual) => ({
-                    ...atual,
-                    nao_fracionada: event.target.checked
-                  }))}
-                />
-                <span>Confirmo que a despesa nao foi fracionada para se enquadrar no limite.</span>
-              </label>
-            </fieldset>
-          )}
+              {usaFluxoDespesaEventual && (
+                <fieldset className="form-campo--linha grid gap-2 rounded-lg border border-[var(--c-border)] p-3">
+                  <legend className="px-1 text-sm font-semibold text-[var(--c-text)]">Declarações obrigatórias</legend>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={despesaEventualDeclaracoes.despesa_pontual_nao_recorrente}
+                      onChange={(event) => {
+                        limparErroCampo('despesa_declaracoes');
+                        setDespesaEventualDeclaracoes((atual) => ({
+                          ...atual,
+                          despesa_pontual_nao_recorrente: event.target.checked
+                        }));
+                      }}
+                    />
+                    <span>Confirmo que esta e uma despesa pontual, esporadica e nao recorrente.</span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={despesaEventualDeclaracoes.sem_vinculo_contratual}
+                      onChange={(event) => {
+                        limparErroCampo('despesa_declaracoes');
+                        setDespesaEventualDeclaracoes((atual) => ({
+                          ...atual,
+                          sem_vinculo_contratual: event.target.checked
+                        }));
+                      }}
+                    />
+                    <span>Confirmo que a despesa nao caracteriza vinculo ou necessidade de contrato.</span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={despesaEventualDeclaracoes.nao_fracionada}
+                      onChange={(event) => {
+                        limparErroCampo('despesa_declaracoes');
+                        setDespesaEventualDeclaracoes((atual) => ({
+                          ...atual,
+                          nao_fracionada: event.target.checked
+                        }));
+                      }}
+                    />
+                    <span>Confirmo que a despesa nao foi fracionada para se enquadrar no limite.</span>
+                  </label>
+                  {errosCampo.despesa_declaracoes ? (
+                    <p className="form-error" role="alert">{errosCampo.despesa_declaracoes}</p>
+                  ) : null}
+                </fieldset>
+              )}
 
-          {exibirCampoDataVencimento && (
-          <label className="grid gap-1 text-sm">
-            {rotuloDataSolicitacao}
-            <input
-              name="data_vencimento"
-              type="date"
-              onChange={handleChange}
-              className="input input-sm"
-              value={form.data_vencimento}
-              min={hojeInput}
-              required={dataVencimentoExigida}
-            />
-          </label>
-          )}
+              {exibirCampoDataVencimento && (
+                <CampoForm
+                  label={rotuloDataSolicitacao}
+                  obrigatorio={dataVencimentoExigida}
+                  erro={errosCampo.data_vencimento}
+                >
+                  <input
+                    name="data_vencimento"
+                    type="date"
+                    onChange={handleChange}
+                    className="input input-sm"
+                    value={form.data_vencimento}
+                    min={hojeInput}
+                    required={dataVencimentoExigida}
+                  />
+                </CampoForm>
+              )}
 
-          {exibirDataDemissao && (
-            <label className="grid gap-1 text-sm">
-              Data de demissao
-              <input
-                name="data_demissao"
-                type="date"
-                onChange={handleChange}
-                className="input input-sm"
-                value={form.data_demissao}
-                required={dataDemissaoObrigatoria}
-              />
-            </label>
-          )}
-        </div>
+              {exibirDataDemissao && (
+                <CampoForm
+                  label="Data de demissao"
+                  obrigatorio={dataDemissaoObrigatoria}
+                  erro={errosCampo.data_demissao}
+                >
+                  <input
+                    name="data_demissao"
+                    type="date"
+                    onChange={handleChange}
+                    className="input input-sm"
+                    value={form.data_demissao}
+                    required={dataDemissaoObrigatoria}
+                  />
+                </CampoForm>
+              )}
+            </FormSecao>
+          </BlocoConteudo>
+        )}
 
         {/* Blocos de contrato ficam FORA do grid de duas colunas: dentro dele o bloco ocupava
             uma coluna so, espremido, com metade da tela vazia ao lado. */}
@@ -3243,470 +3361,501 @@ export default function NovaSolicitacao() {
           />
         )}
 
-        {exibirPeriodoMedicaoSolto && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
-            <label className="grid gap-1 text-sm">
-              Data inicial (Medição)
-              <input
-                name="data_inicio_medicao"
-                type="date"
-                onChange={handleChange}
-                className="input input-sm"
-                value={form.data_inicio_medicao}
-                required={medicaoObrigatoria}
-              />
-            </label>
-            <label className="grid gap-1 text-sm">
-              Data final (Medição)
-              <input
-                name="data_fim_medicao"
-                type="date"
-                onChange={handleChange}
-                className="input input-sm"
-                value={form.data_fim_medicao}
-                required={medicaoObrigatoria}
-              />
-            </label>
-          </div>
-        )}
+        {(exibirPeriodoMedicaoSolto || exibirRefContratoAbertura || exibirItensApropriacao) && (
+          <BlocoConteudo
+            titulo="Medição e apropriação do contrato"
+            descricao="Período medido, referência do contrato de abertura e os itens que serão apropriados."
+          >
+            <FormSecao colunas={2}>
+              {exibirPeriodoMedicaoSolto && (
+                <>
+                  <CampoForm
+                    label="Data inicial (Medição)"
+                    obrigatorio={medicaoObrigatoria}
+                    erro={errosCampo.periodo_medicao}
+                  >
+                    <input
+                      name="data_inicio_medicao"
+                      type="date"
+                      onChange={(event) => { limparErroCampo('periodo_medicao'); handleChange(event); }}
+                      className="input input-sm"
+                      value={form.data_inicio_medicao}
+                      required={medicaoObrigatoria}
+                    />
+                  </CampoForm>
+                  <CampoForm label="Data final (Medição)" obrigatorio={medicaoObrigatoria}>
+                    <input
+                      name="data_fim_medicao"
+                      type="date"
+                      onChange={(event) => { limparErroCampo('periodo_medicao'); handleChange(event); }}
+                      className="input input-sm"
+                      value={form.data_fim_medicao}
+                      required={medicaoObrigatoria}
+                    />
+                  </CampoForm>
+                </>
+              )}
 
-        {exibirRefContratoAbertura && (
-          <label className="grid gap-1 text-sm">
-            Ref. do Contrato
-            <input
-              name="ref_contrato_abertura"
-              onChange={handleChange}
-              className="input input-sm"
-              required={refContratoAberturaObrigatoria}
-              value={form.ref_contrato_abertura}
-              placeholder="Informe a ref do contrato"
-            />
-          </label>
-        )}
+              {exibirRefContratoAbertura && (
+                <CampoForm
+                  label="Ref. do Contrato"
+                  obrigatorio={refContratoAberturaObrigatoria}
+                  erro={errosCampo.ref_contrato_abertura}
+                >
+                  <input
+                    name="ref_contrato_abertura"
+                    onChange={handleChange}
+                    className="input input-sm"
+                    required={refContratoAberturaObrigatoria}
+                    value={form.ref_contrato_abertura}
+                    placeholder="Informe a ref do contrato"
+                  />
+                </CampoForm>
+              )}
 
-        {exibirItensApropriacao && (
-          <label className="grid gap-1 text-sm">
-            Itens de Apropriação
-            <textarea
-              name="itens_apropriacao"
-              onChange={handleChange}
-              className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
-              required={itensApropriacaoObrigatorio}
-              value={form.itens_apropriacao}
-              placeholder="Descreva os itens de apropriação"
-            />
-          </label>
+              {exibirItensApropriacao && (
+                <CampoForm
+                  label="Itens de Apropriação"
+                  obrigatorio={itensApropriacaoObrigatorio}
+                  tipo="texto-longo"
+                  erro={errosCampo.itens_apropriacao}
+                >
+                  <textarea
+                    name="itens_apropriacao"
+                    onChange={handleChange}
+                    className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
+                    required={itensApropriacaoObrigatorio}
+                    value={form.itens_apropriacao}
+                    placeholder="Descreva os itens de apropriação"
+                  />
+                </CampoForm>
+              )}
+            </FormSecao>
+          </BlocoConteudo>
         )}
-
 
         {tipoSolicitacaoEscolhido && (
-        <div className="nova-solicitacao-actions-bar">
-          {exibirAnexos && !(tipoEhDeMedicao && (pagamentoViaBoleto || medicaoContratoDados?.pagamento?.via_boleto)) && (
-          <label className="grid gap-1 text-sm nova-solicitacao-anexos">
-          {tipoEhDeMedicao
-            ? 'Anexo da medição *'
-            : (usaFluxoDespesaEventual ? 'Comprovante da despesa *' : `Anexos${anexosObrigatorios ? ' *' : ''}`)}
-          <div className="flex items-center gap-2 flex-wrap nova-solicitacao-inline-actions nova-solicitacao-anexos-head">
-            <label className="btn btn-outline btn-sm inline-flex items-center gap-2 cursor-pointer">
-              <HiPaperClip className="w-4 h-4" />
-              <span>Anexar arquivos</span>
-              <input
-                type="file"
-                multiple
-                accept={UPLOAD_DOCUMENT_ACCEPT}
-                ref={anexosRef}
-                className="hidden"
-                onChange={e => {
-                  adicionarArquivos(e.target.files);
-                  e.target.value = '';
-                }}
-              />
-            </label>
-            <span className="text-xs text-[var(--c-muted)]">
-              {arquivos.length > 0
-                ? `${arquivos.length} arquivo(s) selecionado(s)`
-                : 'Nenhum arquivo selecionado'}
-            </span>
-          </div>
-          <PendingAttachmentsList
-            items={arquivos}
-            onRemove={(index) => removerArquivo(index)}
-            className="mt-2 space-y-1"
-            itemClassName="nova-solicitacao-file-item flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
-            removeButtonClassName="text-blue-600 font-semibold px-2"
-          />
-          </label>
-          )}
+          <BlocoConteudo titulo="Anexos e envio">
+            {exibirAnexos && !(tipoEhDeMedicao && (pagamentoViaBoleto || medicaoContratoDados?.pagamento?.via_boleto)) && (
+              /* Mesmo motivo do boleto: o gatilho do seletor de arquivo é um
+                 <label>, então este campo usa as classes `.form-*` direto em
+                 vez do `CampoForm` (que também é um <label>). A tela ANTIGA
+                 tinha exatamente esse aninhamento aqui. */
+              <div className="form-group nova-solicitacao-anexos">
+                <span className={`form-label${(tipoEhDeMedicao || usaFluxoDespesaEventual || anexosObrigatorios) ? ' form-label--required' : ''}`}>
+                  {tipoEhDeMedicao
+                    ? 'Anexo da medição'
+                    : (usaFluxoDespesaEventual ? 'Comprovante da despesa' : 'Anexos')}
+                </span>
+                <div className="flex flex-wrap items-center gap-2 nova-solicitacao-inline-actions">
+                  <label className="btn btn-outline btn-sm inline-flex cursor-pointer items-center gap-2">
+                    <HiPaperClip className="h-4 w-4" />
+                    <span>Anexar arquivos</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept={UPLOAD_DOCUMENT_ACCEPT}
+                      ref={anexosRef}
+                      className="hidden"
+                      onChange={e => {
+                        limparErroCampo('anexos');
+                        adicionarArquivos(e.target.files);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  <span className="text-xs text-[var(--c-muted)]">
+                    {arquivos.length > 0
+                      ? `${arquivos.length} arquivo(s) selecionado(s)`
+                      : 'Nenhum arquivo selecionado'}
+                  </span>
+                </div>
+                <PendingAttachmentsList
+                  items={arquivos}
+                  onRemove={(index) => removerArquivo(index)}
+                  className="mt-2 space-y-1"
+                  itemClassName="nova-solicitacao-file-item flex items-center justify-between gap-3 text-sm bg-[var(--c-surface)] border border-[var(--c-border)] rounded px-2 py-1"
+                  removeButtonClassName="px-2 font-semibold text-[var(--c-primary)]"
+                />
+                {errosCampo.anexos ? <span className="form-error">{errosCampo.anexos}</span> : null}
+              </div>
+            )}
 
-          <div className="flex justify-end nova-solicitacao-footer">
-          <button
-            type="submit"
-            className="btn btn-primary btn-sm"
-            disabled={
-              criandoSolicitacao ||
-              (tipoEhDeMedicao && contratoSelecionadoMedicaoBloqueada) ||
-              (usaFluxoRecargaCartao && (!cartaoRecargaId || recargaCartaoContexto?.bloqueado)) ||
-              (usaApropriacaoAutomaticaObra && apropriacaoAutomatica.status === 'loading') ||
-              (usaFluxoDespesaEventual && despesaEventualSaldo.status === 'loading')
-            }
-          >
-            {criandoSolicitacao ? 'Criando...' : 'Criar Solicitação'}
-          </button>
-          </div>
-        </div>
+            <div className="app-actionbar">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={
+                  criandoSolicitacao ||
+                  (tipoEhDeMedicao && contratoSelecionadoMedicaoBloqueada) ||
+                  (usaFluxoRecargaCartao && (!cartaoRecargaId || recargaCartaoContexto?.bloqueado)) ||
+                  (usaApropriacaoAutomaticaObra && apropriacaoAutomatica.status === 'loading') ||
+                  (usaFluxoDespesaEventual && despesaEventualSaldo.status === 'loading')
+                }
+              >
+                {criandoSolicitacao ? 'Criando...' : 'Criar Solicitação'}
+              </button>
+            </div>
+          </BlocoConteudo>
         )}
-        </div>
       </form>
 
-      {modalCredoresContratoAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="card w-full max-w-2xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold" style={{ color: 'var(--c-text)' }}>Credores do contrato</h2>
-                <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
-                  Selecione um dos credores vinculados ao contrato informado.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setModalCredoresContratoAberto(false)}
-              >
-                Fechar
-              </button>
-            </div>
+      {/*
+        R9/R27 — este modal INTERROMPE outro trabalho (escolher o credor no
+        meio da solicitação), então modal é o lugar certo; o que mudou foi a
+        casca: era `fixed inset-0` à mão, com painel de altura livre e sem
+        rolagem própria. Agora é o `OverlayModal` do sistema, que resolve
+        empilhamento, trava de rolagem, Escape, foco e a rolagem do corpo com
+        cabeçalho e rodapé fixos (R27).
+      */}
+      <OverlayModal
+        aberto={modalCredoresContratoAberto}
+        rotulo="Credores do contrato"
+        largura="var(--modal-max-w-md, 680px)"
+        onFechar={() => setModalCredoresContratoAberto(false)}
+      >
+        <div data-modal="cabecalho" className="app-bloco-head">
+          <h2 className="app-bloco-titulo">Credores do contrato</h2>
+          <span className="app-bloco-acoes">
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setModalCredoresContratoAberto(false)}
+            >
+              Fechar
+            </button>
+          </span>
+        </div>
 
-            <div className="relative">
-              <HiOutlineMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--c-muted)]" />
+        <div className="p-4">
+          <p className="text-sm text-muted">
+            Selecione um dos credores vinculados ao contrato informado.
+          </p>
+
+          {/* R3/F1: UMA busca no contexto do modal, ocupando a faixa (.app-busca). */}
+          <div className="mt-3 flex items-center gap-2">
+            <HiOutlineMagnifyingGlass className="h-4 w-4 shrink-0 text-[var(--c-muted)]" aria-hidden="true" />
+            <input
+              className="input input-sm app-busca"
+              placeholder="Pesquisar por nome ou CPF/CNPJ"
+              value={credorContratoModalBusca}
+              onChange={(event) => setCredorContratoModalBusca(event.target.value)}
+              autoFocus
+            />
+          </div>
+
+          <div className="mt-3 rounded-lg border border-[var(--c-border)]">
+          {credoresContratoModalFiltrados.length === 0 ? (
+            <div className="p-4 text-sm text-[var(--c-muted)]">
+              Nenhum credor disponivel para a busca informada.
+            </div>
+          ) : (
+            credoresContratoModalFiltrados.map((credor) => {
+              const selecionado = String(form.parceiro_id) === String(credor.id);
+              return (
+                <button
+                  key={credor.id}
+                  type="button"
+                  className="block w-full border-b border-[var(--c-border)] px-4 py-3 text-left text-sm last:border-b-0 hover:bg-[var(--ui-surface-2)]"
+                  style={{ background: selecionado ? 'var(--sem-info-bg)' : 'var(--c-surface)' }}
+                  onClick={() => selecionarParceiro(credor)}
+                >
+                  <span className="block font-semibold text-[var(--c-text)]">{formatarCredor(credor)}</span>
+                </button>
+              );
+            })
+          )}
+          </div>
+        </div>
+      </OverlayModal>
+
+      {/*
+        R9 — cadastrar credor INTERROMPE o trabalho principal (abrir a
+        solicitação): é o exemplo escrito na própria regra de quando o modal
+        protege em vez de atrapalhar. Fica em modal, agora no `OverlayModal`
+        do sistema (R27: corpo rola, cabeçalho e rodapé ficam).
+      */}
+      <OverlayModal
+        aberto={exibirCadastroCredor && modalParceiroAberto}
+        rotulo="Cadastrar Credor"
+        onFechar={() => setModalParceiroAberto(false)}
+      >
+        <div data-modal="cabecalho" className="app-bloco-head">
+          <h2 className="app-bloco-titulo">Cadastrar Credor</h2>
+          <span className="app-bloco-acoes">
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setModalParceiroAberto(false)}
+            >
+              Fechar
+            </button>
+          </span>
+        </div>
+
+        <div className="p-4">
+          {/* A faixa de avisos tem UM dono por contexto (R16): com o modal
+              aberto ela vive AQUI — no topo da página ficaria atrás do fundo
+              escurecido. */}
+          {faixaAvisos}
+          <p className="text-sm text-muted">
+            Informe os dados principais para vincular o credor a esta solicitação.
+          </p>
+
+          <FormSecao legenda="Identificacao" colunas={2}>
+            <CampoForm label="CPF/CNPJ" obrigatorio>
               <input
-                className="input input-sm w-full pl-9"
-                placeholder="Pesquisar por nome ou CPF/CNPJ"
-                value={credorContratoModalBusca}
-                onChange={(event) => setCredorContratoModalBusca(event.target.value)}
-                autoFocus
+                className="input input-sm"
+                value={novoParceiro.cpf_cnpj}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, cpf_cnpj: maskCpfCnpj(e.target.value) }))}
               />
-            </div>
+            </CampoForm>
+            <CampoForm label="Nome" obrigatorio>
+              <input
+                className="input input-sm"
+                value={novoParceiro.nome}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, nome: e.target.value }))}
+              />
+            </CampoForm>
+            <CampoForm label="Telefone" obrigatorio>
+              <input
+                className="input input-sm"
+                value={novoParceiro.telefone}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, telefone: maskPhone(e.target.value) }))}
+              />
+            </CampoForm>
+            <CampoForm label="E-mail">
+              <input
+                className="input input-sm"
+                value={novoParceiro.email}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, email: e.target.value }))}
+              />
+            </CampoForm>
+          </FormSecao>
 
-            <div className="max-h-[360px] overflow-auto rounded-lg border border-[var(--c-border)]">
-              {credoresContratoModalFiltrados.length === 0 ? (
-                <div className="p-4 text-sm text-[var(--c-muted)]">
-                  Nenhum credor disponivel para a busca informada.
-                </div>
-              ) : (
-                credoresContratoModalFiltrados.map((credor) => {
-                  const selecionado = String(form.parceiro_id) === String(credor.id);
-                  return (
-                    <button
-                      key={credor.id}
-                      type="button"
-                      className={`block w-full border-b border-[var(--c-border)] px-4 py-3 text-left text-sm last:border-b-0 hover:bg-slate-50 ${selecionado ? 'bg-blue-50' : 'bg-[var(--c-surface)]'}`}
-                      onClick={() => selecionarParceiro(credor)}
-                    >
-                      <span className="block font-semibold text-[var(--c-text)]">{formatarCredor(credor)}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {exibirCadastroCredor && modalParceiroAberto && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:items-center sm:p-4">
-          <div className="card flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden p-0 sm:max-h-[calc(100vh-2rem)]">
-            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--c-border)] p-4">
-              <div>
-                <h2 className="text-xl font-semibold" style={{ color: 'var(--c-text)' }}>Cadastrar Credor</h2>
-                <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
-                  Informe os dados principais para vincular o credor a esta solicitação.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setModalParceiroAberto(false)}
-              >
-                Fechar
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {faixaAvisos}
-              <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <label className="grid gap-1 text-sm">
-                CPF/CNPJ *
-                <input
-                  className="input input-sm"
-                  value={novoParceiro.cpf_cnpj}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, cpf_cnpj: maskCpfCnpj(e.target.value) }))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                Nome *
-                <input
-                  className="input input-sm"
-                  value={novoParceiro.nome}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, nome: e.target.value }))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                Telefone *
-                <input
-                  className="input input-sm"
-                  value={novoParceiro.telefone}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, telefone: maskPhone(e.target.value) }))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                E-mail
-                <input
-                  className="input input-sm"
-                  value={novoParceiro.email}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, email: e.target.value }))}
-                />
-              </label>
-
-              {/* Endereco obrigatorio no cadastro (PI-20).
-                  Estes campos ja existiam no estado do formulario, mas nao eram renderizados — e e
-                  por isso que 2.428 dos 2.454 fornecedores ativos estao sem endereco. Exigir aqui
-                  evita que o contrato acima do limite pare na conferencia depois. */}
-              <div className="md:col-span-2 rounded-lg border border-[var(--c-border)] p-3 space-y-3">
-                <div>
-                  <div className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>
-                    Endereco do credor *
-                  </div>
-                  <p className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                    Obrigatorio: contrato acima do limite vai ao Juridico, e a minuta precisa
-                    identificar e localizar a parte.
-                  </p>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-6">
-                  <label className="grid gap-1 text-sm md:col-span-4">
-                    Logradouro *
-                    <input className="input input-sm" name="novo_credor_endereco"
-                      value={novoParceiro.endereco}
-                      onChange={e => setNovoParceiro(prev => ({ ...prev, endereco: e.target.value }))} />
-                  </label>
-                  <label className="grid gap-1 text-sm md:col-span-2">
-                    Numero *
-                    <input className="input input-sm" name="novo_credor_numero"
-                      value={novoParceiro.numero}
-                      onChange={e => setNovoParceiro(prev => ({ ...prev, numero: e.target.value }))} />
-                  </label>
-                  <label className="grid gap-1 text-sm md:col-span-2">
-                    Complemento
-                    <input className="input input-sm" name="novo_credor_complemento"
-                      value={novoParceiro.complemento || ''}
-                      onChange={e => setNovoParceiro(prev => ({ ...prev, complemento: e.target.value }))} />
-                  </label>
-                  <label className="grid gap-1 text-sm md:col-span-4">
-                    Bairro *
-                    <input className="input input-sm" name="novo_credor_bairro"
-                      value={novoParceiro.bairro}
-                      onChange={e => setNovoParceiro(prev => ({ ...prev, bairro: e.target.value }))} />
-                  </label>
-                  <label className="grid gap-1 text-sm md:col-span-2">
-                    CEP *
-                    <input className="input input-sm" name="novo_credor_cep"
-                      value={novoParceiro.cep}
-                      onChange={e => setNovoParceiro(prev => ({ ...prev, cep: e.target.value }))} />
-                  </label>
-                  <label className="grid gap-1 text-sm md:col-span-3">
-                    Municipio *
-                    <input className="input input-sm" name="novo_credor_municipio"
-                      value={novoParceiro.municipio}
-                      onChange={e => setNovoParceiro(prev => ({ ...prev, municipio: e.target.value }))} />
-                  </label>
-                  <label className="grid gap-1 text-sm md:col-span-1">
-                    UF *
-                    <input className="input input-sm" name="novo_credor_estado" maxLength={2}
-                      value={novoParceiro.estado}
-                      onChange={e => setNovoParceiro(prev => ({ ...prev, estado: e.target.value }))} />
-                  </label>
-                </div>
-              </div>
-
-              <div className="md:col-span-2 rounded-lg border border-[var(--c-border)] p-3 space-y-3">
-                <div>
-                  <div className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>
-                    Chaves PIX opcionais
-                  </div>
-                  <p className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                    Cadastre ate duas chaves fixas e uma chave variavel para uso financeiro.
-                  </p>
-                </div>
-
-                <div className="grid gap-3">
-                  <label className="grid gap-1 text-sm">
-                    Chave PIX fixa 1
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[140px_1fr]">
-                      <select
-                        className="input input-sm"
-                        value={novoParceiro.pix_chave_fixa_1_tipo}
-                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_1_tipo: e.target.value }))}
-                      >
-                        {PIX_TIPOS_CHAVE.map((tipo) => (
-                          <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        className="input input-sm"
-                        value={novoParceiro.pix_chave_fixa_1}
-                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_1: e.target.value }))}
-                        placeholder="Informe a chave"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="grid gap-1 text-sm">
-                    Chave PIX fixa 2
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[140px_1fr]">
-                      <select
-                        className="input input-sm"
-                        value={novoParceiro.pix_chave_fixa_2_tipo}
-                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_2_tipo: e.target.value }))}
-                      >
-                        {PIX_TIPOS_CHAVE.map((tipo) => (
-                          <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        className="input input-sm"
-                        value={novoParceiro.pix_chave_fixa_2}
-                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_2: e.target.value }))}
-                        placeholder="Informe a chave"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="grid gap-1 text-sm">
-                    Chave PIX variavel
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[140px_1fr]">
-                      <select
-                        className="input input-sm"
-                        value={novoParceiro.pix_chave_variavel_tipo}
-                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_variavel_tipo: e.target.value }))}
-                      >
-                        {PIX_TIPOS_CHAVE.map((tipo) => (
-                          <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        className="input input-sm"
-                        value={novoParceiro.pix_chave_variavel}
-                        onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_variavel: e.target.value }))}
-                        placeholder="Informe a chave"
-                      />
-                    </div>
-                  </label>
-                </div>
-              </div>
-              <label className="grid gap-1 text-sm">
-                Endereco
-                <input
-                  className="input input-sm"
+          {/* Endereco obrigatorio no cadastro (PI-20).
+              Estes campos ja existiam no estado do formulario, mas nao eram renderizados — e e
+              por isso que 2.428 dos 2.454 fornecedores ativos estao sem endereco. Exigir aqui
+              evita que o contrato acima do limite pare na conferencia depois. */}
+          <BlocoConteudo
+            variante="secundario"
+            titulo="Endereco do credor"
+            descricao="Obrigatorio: contrato acima do limite vai ao Juridico, e a minuta precisa identificar e localizar a parte."
+          >
+            <FormSecao colunas={3}>
+              <CampoForm label="Logradouro" obrigatorio span={2}>
+                <input className="input input-sm" name="novo_credor_endereco"
                   value={novoParceiro.endereco}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, endereco: e.target.value }))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                Numero
-                <input
-                  className="input input-sm"
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, endereco: e.target.value }))} />
+              </CampoForm>
+              <CampoForm label="Numero" obrigatorio>
+                <input className="input input-sm" name="novo_credor_numero"
                   value={novoParceiro.numero}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, numero: e.target.value }))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                Bairro
-                <input
-                  className="input input-sm"
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, numero: e.target.value }))} />
+              </CampoForm>
+              <CampoForm label="Complemento">
+                <input className="input input-sm" name="novo_credor_complemento"
+                  value={novoParceiro.complemento || ''}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, complemento: e.target.value }))} />
+              </CampoForm>
+              <CampoForm label="Bairro" obrigatorio span={2}>
+                <input className="input input-sm" name="novo_credor_bairro"
                   value={novoParceiro.bairro}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, bairro: e.target.value }))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                CEP
-                <input
-                  className="input input-sm"
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, bairro: e.target.value }))} />
+              </CampoForm>
+              <CampoForm label="CEP" obrigatorio>
+                <input className="input input-sm" name="novo_credor_cep"
                   value={novoParceiro.cep}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, cep: maskCep(e.target.value) }))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                Municipio
-                <input
-                  className="input input-sm"
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, cep: e.target.value }))} />
+              </CampoForm>
+              <CampoForm label="Municipio" obrigatorio span={2}>
+                <input className="input input-sm" name="novo_credor_municipio"
                   value={novoParceiro.municipio}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, municipio: e.target.value }))}
-                />
-              </label>
-              <label className="grid gap-1 text-sm">
-                Estado
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, municipio: e.target.value }))} />
+              </CampoForm>
+              <CampoForm label="UF" obrigatorio>
+                <input className="input input-sm" name="novo_credor_estado" maxLength={2}
+                  value={novoParceiro.estado}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, estado: e.target.value }))} />
+              </CampoForm>
+            </FormSecao>
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            variante="secundario"
+            titulo="Chaves PIX opcionais"
+            descricao="Cadastre ate duas chaves fixas e uma chave variavel para uso financeiro."
+          >
+            <FormSecao colunas={2}>
+              <CampoForm label="Chave PIX fixa 1 — tipo">
+                <select
+                  className="input input-sm"
+                  value={novoParceiro.pix_chave_fixa_1_tipo}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_1_tipo: e.target.value }))}
+                >
+                  {PIX_TIPOS_CHAVE.map((tipo) => (
+                    <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                  ))}
+                </select>
+              </CampoForm>
+              <CampoForm label="Chave PIX fixa 1">
                 <input
                   className="input input-sm"
-                  maxLength={2}
-                  value={novoParceiro.estado}
-                  onChange={e => setNovoParceiro(prev => ({ ...prev, estado: e.target.value.toUpperCase() }))}
+                  value={novoParceiro.pix_chave_fixa_1}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_1: e.target.value }))}
+                  placeholder="Informe a chave"
                 />
-              </label>
-            </div>
+              </CampoForm>
 
-            <div className="grid gap-2">
-              <div className="text-sm font-medium">Categorias da pessoa</div>
-              {categoriasParceiro.length === 0 ? (
-                <div className="text-sm text-gray-500">Nenhuma categoria cadastrada.</div>
-              ) : (
-                <div className="grid gap-2 md:grid-cols-2 max-h-[160px] overflow-y-auto rounded-lg border border-[var(--c-border)] p-3">
-                  {categoriasParceiro.map((categoria) => (
-                    <label key={categoria.id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={novoParceiro.categoria_ids.includes(categoria.id)}
-                        onChange={(event) => {
-                          setNovoParceiro((prev) => {
-                            const atual = new Set(prev.categoria_ids || []);
-                            if (event.target.checked) {
-                              atual.add(categoria.id);
-                            } else {
-                              atual.delete(categoria.id);
-                            }
-                            return { ...prev, categoria_ids: Array.from(atual) };
-                          });
-                        }}
-                      />
-                      <span>{categoria.nome}</span>
-                    </label>
+              <CampoForm label="Chave PIX fixa 2 — tipo">
+                <select
+                  className="input input-sm"
+                  value={novoParceiro.pix_chave_fixa_2_tipo}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_2_tipo: e.target.value }))}
+                >
+                  {PIX_TIPOS_CHAVE.map((tipo) => (
+                    <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
                   ))}
-                </div>
-              )}
-            </div>
-              </div>
-            </div>
+                </select>
+              </CampoForm>
+              <CampoForm label="Chave PIX fixa 2">
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.pix_chave_fixa_2}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_fixa_2: e.target.value }))}
+                  placeholder="Informe a chave"
+                />
+              </CampoForm>
 
-            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--c-border)] bg-[var(--c-card)] p-4">
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setModalParceiroAberto(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={salvarNovoParceiro}
-              >
-                Salvar credor
-              </button>
-            </div>
+              <CampoForm label="Chave PIX variavel — tipo">
+                <select
+                  className="input input-sm"
+                  value={novoParceiro.pix_chave_variavel_tipo}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_variavel_tipo: e.target.value }))}
+                >
+                  {PIX_TIPOS_CHAVE.map((tipo) => (
+                    <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                  ))}
+                </select>
+              </CampoForm>
+              <CampoForm label="Chave PIX variavel">
+                <input
+                  className="input input-sm"
+                  value={novoParceiro.pix_chave_variavel}
+                  onChange={e => setNovoParceiro(prev => ({ ...prev, pix_chave_variavel: e.target.value }))}
+                  placeholder="Informe a chave"
+                />
+              </CampoForm>
+            </FormSecao>
+          </BlocoConteudo>
+
+          {/*
+            ACHADO REGISTRADO, NADA REMOVIDO (B3 / disciplina de regras 2):
+            os seis campos abaixo gravam EXATAMENTE as mesmas chaves do
+            endereço obrigatório acima (endereco, numero, bairro, cep,
+            municipio, estado) — mesmo dado, mesmo papel, duas entradas, e com
+            tratamento DIFERENTE (aqui o CEP passa por `maskCep` e a UF é
+            forçada para maiúsculas; lá em cima, não). Remover é decisão do
+            cliente, então ficam; o defeito vai no relatório.
+          */}
+          <FormSecao legenda="Endereco (segunda entrada, ja existente na tela)" colunas={2}>
+            <CampoForm label="Endereco">
+              <input
+                className="input input-sm"
+                value={novoParceiro.endereco}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, endereco: e.target.value }))}
+              />
+            </CampoForm>
+            <CampoForm label="Numero">
+              <input
+                className="input input-sm"
+                value={novoParceiro.numero}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, numero: e.target.value }))}
+              />
+            </CampoForm>
+            <CampoForm label="Bairro">
+              <input
+                className="input input-sm"
+                value={novoParceiro.bairro}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, bairro: e.target.value }))}
+              />
+            </CampoForm>
+            <CampoForm label="CEP">
+              <input
+                className="input input-sm"
+                value={novoParceiro.cep}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, cep: maskCep(e.target.value) }))}
+              />
+            </CampoForm>
+            <CampoForm label="Municipio">
+              <input
+                className="input input-sm"
+                value={novoParceiro.municipio}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, municipio: e.target.value }))}
+              />
+            </CampoForm>
+            <CampoForm label="Estado">
+              <input
+                className="input input-sm"
+                maxLength={2}
+                value={novoParceiro.estado}
+                onChange={e => setNovoParceiro(prev => ({ ...prev, estado: e.target.value.toUpperCase() }))}
+              />
+            </CampoForm>
+          </FormSecao>
+
+          <div className="grid gap-2">
+            <div className="text-sm font-medium">Categorias da pessoa</div>
+            {categoriasParceiro.length === 0 ? (
+              <div className="text-sm text-muted">Nenhuma categoria cadastrada.</div>
+            ) : (
+              <div className="grid max-h-48 gap-2 overflow-y-auto rounded-lg border border-[var(--c-border)] p-3 md:grid-cols-2">
+                {categoriasParceiro.map((categoria) => (
+                  <label key={categoria.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={novoParceiro.categoria_ids.includes(categoria.id)}
+                      onChange={(event) => {
+                        setNovoParceiro((prev) => {
+                          const atual = new Set(prev.categoria_ids || []);
+                          if (event.target.checked) {
+                            atual.add(categoria.id);
+                          } else {
+                            atual.delete(categoria.id);
+                          }
+                          return { ...prev, categoria_ids: Array.from(atual) };
+                        });
+                      }}
+                    />
+                    <span>{categoria.nome}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      )}
+
+        <div
+          data-modal="rodape"
+          className="app-actionbar border-t border-[var(--c-border)] p-4"
+          style={{ background: 'var(--c-surface)' }}
+        >
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={salvarNovoParceiro}
+          >
+            Salvar credor
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => setModalParceiroAberto(false)}
+          >
+            Cancelar
+          </button>
+        </div>
+      </OverlayModal>
 
       {/* Modal do termo aditivo (PI-15). Fica fora do <form> de proposito: o envio dele e proprio
           e nao pode disparar o submit da medicao. */}
@@ -3719,7 +3868,7 @@ export default function NovaSolicitacao() {
           : ''}
         onFechar={() => setModalAditivoAberto(false)}
         onSolicitado={(r) => {
-          alert(`Termo aditivo de R$ ${Number(r?.aditivo?.valor || 0).toFixed(2)} solicitado — aguardando aprovacao.`);
+          avisar.sucesso(`Termo aditivo de R$ ${Number(r?.aditivo?.valor || 0).toFixed(2)} solicitado — aguardando aprovacao.`);
         }}
       />
 
@@ -3734,6 +3883,9 @@ export default function NovaSolicitacao() {
         }}
       />
 
+      {/* R21 — modal de confirmação do sistema (limpar a solicitação, remover
+          anexo, ciência antes de sair da tela). */}
+      {elementoConfirmacao}
     </Pagina>
   );
 }

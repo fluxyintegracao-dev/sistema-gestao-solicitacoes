@@ -169,7 +169,8 @@ export default function CrmTarefas() {
         titulo="Tarefas CRM"
         contagem={`${total} tarefa${total !== 1 ? 's' : ''}`}
         descricao="Agenda de contatos, visitas e propostas do funil comercial."
-        secundarias={[{ rotulo: 'Dashboard', to: '/crm/dashboard' }]}
+        /* "Dashboard" saiu daqui (C6/R11): caminho para OUTRA tela não é ação
+           desta. `crm-dashboard` já é destino do navigationConfig. */
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />

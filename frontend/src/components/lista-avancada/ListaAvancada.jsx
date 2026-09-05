@@ -8,6 +8,17 @@ import {
   useState
 } from 'react';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
+
+/*
+  Busca sem acento e sem caixa: quem procura "jose" tem de achar "José".
+  Comparar as strings cruas é o defeito clássico de busca em português.
+*/
+function normalizarBusca(texto) {
+  return String(texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
 import {
   HiOutlineMagnifyingGlass,
   HiOutlineXMark,
@@ -1089,6 +1100,25 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
   const fechar = useCallback(() => setAberto(false), []);
   useFecharAoSair(wrapRef, aberto, fechar);
 
+  /*
+    BUSCA DENTRO DO MENU (05/09).
+
+    Achado na leva do SST: a SstTimeline carrega ATÉ 500 colaboradores nesta
+    dimensão. O menu funciona — e rolar 500 caixas de marcação para achar uma
+    pessoa não é usar, é procurar. Marcação pressupõe lista que se percorre
+    com o olho; passando de algumas dezenas, ela deixa de ser isso.
+
+    O campo aparece só quando existe lista para filtrar (acima de 12 opções):
+    numa dimensão de 4 status ele seria ruído, e ruído em componente
+    compartilhado se multiplica por toda tela que o usa.
+  */
+  const opcoesTodas = dim.opcoes || [];
+  const [busca, setBusca] = useState('');
+  const temBusca = opcoesTodas.length > 12;
+  const opcoesVisiveis = temBusca && busca.trim()
+    ? opcoesTodas.filter((o) => normalizarBusca(String(o.rotulo)).includes(normalizarBusca(busca)))
+    : opcoesTodas;
+
   const n = selecionados.size;
   return (
     <div className="la-rapido-wrap" ref={wrapRef}>
@@ -1115,7 +1145,7 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
               tem como separar "a base não tem esse dado" de "o filtro
               abriu quebrado" — e painel vazio, sozinho, não distingue as
               duas coisas (a prova de mordida me pegou tentando isso). */}
-          {(dim.opcoes || []).length === 0 && (
+          {opcoesTodas.length === 0 && (
             <p className="la-vazio" data-vazio="sem-opcoes" role="note">
               {dim.vazio || `Nenhum registro de ${String(dim.rotulo).toLowerCase()} disponível para filtrar.`}
             </p>
@@ -1126,7 +1156,20 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
               estreitava — capacidade aparente sem efeito, que é a mesma
               família de defeito da R15. A forma do controle tem de dizer o
               que ele aceita. */}
-          {(dim.opcoes || []).map((opcao) => (
+          {temBusca ? (
+            <input
+              type="text"
+              className="la-rapido-busca"
+              value={busca}
+              onChange={(evento) => setBusca(evento.target.value)}
+              placeholder={`Buscar em ${dim.rotulo}…`}
+              aria-label={`Buscar em ${dim.rotulo}`}
+            />
+          ) : null}
+          {temBusca && opcoesVisiveis.length === 0 ? (
+            <p className="la-vazio">Nenhuma opção com esse texto.</p>
+          ) : null}
+          {opcoesVisiveis.map((opcao) => (
             <label key={String(opcao.valor)}>
               <input
                 type={dim.unico ? 'radio' : 'checkbox'}

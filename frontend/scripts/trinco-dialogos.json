@@ -20,11 +20,8 @@
     "src/modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros.jsx": 2,
     "src/modules/solicitacao-compra/pages/ComprasDelegacao.jsx": 5,
     "src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx": 60,
-    "src/modules/solicitacao-compra/pages/GestaoApropriacoes.jsx": 17,
-    "src/modules/solicitacao-compra/pages/GestaoCategorias.jsx": 10,
     "src/modules/solicitacao-compra/pages/GestaoFornecedores.jsx": 4,
     "src/modules/solicitacao-compra/pages/GestaoInsumos.jsx": 8,
-    "src/modules/solicitacao-compra/pages/GestaoUnidades.jsx": 10,
     "src/modules/solicitacao-compra/pages/ListaCotacoes.jsx": 1,
     "src/modules/solicitacao-compra/pages/NovaSolicitacaoCompra.jsx": 42,
     "src/modules/solicitacao-compra/pages/PedidoCompraDetalhe.jsx": 58,
@@ -36,7 +33,6 @@
     "src/navigation/AtalhosTopbar.jsx": 1,
     "src/pages/AprovacaoDiretoria.jsx": 3,
     "src/pages/ArquivosModelos.jsx": 8,
-    "src/pages/NovaSolicitacao.jsx": 74,
     "src/pages/PrioridadesDiretoria.jsx": 20,
     "src/pages/SolicitacaoDetalhe/AcoesContrato.jsx": 1,
     "src/pages/SolicitacaoDetalhe/AditivosDoContrato.jsx": 1,
@@ -48,10 +44,6 @@
     "src/pages/SolicitacaoDetalhe/Pedido.jsx": 3,
     "src/pages/SolicitacaoDetalhe/RetornoSolicitacaoBar.jsx": 1,
     "src/pages/SolicitacaoDetalhe/Timeline.jsx": 7,
-    "src/pages/Solicitacoes/index.jsx": 39,
-    "src/pages/Solicitacoes/LinhaSolicitacao.jsx": 10,
-    "src/pages/Solicitacoes/ModalAtribuirResponsavel.jsx": 4,
-    "src/pages/Solicitacoes/ModalEnviarSetor.jsx": 3,
     "src/pages/Treinamento.jsx": 1
   }
 }

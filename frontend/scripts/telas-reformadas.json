@@ -17,6 +17,21 @@
     "src/modules/crm/pages/CrmNovoLead.jsx",
     "src/modules/crm/pages/CrmTarefas.jsx",
     "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx",
+    "src/modules/solicitacao-compra/pages/GestaoApropriacoes.jsx",
+    "src/modules/solicitacao-compra/pages/GestaoCategorias.jsx",
+    "src/modules/solicitacao-compra/pages/GestaoUnidades.jsx",
+    "src/modules/sst/pages/SstCentroOperacional.jsx",
+    "src/modules/sst/pages/SstConfiguracoes.jsx",
+    "src/modules/sst/pages/SstCrudPage.jsx",
+    "src/modules/sst/pages/SstDashboard.jsx",
+    "src/modules/sst/pages/SstEsocial.jsx",
+    "src/modules/sst/pages/SstExecutivo.jsx",
+    "src/modules/sst/pages/SstHeatmap.jsx",
+    "src/modules/sst/pages/SstObservabilidade.jsx",
+    "src/modules/sst/pages/SstObservabilidadeAvancada.jsx",
+    "src/modules/sst/pages/SstProducaoMonitoramento.jsx",
+    "src/modules/sst/pages/SstRelatorioOperacional.jsx",
+    "src/modules/sst/pages/SstTimeline.jsx",
     "src/pages/AreasObra.jsx",
     "src/pages/AreasPorSetorOrigem.jsx",
     "src/pages/ArquivosModelosConfig.jsx",
@@ -29,6 +44,16 @@
     "src/pages/ComercialTabelasPreco.jsx",
     "src/pages/ComercialUnidades.jsx",
     "src/pages/ComportamentoRecebimentoSetor.jsx",
+    "src/pages/ComprasRelatorioCategoriasInsumos.jsx",
+    "src/pages/ComprasRelatorioCiclo.jsx",
+    "src/pages/ComprasRelatorioComprasDiretas.jsx",
+    "src/pages/ComprasRelatorioComprasFornecedor.jsx",
+    "src/pages/ComprasRelatorioDemandaPedidos.jsx",
+    "src/pages/ComprasRelatorioEconomiaCotacoes.jsx",
+    "src/pages/ComprasRelatorioEvolucao.jsx",
+    "src/pages/ComprasRelatorioFornecedores.jsx",
+    "src/pages/ComprasRelatorioPendenciasCotacoes.jsx",
+    "src/pages/ComprasRelatorioPrecosInsumos.jsx",
     "src/pages/ComprovantesPendentes.jsx",
     "src/pages/ComunicacaoInterna.jsx",
     "src/pages/Configuracoes.jsx",
@@ -81,6 +106,7 @@
     "src/pages/GestaoContratos.jsx",
     "src/pages/Login/index.jsx",
     "src/pages/ModuloRelatorios.jsx",
+    "src/pages/NovaSolicitacao.jsx",
     "src/pages/NovaSolicitacaoAutomacaoDestinoConfig.jsx",
     "src/pages/NovaSolicitacaoCamposConfig.jsx",
     "src/pages/ObraGestao.jsx",
@@ -106,6 +132,8 @@
     "src/pages/SetoresAcessoTodasObras.jsx",
     "src/pages/SetoresCriacaoTodasObras.jsx",
     "src/pages/SetoresVisiveisUsuario.jsx",
+    "src/pages/Solicitacoes/Filtros.jsx",
+    "src/pages/Solicitacoes/index.jsx",
     "src/pages/SolicitacoesSlaSetor.jsx",
     "src/pages/StatusSetor.jsx",
     "src/pages/TimeoutInatividade.jsx",
@@ -218,5 +246,16 @@
   "excecoes_cor": {
     "src/pages/ConfiguracoesStatusPedidoCompra.jsx": "cor do status é DADO: o hexadecimal é o value do <input type=\"color\"> e o padrão gravado no registro. Token viraria string do token no banco.",
     "src/modules/crm/pages/CrmKanban.jsx": "cor da etapa e DADO: o hexadecimal e o value do <input type=\"color\"> e o padrao gravado no registro da etapa. Token viraria a string do token no banco — mesmo caso ja registrado da ConfiguracoesStatusPedidoCompra."
+  },
+  "componentes_de_tela": {
+    "porque": "Arquivo que NAO tem rota propria e so renderiza dentro de outra tela. Ele precisa das regras mecanicas (cor, medida, filtro, overflow) mas nao pode ter entrada no harness — nao ha URL para abrir. Sem esta categoria o check de cobertura reprovava, com razao: manifesto sem entrada no harness significa 'ninguem abre isso no preview'. Aqui a resposta e outra: quem abre e a tela que o renderiza, declarada abaixo e conferida contra a lista do harness.",
+    "criado_em": "2026-09-05",
+    "regra": "Declarar dono NAO isenta de medicao — ele so diz ONDE a medicao acontece. Componente cujo dono nao esteja no harness continua reprovando. E componente que ninguem renderiza NAO entra aqui: se nao ha dono, nao ha medicao, e o certo e que isso apareca.",
+    "componentes": {
+      "src/pages/Solicitacoes/Filtros.jsx": "src/pages/Solicitacoes/index.jsx"
+    },
+    "fora_por_ora": {
+      "src/pages/Solicitacoes/ModalEnviarSetor.jsx": "Migrado em 05/09, mas o dono que o renderiza (src/pages/SolicitacaoDetalhe/index.jsx) ainda nao esta na lista do harness. Migrado e nao medido nao e PRONTO — entra no manifesto junto com o dono, na rodada do detalhe de Solicitacoes. Este bloco existe porque o check achou isso na PRIMEIRA execucao dele."
+    }
   }
 }

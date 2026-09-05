@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { TabelaPadrao } from '../components/padrao';
+import { useSearchParams } from 'react-router-dom';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  CelulaDupla,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  useAvisos
+} from '../components/padrao';
 import { obterRelatorioPrecosInsumosFornecedores } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -72,11 +83,12 @@ function extractErrorMessage(error) {
 
 export default function ComprasRelatorioPrecosInsumos() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { avisos, avisar, fechar } = useAvisos();
   const [filtros, setFiltros] = useState(() => readFilters(searchParams));
   const [obras, setObras] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
     let ativo = true;
@@ -101,7 +113,6 @@ export default function ComprasRelatorioPrecosInsumos() {
     async function carregar() {
       try {
         setLoading(true);
-        setErro('');
         const data = await obterRelatorioPrecosInsumosFornecedores(filtrosAtivos);
         if (ativo) {
           setRelatorio(data);
@@ -110,7 +121,13 @@ export default function ComprasRelatorioPrecosInsumos() {
         console.error(error);
         if (ativo) {
           setRelatorio(null);
-          setErro(extractErrorMessage(error));
+          /*
+            R19: a faixa de erro era `alert alert-error`. A classe existe no
+            CSS, mas só ANINHADA (`.layout-shell .alert-error` /
+            `.login-card .alert-error`) — fora do shell ela não pinta nada. O
+            aviso do sistema não depende de onde a tela está montada.
+          */
+          avisar.erro(extractErrorMessage(error));
         }
       } finally {
         if (ativo) {
@@ -124,7 +141,7 @@ export default function ComprasRelatorioPrecosInsumos() {
     return () => {
       ativo = false;
     };
-  }, [searchParams]);
+  }, [searchParams, recarga, avisar]);
 
   const resumo = relatorio?.resumo || {};
   const itens = useMemo(() => (Array.isArray(relatorio?.itens) ? relatorio.itens : []), [relatorio]);
@@ -135,9 +152,48 @@ export default function ComprasRelatorioPrecosInsumos() {
     Array.isArray(relatorio?.categorias) ? relatorio.categorias : []
   ), [relatorio]);
 
-  function aplicarFiltros(event) {
-    event.preventDefault();
-    setSearchParams(buildSearchParams(filtros));
+  /*
+    R12: obra/centro sai do `<select>` e vira marcação com etiqueta
+    removível; as duas datas são recorte contínuo e entram em `campos`
+    (R16b).
+  */
+  const ativos = useMemo(() => ({
+    obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : [])
+  }), [filtros.obra_id]);
+
+  /*
+    `unico: true`: o backend valida `obra_id` com `parseInteger`
+    (validateCompraRelatorioPrecosInsumosQuery) — UM valor por consulta.
+  */
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra / Centro de custo',
+      unico: true,
+      opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
+    }
+  ], [obras]);
+
+  /*
+    R23: 1 dimensão marcável + 2 datas não alcança o critério de consulta
+    cara (4+ dimensões), então o recorte aplica ao marcar — a etiqueta na
+    faixa nunca afirma um filtro que ainda não está valendo. "Atualizar
+    relatorio" fica como recarga explícita do recorte atual.
+  */
+  function aplicar(proximos) {
+    setFiltros(proximos);
+    setSearchParams(buildSearchParams(proximos));
+  }
+
+  function alternarFiltro(dimensao, valor) {
+    aplicar({
+      ...filtros,
+      [dimensao]: String(filtros[dimensao]) === String(valor) ? '' : String(valor)
+    });
+  }
+
+  function mudarCampo(campo, valor) {
+    aplicar({ ...filtros, [campo]: valor });
   }
 
   function limparFiltros() {
@@ -145,116 +201,79 @@ export default function ComprasRelatorioPrecosInsumos() {
     setSearchParams(new URLSearchParams());
   }
 
+  function recarregar() {
+    setRecarga((atual) => atual + 1);
+  }
+
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <p className="eyebrow">Compras / Relatorios</p>
-            <h1 className="page-title">Precos por Insumo</h1>
-            <p className="page-subtitle">
-              Preco medio de compra por insumo e fornecedor, calculado pelos itens reais dos pedidos.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/compras/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      <PageHeader
+        titulo="Precos por Insumo"
+        contagem="Compras / Relatorios"
+        descricao="Preco medio de compra por insumo e fornecedor, calculado pelos itens reais dos pedidos."
+        /* R11: o retorno ao hub de relatórios mora na seta do cabeçalho. */
+        voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
+        acaoPrincipal={{
+          rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
+          onClick: recarregar,
+          desabilitada: loading
+        }}
+        secundarias={[{ rotulo: 'Limpar', onClick: limparFiltros }]}
+      />
 
-      <div className="mt-4 card sol-surface-card solicitacoes-filtros app-filters-card">
-        <form className="grid gap-4" onSubmit={aplicarFiltros}>
-          <div className="app-filters-grid">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Obra / Centro de custo</span>
-              <select
-                className="input"
-                value={filtros.obra_id}
-                onChange={(event) => setFiltros((current) => ({ ...current, obra_id: event.target.value }))}
-              >
-                <option value="">Todos</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Pedido criado de</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_inicio}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_inicio: event.target.value }))}
-              />
-            </label>
+      <BlocoConteudo variante="secundario">
+        <BarraFiltros
+          campos={[
+            {
+              id: 'data_inicio',
+              rotulo: 'Pedido criado de',
+              tipo: 'date',
+              valor: filtros.data_inicio,
+              aoMudar: (valor) => mudarCampo('data_inicio', valor)
+            },
+            {
+              id: 'data_fim',
+              rotulo: 'Pedido criado ate',
+              tipo: 'date',
+              valor: filtros.data_fim,
+              aoMudar: (valor) => mudarCampo('data_fim', valor)
+            }
+          ]}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+      </BlocoConteudo>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Pedido criado ate</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_fim}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_fim: event.target.value }))}
-              />
-            </label>
-          </div>
+      <StatGrid colunas={3}>
+        <StatTile label="Itens lancados" valor={formatNumber(resumo.itens_lancados)} sub="Itens reais de pedidos" />
+        <StatTile label="Itens distintos" valor={formatNumber(resumo.itens_distintos)} sub="Insumos ou manuais agrupados" />
+        <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com itens no periodo" />
+        <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Pedidos usados no calculo" />
+        <StatTile label="Valor analisado" valor={formatMoney(resumo.valor_total)} sub="Soma dos itens" />
+        <StatTile label="Mais de um fornecedor" valor={formatNumber(resumo.itens_com_mais_de_um_fornecedor)} sub="Itens comparaveis" />
+      </StatGrid>
 
-          <div className="app-filter-actions">
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              Atualizar relatorio
-            </button>
-            <button type="button" className="btn btn-outline" onClick={limparFiltros} disabled={loading}>
-              Limpar
-            </button>
-          </div>
-        </form>
-      </div>
+      {/*
+        R18: as três tabelas viviam dentro de `card ... overflow-hidden` — o
+        `hidden` cria scrollport e mata o `position: sticky` do cabeçalho e
+        da coluna fixa em silêncio. O BlocoConteudo não recorta.
 
-      {erro ? (
-        <div className="mt-4 alert alert-error">{erro}</div>
-      ) : null}
-
-      <div className="dashboard-metric-grid mt-4">
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Itens lancados</span>
-          <strong>{formatNumber(resumo.itens_lancados)}</strong>
-          <small>Itens reais de pedidos</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Itens distintos</span>
-          <strong>{formatNumber(resumo.itens_distintos)}</strong>
-          <small>Insumos ou manuais agrupados</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Fornecedores</span>
-          <strong>{formatNumber(resumo.fornecedores)}</strong>
-          <small>Com itens no periodo</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Pedidos</span>
-          <strong>{formatNumber(resumo.pedidos)}</strong>
-          <small>Pedidos usados no calculo</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Valor analisado</span>
-          <strong>{formatMoney(resumo.valor_total)}</strong>
-          <small>Soma dos itens</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Mais de um fornecedor</span>
-          <strong>{formatNumber(resumo.itens_com_mais_de_um_fornecedor)}</strong>
-          <small>Itens comparaveis</small>
-        </div>
-      </div>
-
-      <div className="mt-4 card sol-surface-card overflow-hidden">
-        <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Insumos por preco medio</h2>
-        <p className="page-subtitle mb-3">Resumo por item comprado, com menor preco medio observado entre fornecedores.</p>
+        R25 + CelulaDupla: cada célula "principal + detalhe" era
+        `text-slate-900` sobre `text-slate-500` escrita à mão, dez vezes —
+        `text-slate-500` é #64748b, 4,34:1, abaixo do mínimo AA de 4,5:1, e
+        sem par no tema escuro. Era a `CelulaDupla` reimplementada célula a
+        célula: agora é o componente, que já traz o par de tons por token.
+      */}
+      <BlocoConteudo
+        titulo="Insumos por preco medio"
+        descricao="Resumo por item comprado, com menor preco medio observado entre fornecedores."
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -264,10 +283,10 @@ export default function ComprasRelatorioPrecosInsumos() {
               tipo: 'identidade',
               noCard: 'titulo',
               render: (item) => (
-                <div>
-                  <div className="font-semibold text-slate-900">{item.descricao}</div>
-                  <div className="text-xs text-slate-500">{item.unidade || '-'} - {item.origem === 'INSUMO' ? 'Insumo cadastrado' : 'Item manual'}</div>
-                </div>
+                <CelulaDupla
+                  principal={item.descricao}
+                  sub={`${item.unidade || '-'} - ${item.origem === 'INSUMO' ? 'Insumo cadastrado' : 'Item manual'}`}
+                />
               )
             },
             { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoria_nome || '-' },
@@ -281,10 +300,10 @@ export default function ComprasRelatorioPrecosInsumos() {
               titulo: 'Melhor fornecedor medio',
               tipo: 'texto',
               render: (item) => (
-                <div>
-                  <div className="font-semibold text-slate-900">{item.melhor_fornecedor?.nome || '-'}</div>
-                  <div className="text-xs text-slate-500">{formatMoney(item.menor_preco_medio)}</div>
-                </div>
+                <CelulaDupla
+                  principal={item.melhor_fornecedor?.nome || '-'}
+                  sub={formatMoney(item.menor_preco_medio)}
+                />
               )
             }
           ]}
@@ -295,12 +314,13 @@ export default function ComprasRelatorioPrecosInsumos() {
           rotuloRolagem="Insumos por preco medio"
           vazio="Sem itens de pedido nos filtros."
         />
-      </div>
+      </BlocoConteudo>
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr] mt-4">
-        <div className="card sol-surface-card overflow-hidden">
-          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Comparativo por fornecedor</h2>
-          <p className="page-subtitle mb-3">Cada linha compara o preco medio do fornecedor contra o menor preco medio do mesmo item.</p>
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <BlocoConteudo
+          titulo="Comparativo por fornecedor"
+          descricao="Cada linha compara o preco medio do fornecedor contra o menor preco medio do mesmo item."
+        >
           <TabelaPadrao
             colunas={[
               {
@@ -310,13 +330,10 @@ export default function ComprasRelatorioPrecosInsumos() {
                 tipo: 'identidade',
                 noCard: 'titulo',
                 render: (item) => (
-                  <div>
-                    <div className="font-semibold text-slate-900">{item.descricao}</div>
-                    <div className="text-xs text-slate-500">{item.unidade || '-'}</div>
-                  </div>
+                  <CelulaDupla principal={item.descricao} sub={item.unidade || '-'} />
                 )
               },
-              { id: 'fornecedor', titulo: 'Fornecedor', tipo: 'texto', render: (item) => <span className="font-semibold text-slate-900">{item.fornecedor_nome}</span> },
+              { id: 'fornecedor', titulo: 'Fornecedor', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.fornecedor_nome}</span> },
               { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
               { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
               { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
@@ -326,13 +343,29 @@ export default function ComprasRelatorioPrecosInsumos() {
                 id: 'diferenca',
                 titulo: 'Diferenca',
                 tipo: 'valor',
+                /*
+                  R25: `text-amber-700` / `text-emerald-700` viravam a única
+                  fonte do SIGNIFICADO (pagou acima × está no menor preço).
+                  O significado ficou, agora em token semântico: acima do
+                  menor preço é `--c-warning`, no menor preço é `--c-success`.
+                */
                 render: (item) => (
-                  <div>
-                    <div className={Number(item.diferenca_menor_preco_medio || 0) > 0 ? 'text-amber-700 font-semibold' : 'text-emerald-700 font-semibold'}>
-                      {formatMoney(item.diferenca_menor_preco_medio)}
-                    </div>
-                    <div className="text-xs text-slate-500">{formatPercent(item.diferenca_percentual)}</div>
-                  </div>
+                  <CelulaDupla
+                    principal={(
+                      <span
+                        className="font-semibold"
+                        style={{
+                          color: Number(item.diferenca_menor_preco_medio || 0) > 0
+                            ? 'var(--c-warning)'
+                            : 'var(--c-success)'
+                        }}
+                      >
+                        {formatMoney(item.diferenca_menor_preco_medio)}
+                      </span>
+                    )}
+                    sub={formatPercent(item.diferenca_percentual)}
+                    title={`${formatMoney(item.diferenca_menor_preco_medio)} — ${formatPercent(item.diferenca_percentual)}`}
+                  />
                 )
               },
               { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
@@ -344,11 +377,9 @@ export default function ComprasRelatorioPrecosInsumos() {
             rotuloRolagem="Comparativo por fornecedor"
             vazio="Sem comparativo nos filtros."
           />
-        </div>
+        </BlocoConteudo>
 
-        <div className="card sol-surface-card overflow-hidden">
-          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Categorias</h2>
-          <p className="page-subtitle mb-3">Valor analisado por categoria dos insumos.</p>
+        <BlocoConteudo titulo="Categorias" descricao="Valor analisado por categoria dos insumos.">
           <TabelaPadrao
             colunas={[
               {
@@ -370,8 +401,8 @@ export default function ComprasRelatorioPrecosInsumos() {
             rotuloRolagem="Categorias"
             vazio="Sem categorias nos filtros."
           />
-        </div>
+        </BlocoConteudo>
       </div>
-    </div>
+    </Pagina>
   );
 }

@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  useAvisos
+} from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 import { obterRelatorioDemandaPedidosCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -60,11 +71,14 @@ function extractErrorMessage(error) {
   }
 }
 
+/*
+  As duas tabelas "por status" são a MESMA tabela com dados diferentes — o
+  bloco padrão entra aqui inteiro (título, apoio e superfície), no lugar do
+  `card ... overflow-hidden` + `h2` + `page-subtitle` copiados (R5/R18).
+*/
 function StatusTable({ title, subtitle, rows, storageKey, loading }) {
   return (
-    <div className="card sol-surface-card overflow-hidden">
-      <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">{title}</h2>
-      <p className="page-subtitle mb-3">{subtitle}</p>
+    <BlocoConteudo titulo={title} descricao={subtitle}>
       <TabelaPadrao
         colunas={[
           {
@@ -85,17 +99,18 @@ function StatusTable({ title, subtitle, rows, storageKey, loading }) {
         rotuloRolagem={title}
         vazio="Sem registros no periodo."
       />
-    </div>
+    </BlocoConteudo>
   );
 }
 
 export default function ComprasRelatorioDemandaPedidos() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { avisos, avisar, fechar } = useAvisos();
   const [filtros, setFiltros] = useState(() => readFilters(searchParams));
   const [obras, setObras] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
     let ativo = true;
@@ -120,7 +135,6 @@ export default function ComprasRelatorioDemandaPedidos() {
     async function carregar() {
       try {
         setLoading(true);
-        setErro('');
         const data = await obterRelatorioDemandaPedidosCompras(filtrosAtivos);
         if (ativo) {
           setRelatorio(data);
@@ -129,7 +143,9 @@ export default function ComprasRelatorioDemandaPedidos() {
         console.error(error);
         if (ativo) {
           setRelatorio(null);
-          setErro(extractErrorMessage(error));
+          // R19: falha da consulta é evento — faixa do sistema (Avisos), não
+          // caixa de paleta crua montada à mão.
+          avisar.erro(extractErrorMessage(error));
         }
       } finally {
         if (ativo) {
@@ -143,7 +159,7 @@ export default function ComprasRelatorioDemandaPedidos() {
     return () => {
       ativo = false;
     };
-  }, [searchParams]);
+  }, [searchParams, recarga, avisar]);
 
   const resumo = relatorio?.resumo || {};
   const solicitacoesPorStatus = useMemo(() => (
@@ -165,9 +181,50 @@ export default function ComprasRelatorioDemandaPedidos() {
     Array.isArray(relatorio?.pedidos) ? relatorio.pedidos : []
   ), [relatorio]);
 
-  function aplicarFiltros(event) {
-    event.preventDefault();
-    setSearchParams(buildSearchParams(filtros));
+  /*
+    R12: obra/centro sai do `<select>` e vira marcação com etiqueta
+    removível; as datas são recorte contínuo (sem lista fechada) e entram em
+    `campos`, o espaço declarado da R16b.
+  */
+  const ativos = useMemo(() => ({
+    obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : [])
+  }), [filtros.obra_id]);
+
+  /*
+    `unico: true`: o backend valida `obra_id` com `parseInteger`
+    (validateCompraRelatorioDemandaPedidosQuery) — UM valor. Marca redonda,
+    marcar outro substitui; caixa quadrada aqui prometeria múltipla escolha
+    que o serviço não aceita (R15).
+  */
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra / Centro de custo',
+      unico: true,
+      opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
+    }
+  ], [obras]);
+
+  /*
+    R23: 1 dimensão marcável + 2 datas fica LONGE do critério de consulta
+    cara (4+ dimensões), então o recorte aplica ao marcar e a etiqueta nunca
+    afirma um filtro que ainda não vale. "Atualizar relatorio" continua na
+    tela como o que sempre deveria ter sido: recarregar o recorte atual.
+  */
+  function aplicar(proximos) {
+    setFiltros(proximos);
+    setSearchParams(buildSearchParams(proximos));
+  }
+
+  function alternarFiltro(dimensao, valor) {
+    aplicar({
+      ...filtros,
+      [dimensao]: String(filtros[dimensao]) === String(valor) ? '' : String(valor)
+    });
+  }
+
+  function mudarCampo(campo, valor) {
+    aplicar({ ...filtros, [campo]: valor });
   }
 
   function limparFiltros() {
@@ -175,111 +232,68 @@ export default function ComprasRelatorioDemandaPedidos() {
     setSearchParams(new URLSearchParams());
   }
 
+  function recarregar() {
+    setRecarga((atual) => atual + 1);
+  }
+
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <p className="eyebrow">Compras / Relatorios</p>
-            <h1 className="page-title">Demanda e Pedidos</h1>
-            <p className="page-subtitle">
-              Visao sintetica e analitica das solicitacoes de compra e dos pedidos gerados.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/compras/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      <PageHeader
+        titulo="Demanda e Pedidos"
+        contagem="Compras / Relatorios"
+        descricao="Visao sintetica e analitica das solicitacoes de compra e dos pedidos gerados."
+        /* R11: o retorno ao hub de relatórios fica na seta do cabeçalho —
+           navegação não é ação, então não volta para a barra de ações. */
+        voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
+        acaoPrincipal={{
+          rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
+          onClick: recarregar,
+          desabilitada: loading
+        }}
+        secundarias={[{ rotulo: 'Limpar', onClick: limparFiltros }]}
+      />
 
-      <div className="mt-4 card sol-surface-card solicitacoes-filtros app-filters-card">
-        <form className="grid gap-4" onSubmit={aplicarFiltros}>
-          <div className="app-filters-grid">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Obra / Centro de custo</span>
-              <select
-                className="input"
-                value={filtros.obra_id}
-                onChange={(event) => setFiltros((current) => ({ ...current, obra_id: event.target.value }))}
-              >
-                <option value="">Todos</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Criacao inicial</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_inicio}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_inicio: event.target.value }))}
-              />
-            </label>
+      <BlocoConteudo variante="secundario">
+        <BarraFiltros
+          campos={[
+            {
+              id: 'data_inicio',
+              rotulo: 'Criacao inicial',
+              tipo: 'date',
+              valor: filtros.data_inicio,
+              aoMudar: (valor) => mudarCampo('data_inicio', valor)
+            },
+            {
+              id: 'data_fim',
+              rotulo: 'Criacao final',
+              tipo: 'date',
+              valor: filtros.data_fim,
+              aoMudar: (valor) => mudarCampo('data_fim', valor)
+            }
+          ]}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+      </BlocoConteudo>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Criacao final</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_fim}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_fim: event.target.value }))}
-              />
-            </label>
-          </div>
+      <StatGrid colunas={5}>
+        <StatTile label="Solicitacoes" valor={formatNumber(resumo.solicitacoes)} sub="Criadas no periodo" />
+        <StatTile label="Liberadas" valor={formatNumber(resumo.solicitacoes_liberadas)} sub="Com liberacao para compra" />
+        <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Gerados no periodo" />
+        <StatTile label="Valor pedidos" valor={formatMoney(resumo.valor_pedidos)} sub="Somente pedidos reais" />
+        <StatTile label="Ticket medio" valor={formatMoney(resumo.ticket_medio_pedido)} sub="Valor medio por pedido" />
+      </StatGrid>
 
-          <div className="app-page-actions">
-            <button type="button" className="btn btn-outline" onClick={limparFiltros}>
-              Limpar
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Atualizando...' : 'Atualizar relatorio'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {erro && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {erro}
-        </div>
-      )}
-
-      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div className="metric-card">
-          <span>Solicitacoes</span>
-          <strong>{formatNumber(resumo.solicitacoes)}</strong>
-          <small>Criadas no periodo</small>
-        </div>
-        <div className="metric-card">
-          <span>Liberadas</span>
-          <strong>{formatNumber(resumo.solicitacoes_liberadas)}</strong>
-          <small>Com liberacao para compra</small>
-        </div>
-        <div className="metric-card">
-          <span>Pedidos</span>
-          <strong>{formatNumber(resumo.pedidos)}</strong>
-          <small>Gerados no periodo</small>
-        </div>
-        <div className="metric-card">
-          <span>Valor pedidos</span>
-          <strong>{formatMoney(resumo.valor_pedidos)}</strong>
-          <small>Somente pedidos reais</small>
-        </div>
-        <div className="metric-card">
-          <span>Ticket medio</span>
-          <strong>{formatMoney(resumo.ticket_medio_pedido)}</strong>
-          <small>Valor medio por pedido</small>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      {/* R18: as cinco tabelas viviam dentro de `card ... overflow-hidden`.
+          O `hidden` cria scrollport e mata o `position: sticky` do cabeçalho
+          e da coluna fixa, calado — nenhum erro, nenhum teste. O
+          BlocoConteudo não recorta; onde cortar for necessário, o idioma é
+          `overflow: clip`. */}
+      <div className="grid gap-4 xl:grid-cols-2">
         <StatusTable
           title="Solicitacoes por status"
           subtitle="Volume de demandas de compra pela situacao atual."
@@ -296,10 +310,8 @@ export default function ComprasRelatorioDemandaPedidos() {
         />
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <div className="card sol-surface-card overflow-hidden">
-          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Solicitacoes por obra/centro</h2>
-          <p className="page-subtitle mb-3">Origem das demandas no periodo filtrado.</p>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <BlocoConteudo titulo="Solicitacoes por obra/centro" descricao="Origem das demandas no periodo filtrado.">
           <TabelaPadrao
             colunas={[
               {
@@ -320,11 +332,9 @@ export default function ComprasRelatorioDemandaPedidos() {
             rotuloRolagem="Solicitacoes por obra/centro"
             vazio="Sem solicitacoes no periodo."
           />
-        </div>
+        </BlocoConteudo>
 
-        <div className="card sol-surface-card overflow-hidden">
-          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Pedidos por obra/centro</h2>
-          <p className="page-subtitle mb-3">Valor efetivamente pedido por origem operacional.</p>
+        <BlocoConteudo titulo="Pedidos por obra/centro" descricao="Valor efetivamente pedido por origem operacional.">
           <TabelaPadrao
             colunas={[
               {
@@ -345,12 +355,16 @@ export default function ComprasRelatorioDemandaPedidos() {
             rotuloRolagem="Pedidos por obra/centro"
             vazio="Sem pedidos no periodo."
           />
-        </div>
+        </BlocoConteudo>
       </div>
 
-      <div className="mt-4 card sol-surface-card overflow-hidden">
-        <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Analitico de solicitacoes</h2>
-        <p className="page-subtitle mb-3">Ultimas 100 solicitacoes conforme os filtros aplicados.</p>
+      <BlocoConteudo
+        titulo="Analitico de solicitacoes"
+        contagem="Ultimas 100"
+        descricao="Solicitacoes conforme os filtros aplicados."
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -360,13 +374,18 @@ export default function ComprasRelatorioDemandaPedidos() {
               tipo: 'identidade',
               noCard: 'titulo',
               render: (item) => (
-                <Link className="font-semibold text-blue-700 hover:underline" to={`/solicitacoes-compra/${item.id}`}>
+                <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.id}`}>
                   SC #{item.id}
                 </Link>
               )
             },
-            { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-slate-900">{item.titulo || '-'}</span> },
-            { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => item.status_label },
+            { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => <StatusBadge status={item.status_label || '-'} />
+            },
             { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
             { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
             { id: 'valor', titulo: 'Valor pedidos', tipo: 'valor', render: (item) => formatMoney(item.valor_pedidos) },
@@ -378,11 +397,13 @@ export default function ComprasRelatorioDemandaPedidos() {
           rotuloRolagem="Analitico de solicitacoes"
           vazio="Sem solicitacoes no periodo."
         />
-      </div>
+      </BlocoConteudo>
 
-      <div className="mt-4 card sol-surface-card overflow-hidden">
-        <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Analitico de pedidos</h2>
-        <p className="page-subtitle mb-3">Ultimos 100 pedidos conforme os filtros aplicados.</p>
+      <BlocoConteudo
+        titulo="Analitico de pedidos"
+        contagem="Ultimos 100"
+        descricao="Pedidos conforme os filtros aplicados."
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -392,12 +413,17 @@ export default function ComprasRelatorioDemandaPedidos() {
               tipo: 'identidade',
               noCard: 'titulo',
               render: (item) => (
-                <Link className="font-semibold text-blue-700 hover:underline" to={`/pedidos-compra/${item.id}`}>
+                <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/pedidos-compra/${item.id}`}>
                   PC #{item.id}
                 </Link>
               )
             },
-            { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => item.status_label },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => <StatusBadge status={item.status_label || '-'} />
+            },
             { id: 'solicitacao', titulo: 'Solicitacao', tipo: 'codigo', render: (item) => (item.solicitacao ? `SC #${item.solicitacao.id}` : '-') },
             { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
             { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
@@ -409,7 +435,7 @@ export default function ComprasRelatorioDemandaPedidos() {
           rotuloRolagem="Analitico de pedidos"
           vazio="Sem pedidos no periodo."
         />
-      </div>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

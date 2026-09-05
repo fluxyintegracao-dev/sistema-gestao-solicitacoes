@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { TabelaPadrao } from '../components/padrao';
+import { useSearchParams } from 'react-router-dom';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao
+} from '../components/padrao';
 import { obterRelatorioFornecedoresCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -33,6 +42,10 @@ function formatMoney(value) {
     style: 'currency',
     currency: 'BRL'
   });
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString('pt-BR');
 }
 
 function formatPercent(value) {
@@ -162,8 +175,42 @@ export default function ComprasRelatorioFornecedores() {
     [relatorio]
   );
 
-  function aplicarFiltros(event) {
-    event.preventDefault();
+  /*
+    R12: a obra deixou de ser `<select>` e virou MARCACAO. `unico: true`
+    porque o endpoint recebe UM `obra_id` (`parseInteger` no validador do
+    backend, com `ensureAllowedKeys` limitando a chave a um valor): sem
+    declarar, o menu abriria com caixa quadrada prometendo escolha multipla
+    e, com duas marcas, a tela mandaria filtro nenhum — duas etiquetas na
+    faixa e a lista sem estreitar (R15).
+  */
+  const ativos = useMemo(() => ({
+    obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : [])
+  }), [filtros.obra_id]);
+
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra / Centro de custo',
+      unico: true,
+      opcoes: obras.map((obra) => ({
+        valor: String(obra.id),
+        rotulo: obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome
+      }))
+    }
+  ], [obras]);
+
+  function atualizarCampo(campo, valor) {
+    setFiltros((current) => ({ ...current, [campo]: valor }));
+  }
+
+  function alternarFiltro(dimensao, valor) {
+    setFiltros((current) => ({
+      ...current,
+      [dimensao]: String(current[dimensao]) === String(valor) ? '' : String(valor)
+    }));
+  }
+
+  function aplicarFiltros() {
     setSearchParams(buildSearchParams(filtros));
   }
 
@@ -173,119 +220,110 @@ export default function ComprasRelatorioFornecedores() {
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <p className="eyebrow">Compras / Relatorios</p>
-            <h1 className="page-title">Fornecedores</h1>
-            <p className="page-subtitle">
-              Analise de participacao, resposta e vitorias por fornecedor no processo de cotacao.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/compras/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      {/* R11: "Voltar aos relatorios" era botao de acao fazendo papel de
+          navegacao. Vira a seta `voltar` do PageHeader — mesma rota, mesma
+          saida, na affordance que o sistema usa para retorno. */}
+      <PageHeader
+        titulo="Fornecedores"
+        voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
+        contagem={`${formatNumber(fornecedores.length)} fornecedor(es) no recorte`}
+        /* R23: agregacao pesada sobre cotacoes, respostas e itens — o
+           recorte e RASCUNHO ate o clique, e a regra exige que a tela
+           AVISE isso; sem o aviso a etiqueta marcada e lida como filtro
+           ja aplicado. */
+        descricao="Analise de participacao, resposta e vitorias por fornecedor no processo de cotacao. Marque o recorte e clique em Atualizar relatorio."
+        acaoPrincipal={{
+          rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
+          onClick: aplicarFiltros,
+          desabilitada: loading
+        }}
+        secundarias={[{ rotulo: 'Limpar', onClick: limparFiltros }]}
+      />
 
-      <div className="mt-4 card sol-surface-card solicitacoes-filtros app-filters-card">
-        <form className="grid gap-4" onSubmit={aplicarFiltros}>
-          <div className="app-filters-grid">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Obra / Centro de custo</span>
-              <select
-                className="input"
-                value={filtros.obra_id}
-                onChange={(event) => setFiltros((current) => ({ ...current, obra_id: event.target.value }))}
-              >
-                <option value="">Todos</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <BlocoConteudo variante="secundario">
+        {/* R12/R16b: obra e recorte enumeravel (marcacao + etiqueta); as
+            datas sao contornos continuos, sem lista fechada — vao em
+            `campos`, o espaco declarado da BarraFiltros para isso. */}
+        <BarraFiltros
+          campos={[
+            {
+              id: 'data_inicio',
+              rotulo: 'Data inicial',
+              tipo: 'date',
+              valor: filtros.data_inicio,
+              aoMudar: (valor) => atualizarCampo('data_inicio', valor)
+            },
+            {
+              id: 'data_fim',
+              rotulo: 'Data final',
+              tipo: 'date',
+              valor: filtros.data_fim,
+              aoMudar: (valor) => atualizarCampo('data_fim', valor)
+            }
+          ]}
+          filtros={dimensoes}
+          ativos={ativos}
+          /* R16: "Limpar" tem UM dono nesta tela — o botao secundario do
+             cabecalho. Passar `aoLimpar` aqui poria um segundo controle
+             com a MESMA acao no mesmo contexto visual; o ✕ de cada
+             etiqueta continua removendo o recorte individual. */
+          aoAlternar={alternarFiltro}
+        />
+      </BlocoConteudo>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Data inicial</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_inicio}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_inicio: event.target.value }))}
-              />
-            </label>
+      {/* A classe `.alert-danger` NAO EXISTE em CSS nenhum do repositorio: o
+          erro de carregamento aparecia sem tom, sem icone e sem contorno de
+          alerta. Agora e o Avisos do sistema (tom semantico + icone). */}
+      <Avisos
+        avisos={erro ? [{ id: 'fornecedores-erro', tipo: 'error', mensagem: erro }] : []}
+        aoFechar={() => setErro('')}
+      />
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Data final</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_fim}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_fim: event.target.value }))}
-              />
-            </label>
-          </div>
+      <StatGrid colunas={3}>
+        <StatTile
+          label="Fornecedores"
+          valor={formatNumber(resumo.fornecedores)}
+          sub="Com cotacoes no periodo"
+        />
+        <StatTile
+          label="Cotacoes enviadas"
+          valor={formatNumber(resumo.cotacoes_enviadas)}
+          sub="Participacoes registradas"
+        />
+        <StatTile
+          label="Taxa de resposta"
+          valor={formatPercent(resumo.taxa_resposta)}
+          sub={`${formatNumber(resumo.cotacoes_respondidas)} respondida(s)`}
+          tom="success"
+        />
+        <StatTile
+          label="Sem resposta"
+          valor={formatNumber(resumo.cotacoes_sem_resposta)}
+          sub="Participacoes sem retorno"
+          tom={Number(resumo.cotacoes_sem_resposta || 0) > 0 ? 'warning' : undefined}
+        />
+        <StatTile
+          label="Baixa resposta"
+          valor={formatNumber(resumo.fornecedores_baixa_resposta)}
+          sub="Fornecedor(es) com amostra minima"
+          tom={Number(resumo.fornecedores_baixa_resposta || 0) > 0 ? 'danger' : undefined}
+        />
+        <StatTile
+          label="Valor vencedor"
+          valor={formatMoney(resumo.valor_vencedor)}
+          sub={`${formatNumber(resumo.itens_vencedores)} item(ns) vencedor(es)`}
+        />
+      </StatGrid>
 
-          <div className="app-page-actions">
-            <button type="button" className="btn btn-outline" onClick={limparFiltros}>
-              Limpar
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Atualizando...' : 'Atualizar relatorio'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {erro ? (
-        <div className="mt-4 alert alert-danger">{erro}</div>
-      ) : null}
-
-      <div className="mt-4 metric-grid">
-        <div className="dashboard-metric-card dashboard-metric-card--blue">
-          <span className="dashboard-metric-label">Fornecedores</span>
-          <strong className="dashboard-metric-value">{Number(resumo.fornecedores || 0).toLocaleString('pt-BR')}</strong>
-          <small className="dashboard-metric-detail">Com cotacoes no periodo</small>
-        </div>
-        <div className="dashboard-metric-card dashboard-metric-card--slate">
-          <span className="dashboard-metric-label">Cotacoes enviadas</span>
-          <strong className="dashboard-metric-value">{Number(resumo.cotacoes_enviadas || 0).toLocaleString('pt-BR')}</strong>
-          <small className="dashboard-metric-detail">Participacoes registradas</small>
-        </div>
-        <div className="dashboard-metric-card dashboard-metric-card--green">
-          <span className="dashboard-metric-label">Taxa de resposta</span>
-          <strong className="dashboard-metric-value">{formatPercent(resumo.taxa_resposta)}</strong>
-          <small className="dashboard-metric-detail">{Number(resumo.cotacoes_respondidas || 0).toLocaleString('pt-BR')} respondida(s)</small>
-        </div>
-        <div className="dashboard-metric-card dashboard-metric-card--amber">
-          <span className="dashboard-metric-label">Sem resposta</span>
-          <strong className="dashboard-metric-value">{Number(resumo.cotacoes_sem_resposta || 0).toLocaleString('pt-BR')}</strong>
-          <small className="dashboard-metric-detail">Participacoes sem retorno</small>
-        </div>
-        <div className="dashboard-metric-card dashboard-metric-card--red">
-          <span className="dashboard-metric-label">Baixa resposta</span>
-          <strong className="dashboard-metric-value">{Number(resumo.fornecedores_baixa_resposta || 0).toLocaleString('pt-BR')}</strong>
-          <small className="dashboard-metric-detail">Fornecedor(es) com amostra minima</small>
-        </div>
-        <div className="dashboard-metric-card dashboard-metric-card--amber">
-          <span className="dashboard-metric-label">Valor vencedor</span>
-          <strong className="dashboard-metric-value">{formatMoney(resumo.valor_vencedor)}</strong>
-          <small className="dashboard-metric-detail">{Number(resumo.itens_vencedores || 0).toLocaleString('pt-BR')} item(ns) vencedor(es)</small>
-        </div>
-      </div>
-
-      <div className="mt-4 card sol-surface-card overflow-hidden">
-        <div className="card-header">
-          <div>
-            <h2>Fornecedores com menor taxa de resposta</h2>
-            <p>Ranking gerado apenas por cotacoes enviadas e respostas registradas. Fornecedores com menos de 2 participacoes ficam fora desta lista.</p>
-          </div>
-        </div>
+      {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
+          scrollport e matava o `position: sticky` da coluna fixa e do
+          cabecalho — sem erro e sem falha de build. O BlocoConteudo nao
+          recorta nada. */}
+      <BlocoConteudo
+        titulo="Fornecedores com menor taxa de resposta"
+        descricao="Ranking gerado apenas por cotacoes enviadas e respostas registradas. Fornecedores com menos de 2 participacoes ficam fora desta lista."
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -306,8 +344,8 @@ export default function ComprasRelatorioFornecedores() {
               )
             },
             { id: 'taxa_resposta', titulo: 'Taxa resposta', tipo: 'numero', render: (item) => <strong>{formatPercent(item.taxa_resposta)}</strong> },
-            { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => Number(item.cotacoes_sem_resposta || 0).toLocaleString('pt-BR') },
-            { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR') },
+            { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_sem_resposta) },
+            { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
             { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
             { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
             {
@@ -327,15 +365,14 @@ export default function ComprasRelatorioFornecedores() {
           rotuloRolagem="Fornecedores com menor taxa de resposta"
           vazio="Nenhum fornecedor com baixa resposta para os filtros selecionados."
         />
-      </div>
+      </BlocoConteudo>
 
-      <div className="mt-4 card sol-surface-card overflow-hidden">
-        <div className="card-header">
-          <div>
-            <h2>Base analitica de fornecedores</h2>
-            <p>Participacao completa em cotacoes, respostas, itens e valores por fornecedor.</p>
-          </div>
-        </div>
+      <BlocoConteudo
+        titulo="Base analitica de fornecedores"
+        descricao="Participacao completa em cotacoes, respostas, itens e valores por fornecedor."
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -355,7 +392,7 @@ export default function ComprasRelatorioFornecedores() {
                 </div>
               )
             },
-            { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR') },
+            { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
             {
               id: 'resposta',
               titulo: 'Resposta',
@@ -364,17 +401,17 @@ export default function ComprasRelatorioFornecedores() {
                 <div>
                   <strong>{formatPercent(item.taxa_resposta)}</strong>
                   <div className="text-xs text-[var(--c-muted)]">
-                    {Number(item.cotacoes_respondidas || 0).toLocaleString('pt-BR')} de{' '}
-                    {Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR')}
+                    {formatNumber(item.cotacoes_respondidas)} de{' '}
+                    {formatNumber(item.cotacoes_enviadas)}
                   </div>
                 </div>
               )
             },
-            { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => Number(item.cotacoes_sem_resposta || 0).toLocaleString('pt-BR') },
+            { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_sem_resposta) },
             { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
             { id: 'prazo', titulo: 'Prazo medio', tipo: 'numero', render: (item) => formatHours(item.prazo_medio_resposta_horas) },
-            { id: 'itens_respondidos', titulo: 'Itens respondidos', tipo: 'numero', render: (item) => Number(item.itens_respondidos || 0).toLocaleString('pt-BR') },
-            { id: 'itens_vencedores', titulo: 'Itens vencedores', tipo: 'numero', render: (item) => Number(item.itens_vencedores || 0).toLocaleString('pt-BR') },
+            { id: 'itens_respondidos', titulo: 'Itens respondidos', tipo: 'numero', render: (item) => formatNumber(item.itens_respondidos) },
+            { id: 'itens_vencedores', titulo: 'Itens vencedores', tipo: 'numero', render: (item) => formatNumber(item.itens_vencedores) },
             { id: 'valor_cotado', titulo: 'Valor cotado', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_cotado)}</span> },
             { id: 'valor_vencedor', titulo: 'Valor vencedor', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_vencedor)}</span> },
             { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
@@ -395,7 +432,7 @@ export default function ComprasRelatorioFornecedores() {
           rotuloRolagem="Base analitica de fornecedores"
           vazio="Nenhum fornecedor encontrado para os filtros selecionados."
         />
-      </div>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

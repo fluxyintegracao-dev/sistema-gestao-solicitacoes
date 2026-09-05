@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { TabelaPadrao } from '../components/padrao';
+import { useSearchParams } from 'react-router-dom';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao
+} from '../components/padrao';
 import { obterRelatorioCicloCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -53,6 +62,10 @@ function formatHours(value) {
   return `${(numeric / 24).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} dia(s)`;
 }
 
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString('pt-BR');
+}
+
 function formatPercent(value) {
   return `${Number(value || 0).toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
@@ -68,6 +81,30 @@ function extractErrorMessage(error) {
   } catch (_) {
     return message || 'Erro ao carregar ciclo de compras';
   }
+}
+
+/**
+ * BARRA DE PROPORCAO — a "biblioteca de grafico" aqui e uma div com largura
+ * percentual, e a largura em % e DADO (a proporcao da etapa), nao medida de
+ * layout: por isso continua no `style` e nao vira degrau da escala (R10).
+ *
+ * O ZERO NAO DESENHA (correcao de 04/09). A versao anterior calculava
+ * `Math.max(4, pct)` sem guarda: uma etapa com valor ZERO saia com 4% de
+ * barra pintada — barra visivel afirmando que existe tempo onde nao existe
+ * nenhum. O piso de 4% tem um proposito legitimo (valor pequeno porem real
+ * precisa aparecer), mas ele so vale DEPOIS de o valor ser maior que zero.
+ * Agora: zero desenha trilho vazio; qualquer valor positivo tem no minimo
+ * 4% para nao sumir. Cor do trilho e do preenchimento saem de token (R25).
+ */
+function BarraProporcao({ valor, maximo }) {
+  const numero = Number(valor || 0);
+  const proporcao = maximo > 0 ? (numero / maximo) * 100 : 0;
+  const largura = numero > 0 ? Math.max(4, proporcao) : 0;
+  return (
+    <div className="h-2 rounded-full bg-[var(--ui-border)] overflow-clip">
+      <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${largura}%` }} />
+    </div>
+  );
 }
 
 export default function ComprasRelatorioCiclo() {
@@ -168,8 +205,43 @@ export default function ComprasRelatorioCiclo() {
     [etapasCiclo]
   );
 
-  function aplicarFiltros(event) {
-    event.preventDefault();
+  /*
+    R12: a obra deixou de ser `<select>` e virou MARCACAO. `unico: true`
+    porque o endpoint recebe UM `obra_id` (`parseInteger` no validador do
+    backend, com `ensureAllowedKeys` limitando a chave a um valor): sem
+    declarar, o menu abriria com caixa quadrada prometendo escolha multipla
+    e, com duas marcas, a tela mandaria filtro nenhum — duas etiquetas na
+    faixa e a lista sem estreitar (R15: forma do controle tem de dizer o
+    que ele aceita).
+  */
+  const ativos = useMemo(() => ({
+    obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : [])
+  }), [filtros.obra_id]);
+
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra / Centro de custo',
+      unico: true,
+      opcoes: obras.map((obra) => ({
+        valor: String(obra.id),
+        rotulo: obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome
+      }))
+    }
+  ], [obras]);
+
+  function atualizarCampo(campo, valor) {
+    setFiltros((current) => ({ ...current, [campo]: valor }));
+  }
+
+  function alternarFiltro(dimensao, valor) {
+    setFiltros((current) => ({
+      ...current,
+      [dimensao]: String(current[dimensao]) === String(valor) ? '' : String(valor)
+    }));
+  }
+
+  function aplicarFiltros() {
     setSearchParams(buildSearchParams(filtros));
   }
 
@@ -179,160 +251,150 @@ export default function ComprasRelatorioCiclo() {
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <p className="eyebrow">Compras / Relatorios</p>
-            <h1 className="page-title">Ciclo de Compras</h1>
-            <p className="page-subtitle">
-              Tempo real do processo entre solicitacao, liberacao, cotacao, encerramento e pedido.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/compras/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      {/* R11: "Voltar aos relatorios" era um botao de acao fazendo o papel de
+          navegacao. Vira a seta `voltar` do PageHeader — mesma rota, mesma
+          saida, na affordance que o sistema usa para retorno. */}
+      <PageHeader
+        titulo="Ciclo de Compras"
+        voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
+        contagem={`${formatNumber(solicitacoes.length)} solicitacao(oes) no recorte`}
+        /* R23: agregacao pesada sobre solicitacao, cotacao e pedido — o
+           recorte e RASCUNHO ate o clique, e a regra exige que a tela
+           AVISE isso; sem o aviso a etiqueta aparece marcada e a pessoa le
+           como filtro ja aplicado. */
+        descricao="Tempo real do processo entre solicitacao, liberacao, cotacao, encerramento e pedido. Marque o recorte e clique em Atualizar relatorio."
+        acaoPrincipal={{
+          rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
+          onClick: aplicarFiltros,
+          desabilitada: loading
+        }}
+        secundarias={[{ rotulo: 'Limpar', onClick: limparFiltros }]}
+      />
 
-      <div className="mt-4 card sol-surface-card solicitacoes-filtros app-filters-card">
-        <form className="grid gap-4" onSubmit={aplicarFiltros}>
-          <div className="app-filters-grid">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Obra / Centro de custo</span>
-              <select
-                className="input"
-                value={filtros.obra_id}
-                onChange={(event) => setFiltros((current) => ({ ...current, obra_id: event.target.value }))}
-              >
-                <option value="">Todos</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <BlocoConteudo variante="secundario">
+        {/* R12/R16b: obra e recorte enumeravel (marcacao + etiqueta); as
+            datas sao contornos continuos, sem lista fechada — vao em
+            `campos`, o espaco declarado da BarraFiltros para isso. */}
+        <BarraFiltros
+          campos={[
+            {
+              id: 'data_inicio',
+              rotulo: 'Criacao inicial',
+              tipo: 'date',
+              valor: filtros.data_inicio,
+              aoMudar: (valor) => atualizarCampo('data_inicio', valor)
+            },
+            {
+              id: 'data_fim',
+              rotulo: 'Criacao final',
+              tipo: 'date',
+              valor: filtros.data_fim,
+              aoMudar: (valor) => atualizarCampo('data_fim', valor)
+            }
+          ]}
+          filtros={dimensoes}
+          ativos={ativos}
+          /* R16: "Limpar" tem UM dono nesta tela — o botao secundario do
+             cabecalho. Passar `aoLimpar` aqui poria um segundo controle
+             com a MESMA acao no mesmo contexto visual; o ✕ de cada
+             etiqueta continua removendo o recorte individual. */
+          aoAlternar={alternarFiltro}
+        />
+      </BlocoConteudo>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Criacao inicial</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_inicio}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_inicio: event.target.value }))}
-              />
-            </label>
+      {/* A classe `.alert-danger` NAO EXISTE em CSS nenhum do repositorio: o
+          erro de carregamento aparecia sem tom, sem icone e sem contorno de
+          alerta. Agora e o Avisos do sistema (tom semantico + icone). */}
+      <Avisos
+        avisos={erro ? [{ id: 'ciclo-erro', tipo: 'error', mensagem: erro }] : []}
+        aoFechar={() => setErro('')}
+      />
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Criacao final</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_fim}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_fim: event.target.value }))}
-              />
-            </label>
-          </div>
+      <StatGrid>
+        <StatTile
+          label="Solicitacoes"
+          valor={formatNumber(resumo.solicitacoes)}
+          sub="Criadas no periodo"
+        />
+        <StatTile
+          label="Resposta fornecedor"
+          valor={formatPercent(resumo.taxa_resposta_fornecedor)}
+          sub={`${formatNumber(resumo.fornecedores_respondidos)} de ${formatNumber(resumo.fornecedores_enviados)}`}
+          tom="success"
+        />
+        <StatTile
+          label="Criacao ate encerramento"
+          valor={formatHours(resumo.tempo_medio_criacao_encerramento_horas)}
+          sub="Tempo medio das cotacoes encerradas"
+          tom="warning"
+        />
+        <StatTile
+          label="Ciclo ate pedido"
+          valor={formatHours(resumo.tempo_medio_ciclo_total_ate_pedido_horas)}
+          sub={`${formatNumber(resumo.solicitacoes_com_pedido)} com pedido`}
+        />
+      </StatGrid>
 
-          <div className="app-page-actions">
-            <button type="button" className="btn btn-outline" onClick={limparFiltros}>
-              Limpar
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Atualizando...' : 'Atualizar relatorio'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {erro ? <div className="mt-4 alert alert-danger">{erro}</div> : null}
-
-      <div className="mt-4 metric-grid">
-        <div className="dashboard-metric-card dashboard-metric-card--blue">
-          <span className="dashboard-metric-label">Solicitacoes</span>
-          <strong className="dashboard-metric-value">{Number(resumo.solicitacoes || 0).toLocaleString('pt-BR')}</strong>
-          <small className="dashboard-metric-detail">Criadas no periodo</small>
-        </div>
-        <div className="dashboard-metric-card dashboard-metric-card--green">
-          <span className="dashboard-metric-label">Resposta fornecedor</span>
-          <strong className="dashboard-metric-value">{formatPercent(resumo.taxa_resposta_fornecedor)}</strong>
-          <small className="dashboard-metric-detail">
-            {Number(resumo.fornecedores_respondidos || 0).toLocaleString('pt-BR')} de {Number(resumo.fornecedores_enviados || 0).toLocaleString('pt-BR')}
-          </small>
-        </div>
-        <div className="dashboard-metric-card dashboard-metric-card--amber">
-          <span className="dashboard-metric-label">Criacao ate encerramento</span>
-          <strong className="dashboard-metric-value">{formatHours(resumo.tempo_medio_criacao_encerramento_horas)}</strong>
-          <small className="dashboard-metric-detail">Tempo medio das cotacoes encerradas</small>
-        </div>
-        <div className="dashboard-metric-card dashboard-metric-card--slate">
-          <span className="dashboard-metric-label">Ciclo ate pedido</span>
-          <strong className="dashboard-metric-value">{formatHours(resumo.tempo_medio_ciclo_total_ate_pedido_horas)}</strong>
-          <small className="dashboard-metric-detail">{Number(resumo.solicitacoes_com_pedido || 0).toLocaleString('pt-BR')} com pedido</small>
-        </div>
-      </div>
-
-      <div className="mt-4 card sol-surface-card">
-        <div className="app-page-header-row">
-          <div>
-            <h2 className="text-lg font-bold text-[var(--c-text)]">Ciclo medio por etapa</h2>
-            <p className="page-subtitle">
-              Gargalos do processo calculados pelas datas reais registradas na solicitacao, cotacao e pedido.
-            </p>
-          </div>
-        </div>
+      <BlocoConteudo
+        titulo="Ciclo medio por etapa"
+        descricao="Gargalos do processo calculados pelas datas reais registradas na solicitacao, cotacao e pedido."
+      >
         {loading ? (
-          <div className="text-sm text-[var(--c-muted)] py-4">Carregando etapas do ciclo...</div>
+          <div className="app-empty-card">Carregando etapas do ciclo...</div>
         ) : etapasCiclo.length === 0 ? (
-          <div className="app-empty-card mt-3">Sem datas suficientes para montar o grafico do ciclo.</div>
+          <div className="app-empty-card">Sem datas suficientes para montar o grafico do ciclo.</div>
         ) : (
-          <div className="grid gap-3 mt-3">
-            {etapasCiclo.map((etapa) => {
-              const valor = Number(etapa.value || 0);
-              const percentual = maiorTempoEtapa > 0 ? Math.max(4, (valor / maiorTempoEtapa) * 100) : 0;
-              return (
-                <div key={`ciclo-etapa-${etapa.key}`} className="grid gap-2">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <strong className="text-sm text-[var(--c-text)]">{etapa.label}</strong>
-                      <span className="ml-2 text-xs text-[var(--c-muted)]">{etapa.detail}</span>
-                    </div>
-                    <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatHours(valor)}</strong>
+          <div className="grid gap-3">
+            {etapasCiclo.map((etapa) => (
+              <div key={`ciclo-etapa-${etapa.key}`} className="grid gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <strong className="text-sm text-[var(--c-text)]">{etapa.label}</strong>
+                    <span className="ml-2 text-xs text-[var(--c-muted)]">{etapa.detail}</span>
                   </div>
-                  <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-[var(--c-primary)]"
-                      style={{ width: `${percentual}%` }}
-                    />
-                  </div>
+                  <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatHours(etapa.value)}</strong>
                 </div>
-              );
-            })}
+                <BarraProporcao valor={etapa.value} maximo={maiorTempoEtapa} />
+              </div>
+            ))}
           </div>
         )}
-      </div>
+      </BlocoConteudo>
 
-      <div className="mt-4 card sol-surface-card">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="app-empty-card">
-            <strong>{formatHours(resumo.tempo_medio_criacao_liberacao_horas)}</strong>
-            <span>criacao ate liberacao</span>
-          </div>
-          <div className="app-empty-card">
-            <strong>{formatHours(resumo.tempo_medio_liberacao_envio_horas)}</strong>
-            <span>liberacao ate primeiro envio</span>
-          </div>
-          <div className="app-empty-card">
-            <strong>{formatHours(resumo.tempo_medio_envio_primeira_resposta_horas)}</strong>
-            <span>envio ate primeira resposta</span>
-          </div>
-        </div>
-      </div>
+      {/* Estes tres tempos JA aparecem no grafico acima (mesma origem, mesmo
+          numero). Ficam porque a reorganizacao e pura — a proposta de
+          remover a segunda aparicao esta no relatorio, nao no codigo. */}
+      <BlocoConteudo titulo="Etapas iniciais em numeros" variante="secundario">
+        <StatGrid colunas={3}>
+          <StatTile
+            label="Criacao ate liberacao"
+            valor={formatHours(resumo.tempo_medio_criacao_liberacao_horas)}
+            sub="Tempo medio"
+          />
+          <StatTile
+            label="Liberacao ate primeiro envio"
+            valor={formatHours(resumo.tempo_medio_liberacao_envio_horas)}
+            sub="Tempo medio"
+          />
+          <StatTile
+            label="Envio ate primeira resposta"
+            valor={formatHours(resumo.tempo_medio_envio_primeira_resposta_horas)}
+            sub="Tempo medio"
+          />
+        </StatGrid>
+      </BlocoConteudo>
 
-      <div className="mt-4 card sol-surface-card overflow-hidden">
+      {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
+          scrollport e matava o `position: sticky` da coluna fixa e do
+          cabecalho — sem erro, sem falha de build. O BlocoConteudo nao
+          recorta nada; quem precisa rolar e o proprio contêiner da tabela. */}
+      <BlocoConteudo
+        titulo="Ciclo por solicitacao"
+        descricao="Cada solicitacao com os tempos reais entre criacao, encerramento e pedido."
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -366,8 +428,8 @@ export default function ComprasRelatorioCiclo() {
               tipo: 'numero',
               render: (linha) => (
                 <>
-                  {Number(linha.contadores.fornecedores_respondidos || 0).toLocaleString('pt-BR')} de{' '}
-                  {Number(linha.contadores.fornecedores_enviados || 0).toLocaleString('pt-BR')}
+                  {formatNumber(linha.contadores.fornecedores_respondidos)} de{' '}
+                  {formatNumber(linha.contadores.fornecedores_enviados)}
                 </>
               )
             },
@@ -382,7 +444,7 @@ export default function ComprasRelatorioCiclo() {
           rotuloRolagem="Ciclo por solicitacao"
           vazio="Nenhuma solicitacao encontrada para os filtros selecionados."
         />
-      </div>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

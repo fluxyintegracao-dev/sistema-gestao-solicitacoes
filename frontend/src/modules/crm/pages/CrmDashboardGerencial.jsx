@@ -171,11 +171,14 @@ export default function CrmDashboardGerencial() {
             id: 'dias',
             rotulo: 'Periodo',
             unico: true,
+            // O relatorio SEMPRE tem um periodo: nao ha "sem recorte" para
+            // onde voltar. A etiqueta e o estado atual, nao um filtro que se
+            // tira — por isso ela nasce sem o "x" (ver BarraFiltros).
+            obrigatorio: true,
             opcoes: OPCOES_PERIODO
           }]}
           ativos={{ dias: new Set([String(dias)]) }}
           aoAlternar={(_dimensao, valor) => aplicarPeriodo(valor)}
-          aoLimpar={() => setDias(DIAS_PADRAO)}
         />
       </BlocoConteudo>
 

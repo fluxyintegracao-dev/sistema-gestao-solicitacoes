@@ -761,6 +761,11 @@ async function checarEtiquetasFiltro(page, tela, resultado) {
     await page.mouse.click(4, 4);
     return;
   }
+  // O rótulo da opção marcada é o que a etiqueta tem de refletir depois.
+  const rotuloMarcado = await opcao.evaluate((el) => {
+    const label = el.closest('label');
+    return label ? label.innerText.trim() : '';
+  });
   await opcao.click();
   await page.mouse.click(4, 4); // fecha o menu (clique fora)
   await page.waitForTimeout(700);
@@ -768,6 +773,28 @@ async function checarEtiquetasFiltro(page, tela, resultado) {
   const problemas = [];
   if (!(await etiqueta.count())) {
     problemas.push('filtro marcado não gerou etiqueta visível');
+  } else if (await etiqueta.first().getAttribute('data-obrigatorio')) {
+    /*
+      RECORTE OBRIGATÓRIO: O EXERCÍCIO É OUTRO (05/09).
+
+      Achado na matriz do CRM. Uma dimensão que a tela não consegue NÃO ter —
+      o período de um relatório é sempre algum período — não tem etiqueta
+      removível: remover voltava ao padrão, o padrão gerava outra etiqueta na
+      hora, e a F3 media 1 → 1. O botão prometia remover e trocava.
+
+      Aqui não se afrouxa nada: em vez de provar que a etiqueta REMOVIDA
+      some, prova-se que a etiqueta ACOMPANHA a marcação — marquei outra
+      opção, o texto tem de ter mudado. Uma tela que declarasse `obrigatorio`
+      para escapar do teste continuaria tendo de passar neste, e ainda
+      pagaria o preço visível de ficar sem o "×".
+    */
+    const textoAgora = (await etiqueta.first().innerText()).trim();
+    if (!textoAgora.includes(String(rotuloMarcado || '').trim()) && rotuloMarcado) {
+      problemas.push(`recorte obrigatório: marquei "${rotuloMarcado}" e a etiqueta continua dizendo "${textoAgora}"`);
+    }
+    if ((await etiqueta.first().locator('button').count())) {
+      problemas.push('recorte obrigatório com botão de remover — o botão promete tirar e só troca pelo padrão');
+    }
   } else {
     const remover = etiqueta.first().locator('button');
     if (!(await remover.count())) {

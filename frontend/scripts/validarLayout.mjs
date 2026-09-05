@@ -600,7 +600,29 @@ export function validarLayout() {
     avisos.push(`[COBERTURA] o passivo de rotas sem medicao caiu de ${trincoRotas.telas.length} para ${semMedicao.length} — atualize scripts/trinco-rotas-sem-medicao.json`);
   }
 
-  const foraDoPreview = manifesto.telas.filter((t) => !noHarness.has(t) && !transitorias.has(t));
+  /*
+    COMPONENTE DE TELA: MEDIDO PELA TELA QUE O RENDERIZA (05/09).
+
+    Achado ao promover a rodada de Solicitações. `Filtros.jsx` não tem rota
+    própria — ele vive dentro de `/solicitacoes`. Pôr no manifesto sem entrada
+    no harness fazia este check reprovar, e com razão: manifesto sem harness
+    significa "ninguém abre isso no preview".
+
+    A resposta não é isentar. É dizer QUEM abre. O autor declara o dono em
+    `componentes_de_tela`, e aqui se confere que esse dono está mesmo na lista
+    do harness — declaração MAIS verificação, como na R1 e na F3. Dono fora do
+    harness reprova, e reprova nomeando o componente e o dono.
+  */
+  const componentesDeTela = manifesto.componentes_de_tela?.componentes || {};
+  const donoSemHarness = Object.entries(componentesDeTela).filter(([, dono]) => !noHarness.has(dono));
+  if (donoSemHarness.length) {
+    falhas.push(
+      `${donoSemHarness[0][0]}:0 [COBERTURA] ${donoSemHarness.length} componente(s) declaram um dono que NAO esta na lista do harness — entao ninguem os abre no preview. ${donoSemHarness.map(([c, d]) => `${c} -> ${d}`).join('; ')}`
+    );
+  }
+  const foraDoPreview = manifesto.telas.filter((t) => (
+    !noHarness.has(t) && !transitorias.has(t) && !componentesDeTela[t]
+  ));
   if (foraDoPreview.length > 0) {
     falhas.push(
       `${foraDoPreview[0]}:0 [COBERTURA] ${foraDoPreview.length} tela(s) do manifesto estático NÃO estão em scripts/qa-preview/telas.mjs — o harness nunca as abre no preview, e "PRONTO" é verificado no preview. Telas: ${foraDoPreview.join(', ')}`

@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { TabelaPadrao } from '../components/padrao';
+import { useSearchParams } from 'react-router-dom';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao
+} from '../components/padrao';
 import { obterRelatorioEvolucaoCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -49,13 +58,28 @@ function extractErrorMessage(error) {
   }
 }
 
+/**
+ * MINIBARRA DA CURVA MENSAL — a largura em % e DADO (a proporcao do mes
+ * contra o maior mes), nao medida de layout: por isso continua no `style` e
+ * nao vira degrau da escala (R10). Trilho e preenchimento saem de token
+ * (R25); antes eram `bg-slate-100` e `bg-blue-600`, paleta crua sem par no
+ * tema escuro e fora do piso de contraste do ThemeContext.
+ *
+ * O ZERO NAO DESENHA (correcao de 04/09). A versao anterior calculava
+ * `Math.max(4, ...)` sem guarda: um mes com valor ZERO saia com 4% de barra
+ * pintada — barra visivel afirmando que houve compra num mes sem nenhuma.
+ * O piso de 4% tem proposito legitimo (mes pequeno porem real precisa
+ * aparecer), mas so vale DEPOIS de o valor ser maior que zero.
+ */
 function MiniBar({ value, max }) {
-  const percent = max > 0 ? Math.max(4, Math.round((Number(value || 0) / max) * 100)) : 0;
+  const numero = Number(value || 0);
+  const proporcao = max > 0 ? Math.round((numero / max) * 100) : 0;
+  const largura = numero > 0 ? Math.max(4, proporcao) : 0;
   return (
-    <div className="mt-1 h-2 rounded-full bg-slate-100">
+    <div className="mt-1 h-2 rounded-full bg-[var(--ui-border)] overflow-clip">
       <div
-        className="h-2 rounded-full bg-blue-600"
-        style={{ width: `${percent}%` }}
+        className="h-2 rounded-full bg-[var(--c-primary)]"
+        style={{ width: `${largura}%` }}
       />
     </div>
   );
@@ -125,8 +149,42 @@ export default function ComprasRelatorioEvolucao() {
     meses.reduce((max, item) => Math.max(max, Number(item.valor_total || 0)), 0)
   ), [meses]);
 
-  function aplicarFiltros(event) {
-    event.preventDefault();
+  /*
+    R12: a obra deixou de ser `<select>` e virou MARCACAO. `unico: true`
+    porque o endpoint recebe UM `obra_id` (`parseInteger` no validador do
+    backend, com `ensureAllowedKeys` limitando a chave a um valor): sem
+    declarar, o menu abriria com caixa quadrada prometendo escolha multipla
+    e, com duas marcas, a tela mandaria filtro nenhum — duas etiquetas na
+    faixa e a lista sem estreitar (R15).
+  */
+  const ativos = useMemo(() => ({
+    obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : [])
+  }), [filtros.obra_id]);
+
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra / Centro de custo',
+      unico: true,
+      opcoes: obras.map((obra) => ({
+        valor: String(obra.id),
+        rotulo: obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome
+      }))
+    }
+  ], [obras]);
+
+  function atualizarCampo(campo, valor) {
+    setFiltros((current) => ({ ...current, [campo]: valor }));
+  }
+
+  function alternarFiltro(dimensao, valor) {
+    setFiltros((current) => ({
+      ...current,
+      [dimensao]: String(current[dimensao]) === String(valor) ? '' : String(valor)
+    }));
+  }
+
+  function aplicarFiltros() {
     setSearchParams(buildSearchParams(filtros));
   }
 
@@ -136,121 +194,89 @@ export default function ComprasRelatorioEvolucao() {
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <p className="eyebrow">Compras / Relatorios</p>
-            <h1 className="page-title">Evolucao Mensal de Compras</h1>
-            <p className="page-subtitle">
-              Curva mensal de pedidos de compra emitidos, valor total, ticket medio e concentracao por obra/centro.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/compras/relatorios" className="btn btn-outline">
-              Voltar aos relatorios
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      {/* R11: "Voltar aos relatorios" era botao de acao fazendo papel de
+          navegacao. Vira a seta `voltar` do PageHeader. */}
+      <PageHeader
+        titulo="Evolucao Mensal de Compras"
+        voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
+        contagem={`${formatNumber(meses.length)} mes(es) com movimentacao`}
+        /* R23: agregacao pesada sobre pedidos, itens e fornecedores — o
+           recorte e RASCUNHO ate o clique, e a regra exige que a tela
+           AVISE isso. */
+        descricao="Curva mensal de pedidos de compra emitidos, valor total, ticket medio e concentracao por obra/centro. Marque o recorte e clique em Atualizar relatorio."
+        acaoPrincipal={{
+          rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
+          onClick: aplicarFiltros,
+          desabilitada: loading
+        }}
+        secundarias={[{ rotulo: 'Limpar', onClick: limparFiltros }]}
+      />
 
-      <div className="mt-4 card sol-surface-card solicitacoes-filtros app-filters-card">
-        <form className="grid gap-4" onSubmit={aplicarFiltros}>
-          <div className="app-filters-grid">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Obra / Centro de custo</span>
-              <select
-                className="input"
-                value={filtros.obra_id}
-                onChange={(event) => setFiltros((current) => ({ ...current, obra_id: event.target.value }))}
-              >
-                <option value="">Todos</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <BlocoConteudo variante="secundario">
+        {/* R12/R16b: obra e recorte enumeravel (marcacao + etiqueta); as
+            datas sao contornos continuos — vao em `campos`. */}
+        <BarraFiltros
+          campos={[
+            {
+              id: 'data_inicio',
+              rotulo: 'Pedido criado de',
+              tipo: 'date',
+              valor: filtros.data_inicio,
+              aoMudar: (valor) => atualizarCampo('data_inicio', valor)
+            },
+            {
+              id: 'data_fim',
+              rotulo: 'Pedido criado ate',
+              tipo: 'date',
+              valor: filtros.data_fim,
+              aoMudar: (valor) => atualizarCampo('data_fim', valor)
+            }
+          ]}
+          filtros={dimensoes}
+          ativos={ativos}
+          /* R16: "Limpar" tem UM dono nesta tela — o botao secundario do
+             cabecalho. Passar `aoLimpar` aqui poria um segundo controle
+             com a MESMA acao no mesmo contexto visual; o ✕ de cada
+             etiqueta continua removendo o recorte individual. */
+          aoAlternar={alternarFiltro}
+        />
+      </BlocoConteudo>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Pedido criado de</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_inicio}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_inicio: event.target.value }))}
-              />
-            </label>
+      <Avisos
+        avisos={erro ? [{ id: 'evolucao-erro', tipo: 'error', mensagem: erro }] : []}
+        aoFechar={() => setErro('')}
+      />
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Pedido criado ate</span>
-              <input
-                className="input"
-                type="date"
-                value={filtros.data_fim}
-                onChange={(event) => setFiltros((current) => ({ ...current, data_fim: event.target.value }))}
-              />
-            </label>
-          </div>
+      <StatGrid colunas={3}>
+        <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Pedidos emitidos" />
+        <StatTile label="Meses" valor={formatNumber(resumo.meses)} sub="Com movimentacao" />
+        <StatTile label="Valor total" valor={formatMoney(resumo.valor_total)} sub="Soma dos pedidos" />
+        <StatTile label="Ticket medio" valor={formatMoney(resumo.ticket_medio)} sub="Valor por pedido" />
+        <StatTile
+          label="Maior mes"
+          valor={resumo.maior_mes?.label || '-'}
+          sub={resumo.maior_mes ? formatMoney(resumo.maior_mes.valor_total) : 'Sem dados'}
+          vazio={!resumo.maior_mes}
+        />
+        <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com pedido no periodo" />
+      </StatGrid>
 
-          <div className="app-filter-actions">
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              Atualizar relatorio
-            </button>
-            <button type="button" className="btn btn-outline" onClick={limparFiltros} disabled={loading}>
-              Limpar
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {erro ? (
-        <div className="mt-4 alert alert-error">{erro}</div>
-      ) : null}
-
-      <div className="dashboard-metric-grid mt-4">
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Pedidos</span>
-          <strong>{formatNumber(resumo.pedidos)}</strong>
-          <small>Pedidos emitidos</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Meses</span>
-          <strong>{formatNumber(resumo.meses)}</strong>
-          <small>Com movimentacao</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Valor total</span>
-          <strong>{formatMoney(resumo.valor_total)}</strong>
-          <small>Soma dos pedidos</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Ticket medio</span>
-          <strong>{formatMoney(resumo.ticket_medio)}</strong>
-          <small>Valor por pedido</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Maior mes</span>
-          <strong>{resumo.maior_mes?.label || '-'}</strong>
-          <small>{resumo.maior_mes ? formatMoney(resumo.maior_mes.valor_total) : 'Sem dados'}</small>
-        </div>
-        <div className="dashboard-metric-card">
-          <span className="dashboard-metric-label">Fornecedores</span>
-          <strong>{formatNumber(resumo.fornecedores)}</strong>
-          <small>Com pedido no periodo</small>
-        </div>
-      </div>
-
-      <div className="mt-4 card sol-surface-card overflow-hidden">
-        <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Curva mensal</h2>
-        <p className="page-subtitle mb-3">Pedidos agrupados pelo mes real de criacao do pedido de compra.</p>
+      {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
+          scrollport e matava o `position: sticky` da coluna fixa e do
+          cabecalho — sem erro e sem falha de build. */}
+      <BlocoConteudo
+        titulo="Curva mensal"
+        descricao="Pedidos agrupados pelo mes real de criacao do pedido de compra."
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         <TabelaPadrao
           // R17: serie puramente temporal (mes x totais) — a linha e um
           // periodo, nao um registro nomeado; nao ha coluna de identidade.
           semIdentidade
           colunas={[
-            { id: 'mes', titulo: 'Mes', tipo: 'texto', noCard: 'titulo', render: (item) => <span className="font-semibold text-slate-900">{item.label}</span> },
+            { id: 'mes', titulo: 'Mes', tipo: 'texto', noCard: 'titulo', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.label}</span> },
             { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
             { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
             { id: 'obras', titulo: 'Obras', tipo: 'numero', render: (item) => formatNumber(item.obras) },
@@ -273,8 +299,11 @@ export default function ComprasRelatorioEvolucao() {
               tipo: 'texto',
               render: (item) => (
                 <>
+                  {/* `.badge-soft` NAO EXISTE em CSS nenhum do repositorio —
+                      a pilula saia sem fundo, sem contorno e sem forma.
+                      `badge-muted` existe e e a familia neutra do sistema. */}
                   {(item.status || []).slice(0, 3).map((status) => (
-                    <span key={status.key} className="badge badge-soft mr-1">
+                    <span key={status.key} className="badge badge-muted mr-1">
                       {status.label}: {status.total}
                     </span>
                   ))}
@@ -289,12 +318,14 @@ export default function ComprasRelatorioEvolucao() {
           rotuloRolagem="Curva mensal"
           vazio="Sem pedidos nos filtros."
         />
-      </div>
+      </BlocoConteudo>
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr] mt-4">
-        <div className="card sol-surface-card overflow-hidden">
-          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Compras por obra/centro</h2>
-          <p className="page-subtitle mb-3">Ranking de valor comprado por obra ou centro de custo no periodo.</p>
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <BlocoConteudo
+          titulo="Compras por obra/centro"
+          descricao="Ranking de valor comprado por obra ou centro de custo no periodo."
+          variante="secundario"
+        >
           <TabelaPadrao
             colunas={[
               {
@@ -315,7 +346,7 @@ export default function ComprasRelatorioEvolucao() {
                 titulo: 'Meses',
                 tipo: 'texto',
                 render: (item) => (
-                  <span className="text-xs text-slate-600">
+                  <span className="text-xs text-[var(--c-muted)]">
                     {(item.meses || []).slice(-3).map((mes) => `${mes.label}: ${formatMoney(mes.valor_total)}`).join(' | ') || '-'}
                   </span>
                 )
@@ -328,11 +359,13 @@ export default function ComprasRelatorioEvolucao() {
             rotuloRolagem="Compras por obra/centro"
             vazio="Sem dados por obra/centro."
           />
-        </div>
+        </BlocoConteudo>
 
-        <div className="card sol-surface-card overflow-hidden">
-          <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Pedidos por status</h2>
-          <p className="page-subtitle mb-3">Distribuicao dos pedidos usados na evolucao.</p>
+        <BlocoConteudo
+          titulo="Pedidos por status"
+          descricao="Distribuicao dos pedidos usados na evolucao."
+          variante="secundario"
+        >
           <TabelaPadrao
             colunas={[
               {
@@ -353,8 +386,8 @@ export default function ComprasRelatorioEvolucao() {
             rotuloRolagem="Pedidos por status"
             vazio="Sem status nos filtros."
           />
-        </div>
+        </BlocoConteudo>
       </div>
-    </div>
+    </Pagina>
   );
 }

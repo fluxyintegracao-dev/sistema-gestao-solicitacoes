@@ -456,9 +456,12 @@ export default function CrmKanban() {
         contagem={`${totalLeads} lead${totalLeads !== 1 ? 's' : ''} no funil`}
         descricao={kanban?.pipeline ? kanban.pipeline.nome : 'Funil comercial'}
         acaoPrincipal={{ rotulo: '+ Novo Lead', to: '/crm/leads/novo' }}
+        /* "Lista" saiu daqui (C6/R11): caminho para OUTRA tela não mora na
+           faixa de ações — menu e Ctrl+K resolvem, e `crm-leads` já é destino
+           do navigationConfig, então ninguém fica sem porta. Ação é o que age
+           SOBRE esta tela. */
         secundarias={[
-          { rotulo: 'Nova etapa', onClick: abrirNovaEtapa, desabilitada: !pipelineId },
-          { rotulo: 'Lista', to: '/crm/leads' }
+          { rotulo: 'Nova etapa', onClick: abrirNovaEtapa, desabilitada: !pipelineId }
         ]}
       />
 

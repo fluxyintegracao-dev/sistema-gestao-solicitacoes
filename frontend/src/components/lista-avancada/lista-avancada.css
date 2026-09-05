@@ -319,6 +319,25 @@
 .la-colunas-wrap { position: relative; }
 .la-colunas-pop { left: auto; right: 0; }
 
+/* Campo de busca do menu de marcação: aparece só em dimensão com muitas
+   opções (ver FiltroRapido). Gruda no topo para não sumir na rolagem — e
+   `clip` em vez de `hidden` no pai, pela R18, é o que deixa isso funcionar. */
+.la-rapido-busca {
+  position: sticky;
+  /* O menu tem 8px de recuo interno: colando em `top: 0` sobraria uma fresta
+     por onde as opções passariam por cima ao rolar. Sobe o recuo. */
+  top: calc(var(--esp-2) * -1);
+  z-index: 1;
+  width: 100%;
+  margin-bottom: var(--esp-1);
+  padding: var(--esp-2);
+  font-size: var(--fonte-corpo);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--raio-1);
+  background: var(--ui-surface);
+  color: var(--c-text);
+}
+
 .la-rapido-pop label,
 .la-colunas-pop label {
   display: flex;

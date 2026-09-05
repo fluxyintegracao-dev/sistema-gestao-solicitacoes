@@ -1,8 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  useAvisos
+} from '../../../components/padrao';
+import StatusBadge from '../../../components/StatusBadge';
 import { getObras } from '../../../services/obras';
 import { getRhEmpresasGrupo } from '../../../services/rhDp';
 import { getSstRelatorioOperacional, sincronizarEventosVencimentoSst } from '../services/sst';
-import { TabelaPadrao } from '../../../components/padrao';
+
+const FILTROS_VAZIOS = { empresa_id: '', obra_id: '' };
 
 function moneyless(value) {
   return value ?? 0;
@@ -21,54 +34,40 @@ function optionLabel(type, item) {
   return item.razao_social || item.nome_fantasia || item.nome || `#${item.id}`;
 }
 
-function Metric({ label, value, detail, tone = 'default' }) {
-  const toneClass = {
-    default: 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]',
-    ok: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-    warn: 'border-amber-200 bg-amber-50 text-amber-900',
-    danger: 'border-rose-200 bg-rose-50 text-rose-900',
-    info: 'border-sky-200 bg-sky-50 text-sky-900'
-  }[tone] || 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]';
-
-  return (
-    <div className={`rounded-lg border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight">{value}</p>
-      {detail ? <p className="mt-1 text-xs font-medium opacity-70">{detail}</p> : null}
-    </div>
-  );
+/*
+  R2/R25 — severidade, gravidade e probabilidade NÃO são status de fluxo: o
+  classificador automático do StatusBadge não conhece BAIXA/MEDIA/ALTA/CRITICA
+  (leria "CRITICA" como informação). Então a família semântica é declarada
+  aqui, explicitamente, e a cor sai do token — nunca da paleta crua que estas
+  células usavam (emerald/amber/rose escritos na tela).
+*/
+function familiaSeveridade(valor) {
+  const nivel = String(valor || '').trim().toUpperCase();
+  if (['CRITICA', 'CRITICO', 'ALTA', 'ALTO', 'GRAVE', 'FATAL'].includes(nivel)) return 'danger';
+  if (['MEDIA', 'MEDIO', 'MODERADA', 'MODERADO'].includes(nivel)) return 'warning';
+  if (['BAIXA', 'BAIXO', 'LEVE'].includes(nivel)) return 'success';
+  return 'neutral';
 }
 
-// R17: o painel só emoldura a tabela — as COLUNAS (com o `tipo` de cada uma)
-// são declaradas no ponto de uso, uma a uma, por quem conhece o dado.
-function PainelTabela({ title, total, children }) {
-  return (
-    <section className="overflow-hidden rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-sm">
-      <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
-        <h2 className="text-lg font-semibold text-[var(--c-text)]">{title}</h2>
-        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">{total} item(ns)</span>
-      </div>
-      <div className="p-2">{children}</div>
-    </section>
-  );
+function CelulaSeveridade({ valor }) {
+  if (!valor) return '-';
+  return <StatusBadge status={valor} kind={familiaSeveridade(valor)} />;
 }
 
 export default function SstRelatorioOperacional() {
+  const { avisos, avisar, fechar } = useAvisos();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const [refs, setRefs] = useState({ empresas: [], obras: [] });
-  const [filters, setFilters] = useState({ empresa_id: '', obra_id: '' });
+  const [filters, setFilters] = useState(FILTROS_VAZIOS);
 
   const load = (params = filters) => {
     setLoading(true);
     getSstRelatorioOperacional(params)
       .then((payload) => {
         setData(payload);
-        setError('');
       })
-      .catch((err) => setError(err.message || 'Erro ao carregar relatorio SST'))
+      .catch((err) => avisar.erro(err.message || 'Erro ao carregar relatorio SST'))
       .finally(() => setLoading(false));
   };
 
@@ -89,132 +88,151 @@ export default function SstRelatorioOperacional() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function syncEvents() {
-    setMessage('');
     try {
       const payload = await sincronizarEventosVencimentoSst();
-      setMessage(`${payload.eventos_criados || 0} evento(s) novo(s), ${payload.eventos_existentes || 0} ja existentes.`);
+      avisar.sucesso(`${payload.eventos_criados || 0} evento(s) novo(s), ${payload.eventos_existentes || 0} ja existentes.`);
       load();
     } catch (err) {
-      setError(err.message || 'Erro ao atualizar eventos SST');
+      avisar.erro(err.message || 'Erro ao atualizar eventos SST');
     }
   }
+
+  /*
+    R23 — o recorte tem DUAS dimensões e uma requisição por recorte, longe do
+    critério da exceção (4+ dimensões combinadas ou consulta acima de 2s).
+    Então marcar APLICA na hora: a etiqueta que aparece na faixa já descreve o
+    que está filtrando. Os dois botões antigos continuam na tela — "Atualizar
+    relatório" recarrega o recorte corrente e "Limpar" zera —, mas nenhum deles
+    é mais a condição para o filtro valer.
+  */
+  function alternarFiltro(dimensao, valor) {
+    const proximo = {
+      ...filters,
+      [dimensao]: String(filters[dimensao]) === String(valor) ? '' : String(valor)
+    };
+    setFilters(proximo);
+    load(proximo);
+  }
+
+  function limparFiltros() {
+    setFilters(FILTROS_VAZIOS);
+    load(FILTROS_VAZIOS);
+  }
+
+  const ativos = useMemo(() => ({
+    empresa_id: new Set(filters.empresa_id ? [String(filters.empresa_id)] : []),
+    obra_id: new Set(filters.obra_id ? [String(filters.obra_id)] : [])
+  }), [filters]);
+
+  /*
+    `unico: true`: o endpoint aceita UM valor por chave (empresa_id, obra_id) e
+    o estado guarda escalar. Sem declarar, o menu abriria com caixa quadrada
+    prometendo múltipla escolha e entregando exclusiva (R15).
+  */
+  const dimensoes = useMemo(() => [
+    {
+      id: 'empresa_id',
+      rotulo: 'Empresa',
+      unico: true,
+      opcoes: refs.empresas.map((item) => ({ valor: String(item.id), rotulo: optionLabel('empresas', item) }))
+    },
+    {
+      id: 'obra_id',
+      rotulo: 'Obra/Centro',
+      unico: true,
+      opcoes: refs.obras.map((item) => ({ valor: String(item.id), rotulo: optionLabel('obras', item) }))
+    }
+  ], [refs]);
 
   const cards = data?.cards || {};
   const prontidao = data?.prontidao_esocial || {};
   const conformidade = data?.conformidade || {};
   const analytics = data?.analytics || {};
+  const pendenciasCriticas = conformidade.pendencias_criticas || cards.pendencias_criticas;
+  const riscosCriticos = cards.riscos_criticos;
 
   return (
-    <div className="sst-page space-y-6">
-      <section className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--c-muted)]">SST</p>
-        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-[var(--c-text)]">Relatorio operacional SST</h1>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--c-muted)]">
-              Visao analitica de conformidade, riscos, vencimentos, documentos, acidentes, eventos operacionais e prontidao tecnica para eSocial.
-            </p>
-          </div>
-          <button type="button" onClick={syncEvents} className="btn btn-primary">Atualizar vencimentos</button>
-        </div>
-      </section>
+    <Pagina className="sst-page">
+      <PageHeader
+        titulo="Relatorio operacional SST"
+        descricao="Visao analitica de conformidade, riscos, vencimentos, documentos, acidentes, eventos operacionais e prontidao tecnica para eSocial."
+        acaoPrincipal={{ rotulo: 'Atualizar vencimentos', onClick: syncEvents }}
+        secundarias={[
+          { rotulo: 'Atualizar relatorio', onClick: () => load() },
+          { rotulo: 'Limpar', onClick: limparFiltros }
+        ]}
+      />
 
-      {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">{error}</div> : null}
-      {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">{message}</div> : null}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <section className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-5 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-3">
-          <label>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">Empresa</span>
-            <select
-              value={filters.empresa_id}
-              onChange={(event) => setFilters((current) => ({ ...current, empresa_id: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
-            >
-              <option value="">Todas</option>
-              {refs.empresas.map((item) => <option key={item.id} value={item.id}>{optionLabel('empresas', item)}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">Obra/Centro</span>
-            <select
-              value={filters.obra_id}
-              onChange={(event) => setFilters((current) => ({ ...current, obra_id: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
-            >
-              <option value="">Todos</option>
-              {refs.obras.map((item) => <option key={item.id} value={item.id}>{optionLabel('obras', item)}</option>)}
-            </select>
-          </label>
-          <div className="flex items-end gap-2">
-            <button type="button" onClick={() => load()} className="btn btn-primary">Atualizar relatorio</button>
-            <button
-              type="button"
-              onClick={() => {
-                const empty = { empresa_id: '', obra_id: '' };
-                setFilters(empty);
-                load(empty);
-              }}
-              className="btn btn-outline"
-            >
-              Limpar
-            </button>
-          </div>
-        </div>
-      </section>
+      <BlocoConteudo variante="secundario">
+        <BarraFiltros
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+      </BlocoConteudo>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Compliance score" value={`${moneyless(cards.compliance_score ?? 100)}%`} detail="Base operacional atual" tone="ok" />
-        <Metric label="Riscos criticos" value={moneyless(cards.riscos_criticos)} detail="Severidade alta ou critica" tone={cards.riscos_criticos ? 'danger' : 'info'} />
-        <Metric label="Pendencias criticas" value={moneyless(conformidade.pendencias_criticas || cards.pendencias_criticas)} detail="Motor de conformidade" tone={(conformidade.pendencias_criticas || cards.pendencias_criticas) ? 'danger' : 'ok'} />
-        <Metric label="Pendencias totais" value={moneyless(conformidade.pendencias_total || cards.pendencias_total)} detail={`${data?.periodo_alerta_dias || 30} dias`} tone="warn" />
-      </section>
+      <StatGrid colunas={4}>
+        <StatTile label="Compliance score" valor={`${moneyless(cards.compliance_score ?? 100)}%`} sub="Base operacional atual" tom="success" />
+        <StatTile label="Riscos criticos" valor={moneyless(riscosCriticos)} sub="Severidade alta ou critica" tom={riscosCriticos ? 'danger' : 'info'} />
+        <StatTile label="Pendencias criticas" valor={moneyless(pendenciasCriticas)} sub="Motor de conformidade" tom={pendenciasCriticas ? 'danger' : 'success'} />
+        <StatTile label="Pendencias totais" valor={moneyless(conformidade.pendencias_total || cards.pendencias_total)} sub={`${data?.periodo_alerta_dias || 30} dias`} tom="warning" />
+      </StatGrid>
 
-      <section className="grid gap-3 md:grid-cols-3">
-        <Metric label="Acidentes por obra" value={analytics.acidentes_por_obra?.length || 0} detail="Agrupamentos com ocorrencias" />
-        <Metric label="Riscos por obra" value={analytics.riscos_por_obra?.length || 0} detail="Base para mapa operacional" />
-        <Metric label="Colaboradores ativos" value={conformidade.total_colaboradores_ativos || 0} detail="Analisados na conformidade" />
-      </section>
+      <StatGrid colunas={3}>
+        <StatTile label="Acidentes por obra" valor={analytics.acidentes_por_obra?.length || 0} sub="Agrupamentos com ocorrencias" />
+        <StatTile label="Riscos por obra" valor={analytics.riscos_por_obra?.length || 0} sub="Base para mapa operacional" />
+        <StatTile label="Colaboradores ativos" valor={conformidade.total_colaboradores_ativos || 0} sub="Analisados na conformidade" />
+      </StatGrid>
 
-      <section className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-5 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Prontidao eSocial SST</h2>
-            <p className="mt-1 text-sm text-[var(--c-muted)]">
-              Transmissao permanece bloqueada ate validacao formal dos leiautes/XSDs oficiais dos eventos S-2210, S-2220 e S-2240.
-            </p>
-          </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            prontidao.bloqueio_produto
-              ? 'border border-amber-200 bg-amber-50 text-amber-800'
-              : 'border border-emerald-200 bg-emerald-50 text-emerald-800'
-          }`}>
-            {prontidao.bloqueio_produto ? 'Bloqueado para transmissao' : 'Preparado para transmissao'}
-          </span>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <Metric label="Ambiente" value={prontidao.ambiente || 'NAO_CONFIGURADO'} detail="Configuracao tecnica" />
-          <Metric label="Eventos preparados" value={moneyless(prontidao.eventos_preparados)} detail="Registros internos" />
-          <Metric label="Documentacao oficial" value={prontidao.documentacao_oficial_validada ? 'Validada' : 'Pendente'} detail="Leiautes e XSDs SST" tone={prontidao.documentacao_oficial_validada ? 'ok' : 'warn'} />
-        </div>
-      </section>
+      <BlocoConteudo
+        titulo="Prontidao eSocial SST"
+        descricao="Transmissao permanece bloqueada ate validacao formal dos leiautes/XSDs oficiais dos eventos S-2210, S-2220 e S-2240."
+        acoes={(
+          <StatusBadge
+            status={prontidao.bloqueio_produto ? 'Bloqueado para transmissao' : 'Preparado para transmissao'}
+            kind={prontidao.bloqueio_produto ? 'warning' : 'success'}
+          />
+        )}
+      >
+        <StatGrid colunas={3}>
+          <StatTile label="Ambiente" valor={prontidao.ambiente || 'NAO_CONFIGURADO'} sub="Configuracao tecnica" />
+          <StatTile label="Eventos preparados" valor={moneyless(prontidao.eventos_preparados)} sub="Registros internos" />
+          <StatTile
+            label="Documentacao oficial"
+            valor={prontidao.documentacao_oficial_validada ? 'Validada' : 'Pendente'}
+            sub="Leiautes e XSDs SST"
+            tom={prontidao.documentacao_oficial_validada ? 'success' : 'warning'}
+          />
+        </StatGrid>
+      </BlocoConteudo>
 
-      {loading ? <p className="text-sm text-[var(--c-muted)]">Carregando relatorio...</p> : null}
+      {loading ? <div className="app-empty-card">Carregando relatorio...</div> : null}
 
-      <PainelTabela title="Pendencias de conformidade" total={(conformidade.pendencias || []).length}>
+      <BlocoConteudo
+        titulo="Pendencias de conformidade"
+        contagem={`${(conformidade.pendencias || []).length} item(ns)`}
+        variante="primario"
+        cor="var(--sem-danger)"
+      >
         <TabelaPadrao
           colunas={[
             {
               id: 'tipo',
               titulo: 'Tipo',
+              // R17: a pendência é lida pelo TIPO de conformidade que falhou —
+              // é o que nomeia a linha; origem_tipo/#id é a referência técnica.
               tipo: 'identidade',
               noCard: 'titulo',
-              render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.tipo}</span>
+              render: (row) => row.tipo
             },
-            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => row.severidade },
+            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
             { id: 'mensagem', titulo: 'Mensagem', tipo: 'texto', render: (row) => row.mensagem },
             {
               id: 'origem',
@@ -229,9 +247,12 @@ export default function SstRelatorioOperacional() {
           storageKey="tabela:sst-relatorio-operacional:pendencias"
           rotuloRolagem="Pendencias de conformidade"
         />
-      </PainelTabela>
+      </BlocoConteudo>
 
-      <PainelTabela title="Eventos operacionais abertos" total={(data?.eventos_abertos || []).length}>
+      <BlocoConteudo
+        titulo="Eventos operacionais abertos"
+        contagem={`${(data?.eventos_abertos || []).length} item(ns)`}
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -239,9 +260,9 @@ export default function SstRelatorioOperacional() {
               titulo: 'Tipo',
               tipo: 'identidade',
               noCard: 'titulo',
-              render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.tipo_evento}</span>
+              render: (row) => row.tipo_evento
             },
-            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => row.severidade },
+            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
             { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
             { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) },
             { id: 'mensagem', titulo: 'Mensagem', tipo: 'texto', render: (row) => row.mensagem }
@@ -251,52 +272,63 @@ export default function SstRelatorioOperacional() {
           storageKey="tabela:sst-relatorio-operacional:eventos-abertos"
           rotuloRolagem="Eventos operacionais abertos"
         />
-      </PainelTabela>
+      </BlocoConteudo>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <PainelTabela title="Riscos criticos" total={(data?.riscos_criticos || []).length}>
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'risco',
-                titulo: 'Risco',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.nome}</span>
-              },
-              { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => row.severidade },
-              { id: 'probabilidade', titulo: 'Probabilidade', tipo: 'badge', render: (row) => row.probabilidade },
-              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
-            ]}
-            itens={data?.riscos_criticos || []}
-            vazio="Nenhum registro encontrado."
-            storageKey="tabela:sst-relatorio-operacional:riscos-criticos"
-            rotuloRolagem="Riscos criticos"
-          />
-        </PainelTabela>
-        <PainelTabela title="Acidentes e incidentes recentes" total={(data?.acidentes_recentes || []).length}>
-          <TabelaPadrao
-            colunas={[
-              { id: 'data_ocorrencia', titulo: 'Data', tipo: 'data', render: (row) => row.data_ocorrencia },
-              {
-                id: 'tipo',
-                titulo: 'Tipo',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.tipo}</span>
-              },
-              { id: 'gravidade', titulo: 'Gravidade', tipo: 'badge', render: (row) => row.gravidade },
-              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
-            ]}
-            itens={data?.acidentes_recentes || []}
-            vazio="Nenhum registro encontrado."
-            storageKey="tabela:sst-relatorio-operacional:acidentes-recentes"
-            rotuloRolagem="Acidentes e incidentes recentes"
-          />
-        </PainelTabela>
-      </div>
+      <BlocoConteudo
+        titulo="Riscos criticos"
+        contagem={`${(data?.riscos_criticos || []).length} item(ns)`}
+      >
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'risco',
+              titulo: 'Risco',
+              // R17: o risco tem nome próprio — é ele que identifica a linha.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (row) => row.nome
+            },
+            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
+            { id: 'probabilidade', titulo: 'Probabilidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.probabilidade} /> },
+            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
+          ]}
+          itens={data?.riscos_criticos || []}
+          vazio="Nenhum registro encontrado."
+          storageKey="tabela:sst-relatorio-operacional:riscos-criticos"
+          rotuloRolagem="Riscos criticos"
+        />
+      </BlocoConteudo>
 
-      <PainelTabela title="Historico recente SST" total={(data?.historicos_recentes || []).length}>
+      <BlocoConteudo
+        titulo="Acidentes e incidentes recentes"
+        contagem={`${(data?.acidentes_recentes || []).length} item(ns)`}
+      >
+        <TabelaPadrao
+          colunas={[
+            { id: 'data_ocorrencia', titulo: 'Data', tipo: 'data', render: (row) => row.data_ocorrencia },
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (row) => row.tipo
+            },
+            { id: 'gravidade', titulo: 'Gravidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.gravidade} /> },
+            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
+          ]}
+          itens={data?.acidentes_recentes || []}
+          vazio="Nenhum registro encontrado."
+          storageKey="tabela:sst-relatorio-operacional:acidentes-recentes"
+          rotuloRolagem="Acidentes e incidentes recentes"
+        />
+      </BlocoConteudo>
+
+      <BlocoConteudo
+        titulo="Historico recente SST"
+        contagem={`${(data?.historicos_recentes || []).length} item(ns)`}
+        recolhivel
+        recolhidoPadrao
+      >
         <TabelaPadrao
           colunas={[
             { id: 'data', titulo: 'Data', tipo: 'data', render: (row) => new Date(row.createdAt).toLocaleString('pt-BR') },
@@ -305,7 +337,7 @@ export default function SstRelatorioOperacional() {
               titulo: 'Recurso',
               tipo: 'identidade',
               noCard: 'titulo',
-              render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.recurso}</span>
+              render: (row) => row.recurso
             },
             { id: 'acao', titulo: 'Acao', tipo: 'texto', render: (row) => row.acao },
             { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
@@ -316,7 +348,7 @@ export default function SstRelatorioOperacional() {
           storageKey="tabela:sst-relatorio-operacional:historico"
           rotuloRolagem="Historico recente SST"
         />
-      </PainelTabela>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

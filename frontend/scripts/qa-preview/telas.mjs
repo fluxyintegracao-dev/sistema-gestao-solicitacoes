@@ -1287,6 +1287,174 @@ export const TELAS = [
     tipo: 'mista',
     cadastroInline: "a tela existe PARA configurar a integracao (R9 revista em 04/09)"
   },
+  // ---- Rodada 5: relatorios de Compras, cadastros de Compras, SST e Solicitacoes (05/09) ----
+  {
+    id: 'compras-rel-categorias-insumos',
+    arquivo: 'src/pages/ComprasRelatorioCategoriasInsumos.jsx',
+    rota: '/compras/relatorios/categorias-insumos',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-ciclo',
+    arquivo: 'src/pages/ComprasRelatorioCiclo.jsx',
+    rota: '/compras/relatorios/ciclo',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-compras-diretas',
+    arquivo: 'src/pages/ComprasRelatorioComprasDiretas.jsx',
+    rota: '/compras/relatorios/compras-diretas',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-compras-fornecedor',
+    arquivo: 'src/pages/ComprasRelatorioComprasFornecedor.jsx',
+    rota: '/compras/relatorios/compras-fornecedor',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-demanda-pedidos',
+    arquivo: 'src/pages/ComprasRelatorioDemandaPedidos.jsx',
+    rota: '/compras/relatorios/demanda-pedidos',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-economia-cotacoes',
+    arquivo: 'src/pages/ComprasRelatorioEconomiaCotacoes.jsx',
+    rota: '/compras/relatorios/economia-cotacoes',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-evolucao',
+    arquivo: 'src/pages/ComprasRelatorioEvolucao.jsx',
+    rota: '/compras/relatorios/evolucao',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-fornecedores',
+    arquivo: 'src/pages/ComprasRelatorioFornecedores.jsx',
+    rota: '/compras/relatorios/fornecedores',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-pendencias-cotacoes',
+    arquivo: 'src/pages/ComprasRelatorioPendenciasCotacoes.jsx',
+    rota: '/compras/relatorios/pendencias-cotacoes',
+    tipo: 'painel'
+  },
+  {
+    id: 'compras-rel-precos-insumos',
+    arquivo: 'src/pages/ComprasRelatorioPrecosInsumos.jsx',
+    rota: '/compras/relatorios/precos-insumos',
+    tipo: 'painel'
+  },
+  {
+    id: 'gestao-categorias',
+    arquivo: 'src/modules/solicitacao-compra/pages/GestaoCategorias.jsx',
+    rota: '/gestao-categorias',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar categoria de insumo (R9 revista em 04/09)"
+  },
+  {
+    id: 'gestao-unidades',
+    arquivo: 'src/modules/solicitacao-compra/pages/GestaoUnidades.jsx',
+    rota: '/gestao-unidades',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar unidade de medida (R9 revista em 04/09)"
+  },
+  {
+    id: 'gestao-apropriacoes',
+    arquivo: 'src/modules/solicitacao-compra/pages/GestaoApropriacoes.jsx',
+    rota: '/gestao-apropriacoes',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA cadastrar apropriacao (R9 revista em 04/09)"
+  },
+  {
+    id: 'sst-dashboard',
+    arquivo: 'src/modules/sst/pages/SstDashboard.jsx',
+    rota: '/sst',
+    tipo: 'painel'
+  },
+  {
+    id: 'sst-rel-operacional',
+    arquivo: 'src/modules/sst/pages/SstRelatorioOperacional.jsx',
+    rota: '/sst/relatorios/operacional',
+    tipo: 'painel'
+  },
+  {
+    id: 'sst-executivo',
+    arquivo: 'src/modules/sst/pages/SstExecutivo.jsx',
+    rota: '/sst/relatorios/executivo',
+    tipo: 'painel'
+  },
+  {
+    id: 'sst-centro-operacional',
+    arquivo: 'src/modules/sst/pages/SstCentroOperacional.jsx',
+    rota: '/sst/relatorios/centro-operacional',
+    tipo: 'painel'
+  },
+  {
+    id: 'sst-heatmap',
+    arquivo: 'src/modules/sst/pages/SstHeatmap.jsx',
+    rota: '/sst/relatorios/heatmap',
+    tipo: 'painel'
+  },
+  {
+    id: 'sst-observabilidade',
+    arquivo: 'src/modules/sst/pages/SstObservabilidade.jsx',
+    rota: '/sst/observabilidade',
+    tipo: 'painel'
+  },
+  {
+    id: 'sst-producao',
+    arquivo: 'src/modules/sst/pages/SstProducaoMonitoramento.jsx',
+    rota: '/sst/producao',
+    tipo: 'painel'
+  },
+  {
+    id: 'sst-observabilidade-avancada',
+    arquivo: 'src/modules/sst/pages/SstObservabilidadeAvancada.jsx',
+    rota: '/sst/observabilidade-avancada',
+    tipo: 'painel'
+  },
+  {
+    id: 'sst-timeline',
+    arquivo: 'src/modules/sst/pages/SstTimeline.jsx',
+    rota: '/sst/timeline',
+    tipo: 'listagem'
+  },
+  {
+    id: 'sst-esocial',
+    arquivo: 'src/modules/sst/pages/SstEsocial.jsx',
+    rota: '/sst/esocial',
+    tipo: 'listagem'
+  },
+  {
+    id: 'sst-configuracoes',
+    arquivo: 'src/modules/sst/pages/SstConfiguracoes.jsx',
+    rota: '/sst/configuracoes',
+    tipo: 'mista',
+    cadastroInline: "a tela existe PARA configurar o modulo (R9 revista em 04/09)"
+  },
+  {
+    id: 'sst-crud',
+    arquivo: 'src/modules/sst/pages/SstCrudPage.jsx',
+    rota: '/sst/colaboradores',
+    tipo: 'listagem'
+  },
+  {
+    id: 'solicitacoes',
+    arquivo: 'src/pages/Solicitacoes/index.jsx',
+    rota: '/solicitacoes',
+    tipo: 'listagem'
+  },
+  {
+    id: 'nova-solicitacao',
+    arquivo: 'src/pages/NovaSolicitacao.jsx',
+    rota: '/nova-solicitacao',
+    tipo: 'form',
+    cadastroInline: "a rota existe PARA abrir solicitacao — tirando o formulario nao sobra tela (R9 revista em 04/09)"
+  },
 ];
 
 /** Itens da DoD, na ordem da matriz. */

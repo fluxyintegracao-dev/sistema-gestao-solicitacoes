@@ -1,23 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  HiDocumentArrowDown,
-  HiViewColumns,
-  HiOutlineEye,
-  HiOutlineHandRaised,
-  HiOutlineUserPlus,
-  HiOutlineUserGroup,
-  HiOutlineFolderOpen,
-  HiOutlineArrowRightOnRectangle,
-  HiOutlineBanknotes,
-  HiOutlineTrash,
-  HiOutlineXMark
-} from 'react-icons/hi2';
 import Filtros from './Filtros';
-import TabelaSolicitacoes from './TabelaSolicitacoes';
-import ModalAtribuirResponsavel from './ModalAtribuirResponsavel';
-import ModalEnviarSetor from './ModalEnviarSetor';
 import { API_URL, authHeaders } from '../../services/api';
 import { getSetores } from '../../services/setores';
 import { getTiposSolicitacao } from '../../services/tiposSolicitacao';
@@ -26,11 +9,23 @@ import { getStatusSetor } from '../../services/statusSetor';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLiveUpdateSubscription } from '../../contexts/LiveUpdatesContext';
 import { parseDateSmart } from '../../utils/dateLocal';
-import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
+import { solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import { hasEnabledModule } from '../../utils/acessoProduto';
 import ListaAvancada from '../../components/lista-avancada/ListaAvancada';
 import StatusBadge from '../../components/StatusBadge';
-import { TabelaPadrao, CelulaDupla } from '../../components/padrao';
+import OverlayModal from '../../components/ui/OverlayModal';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  CelulaDupla,
+  FormSecao,
+  CampoForm,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../../components/padrao';
 import {
   formatarMaiusculas,
   formatarDescricao,
@@ -39,7 +34,6 @@ import {
 } from '../../utils/formatarTexto';
 import {
   arquivarSolicitacoesEmMassa,
-  deleteSolicitacao,
   desarquivarSolicitacao,
   enviarSolicitacoesParaSetorEmMassa,
   getSolicitacaoResumoLista,
@@ -85,7 +79,6 @@ function dataCurta(valor) {
   return data.toLocaleDateString('pt-BR');
 }
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 const FILTER_DEBOUNCE_MS = 450;
 const EXPORT_PAGE_SIZE = 200;
 const STATUS_AUTOMATICOS_SOLICITACAO = [
@@ -175,21 +168,10 @@ function compararFaixaValor(a, b) {
 export default function Solicitacoes({ arquivadas = false }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const DEFAULT_VISIBLE_COLUMNS = [
-    'data',
-    'codigo',
-    'numero_sienge',
-    'obra',
-    'contrato',
-    'ref_contrato',
-    'descricao',
-    'tipo',
-    'valor',
-    'setor',
-    'responsavel',
-    'status',
-    'vencimento'
-  ];
+  // R19: nada de caixa do navegador. Faixa de aviso dentro da página e
+  // modal de confirmação do sistema — os dois vindos dos padrões.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
@@ -201,9 +183,12 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [responsaveisOptions, setResponsaveisOptions] = useState([]);
   const [permissaoUsuario, setPermissaoUsuario] = useState(null);
   const [selecionadasIds, setSelecionadasIds] = useState([]);
+  // R26 — CONSENTIMENTO. O modal do sistema NÃO congela a lista atrás dele:
+  // a seleção pode mudar entre abrir o modal e clicar em "Enviar". Estes são
+  // os ALVOS FIXADOS no instante em que a ação foi acionada (exatamente os
+  // itens que a barra de lote contou), e é sobre eles que a ação opera.
+  const [alvosLote, setAlvosLote] = useState([]);
   const [modalEnvioMassa, setModalEnvioMassa] = useState(false);
-  const [modalAtribuir, setModalAtribuir] = useState(false);
-  const [modalEnviarUnitario, setModalEnviarUnitario] = useState(false);
   const [modalAtribuirMassa, setModalAtribuirMassa] = useState(false);
   const [usuariosAtribuicao, setUsuariosAtribuicao] = useState([]);
   const [usuarioAtribuicaoMassa, setUsuarioAtribuicaoMassa] = useState('');
@@ -215,10 +200,6 @@ export default function Solicitacoes({ arquivadas = false }) {
   const [lotesPrioridadeAbertos, setLotesPrioridadeAbertos] = useState([]);
   const [lotePrioridadeDestino, setLotePrioridadeDestino] = useState('');
   const [titulosPrioridadeSelecionados, setTitulosPrioridadeSelecionados] = useState(new Set());
-  const [mostrarSeletorColunas, setMostrarSeletorColunas] = useState(false);
-  const [colunasVisiveis, setColunasVisiveis] = useState(DEFAULT_VISIBLE_COLUMNS);
-  const [colunasStoragePronto, setColunasStoragePronto] = useState(false);
-  const [seletorColunasPosition, setSeletorColunasPosition] = useState({ left: 16, top: 16 });
   const [filtrosStoragePronto, setFiltrosStoragePronto] = useState(false);
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [limitePorPagina, setLimitePorPagina] = useState(25);
@@ -228,8 +209,6 @@ export default function Solicitacoes({ arquivadas = false }) {
     total: 0,
     total_pages: 0
   });
-  const seletorColunasRef = useRef(null);
-  const botaoColunasRef = useRef(null);
   const solicitacoesRef = useRef([]);
   const localMutationsRef = useRef(new Map());
   const { user } = useAuth();
@@ -965,7 +944,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       }
     } catch (error) {
       console.error(error);
-      if (!silent) alert('Erro ao carregar solicitações');
+      if (!silent) avisar.erro('Erro ao carregar solicitações.');
     } finally {
       setLoading(false);
     }
@@ -1041,12 +1020,6 @@ export default function Solicitacoes({ arquivadas = false }) {
     return total + (Number.isNaN(valor) ? 0 : valor);
   }, 0);
   const totalSolicitacoes = Number(metaPaginacao?.total || 0);
-  const totalPaginas = Number(metaPaginacao?.total_pages || 0);
-  const limiteNumericoAtual = Number(limitePorPagina || 25);
-  const paginaInicial = totalSolicitacoes === 0 ? 0 : ((paginaAtual - 1) * limiteNumericoAtual) + 1;
-  const paginaFinal = totalSolicitacoes === 0
-    ? 0
-    : Math.min(totalSolicitacoes, paginaAtual * limiteNumericoAtual);
 
   const setorTokens = [
     String(user?.setor?.codigo || '').toUpperCase(),
@@ -1060,170 +1033,76 @@ export default function Solicitacoes({ arquivadas = false }) {
   const isDiretoriaObrasPrivadas = setorTokensNormalizados.includes('DIR_OBRAS_PRIVADAS');
   const podeSolicitarPrioridadeFinanceiro = !arquivadas && (isDiretoriaObrasPublicas || isDiretoriaObrasPrivadas);
   const classificacaoPrioridadeDiretoria = isDiretoriaObrasPublicas ? 'PUBLICA' : 'PRIVADA';
-  const isAdminGEO = perfilUpper.startsWith('ADMIN') && userHasSetorCapability(user, 'eh_setor_geo');
   const isSuperadmin = perfilUpper === 'SUPERADMIN';
   const podeEnviarQualquerSetor = Boolean(user?.pode_enviar_qualquer_setor);
-  const colunasStorageKey = useMemo(() => {
-    const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
-    return `solicitacoes:colunas:${identificador}`;
-  }, [user?.id, user?.email, user?.nome, user?.perfil]);
-  const opcoesColunas = useMemo(() => [
-    { id: 'data', label: 'Data' },
-    { id: 'codigo', label: 'Código' },
-    { id: 'numero_sienge', label: 'Nº pedido' },
-    { id: 'obra', label: 'Obra' },
-    ...(moduloContratosHabilitado ? [{ id: 'contrato', label: 'Contrato' }] : []),
-    ...(moduloContratosHabilitado && isSetorObra ? [{ id: 'ref_contrato', label: 'Ref. do Contrato' }] : []),
-    { id: 'descricao', label: 'Descrição' },
-    { id: 'tipo', label: 'Tipo de Solicitação' },
-    { id: 'valor', label: 'Valor' },
-    { id: 'setor', label: 'Setor' },
-    { id: 'responsavel', label: 'Responsável' },
-    { id: 'status', label: 'Status' },
-    { id: 'vencimento', label: 'Data Resposta/Pagamento' }
-  ], [moduloContratosHabilitado, isSetorObra]);
 
-  useEffect(() => {
-    try {
-      const salvo = localStorage.getItem(colunasStorageKey);
-      if (salvo) {
-        const parsed = JSON.parse(salvo);
-        if (Array.isArray(parsed)) {
-          setColunasVisiveis(parsed);
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar preferencia de colunas', error);
-    } finally {
-      setColunasStoragePronto(true);
+  // Alvos de uma ação em lote: SEMPRE os itens que a barra de lote contou
+  // (a ListaAvancada passa a lista selecionada para `executar`). Só cai no
+  // estado quando a ação foi chamada de fora da barra.
+  function idsDosAlvos(itensAlvo) {
+    if (Array.isArray(itensAlvo) && itensAlvo.length > 0) {
+      return itensAlvo
+        .map((item) => Number(item?.id))
+        .filter((id) => Number.isInteger(id) && id > 0);
     }
-  }, [colunasStorageKey]);
-
-  useEffect(() => {
-    setColunasVisiveis(prev => {
-      const validas = opcoesColunas.map(c => c.id);
-      const filtradas = prev.filter(id => validas.includes(id));
-      const obrigatorias = ['codigo', 'status'];
-      for (const obrigatoria of obrigatorias) {
-        if (!filtradas.includes(obrigatoria) && validas.includes(obrigatoria)) {
-          filtradas.push(obrigatoria);
-        }
-      }
-      return filtradas.length > 0 ? filtradas : validas;
-    });
-  }, [opcoesColunas]);
-
-  useEffect(() => {
-    if (!colunasStoragePronto) return;
-    try {
-      localStorage.setItem(colunasStorageKey, JSON.stringify(colunasVisiveis));
-    } catch (error) {
-      console.error('Erro ao salvar preferencia de colunas', error);
-    }
-  }, [colunasVisiveis, colunasStorageKey, colunasStoragePronto]);
-
-  useEffect(() => {
-    function fecharAoClicarFora(event) {
-      if (!mostrarSeletorColunas) return;
-      const alvo = event.target;
-      if (seletorColunasRef.current?.contains(alvo)) return;
-      if (botaoColunasRef.current?.contains(alvo)) return;
-      setMostrarSeletorColunas(false);
-    }
-
-    document.addEventListener('mousedown', fecharAoClicarFora);
-    return () => document.removeEventListener('mousedown', fecharAoClicarFora);
-  }, [mostrarSeletorColunas]);
-
-  useEffect(() => {
-    function handleEscape(event) {
-      if (event.key !== 'Escape') return;
-      setMostrarSeletorColunas(false);
-      setModalEnvioMassa(false);
-      setModalPrioridadeTitulos(false);
-    }
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, []);
-
-  useEffect(() => {
-    if (!mostrarSeletorColunas) return undefined;
-
-    const frameId = window.requestAnimationFrame(() => {
-      posicionarSeletorColunas();
-    });
-
-    function reposicionarSeletor() {
-      posicionarSeletorColunas();
-    }
-
-    window.addEventListener('resize', reposicionarSeletor);
-    window.addEventListener('scroll', reposicionarSeletor, true);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      window.removeEventListener('resize', reposicionarSeletor);
-      window.removeEventListener('scroll', reposicionarSeletor, true);
-    };
-  }, [mostrarSeletorColunas]);
-
-  function toggleSelecionada(id) {
-    const idNum = Number(id);
-    setSelecionadasIds(prev =>
-      prev.includes(idNum)
-        ? prev.filter(item => item !== idNum)
-        : [...prev, idNum]
-    );
+    return selecionadasIds.map(Number).filter((id) => Number.isInteger(id) && id > 0);
   }
 
-  function toggleSelecionarTodas() {
-    const idsPagina = solicitacoes.map(item => Number(item.id));
-    const todasSelecionadas = idsPagina.length > 0 && idsPagina.every(id => selecionadasIds.includes(id));
-    setSelecionadasIds(todasSelecionadas ? [] : idsPagina);
-  }
-
-  async function arquivarEmMassa() {
-    if (selecionadasIds.length === 0) {
-      alert('Selecione ao menos uma solicitação.');
+  async function arquivarEmMassa(itensAlvo) {
+    // R26: os IDs ficam fixados numa const ANTES do await da confirmação.
+    // O modal do sistema não bloqueia a lista atrás dele — sem isto,
+    // perguntar sobre 3 e arquivar 47 é possível.
+    const alvos = idsDosAlvos(itensAlvo);
+    if (alvos.length === 0) {
+      avisar.alerta('Selecione ao menos uma solicitação.');
       return;
     }
-    if (!confirm(`Arquivar ${selecionadasIds.length} solicitação(ões) somente para sua visualização?`)) {
-      return;
-    }
+    const { ok } = await confirmar({
+      titulo: 'Arquivar solicitações',
+      mensagem: `Arquivar ${alvos.length} solicitação(ões) somente para sua visualização?`,
+      rotuloConfirmar: `Arquivar ${alvos.length}`
+    });
+    if (!ok) return;
 
     try {
       setProcessandoMassa(true);
-      const resultado = await arquivarSolicitacoesEmMassa(selecionadasIds);
+      const resultado = await arquivarSolicitacoesEmMassa(alvos);
       setSelecionadasIds([]);
+      listaRef.current?.clearSelecao?.();
       await carregar({ silent: true });
       if (resultado?.erros?.length > 0) {
-        alert(`Arquivamento em massa concluído. Arquivadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}.`);
+        avisar.alerta(`Arquivamento em massa concluído. Arquivadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}.`);
       } else {
-        alert('Solicitações arquivadas em massa com sucesso.');
+        avisar.sucesso('Solicitações arquivadas em massa com sucesso.');
       }
     } catch (error) {
       console.error(error);
-      alert('Erro ao arquivar solicitações em massa.');
+      avisar.erro('Erro ao arquivar solicitações em massa.');
     } finally {
       setProcessandoMassa(false);
     }
   }
 
-  async function desarquivarEmMassa() {
-    if (selecionadasIds.length === 0) {
-      alert('Selecione ao menos uma solicitacao.');
+  async function desarquivarEmMassa(itensAlvo) {
+    // R26: mesma fixação de alvos antes do await.
+    const alvos = idsDosAlvos(itensAlvo);
+    if (alvos.length === 0) {
+      avisar.alerta('Selecione ao menos uma solicitação.');
       return;
     }
-    if (!confirm(`Desarquivar ${selecionadasIds.length} solicitacao(oes) da sua lista de arquivadas?`)) {
-      return;
-    }
+    const { ok } = await confirmar({
+      titulo: 'Desarquivar solicitações',
+      mensagem: `Desarquivar ${alvos.length} solicitação(ões) da sua lista de arquivadas?`,
+      rotuloConfirmar: `Desarquivar ${alvos.length}`
+    });
+    if (!ok) return;
 
     try {
       setProcessandoMassa(true);
       let sucesso = 0;
       const erros = [];
 
-      for (const solicitacaoId of selecionadasIds) {
+      for (const solicitacaoId of alvos) {
         try {
           await desarquivarSolicitacao(solicitacaoId);
           sucesso += 1;
@@ -1233,16 +1112,17 @@ export default function Solicitacoes({ arquivadas = false }) {
       }
 
       setSelecionadasIds([]);
+      listaRef.current?.clearSelecao?.();
       await carregar({ silent: true });
 
       if (erros.length > 0) {
-        alert(`Desarquivamento em massa concluido. Desarquivadas: ${sucesso}. Falhas: ${erros.length}.`);
+        avisar.alerta(`Desarquivamento em massa concluído. Desarquivadas: ${sucesso}. Falhas: ${erros.length}.`);
       } else {
-        alert('Solicitacoes desarquivadas com sucesso.');
+        avisar.sucesso('Solicitações desarquivadas com sucesso.');
       }
     } catch (error) {
       console.error(error);
-      alert('Erro ao desarquivar solicitacoes em massa.');
+      avisar.erro('Erro ao desarquivar solicitações em massa.');
     } finally {
       setProcessandoMassa(false);
     }
@@ -1263,7 +1143,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   function baixarSolicitacoesCsv(lista, escopo) {
     if (!Array.isArray(lista) || lista.length === 0) {
-      alert('Nenhuma solicitação encontrada para exportar.');
+      avisar.alerta('Nenhuma solicitação encontrada para exportar.');
       return;
     }
     const linhas = [
@@ -1335,6 +1215,13 @@ export default function Solicitacoes({ arquivadas = false }) {
       });
       if (arquivadas) paramsObj.arquivadas = '1';
       if (filtroVisaoUrl) paramsObj.visao = filtroVisaoUrl;
+      // CONSENTIMENTO: a exportação "filtradas" precisa exportar EXATAMENTE
+      // o recorte que está na tela. Sem o `ids` do Hub e sem a consulta da
+      // ListaAvancada (visão, filtros rápidos, busca) ela ignorava o que a
+      // pessoa vê e baixava o conjunto inteiro — 47 linhas para quem tinha
+      // 3 na tela.
+      if (filtroIdsUrl.length > 0) paramsObj.ids = filtroIdsUrl.join(',');
+      aplicarConsultaListaNosParams(paramsObj);
       paramsObj.page = String(pagina);
       paramsObj.limit = String(EXPORT_PAGE_SIZE);
 
@@ -1354,13 +1241,17 @@ export default function Solicitacoes({ arquivadas = false }) {
     return Array.from(registrosPorId.values());
   }
 
-  async function exportarSolicitacoesExcel() {
+  async function exportarSolicitacoesExcel(itensAlvo) {
     if (!filtrosDataValidos) {
-      alert('Corrija as datas dos filtros antes de exportar.');
+      avisar.alerta('Corrija as datas dos filtros antes de exportar.');
       return;
     }
 
-    const selecionadas = solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
+    // A barra de lote entrega os itens que ela contou: o CSV sai com esses
+    // mesmos registros, não com o que o estado tiver depois.
+    const selecionadas = Array.isArray(itensAlvo) && itensAlvo.length > 0
+      ? itensAlvo
+      : solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
     if (selecionadas.length > 0) {
       baixarSolicitacoesCsv(selecionadas, 'selecionadas');
       return;
@@ -1372,107 +1263,98 @@ export default function Solicitacoes({ arquivadas = false }) {
       baixarSolicitacoesCsv(filtradas, 'filtradas');
     } catch (error) {
       console.error(error);
-      alert('Erro ao exportar as solicitações filtradas.');
+      avisar.erro('Erro ao exportar as solicitações filtradas.');
     } finally {
       setExportando(false);
     }
   }
 
-  function toggleColuna(id) {
-    const obrigatorias = new Set(['codigo', 'status', 'acoes']);
-    if (obrigatorias.has(id)) return;
-    setColunasVisiveis(prev => (
-      prev.includes(id)
-        ? prev.filter(col => col !== id)
-        : [...prev, id]
-    ));
-  }
-
-  function posicionarSeletorColunas() {
-    if (!botaoColunasRef.current || typeof window === 'undefined') return;
-
-    const margem = 16;
-    const btnRect = botaoColunasRef.current.getBoundingClientRect();
-    const seletorRect = seletorColunasRef.current?.getBoundingClientRect();
-    const larguraSeletor = Math.min(seletorRect?.width || 320, window.innerWidth - margem * 2);
-    const alturaSeletor = Math.min(seletorRect?.height || 260, window.innerHeight - margem * 2);
-    const maxLeft = Math.max(margem, window.innerWidth - larguraSeletor - margem);
-    const espacoAbaixo = window.innerHeight - btnRect.bottom - margem;
-    const espacoAcima = btnRect.top - margem;
-    const abreAcima = alturaSeletor > espacoAbaixo && espacoAcima > espacoAbaixo;
-
-    setSeletorColunasPosition({
-      left: Math.round(Math.min(Math.max(margem, btnRect.left), maxLeft)),
-      top: Math.round(abreAcima
-        ? Math.max(margem, btnRect.top - alturaSeletor - 8)
-        : Math.min(window.innerHeight - alturaSeletor - margem, btnRect.bottom + 8))
-    });
-  }
-
-  function alternarSeletorColunas() {
-    if (!mostrarSeletorColunas) posicionarSeletorColunas();
-    setMostrarSeletorColunas(prev => !prev);
+  // Abre o modal FIXANDO os alvos (R26): o que a barra de lote contou é o
+  // que o modal mostra e o que o envio vai atingir, mesmo que a pessoa
+  // mexa na seleção da lista com o modal aberto.
+  function abrirModalEnvioMassa(itensAlvo) {
+    const alvos = idsDosAlvos(itensAlvo);
+    if (alvos.length === 0) {
+      avisar.alerta('Selecione ao menos uma solicitação.');
+      return;
+    }
+    setAlvosLote(alvos);
+    setSetorEnvioMassa('');
+    setModalEnvioMassa(true);
   }
 
   async function confirmarEnvioMassa() {
+    // Alvos fixados na abertura do modal — nunca relidos do estado da lista.
+    const alvos = alvosLote;
     if (isSetorObra) {
-      alert('Setor OBRA não pode enviar solicitações para outro setor.');
+      avisar.alerta('Setor OBRA não pode enviar solicitações para outro setor.');
       return;
     }
-    if (selecionadasIds.length === 0) {
-      alert('Selecione ao menos uma solicitação.');
+    if (alvos.length === 0) {
+      avisar.alerta('Selecione ao menos uma solicitação.');
       return;
     }
     if (!setorEnvioMassa) {
-      alert('Selecione um setor de destino.');
+      avisar.alerta('Selecione um setor de destino.');
       return;
     }
 
     try {
       setProcessandoMassa(true);
       const resultado = await enviarSolicitacoesParaSetorEmMassa({
-        solicitacao_ids: selecionadasIds,
+        solicitacao_ids: alvos,
         setor_destino: setorEnvioMassa
       });
       setModalEnvioMassa(false);
       setSetorEnvioMassa('');
+      setAlvosLote([]);
       setSelecionadasIds([]);
+      listaRef.current?.clearSelecao?.();
       await carregar({ silent: true });
       if (resultado?.erros?.length > 0) {
         const detalhes = resultado.erros
           .slice(0, 8)
           .map(item => `#${item.id}: ${item.error || 'Erro ao enviar'}`)
-          .join('\n');
+          .join(' · ');
         const complemento = resultado.erros.length > 8
-          ? `\n... e mais ${resultado.erros.length - 8} falha(s).`
+          ? ` … e mais ${resultado.erros.length - 8} falha(s).`
           : '';
-        alert(`Envio em massa concluído com pendências.\n\nEnviadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}.\n\n${detalhes}${complemento}`);
+        avisar.alerta(
+          `Enviadas: ${resultado.sucesso}. Falhas: ${resultado.erros.length}. ${detalhes}${complemento}`,
+          'Envio em massa concluído com pendências'
+        );
       } else {
-        alert('Solicitações enviadas em massa com sucesso.');
+        avisar.sucesso('Solicitações enviadas em massa com sucesso.');
       }
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao enviar solicitações em massa.');
+      avisar.erro(error?.message || 'Erro ao enviar solicitações em massa.');
     } finally {
       setProcessandoMassa(false);
     }
   }
 
-  async function solicitarPrioridadeFinanceiroSelecionadas() {
+  async function solicitarPrioridadeFinanceiroSelecionadas(itensAlvo) {
     if (!podeSolicitarPrioridadeFinanceiro) {
-      alert('Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade para o financeiro.');
+      avisar.alerta('Apenas DIR_OBRAS_PUBLICAS ou DIR_OBRAS_PRIVADAS podem solicitar prioridade para o financeiro.');
       return;
     }
 
-    if (selecionadasIds.length === 0) {
-      alert('Selecione ao menos uma solicitacao.');
+    // R26: os alvos são fixados AQUI, antes de qualquer await, e ficam em
+    // `alvosLote` até o envio — o modal de títulos abre depois de duas
+    // requisições e a seleção da lista pode ter mudado nesse meio-tempo.
+    const alvos = idsDosAlvos(itensAlvo);
+    if (alvos.length === 0) {
+      avisar.alerta('Selecione ao menos uma solicitação.');
       return;
     }
 
-    const selecionadas = solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
+    const selecionadas = Array.isArray(itensAlvo) && itensAlvo.length > 0
+      ? itensAlvo
+      : solicitacoes.filter(item => alvos.includes(Number(item.id)));
     const foraFinanceiro = selecionadas.filter(item => normalizarTextoComparacao(item.area_responsavel) !== 'FINANCEIRO');
     if (foraFinanceiro.length > 0) {
-      alert('Selecione apenas solicitacoes que estejam no setor FINANCEIRO para solicitar prioridade.');
+      avisar.alerta('Selecione apenas solicitações que estejam no setor FINANCEIRO para solicitar prioridade.');
       return;
     }
 
@@ -1480,7 +1362,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       setProcessandoMassa(true);
       const [resposta, lotesAbertosData] = await Promise.all([
         getTitulosPrioridadePorSolicitacoes({
-          solicitacao_ids: selecionadasIds,
+          solicitacao_ids: alvos,
           classificacao_alvo: classificacaoPrioridadeDiretoria
         }),
         listarLotesPrioridadeDiretoria({ status: 'ABERTO' })
@@ -1489,7 +1371,9 @@ export default function Solicitacoes({ arquivadas = false }) {
       const semTitulos = Array.isArray(resposta?.solicitacoes_sem_titulos) ? resposta.solicitacoes_sem_titulos : [];
       if (titulos.length === 0) {
         const lista = semTitulos.map(item => item.codigo || `#${item.id}`).join(', ');
-        alert(`Nenhuma solicitacao selecionada possui titulo financeiro aberto elegivel.${lista ? `\n\nSolicitacoes sem titulo: ${lista}` : ''}\n\nCadastre os titulos financeiros e clique novamente em Prioridade financeiro para recarregar.`);
+        avisar.alerta(
+          `Nenhuma solicitação selecionada possui título financeiro aberto elegível.${lista ? ` Solicitações sem título: ${lista}.` : ''} Cadastre os títulos financeiros e clique novamente em Prioridade financeira para recarregar.`
+        );
         return;
       }
       const lotesAbertos = (Array.isArray(lotesAbertosData?.items) ? lotesAbertosData.items : [])
@@ -1498,6 +1382,7 @@ export default function Solicitacoes({ arquivadas = false }) {
           String(lote.tipo_lote || '').toUpperCase() === 'SOLICITACAO_DIRETORIA' &&
           String(lote.classificacao_alvo || '').toUpperCase() === String(classificacaoPrioridadeDiretoria || '').toUpperCase()
         ));
+      setAlvosLote(alvos);
       setTitulosPrioridade(titulos);
       setSolicitacoesPrioridadeSemTitulos(semTitulos);
       setLotesPrioridadeAbertos(lotesAbertos);
@@ -1506,7 +1391,7 @@ export default function Solicitacoes({ arquivadas = false }) {
       setModalPrioridadeTitulos(true);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao buscar titulos para prioridade.');
+      avisar.erro(error?.message || 'Erro ao buscar títulos para prioridade.');
     } finally {
       setProcessandoMassa(false);
     }
@@ -1523,25 +1408,35 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   async function confirmarPrioridadeFinanceiroTitulos() {
+    // R26: títulos E solicitações fixados ANTES do await da confirmação.
+    // `solicitacao_ids` vinha do estado vivo da lista — o backend recebia um
+    // conjunto de solicitações que podia não ser o que gerou estes títulos.
     const tituloIds = Array.from(titulosPrioridadeSelecionados).map(Number).filter(Boolean);
+    const solicitacaoIds = alvosLote;
+    const loteDestino = lotePrioridadeDestino ? Number(lotePrioridadeDestino) : undefined;
     if (tituloIds.length === 0) {
-      alert('Selecione ao menos um titulo para enviar a prioridade.');
+      avisar.alerta('Selecione ao menos um título para enviar à prioridade.');
       return;
     }
 
-    if (!window.confirm(`Enviar ${tituloIds.length} titulo(s) para aprovacao de prioridade pela Diretoria Administrativa?`)) {
-      return;
-    }
+    const { ok } = await confirmar({
+      titulo: 'Enviar para prioridade',
+      mensagem: `Enviar ${tituloIds.length} título(s) para aprovação de prioridade pela Diretoria Administrativa?`,
+      rotuloConfirmar: `Enviar ${tituloIds.length}`
+    });
+    if (!ok) return;
 
     try {
       setProcessandoMassa(true);
       await solicitarUrgenciaPrioridadeDiretoria({
         titulo_ids: tituloIds,
-        solicitacao_ids: selecionadasIds,
+        solicitacao_ids: solicitacaoIds,
         classificacao_alvo: classificacaoPrioridadeDiretoria,
-        lote_id: lotePrioridadeDestino ? Number(lotePrioridadeDestino) : undefined
+        lote_id: loteDestino
       });
       setSelecionadasIds([]);
+      listaRef.current?.clearSelecao?.();
+      setAlvosLote([]);
       setTitulosPrioridade([]);
       setSolicitacoesPrioridadeSemTitulos([]);
       setLotesPrioridadeAbertos([]);
@@ -1549,10 +1444,10 @@ export default function Solicitacoes({ arquivadas = false }) {
       setTitulosPrioridadeSelecionados(new Set());
       setModalPrioridadeTitulos(false);
       await carregar({ silent: true });
-      alert('Lote de prioridade enviado para aprovacao da Diretoria Administrativa.');
+      avisar.sucesso('Lote de prioridade enviado para aprovação da Diretoria Administrativa.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao solicitar prioridade para o financeiro.');
+      avisar.erro(error?.message || 'Erro ao solicitar prioridade para o financeiro.');
     } finally {
       setProcessandoMassa(false);
     }
@@ -1574,14 +1469,6 @@ export default function Solicitacoes({ arquivadas = false }) {
     return isUsuario ? (!!permissaoUsuario?.usuario_pode_assumir || isSetorFinanceiro) : true;
   }, [selecionadaUnica, isSetorObra, isSuperadmin, permissaoUsuario, user, isSetorFinanceiro]);
 
-  const podeAtribuirUnica = useMemo(() => {
-    if (!selecionadaUnica) return false;
-    if (isSetorObra) return false;
-    const modo = String(permissaoUsuario?.modo_recebimento || 'TODOS_VISIVEIS').toUpperCase();
-    if (modo !== 'TODOS_VISIVEIS') return false;
-    const isUsuario = user?.perfil === 'USUARIO';
-    return isUsuario ? (!!permissaoUsuario?.usuario_pode_atribuir || isSetorFinanceiro) : true;
-  }, [selecionadaUnica, isSetorObra, permissaoUsuario, user?.perfil, isSetorFinanceiro]);
   const podeAtribuirMassa = useMemo(() => {
     if (selecionadasIds.length === 0) return false;
     if (isSetorObra) return false;
@@ -1591,15 +1478,6 @@ export default function Solicitacoes({ arquivadas = false }) {
     return isUsuario ? (!!permissaoUsuario?.usuario_pode_atribuir || isSetorFinanceiro) : true;
   }, [selecionadasIds.length, isSetorObra, permissaoUsuario, user?.perfil, isSetorFinanceiro]);
 
-  const podeExcluirUnica = !!selecionadaUnica && (isSuperadmin || isAdminGEO);
-  const podeEnviarUnica = useMemo(() => {
-    if (!selecionadaUnica || isSetorObra) return false;
-    return (
-      isSuperadmin ||
-      podeEnviarQualquerSetor ||
-      solicitacaoEstaNoSetorDoUsuario(selecionadaUnica.area_responsavel, user)
-    );
-  }, [selecionadaUnica, isSetorObra, isSuperadmin, podeEnviarQualquerSetor, user]);
   const podeEnviarMassa = useMemo(() => {
     if (selecionadasIds.length === 0 || isSetorObra) return false;
     if (isSuperadmin || podeEnviarQualquerSetor) return true;
@@ -1609,36 +1487,15 @@ export default function Solicitacoes({ arquivadas = false }) {
     });
   }, [selecionadasIds, isSetorObra, isSuperadmin, podeEnviarQualquerSetor, solicitacoes, user]);
 
-  const isSetorObraSolicitacaoUnica = useMemo(() => {
-    if (!selecionadaUnica) return false;
-    const setorSolicitacao =
-      (setoresMap?.[selecionadaUnica.area_responsavel] || null);
-    return Boolean(setorSolicitacao?.eh_setor_obra) ||
-      String(setorSolicitacao?.nome || selecionadaUnica.area_responsavel || '').trim().toUpperCase() === 'OBRA';
-  }, [selecionadaUnica, setoresMap]);
-
-  const exigePrazoCompraDelegacaoUnica = useMemo(() => {
-    if (!selecionadaUnica) return false;
-    const texto = [
-      selecionadaUnica?.tipo_solicitacao?.nome,
-      selecionadaUnica?.tipo_solicitacao?.codigo,
-      selecionadaUnica?.tipoSolicitacao?.nome,
-      selecionadaUnica?.tipoSolicitacao?.codigo,
-      selecionadaUnica?.tipo?.nome,
-      selecionadaUnica?.tipo?.codigo,
-      selecionadaUnica?.tipo_solicitacao_nome,
-      selecionadaUnica?.tipo_solicitacao_codigo,
-      selecionadaUnica?.titulo,
-      selecionadaUnica?.descricao
-    ].filter(Boolean).join(' ');
-    const normalizado = normalizarTextoComparacao(texto);
-    return normalizado.includes('SOLICITACAO DE COMPRA') || normalizado.includes('COMPRA DIRETA');
-  }, [selecionadaUnica]);
-
-  async function assumirSelecionada() {
-    if (!selecionadaUnica) return;
+  async function assumirSelecionada(itensAlvo) {
+    // R26: a solicitação alvo fica numa const antes de qualquer await —
+    // nada de reler `selecionadaUnica` (derivado do estado) depois.
+    const alvo = (Array.isArray(itensAlvo) && itensAlvo.length === 1)
+      ? itensAlvo[0]
+      : selecionadaUnica;
+    if (!alvo) return;
     try {
-      const res = await fetch(`${API_URL}/solicitacoes/${selecionadaUnica.id}/assumir`, {
+      const res = await fetch(`${API_URL}/solicitacoes/${alvo.id}/assumir`, {
         method: 'POST',
         headers: authHeaders()
       });
@@ -1649,27 +1506,15 @@ export default function Solicitacoes({ arquivadas = false }) {
           const data = await res.json();
           mensagem = data?.error || mensagem;
         } catch (_) {}
-        alert(mensagem);
+        avisar.erro(mensagem);
         return;
       }
 
-      alert('Solicitação assumida com sucesso.');
-      await handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });
+      avisar.sucesso('Solicitação assumida com sucesso.');
+      await handleAtualizarLista({ type: 'refresh_item', id: alvo.id });
     } catch (error) {
       console.error(error);
-      alert('Erro ao assumir solicitação');
-    }
-  }
-
-  async function excluirSelecionada() {
-    if (!selecionadaUnica) return;
-    if (!confirm('Excluir esta solicitação? Esta ação não pode ser desfeita.')) return;
-    try {
-      await deleteSolicitacao(selecionadaUnica.id);
-      await handleAtualizarLista({ type: 'remove_item', id: selecionadaUnica.id });
-    } catch (error) {
-      console.error(error);
-      alert('Erro ao excluir solicitação');
+      avisar.erro('Erro ao assumir solicitação.');
     }
   }
 
@@ -1723,19 +1568,29 @@ export default function Solicitacoes({ arquivadas = false }) {
     }
   }
 
-  async function abrirModalAtribuirMassa() {
+  async function abrirModalAtribuirMassa(itensAlvo) {
+    // R26: alvos fixados na abertura — `carregarUsuariosAtribuicao` tem
+    // await e a seleção da lista pode mudar enquanto ele roda.
+    const alvos = idsDosAlvos(itensAlvo);
+    if (alvos.length === 0) {
+      avisar.alerta('Selecione ao menos uma solicitação.');
+      return;
+    }
+    setAlvosLote(alvos);
     setUsuarioAtribuicaoMassa('');
     await carregarUsuariosAtribuicao();
     setModalAtribuirMassa(true);
   }
 
   async function confirmarAtribuirMassa() {
-    if (!usuarioAtribuicaoMassa) {
-      alert('Selecione um usuário.');
+    const alvos = alvosLote;
+    const usuarioDestino = usuarioAtribuicaoMassa;
+    if (!usuarioDestino) {
+      avisar.alerta('Selecione um usuário.');
       return;
     }
-    if (selecionadasIds.length === 0) {
-      alert('Selecione ao menos uma solicitação.');
+    if (alvos.length === 0) {
+      avisar.alerta('Selecione ao menos uma solicitação.');
       return;
     }
 
@@ -1744,13 +1599,13 @@ export default function Solicitacoes({ arquivadas = false }) {
       let sucesso = 0;
       const erros = [];
 
-      for (const solicitacaoId of selecionadasIds) {
+      for (const solicitacaoId of alvos) {
         try {
           const res = await fetch(`${API_URL}/solicitacoes/${solicitacaoId}/atribuir`, {
             method: 'POST',
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({
-              usuario_responsavel_id: usuarioAtribuicaoMassa
+              usuario_responsavel_id: usuarioDestino
             })
           });
 
@@ -1771,16 +1626,22 @@ export default function Solicitacoes({ arquivadas = false }) {
       }
 
       setModalAtribuirMassa(false);
+      setAlvosLote([]);
+      setSelecionadasIds([]);
+      listaRef.current?.clearSelecao?.();
       await carregar();
 
       if (erros.length > 0) {
-        alert(`Atribuição em massa concluída. Sucesso: ${sucesso}. Falhas: ${erros.length}.`);
+        avisar.alerta(
+          `Sucesso: ${sucesso}. Falhas: ${erros.length}. ${erros.slice(0, 8).join(' · ')}`,
+          'Atribuição em massa concluída'
+        );
       } else {
-        alert('Atribuição em massa realizada com sucesso.');
+        avisar.sucesso('Atribuição em massa realizada com sucesso.');
       }
     } catch (error) {
       console.error(error);
-      alert('Erro ao atribuir em massa.');
+      avisar.erro('Erro ao atribuir em massa.');
     } finally {
       setProcessandoMassa(false);
     }
@@ -2047,13 +1908,13 @@ export default function Solicitacoes({ arquivadas = false }) {
         id: 'desarquivar',
         rotulo: (n) => (n === 1 ? 'Desarquivar' : `Desarquivar ${n}`),
         desabilitada: () => processandoMassa,
-        executar: () => desarquivarEmMassa()
+        executar: (itens) => desarquivarEmMassa(itens)
       },
       {
         id: 'exportar',
         rotulo: (n) => (n === 1 ? 'Exportar' : `Exportar ${n}`),
         desabilitada: () => processandoMassa || exportando || !filtrosDataValidos,
-        executar: () => exportarSolicitacoesExcel()
+        executar: (itens) => exportarSolicitacoesExcel(itens)
       }
     ]
     : [
@@ -2062,379 +1923,425 @@ export default function Solicitacoes({ arquivadas = false }) {
         rotulo: () => 'Assumir',
         visivel: (itens) => itens.length === 1 && podeAssumirUnica,
         desabilitada: () => processandoMassa,
-        executar: () => assumirSelecionada()
+        executar: (itens) => assumirSelecionada(itens)
       },
       {
         id: 'enviar',
         rotulo: (n) => (n === 1 ? 'Enviar para outro setor' : `Enviar ${n} para outro setor`),
         visivel: () => podeEnviarMassa,
         desabilitada: () => processandoMassa,
-        executar: () => setModalEnvioMassa(true)
+        executar: (itens) => abrirModalEnvioMassa(itens)
       },
       {
         id: 'exportar',
         rotulo: (n) => (n === 1 ? 'Exportar' : `Exportar ${n}`),
         desabilitada: () => processandoMassa || exportando || !filtrosDataValidos,
-        executar: () => exportarSolicitacoesExcel()
+        executar: (itens) => exportarSolicitacoesExcel(itens)
       },
       {
         id: 'arquivar',
         rotulo: (n) => (n === 1 ? 'Arquivar' : `Arquivar ${n}`),
         desabilitada: () => processandoMassa,
-        executar: () => arquivarEmMassa()
+        executar: (itens) => arquivarEmMassa(itens)
       },
       {
         id: 'atribuir',
         rotulo: (n) => (n === 1 ? 'Atribuir responsável' : `Atribuir responsável a ${n}`),
         visivel: () => podeAtribuirMassa,
         desabilitada: () => processandoMassa,
-        executar: () => abrirModalAtribuirMassa()
+        executar: (itens) => abrirModalAtribuirMassa(itens)
       },
       ...(podeSolicitarPrioridadeFinanceiro ? [{
         id: 'prioridade',
         rotulo: (n) => (n === 1 ? 'Prioridade financeira' : `Prioridade financeira para ${n}`),
         desabilitada: () => processandoMassa,
-        executar: () => solicitarPrioridadeFinanceiroSelecionadas()
+        executar: (itens) => solicitarPrioridadeFinanceiroSelecionadas(itens)
       }] : [])
     ];
 
   return (
-    <div className="solicitacoes-page px-0 py-1 md:py-2">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4 md:mb-6">
-        <h1 className="text-xl md:text-2xl font-semibold">
-          {arquivadas ? 'Solicitações Arquivadas' : 'Solicitações'}
-        </h1>
-      </div>
+    <Pagina>
+      {/* R13/R5: título, contagem e apoio na faixa fixa do topo — o h1 solto
+          com escala fora da tabela de tipos saiu daqui. */}
+      <PageHeader
+        titulo={arquivadas ? 'Solicitações Arquivadas' : 'Solicitações'}
+        contagem={loading ? null : `${totalSolicitacoes} solicitação(ões)`}
+        descricao={arquivadas
+          ? 'Solicitações que você tirou da sua lista ativa.'
+          : 'Fila de trabalho do módulo: visões, filtros salvos, busca e ações em lote.'}
+      />
 
-      {modalPrioridadeTitulos && typeof document !== 'undefined' && createPortal((
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/60 p-4">
-          <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Selecionar titulos para prioridade</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Confirme quais titulos abertos das solicitacoes selecionadas devem seguir para a Diretoria Administrativa.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                onClick={() => setModalPrioridadeTitulos(false)}
-                aria-label="Fechar"
-              >
-                <HiOutlineXMark className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
-              {solicitacoesPrioridadeSemTitulos.length > 0 && (
-                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
-                  <p className="font-semibold">Algumas solicitacoes ainda nao possuem titulo financeiro aberto.</p>
-                  <p className="mt-1">
-                    Elas nao serao enviadas agora. Clique em OK/Cancelar para voltar, desmarque se desejar, ou cadastre o titulo e clique novamente em Prioridade financeiro para recarregar.
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {solicitacoesPrioridadeSemTitulos.map((item) => (
-                      <span key={item.id} className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950 dark:bg-amber-900/70 dark:text-amber-50">
-                        {item.codigo || `#${item.id}`}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <label className="mb-4 block text-sm">
-                <span className="mb-1 block font-medium text-slate-700 dark:text-slate-200">Destino dos titulos</span>
-                <select
-                  className="input"
-                  value={lotePrioridadeDestino}
-                  onChange={event => setLotePrioridadeDestino(event.target.value)}
-                >
-                  <option value="">Criar novo lote de prioridade</option>
-                  {lotesPrioridadeAbertos.map((lote) => (
-                    <option key={lote.id} value={lote.id}>
-                      Incluir no lote aberto #{lote.id} - {dataCurta(lote.createdAt)} - {moeda(lote.valor_utilizado)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
-                <span>
-                  Selecionados: <strong>{titulosPrioridadeSelecionados.size}</strong> de <strong>{titulosPrioridade.length}</strong>
-                </span>
-                <span>
-                  Total selecionado: <strong>{moeda(titulosPrioridade
-                    .filter(item => titulosPrioridadeSelecionados.has(String(item.id)))
-                    .reduce((total, item) => total + Number(item.valor_prioridade || item.valor_saldo || 0), 0))}</strong>
-                </span>
-              </div>
-              <TabelaPadrao
-                colunas={[
-                  {
-                    id: 'selecionar',
-                    titulo: 'Selecionar',
-                    tipo: 'status',
-                    render: (titulo) => (
-                      <input
-                        type="checkbox"
-                        checked={titulosPrioridadeSelecionados.has(String(titulo.id))}
-                        onChange={() => alternarTituloPrioridade(titulo.id)}
-                      />
-                    )
-                  },
-                  {
-                    id: 'titulo',
-                    titulo: 'Titulo',
-                    tipo: 'identidade',
-                    noCard: 'titulo',
-                    render: (titulo) => (
-                      <CelulaDupla
-                        principal={titulo.codigo || `#${titulo.id}`}
-                        sub={titulo.parceiro?.nome || titulo.descricao || '-'}
-                      />
-                    )
-                  },
-                  {
-                    id: 'solicitacao',
-                    titulo: 'Solicitacao',
-                    tipo: 'texto',
-                    render: (titulo) => (
-                      <CelulaDupla
-                        principal={titulo.solicitacao?.codigo || '-'}
-                        sub={titulo.solicitacao?.descricao || ''}
-                      />
-                    )
-                  },
-                  {
-                    id: 'obra',
-                    titulo: 'Obra',
-                    tipo: 'texto',
-                    render: (titulo) => titulo.obra?.nome || '-'
-                  },
-                  {
-                    id: 'vencimento',
-                    titulo: 'Vencimento',
-                    tipo: 'data',
-                    render: (titulo) => dataCurta(titulo.data_vencimento)
-                  },
-                  {
-                    id: 'saldo',
-                    titulo: 'Saldo',
-                    tipo: 'valor',
-                    render: (titulo) => <span className="font-semibold">{moeda(titulo.valor_prioridade || titulo.valor_saldo)}</span>
-                  }
-                ]}
-                itens={titulosPrioridade}
-                vazio="Nenhum titulo aberto para as solicitacoes selecionadas."
-                storageKey="tabela:solicitacoes:lote-prioridade"
-                rotuloRolagem="Titulos para prioridade"
-              />
-            </div>
-
-            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-800 sm:flex-row sm:justify-end">
-              <button type="button" className="btn btn-outline" onClick={() => setModalPrioridadeTitulos(false)} disabled={processandoMassa}>
-                Cancelar
-              </button>
-              <button type="button" className="btn btn-primary" onClick={confirmarPrioridadeFinanceiroTitulos} disabled={processandoMassa || titulosPrioridadeSelecionados.size === 0}>
-                Enviar titulos selecionados
-              </button>
-            </div>
-          </div>
-        </div>
-      ), document.body)}
+      {/* R19: os avisos da tela vivem aqui, não em caixa do navegador. */}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       {filtroIdsUrl.length > 0 && (
-        <div className="sol-surface-card rounded-xl mb-3 p-3 flex items-center gap-3" role="status">
-          <span className="fx-badge fx-badge--warning">
-            Mostrando {filtroIdsUrl.length} pendência(s) vinda(s) do Início
-          </span>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => {
-              setFiltroIdsUrl([]);
-              navigate(location.pathname, { replace: true });
-            }}
-          >
-            Limpar este filtro
-          </button>
-        </div>
+        <BlocoConteudo variante="secundario">
+          <div className="app-actionbar" role="status">
+            <span className="fx-badge fx-badge--warning">
+              Mostrando {filtroIdsUrl.length} pendência(s) vinda(s) do Início
+            </span>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => {
+                setFiltroIdsUrl([]);
+                navigate(location.pathname, { replace: true });
+              }}
+            >
+              Limpar este filtro
+            </button>
+          </div>
+        </BlocoConteudo>
       )}
 
       {filtroVisaoUrl && (
-        <div className="sol-surface-card rounded-xl mb-3 p-3 flex items-center gap-3" role="status">
-          <span className="fx-badge fx-badge--warning">
-            Mostrando: {ROTULOS_VISAO_PENDENCIA[filtroVisaoUrl] || filtroVisaoUrl} — o mesmo
-            conjunto contado no cartão do Início{metaPaginacao?.total != null ? ` (${metaPaginacao.total})` : ''}
-          </span>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => {
-              setFiltroVisaoUrl('');
-              navigate(location.pathname, { replace: true });
-            }}
-          >
-            Limpar este filtro
-          </button>
-        </div>
+        <BlocoConteudo variante="secundario">
+          <div className="app-actionbar" role="status">
+            <span className="fx-badge fx-badge--warning">
+              Mostrando: {ROTULOS_VISAO_PENDENCIA[filtroVisaoUrl] || filtroVisaoUrl} — o mesmo
+              conjunto contado no cartão do Início{metaPaginacao?.total != null ? ` (${metaPaginacao.total})` : ''}
+            </span>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => {
+                setFiltroVisaoUrl('');
+                navigate(location.pathname, { replace: true });
+              }}
+            >
+              Limpar este filtro
+            </button>
+          </div>
+        </BlocoConteudo>
       )}
 
-      <ListaAvancada
-        ref={listaRef}
-        id={arquivadas ? 'solicitacoes-arquivadas' : 'solicitacoes'}
-        buscaInicial={buscaUrlInicial}
-        filtrosIniciais={filtrosUrlIniciais}
-        itens={itensExibidos}
-        total={Number(metaPaginacao?.total || 0)}
-        totalPaginas={Number(metaPaginacao?.total_pages || 0)}
-        pagina={paginaAtual}
-        carregando={loading}
-        onQueryChange={handleQueryChangeLista}
-        onPageRequest={handlePageRequestLista}
-        fetchContadores={arquivadas || !B3_DISPONIVEL ? null : getContadoresSolicitacoes}
-        visoes={visoesLista}
-        visaoInicial="todas"
-        filtrosRapidos={filtrosRapidosLista}
-        filtrosAvancadosAtivos={filtrosAvancadosAtivos}
-        filtrosAvancados={() => (
-          <Filtros
-            filtros={filtros}
-            setFiltros={setFiltros}
-            obrasOptions={obrasOptions}
-            responsaveisOptions={responsaveisOptions}
-            setores={setoresLista}
-            tiposSolicitacao={tiposSolicitacao}
-            statusOptions={statusOptions}
-            mostrarFiltroResponsavel={isSetorFinanceiro}
-            mostrarSomaValor={mostrarSomaValor}
-            somaValorFiltrado={somaValorFiltrado}
-            errosDatas={errosFiltrosData}
-          />
-        )}
-        busca={{
-          placeholder: 'Buscar por código, obra, descrição ou fornecedor…',
-          // Enquanto o B3 não existe a busca roda no cliente — o usuário
-          // precisa saber que ela não varre o banco inteiro.
-          aviso: B3_DISPONIVEL ? '' : 'A busca considera apenas os registros já carregados na tela.'
-        }}
-        colunas={colunasLista}
-        agrupamentos={[
-          { id: 'obra', rotulo: 'obra', valor: (item) => formatarMaiusculas(item.obra?.nome || '(sem obra)') },
-          { id: 'tipo', rotulo: 'tipo', valor: (item) => item.tipo?.nome || '(sem tipo)' },
-          { id: 'setor', rotulo: 'setor', valor: (item) => item.area_responsavel || '(sem setor)' },
-          { id: 'status', rotulo: 'status', valor: (item) => item.status_global || '(sem status)' },
-          { id: 'responsavel', rotulo: 'responsável', valor: (item) => item.responsavel || '(sem responsável)' },
-          { id: 'parceiro', rotulo: 'fornecedor/parceiro', valor: (item) => item.parceiro?.nome || '(sem parceiro)' },
-          { id: 'vencimento_mes', rotulo: 'mês de vencimento', valor: (item) => mesDeVencimento(item.data_vencimento), ordenarGrupos: compararMesVencimento },
-          { id: 'criador', rotulo: 'criador', valor: (item) => item.criador?.nome || '(sem criador)' },
-          {
-            id: 'apropriacao',
-            rotulo: 'apropriação',
-            valor: (item) => (item.apropriacao
-              ? [item.apropriacao.codigo, item.apropriacao.descricao].filter(Boolean).join(' — ')
-              : '(sem apropriação)')
-          },
-          {
-            id: 'contrato',
-            rotulo: 'contrato vinculado',
-            valor: (item) => item.contrato?.codigo || item.codigo_contrato || '(sem contrato)'
-          },
-          { id: 'faixa_valor', rotulo: 'faixa de valor', valor: (item) => faixaDeValor(item.valor_exibicao ?? item.valor), ordenarGrupos: compararFaixaValor }
-        ]}
-        renderCard={renderCardSolicitacao}
-        urgencia={(item) => urgenciaVencimento(item.data_vencimento)}
-        acoesLote={acoesLoteLista}
-        aoAbrirItem={(item) => navigate(`/solicitacoes/${item.id}`)}
-        onSelecaoChange={(ids) => setSelecionadasIds(ids.map(Number))}
-      />
+      {/* A lista é a pergunta central da tela: bloco primário, largura total.
+          Continua na ListaAvancada — ver o relatório da rodada para o porquê
+          de não virar TabelaPadrao. */}
+      <BlocoConteudo variante="primario" cor="var(--c-primary)">
+        <ListaAvancada
+          ref={listaRef}
+          id={arquivadas ? 'solicitacoes-arquivadas' : 'solicitacoes'}
+          buscaInicial={buscaUrlInicial}
+          filtrosIniciais={filtrosUrlIniciais}
+          itens={itensExibidos}
+          total={Number(metaPaginacao?.total || 0)}
+          totalPaginas={Number(metaPaginacao?.total_pages || 0)}
+          pagina={paginaAtual}
+          carregando={loading}
+          onQueryChange={handleQueryChangeLista}
+          onPageRequest={handlePageRequestLista}
+          fetchContadores={arquivadas || !B3_DISPONIVEL ? null : getContadoresSolicitacoes}
+          visoes={visoesLista}
+          visaoInicial="todas"
+          filtrosRapidos={filtrosRapidosLista}
+          filtrosAvancadosAtivos={filtrosAvancadosAtivos}
+          filtrosAvancados={() => (
+            <Filtros
+              filtros={filtros}
+              setFiltros={setFiltros}
+              obrasOptions={obrasOptions}
+              responsaveisOptions={responsaveisOptions}
+              setores={setoresLista}
+              tiposSolicitacao={tiposSolicitacao}
+              statusOptions={statusOptions}
+              mostrarFiltroResponsavel={isSetorFinanceiro}
+              mostrarSomaValor={mostrarSomaValor}
+              somaValorFiltrado={somaValorFiltrado}
+              errosDatas={errosFiltrosData}
+            />
+          )}
+          busca={{
+            placeholder: 'Buscar por código, obra, descrição ou fornecedor…',
+            // Enquanto o B3 não existe a busca roda no cliente — o usuário
+            // precisa saber que ela não varre o banco inteiro.
+            aviso: B3_DISPONIVEL ? '' : 'A busca considera apenas os registros já carregados na tela.'
+          }}
+          colunas={colunasLista}
+          agrupamentos={[
+            { id: 'obra', rotulo: 'obra', valor: (item) => formatarMaiusculas(item.obra?.nome || '(sem obra)') },
+            { id: 'tipo', rotulo: 'tipo', valor: (item) => item.tipo?.nome || '(sem tipo)' },
+            { id: 'setor', rotulo: 'setor', valor: (item) => item.area_responsavel || '(sem setor)' },
+            { id: 'status', rotulo: 'status', valor: (item) => item.status_global || '(sem status)' },
+            { id: 'responsavel', rotulo: 'responsável', valor: (item) => item.responsavel || '(sem responsável)' },
+            { id: 'parceiro', rotulo: 'fornecedor/parceiro', valor: (item) => item.parceiro?.nome || '(sem parceiro)' },
+            { id: 'vencimento_mes', rotulo: 'mês de vencimento', valor: (item) => mesDeVencimento(item.data_vencimento), ordenarGrupos: compararMesVencimento },
+            { id: 'criador', rotulo: 'criador', valor: (item) => item.criador?.nome || '(sem criador)' },
+            {
+              id: 'apropriacao',
+              rotulo: 'apropriação',
+              valor: (item) => (item.apropriacao
+                ? [item.apropriacao.codigo, item.apropriacao.descricao].filter(Boolean).join(' — ')
+                : '(sem apropriação)')
+            },
+            {
+              id: 'contrato',
+              rotulo: 'contrato vinculado',
+              valor: (item) => item.contrato?.codigo || item.codigo_contrato || '(sem contrato)'
+            },
+            { id: 'faixa_valor', rotulo: 'faixa de valor', valor: (item) => faixaDeValor(item.valor_exibicao ?? item.valor), ordenarGrupos: compararFaixaValor }
+          ]}
+          renderCard={renderCardSolicitacao}
+          urgencia={(item) => urgenciaVencimento(item.data_vencimento)}
+          acoesLote={acoesLoteLista}
+          aoAbrirItem={(item) => navigate(`/solicitacoes/${item.id}`)}
+          onSelecaoChange={(ids) => setSelecionadasIds(ids.map(Number))}
+        />
+      </BlocoConteudo>
 
+      {/* R9: modal, porque a ação INTERROMPE o trabalho da lista — a tela
+          não existe para atribuir nem para enviar. R27: o corpo rola e o
+          rodapé com o botão de confirmar fica fixo (do OverlayModal). */}
       {modalAtribuirMassa && !arquivadas && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-3">
-          <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-xl w-full max-w-md ring-1 ring-gray-200 dark:ring-slate-700">
-            <h2 className="text-lg font-semibold mb-3">Atribuir em massa</h2>
-            <p className="text-sm text-gray-600 dark:text-slate-300 mb-3">
-              Selecionadas: {selecionadasIds.length}
-            </p>
-            <select
-              className="input mb-4"
-              value={usuarioAtribuicaoMassa}
-              onChange={e => setUsuarioAtribuicaoMassa(e.target.value)}
-            >
-              <option value="">Selecione um usuário</option>
-              {usuariosAtribuicao.map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.nome}
-                </option>
-              ))}
-            </select>
+        <OverlayModal
+          rotulo="Atribuir responsável em massa"
+          largura="var(--modal-max-w-sm, 480px)"
+          onFechar={() => {
+            setModalAtribuirMassa(false);
+            setAlvosLote([]);
+          }}
+        >
+          <BlocoConteudo
+            titulo="Atribuir em massa"
+            contagem={`${alvosLote.length} solicitação(ões)`}
+            descricao="As solicitações contadas aqui são as que estavam selecionadas quando você abriu esta janela."
+          >
+            <FormSecao legenda="Destino" colunas={2}>
+              <CampoForm label="Responsável" obrigatorio span={2}>
+                <select
+                  className="input w-full"
+                  value={usuarioAtribuicaoMassa}
+                  onChange={e => setUsuarioAtribuicaoMassa(e.target.value)}
+                >
+                  <option value="">Selecione um usuário</option>
+                  {usuariosAtribuicao.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.nome}
+                    </option>
+                  ))}
+                </select>
+              </CampoForm>
+            </FormSecao>
 
-            <div className="flex justify-end gap-3">
+            <div className="app-actionbar">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmarAtribuirMassa}
+                disabled={processandoMassa}
+              >
+                {processandoMassa ? 'Atribuindo…' : `Atribuir ${alvosLote.length}`}
+              </button>
               <button
                 type="button"
                 className="btn btn-outline"
-                onClick={() => setModalAtribuirMassa(false)}
+                onClick={() => {
+                  setModalAtribuirMassa(false);
+                  setAlvosLote([]);
+                }}
                 disabled={processandoMassa}
               >
                 Cancelar
               </button>
-              <button
-                type="button"
-                className="btn bg-blue-700 text-white disabled:opacity-60"
-                onClick={confirmarAtribuirMassa}
-                disabled={processandoMassa}
-              >
-                {processandoMassa ? 'Atribuindo...' : 'Atribuir'}
-              </button>
             </div>
-          </div>
-        </div>
+          </BlocoConteudo>
+        </OverlayModal>
       )}
 
       {modalEnvioMassa && !arquivadas && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 px-3">
-          <div className="bg-white dark:bg-slate-900 p-4 md:p-6 rounded-xl w-full max-w-md ring-1 ring-gray-200 dark:ring-slate-700" role="dialog" aria-modal="true" aria-label="Enviar solicita??es em massa">
-            <h2 className="text-lg font-semibold mb-4">Enviar solicitações em massa</h2>
-            <p className="text-sm text-gray-600 dark:text-slate-300 mb-3">
-              Selecionadas: {selecionadasIds.length}
-            </p>
-            <select
-              className="input mb-4"
-              value={setorEnvioMassa}
-              onChange={e => setSetorEnvioMassa(e.target.value)}
-            >
-              <option value="">Selecione um setor</option>
-              {setoresLista.map(s => (
-                <option key={s.id} value={s.nome}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
-            <div className="flex justify-end gap-3">
+        <OverlayModal
+          rotulo="Enviar solicitações em massa"
+          largura="var(--modal-max-w-sm, 480px)"
+          onFechar={() => {
+            setModalEnvioMassa(false);
+            setSetorEnvioMassa('');
+            setAlvosLote([]);
+          }}
+        >
+          <BlocoConteudo
+            titulo="Enviar solicitações em massa"
+            contagem={`${alvosLote.length} solicitação(ões)`}
+            descricao="As solicitações contadas aqui são as que estavam selecionadas quando você abriu esta janela."
+          >
+            <FormSecao legenda="Destino" colunas={2}>
+              <CampoForm label="Setor de destino" obrigatorio span={2}>
+                <select
+                  className="input w-full"
+                  value={setorEnvioMassa}
+                  onChange={e => setSetorEnvioMassa(e.target.value)}
+                >
+                  <option value="">Selecione um setor</option>
+                  {setoresLista.map(s => (
+                    <option key={s.id} value={s.nome}>
+                      {s.nome}
+                    </option>
+                  ))}
+                </select>
+              </CampoForm>
+            </FormSecao>
+
+            <div className="app-actionbar">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmarEnvioMassa}
+                disabled={processandoMassa}
+              >
+                {processandoMassa ? 'Enviando…' : `Enviar ${alvosLote.length}`}
+              </button>
               <button
                 type="button"
                 className="btn btn-outline"
                 onClick={() => {
                   setModalEnvioMassa(false);
                   setSetorEnvioMassa('');
+                  setAlvosLote([]);
                 }}
                 disabled={processandoMassa}
               >
                 Cancelar
               </button>
+            </div>
+          </BlocoConteudo>
+        </OverlayModal>
+      )}
+
+      {modalPrioridadeTitulos && (
+        <OverlayModal
+          rotulo="Selecionar títulos para prioridade"
+          largura="var(--modal-max-w-xl, 1040px)"
+          onFechar={() => setModalPrioridadeTitulos(false)}
+        >
+          <BlocoConteudo
+            titulo="Selecionar títulos para prioridade"
+            contagem={`${titulosPrioridadeSelecionados.size} de ${titulosPrioridade.length} título(s)`}
+            descricao="Confirme quais títulos abertos das solicitações selecionadas devem seguir para a Diretoria Administrativa."
+          >
+            {solicitacoesPrioridadeSemTitulos.length > 0 && (
+              <div className="app-alert" role="status">
+                <span>
+                  <strong>Algumas solicitações ainda não possuem título financeiro aberto.</strong>{' '}
+                  Elas não serão enviadas agora. Cancele para voltar e desmarcá-las, ou cadastre o
+                  título e acione Prioridade financeira novamente para recarregar. Sem título:{' '}
+                  {solicitacoesPrioridadeSemTitulos
+                    .map((item) => item.codigo || `#${item.id}`)
+                    .join(', ')}
+                </span>
+              </div>
+            )}
+
+            <FormSecao legenda="Destino dos títulos" colunas={2}>
+              <CampoForm label="Lote de prioridade" span={2}>
+                <select
+                  className="input w-full"
+                  value={lotePrioridadeDestino}
+                  onChange={event => setLotePrioridadeDestino(event.target.value)}
+                >
+                  <option value="">Criar novo lote de prioridade</option>
+                  {lotesPrioridadeAbertos.map((lote) => (
+                    <option key={lote.id} value={lote.id}>
+                      Incluir no lote aberto #{lote.id} — {dataCurta(lote.createdAt)} — {moeda(lote.valor_utilizado)}
+                    </option>
+                  ))}
+                </select>
+              </CampoForm>
+            </FormSecao>
+
+            <p className="app-note">
+              Total selecionado:{' '}
+              <strong>
+                {moeda(titulosPrioridade
+                  .filter(item => titulosPrioridadeSelecionados.has(String(item.id)))
+                  .reduce((total, item) => total + Number(item.valor_prioridade || item.valor_saldo || 0), 0))}
+              </strong>
+            </p>
+
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'selecionar',
+                  titulo: 'Selecionar',
+                  tipo: 'status',
+                  render: (titulo) => (
+                    <input
+                      type="checkbox"
+                      checked={titulosPrioridadeSelecionados.has(String(titulo.id))}
+                      onChange={() => alternarTituloPrioridade(titulo.id)}
+                      aria-label={`Incluir o título ${titulo.codigo || titulo.id} no lote`}
+                    />
+                  )
+                },
+                {
+                  id: 'titulo',
+                  titulo: 'Título',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (titulo) => (
+                    <CelulaDupla
+                      principal={titulo.codigo || `#${titulo.id}`}
+                      sub={titulo.parceiro?.nome || titulo.descricao || '-'}
+                    />
+                  )
+                },
+                {
+                  id: 'solicitacao',
+                  titulo: 'Solicitação',
+                  tipo: 'texto',
+                  render: (titulo) => (
+                    <CelulaDupla
+                      principal={titulo.solicitacao?.codigo || '-'}
+                      sub={titulo.solicitacao?.descricao || ''}
+                    />
+                  )
+                },
+                {
+                  id: 'obra',
+                  titulo: 'Obra',
+                  tipo: 'texto',
+                  render: (titulo) => titulo.obra?.nome || '-'
+                },
+                {
+                  id: 'vencimento',
+                  titulo: 'Vencimento',
+                  tipo: 'data',
+                  render: (titulo) => dataCurta(titulo.data_vencimento)
+                },
+                {
+                  id: 'saldo',
+                  titulo: 'Saldo',
+                  tipo: 'valor',
+                  render: (titulo) => moeda(titulo.valor_prioridade || titulo.valor_saldo)
+                }
+              ]}
+              itens={titulosPrioridade}
+              vazio="Nenhum título aberto para as solicitações selecionadas."
+              storageKey="tabela:solicitacoes:lote-prioridade"
+              rotuloRolagem="Títulos para prioridade"
+            />
+
+            <div className="app-actionbar">
               <button
                 type="button"
-                className="btn bg-blue-600 text-white disabled:opacity-60"
-                onClick={confirmarEnvioMassa}
+                className="btn btn-primary"
+                onClick={confirmarPrioridadeFinanceiroTitulos}
+                disabled={processandoMassa || titulosPrioridadeSelecionados.size === 0}
+              >
+                Enviar títulos selecionados
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setModalPrioridadeTitulos(false)}
                 disabled={processandoMassa}
               >
-                {processandoMassa ? 'Enviando...' : 'Enviar'}
+                Cancelar
               </button>
             </div>
-          </div>
-        </div>
+          </BlocoConteudo>
+        </OverlayModal>
       )}
-    </div>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

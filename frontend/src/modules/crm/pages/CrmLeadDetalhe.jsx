@@ -453,6 +453,12 @@ export default function CrmLeadDetalhe() {
       */}
       <PageHeader
         titulo={lead.nome}
+        /* C2: a faixa carrega o apoio que identifica O REGISTRO — quem rola a
+           página e perde o corpo de vista continua sabendo de qual lead se
+           trata e em que ponto do ciclo ele está. */
+        contagem={lifecycle.label}
+        descricao={[lead.empresa, lead.origem && `Origem: ${lead.origem}`]
+          .filter(Boolean).join(' · ') || 'Lead sem empresa e sem origem registradas.'}
         voltar={{ to: '/crm/leads', title: 'Voltar para leads' }}
         acaoPrincipal={editando
           ? {

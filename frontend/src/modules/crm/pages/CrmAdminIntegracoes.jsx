@@ -259,6 +259,9 @@ export default function CrmAdminIntegracoes() {
           fixa do PageHeader, que compacta na rolagem em vez de sumir. */}
       <PageHeader
         titulo="Integracoes CRM"
+        /* C2: o apoio da faixa diz QUANTAS integracoes estao de pe — o numero
+           que a pessoa vem conferir, sem depender de achar o bloco certo. */
+        contagem={`${[config?.meta_configurado, config?.google_configurado].filter(Boolean).length} de 2 configuradas`}
         descricao="Webhooks e processamento base para Meta Ads e Google Ads."
         secundarias={[{ rotulo: 'Atualizar', onClick: load, desabilitada: loading }]}
       />
