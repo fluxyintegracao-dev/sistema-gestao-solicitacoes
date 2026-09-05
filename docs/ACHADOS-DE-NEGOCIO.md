@@ -735,7 +735,13 @@ porque cada colaborador tem exatamente uma pendência crítica.
 Fica registrado porque a suspeita era razoável e a resposta é verificável —
 se alguém a levantar de novo, o caminho já está andado.
 
-### N52. O mapa de risco é desenhado a partir de quatro tabelas que ninguém alimenta — e ignora o risco que está na mesma resposta
+### N52. [CRÍTICO] O mapa de risco é desenhado a partir de quatro tabelas que ninguém alimenta — e ignora o risco que está na mesma resposta
+
+> **Classificado CRÍTICO por decisão do cliente em 05/09**, pelo argumento
+> que segue: **silêncio falso é pior que alarme falso, porque ninguém
+> investiga um mapa limpo.** Alarme falso é olhado e descartado; ausência
+> de alarme não é olhada por ninguém. Em segurança do trabalho, o custo do
+> segundo é a decisão que não foi tomada.
 
 **O que acontece.** A tela "Mapa de risco operacional" (`/sst/relatorios/heatmap`)
 abre vazia. Não há um quadrado no mapa.
@@ -770,6 +776,11 @@ ponto que separa este achado dos outros dois estados possíveis:
 | Consulta quebrada | 4xx/5xx, ou erro no servidor | **Não.** 200, roda limpo. |
 | Base sem registro | nada de risco em lugar nenhum | **Não.** 110 scores e 99 pendências críticas na mesma resposta. |
 | Fonte errada | a consulta lê a tabela que ninguém preenche, e a que tem o dado fica de fora | **Sim.** |
+
+**Não é uma tela, são quatro.** A mesma função alimenta o mapa do centro
+operacional, o da inteligência operacional e o do relatório executivo, além
+do heatmap. As quatro carregam os 110 scores e as 99 pendências na mesma
+resposta que não plotam.
 
 **Efeito prático.** Um diretor abre uma tela chamada "Mapa de risco
 operacional" e vê o mapa limpo. A leitura natural é "nenhuma obra em risco".
