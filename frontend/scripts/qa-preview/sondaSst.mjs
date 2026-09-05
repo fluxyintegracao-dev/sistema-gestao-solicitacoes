@@ -109,8 +109,32 @@ try {
     const erros = [];
     const aoErro = (e) => erros.push(`pageerror: ${String(e.message || e).slice(0, 160)}`);
     const aoConsole = (m) => { if (m.type() === 'error') erros.push(`console: ${m.text().slice(0, 160)}`); };
+    /*
+      QUAL requisição falhou — sem isso a sonda não serve (05/09).
+
+      A primeira corrida devolveu "TypeError: Failed to fetch" em 10 das 12
+      telas, e essa mensagem sozinha não distingue TRÊS coisas muito
+      diferentes: endpoint que não existe, servidor que respondeu erro, e o
+      proxy de saída da própria sonda derrubando a chamada. Acusar as telas
+      com base nela seria repetir o erro do dia — a mensagem no lugar da
+      medição.
+    */
+    const requisicoesQuebradas = [];
+    const aoFalharPedido = (req) => {
+      const u = req.url();
+      if (u.startsWith('data:') || /\.(png|jpg|svg|woff2?|css|js)(\?|$)/.test(u)) return;
+      requisicoesQuebradas.push(`${req.method()} ${u.replace(BASE, '')} — ${req.failure()?.errorText || 'sem motivo'}`);
+    };
+    const aoResponder = async (res) => {
+      if (res.status() < 400) return;
+      const u = res.url();
+      if (/\.(png|jpg|svg|woff2?|css|js)(\?|$)/.test(u)) return;
+      requisicoesQuebradas.push(`HTTP ${res.status()} ${res.request().method()} ${u.replace(BASE, '')}`);
+    };
     page.on('pageerror', aoErro);
     page.on('console', aoConsole);
+    page.on('requestfailed', aoFalharPedido);
+    page.on('response', aoResponder);
 
     const r = { id, rota, redirecionou: null, dados: null, acoes: null, erros: [] };
     try {
@@ -155,7 +179,10 @@ try {
     }
     page.off('pageerror', aoErro);
     page.off('console', aoConsole);
+    page.off('requestfailed', aoFalharPedido);
+    page.off('response', aoResponder);
     r.erros.push(...erros);
+    r.requisicoes = [...new Set(requisicoesQuebradas)];
     resultados.push(r);
 
     const d = r.dados || {};
@@ -163,7 +190,8 @@ try {
     console.log(`${sinal} ${id.padEnd(30)} ${r.redirecionou ? `REDIRECIONOU -> ${r.redirecionou}` : `${d.linhas || 0} linha(s), ${d.ladrilhosComNumero || 0}/${d.ladrilhos || 0} ladrilho(s) com numero, ${d.graficos || 0} grafico(s)${d.vazio ? ` | vazio: "${d.vazio}"` : ''}${d.quebrou ? ` | ${d.quebrou}` : ''}`}`);
     if (r.acoes?.testada) console.log(`  acao "${r.acoes.testada}": ${r.acoes.respondeu ? 'RESPONDEU' : 'NAO respondeu'} · ${r.acoes.total} botao(oes) na faixa/filtros, ${r.acoes.desabilitados} desabilitado(s)`);
     else if (r.acoes) console.log(`  nenhuma acao de ABRIR para testar · ${r.acoes.total} botao(oes): ${r.acoes.rotulos.join(', ') || '—'}`);
-    r.erros.slice(0, 3).forEach((e) => console.log(`  ERRO ${e}`));
+    r.erros.slice(0, 2).forEach((e) => console.log(`  ERRO ${e.split('\n')[0]}`));
+    (r.requisicoes || []).slice(0, 4).forEach((q) => console.log(`  REQ  ${q}`));
   }
 } finally {
   fs.writeFileSync('scripts/qa-preview/saida/sonda-sst.json', `${JSON.stringify(resultados, null, 2)}\n`);
