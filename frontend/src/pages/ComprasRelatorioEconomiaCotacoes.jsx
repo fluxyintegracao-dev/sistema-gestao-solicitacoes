@@ -476,15 +476,32 @@ export default function ComprasRelatorioEconomiaCotacoes() {
               )
             },
             { id: 'quantidade', titulo: 'Qtd.', tipo: 'numero', render: (linha) => Number(linha.item.quantidade || 0).toLocaleString('pt-BR') },
+            /*
+              T7: fornecedor e preco unitario iam juntos na MESMA linha do
+              `sub` (" · "), num texto so — e o nome do fornecedor sozinho ja
+              passa da largura da coluna de valor (190px, pior caso e
+              dinheiro, nao identidade). O preco ficava truncado JUNTO com o
+              nome. Aqui cada dado vira sua PROPRIA linha: o nome do
+              fornecedor (sem "R$") pode truncar com reticencias — T6 aceita
+              texto truncado com o title completo cobrindo, que e o que o
+              `title` do proprio `.app-celula-dupla` ja faz; o preco
+              unitario, sozinho, e curto ("R$ 5,00") e sempre cabe inteiro —
+              T7 nao aceita truncar nem quebrar dinheiro, e sozinho ele nunca
+              precisa.
+            */
             {
               id: 'menor_preco',
               titulo: 'Menor preco',
               tipo: 'valor',
               render: (linha) => (
-                <CelulaDupla
-                  principal={formatMoney(linha.menor_preco.valor_total)}
-                  sub={`${linha.menor_preco.fornecedor_nome} · ${formatMoney(linha.menor_preco.preco_unitario)}`}
-                />
+                <div
+                  className="app-celula-dupla"
+                  title={`${formatMoney(linha.menor_preco.valor_total)} — ${linha.menor_preco.fornecedor_nome} · ${formatMoney(linha.menor_preco.preco_unitario)}`}
+                >
+                  <span className="app-celula-dupla-principal">{formatMoney(linha.menor_preco.valor_total)}</span>
+                  <span className="app-celula-dupla-sub">{linha.menor_preco.fornecedor_nome}</span>
+                  <span className="app-celula-dupla-sub">{formatMoney(linha.menor_preco.preco_unitario)}</span>
+                </div>
               )
             },
             {
@@ -492,10 +509,14 @@ export default function ComprasRelatorioEconomiaCotacoes() {
               titulo: 'Vencedor',
               tipo: 'valor',
               render: (linha) => (
-                <CelulaDupla
-                  principal={formatMoney(linha.vencedor.valor_total)}
-                  sub={`${linha.vencedor.fornecedor_nome} · ${formatMoney(linha.vencedor.preco_unitario)}`}
-                />
+                <div
+                  className="app-celula-dupla"
+                  title={`${formatMoney(linha.vencedor.valor_total)} — ${linha.vencedor.fornecedor_nome} · ${formatMoney(linha.vencedor.preco_unitario)}`}
+                >
+                  <span className="app-celula-dupla-principal">{formatMoney(linha.vencedor.valor_total)}</span>
+                  <span className="app-celula-dupla-sub">{linha.vencedor.fornecedor_nome}</span>
+                  <span className="app-celula-dupla-sub">{formatMoney(linha.vencedor.preco_unitario)}</span>
+                </div>
               )
             },
             {

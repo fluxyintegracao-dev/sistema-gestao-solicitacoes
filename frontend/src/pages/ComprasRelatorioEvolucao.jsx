@@ -12,6 +12,7 @@ import {
 } from '../components/padrao';
 import { obterRelatorioEvolucaoCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
+import '../styles/compras-relatorio-apoio.css';
 
 const DEFAULT_FILTERS = {
   obra_id: '',
@@ -194,7 +195,11 @@ export default function ComprasRelatorioEvolucao() {
   }
 
   return (
-    <Pagina>
+    /* C1: apoio (contagem + descricao) passa de 180 caracteres — mais longo
+       que nos outros relatorios de Compras — e empurrava a barra de acoes
+       para uma segunda linha na faixa compacta (94px; ver o comentario em
+       styles/compras-relatorio-apoio.css). */
+    <Pagina className="apoio-linha-unica">
       {/* R11: "Voltar aos relatorios" era botao de acao fazendo papel de
           navegacao. Vira a seta `voltar` do PageHeader. */}
       <PageHeader
@@ -344,12 +349,40 @@ export default function ComprasRelatorioEvolucao() {
               {
                 id: 'meses',
                 titulo: 'Meses',
-                tipo: 'texto',
-                render: (item) => (
-                  <span className="text-xs text-[var(--c-muted)]">
-                    {(item.meses || []).slice(-3).map((mes) => `${mes.label}: ${formatMoney(mes.valor_total)}`).join(' | ') || '-'}
-                  </span>
-                )
+                tipo: 'valor',
+                /*
+                  T7: os tres meses iam juntos num UNICO texto ("mes: valor |
+                  mes: valor | ..."), e esse texto e um SO no de dinheiro:
+                  quando nao cabia, ele nao truncava, QUEBRAVA em ate 3
+                  linhas — o mesmo defeito que a T6 ja tinha aprendido para
+                  palavra partida, só que aqui era o VALOR que virava dois.
+                  Cada mes vira sua PROPRIA linha (nowrap, sem juntar por
+                  "|"): a T7 mede cada um separado, e cada um sozinho e bem
+                  mais curto que a largura da coluna.
+
+                  E a coluna passa a declarar o PAPEL em vez da medida: cada
+                  linha dela é dinheiro, então o papel é `valor` — e quem
+                  sabe a largura de dinheiro é o componente (190px e piso
+                  monetário, contra o pior caso real de 162px). A primeira
+                  versão deste conserto cravou `largura: 200` aqui e o
+                  validador reprovou, com razão: R10, medida na tela é o
+                  defeito que a declaração de papel existe para evitar.
+                */
+                render: (item) => {
+                  const ultimosMeses = (item.meses || []).slice(-3);
+                  if (!ultimosMeses.length) {
+                    return <span className="text-xs text-[var(--c-muted)]">-</span>;
+                  }
+                  return (
+                    <div className="grid gap-1">
+                      {ultimosMeses.map((mes) => (
+                        <span key={mes.label} className="block whitespace-nowrap text-xs text-[var(--c-muted)]">
+                          {mes.label}: {formatMoney(mes.valor_total)}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                }
               }
             ]}
             itens={obrasResumo}

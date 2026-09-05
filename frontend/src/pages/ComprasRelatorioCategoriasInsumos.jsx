@@ -12,6 +12,7 @@ import {
 } from '../components/padrao';
 import { obterRelatorioCategoriasInsumosCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
+import '../styles/compras-relatorio-apoio.css';
 
 const DEFAULT_FILTERS = {
   obra_id: '',
@@ -195,7 +196,11 @@ export default function ComprasRelatorioCategoriasInsumos() {
   }
 
   return (
-    <Pagina>
+    /* C1: apoio (contagem + descricao) passa de 180 caracteres — mais longo
+       que nos outros relatorios de Compras — e empurrava a barra de acoes
+       para uma segunda linha na faixa compacta (94px; ver o comentario em
+       styles/compras-relatorio-apoio.css). */
+    <Pagina className="apoio-linha-unica">
       {/* R11: "Voltar aos relatorios" era botao de acao fazendo papel de
           navegacao. Vira a seta `voltar` do PageHeader. */}
       <PageHeader
