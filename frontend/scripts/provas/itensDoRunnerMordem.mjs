@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 /**
- * PROVA — OS SETE ITENS QUE MORAM NO RUNNER TÊM DE MORDER.
+ * PROVA — OS ITENS QUE MORAM NO RUNNER TÊM DE MORDER.
  *
  * A `itensDaDoDMordem.mjs` provou os 27 itens que `checks.mjs` mede num DOM
  * parado e declarou, por escrito, a lacuna que sobrava: "ficam DE FORA, e
  * continuam sem prova de reprovação, os itens que só existem na interação e
  * moram no runner (`verificar.mjs`): C1, T3, F3, M2, R1, R3 e X2". Esta
- * prova fecha essa lacuna.
+ * prova fecha essa lacuna — e desde 05/09 cobre também o T2, que deixou de
+ * ser "a affordance aparece no hover" (medida estática disfarçada de
+ * interação) para ser a SEQUÊNCIA inteira: abrir o menu, vê-lo VISÍVEL,
+ * escolher outra opção, conferir que o alinhamento mudou no th e no td e
+ * que sobreviveu à recarga.
  *
  * Por que ela importa mais do que a média: a auditoria de 03/09 testou 35
  * instrumentos no sentido de REPROVAR e achou 7 que não mordiam — nenhum
@@ -34,8 +38,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { criarServidorDaFixture } from './fixtures/paginaRunner.mjs';
+import { checksEstaticos } from '../qa-preview/checks.mjs';
 import {
   checarFaixa,
+  checarAlinhamentoDaColuna,
   checarRedimensionamento,
   checarEtiquetasFiltro,
   checarModalCadastro,
@@ -102,6 +108,69 @@ const CASOS_T3 = [
   }
 ];
 
+/*
+  T2 — REESCRITO EM 05/09, DEPOIS DE PASSAR VERDE EM 189 TELAS COM A
+  CAPACIDADE QUEBRADA.
+
+  O check antigo media a OPACIDADE do ícone `.app-th-alinhar` com o ponteiro
+  sobre o cabeçalho: presença da affordance, nunca efeito do clique. O menu
+  de alinhamento abria e ficava INVISÍVEL — recortado pelo `overflow:
+  hidden` do `th` — e o item seguia verde em toda tabela do sistema. É o
+  caso mais caro que esta prova já teve de cobrir: não é um check que não
+  morde, é um check que mordia a coisa errada.
+
+  Os seis casos abaixo cobrem os lugares onde a sequência pode quebrar sem
+  que o ícone deixe de aparecer — que é tudo o que o check antigo olhava: o
+  ícone não recebe o clique; o menu abre RECORTADO; o menu abre ATRÁS da
+  tabela; o menu abre FORA da janela; o menu escolhe e o alinhamento não
+  muda; o alinhamento muda e não fica na recarga.
+
+  Os três primeiros são a mesma família — "tem caixa de layout e ninguém
+  alcança" — e é de propósito que sejam três: era essa família inteira que
+  passava verde, e ela tem mais de uma forma. O componente foi consertado no
+  mesmo dia (o menu virou portal no `body`), então a fixture reproduz o
+  MECANISMO do recorte, não a propriedade CSS que o causava; a nota longa
+  está em `fixtures/paginaRunner.jsx`.
+*/
+const CASOS_T2 = [
+  {
+    item: 'T2',
+    d: 't2MenuRecortado',
+    planta: 'menu que ABRE (está no DOM, com caixa de 1403×121px) e é RECORTADO — nada dele é pintado, ninguém alcança. É o defeito real de 05/09, o que o T2 antigo deixava passar',
+    ramo: 'RECORTADO ou COBERTO'
+  },
+  {
+    item: 'T2',
+    d: 't2MenuAtras',
+    planta: 'menu que abre ATRÁS da tabela — quem recebe o clique no centro dele é a célula',
+    ramo: 'RECORTADO ou COBERTO'
+  },
+  {
+    item: 'T2',
+    d: 't2MenuForaDaTela',
+    planta: 'menu fixo que abre FORA da janela (coordenada errada) — rolar não traz de volta',
+    ramo: 'FORA da janela'
+  },
+  {
+    item: 'T2',
+    d: 't2IconeMorto',
+    planta: 'ícone de alinhamento que aparece no hover e NÃO recebe o ponteiro (clicar não abre nada)',
+    ramo: 'passo 3'
+  },
+  {
+    item: 'T2',
+    d: 't2NaoAplica',
+    planta: 'menu que abre visível, recebe a escolha e NÃO muda o alinhamento do th nem do td',
+    ramo: 'passo 7'
+  },
+  {
+    item: 'T2',
+    d: 't2NaoPersiste',
+    planta: 'alinhamento que é aplicado e NÃO sobrevive à recarga (R14)',
+    ramo: 'passo 8'
+  }
+];
+
 const CASOS_NAVEGADOR = [
   /* ---- C1: faixa fixa na rolagem ---- */
   { item: 'C1', d: 'c1SemFaixa', planta: 'tela sem .app-page-header', ramo: 'faixa .app-page-header ausente' },
@@ -135,6 +204,12 @@ const NEGATIVOS = [
     item: 'T3',
     d: '',
     planta: 'tabela que obedece: só a arrastada é gravada e a VIZINHA muda de largura para devolver a sobra',
+    estados: ['PASSOU']
+  },
+  {
+    item: 'T2',
+    d: '',
+    planta: 'tabela que obedece: o menu abre VISÍVEL, a escolha muda o th e o td e persiste à recarga',
     estados: ['PASSOU']
   },
   {
@@ -258,7 +333,19 @@ async function medir(navegador, servidor, caso) {
   try {
     await pagina.goto(url, { waitUntil: 'domcontentloaded' });
     await esperarCarregar(pagina);
-    if (caso.item === 'T3') {
+    if (caso.item === 'T2') {
+      /*
+        O T2 interativo só roda depois de a metade ESTÁTICA passar (é o
+        portão `resultado.T2?.estado !== 'PASSOU'` do runner: não faz
+        sentido exercitar o menu de uma tabela que nem tem o controle de
+        alinhamento no cabeçalho). No harness quem põe esse PASSOU é o
+        `checksEstaticos`, que roda antes; aqui a prova o põe à mão, e é
+        honesto: a parte estática do T2 já tem prova própria na
+        `itensDaDoDMordem.mjs`.
+      */
+      resultado.T2 = { estado: 'PASSOU' };
+      await checarAlinhamentoDaColuna(pagina, resultado);
+    } else if (caso.item === 'T3') {
       await checarRedimensionamento(pagina, { id: 'prova' }, resultado);
     } else if (caso.item === 'C1') {
       await checarFaixa(pagina, resultado);
@@ -291,6 +378,17 @@ async function main() {
     args: ['--no-proxy-server']
   });
   try {
+    console.log('\n— T2 (menu de alinhamento): reescrito em 05/09, de "o ícone aparece" para "o alinhamento muda e fica" —');
+    for (const caso of CASOS_T2) {
+      const resultado = await medir(navegador, servidor, caso);
+      const obtido = resultado[caso.item] || { estado: 'AUSENTE' };
+      const ramoCerto = !caso.ramo || String(obtido.motivo || '').includes(caso.ramo);
+      const mordeu = obtido.estado === 'FALHOU' && ramoCerto;
+      registrar(mordeu, `${caso.item} ← ${caso.planta} :: ${obtido.estado}`
+        + (obtido.motivo ? ` — ${String(obtido.motivo).slice(0, 230)}` : '')
+        + (!ramoCerto && obtido.estado === 'FALHOU' ? ` (ramo esperado: "${caso.ramo}")` : ''));
+    }
+
     console.log('\n— T3 (arrasto de coluna): reescrita em 03/09, nunca provada —');
     for (const caso of [...CASOS_T3]) {
       const resultado = await medir(navegador, servidor, caso);
@@ -313,6 +411,41 @@ async function main() {
         + (!ramoCerto && obtido.estado === 'FALHOU' ? ` (ramo esperado: "${caso.ramo}")` : ''));
     }
 
+    /*
+      OS DOIS ITENS DE CABEÇALHO DE TABELA, MEDIDOS NO COMPONENTE REAL
+      (05/09).
+
+      São checks de DOM parado (moram em `checks.mjs` e têm prova de
+      mordida na `itensDaDoDMordem.mjs`, contra HTML montado à mão). O que
+      falta lá, e só esta fixture pode dar, é o sentido inverso contra a
+      TabelaPadrao DE VERDADE, com a coluna de AÇÕES ligada — que é o
+      cabeçalho que a tela não escreve, o componente monta sozinho, e onde
+      o cliente achou o defeito:
+
+        T8 — os títulos da tabela assentam TODOS na mesma linha de base;
+        T2 (estático) — a coluna de botões NÃO é acusada de "sem controle
+        de alinhamento", porque não há o que alinhar nela.
+
+      Provar isso numa réplica de HTML não bastaria: a réplica é minha, o
+      cabeçalho de ações é dele.
+    */
+    console.log('\n— cabeçalho da tabela REAL (T8 e T2 estático), com coluna de ações —');
+    {
+      const contexto = await navegador.newContext({ viewport: { width: 1600, height: 900 } });
+      const pagina = await contexto.newPage();
+      await pagina.goto(servidor.rota('comAcoes'), { waitUntil: 'domcontentloaded' });
+      await esperarCarregar(pagina);
+      const itens = await pagina.evaluate(checksEstaticos, { tipo: 'listagem' });
+      ['T8', 'T2'].forEach((item) => {
+        const obtido = itens[item] || { estado: 'AUSENTE' };
+        registrar(obtido.estado === 'PASSOU',
+          `${item} = PASSOU ← TabelaPadrao real com coluna de ações :: ${obtido.estado}`
+          + (obtido.motivo ? ` — ${String(obtido.motivo).slice(0, 190)}` : ''));
+      });
+      await pagina.close();
+      await contexto.close();
+    }
+
     console.log('\n— sentido inverso: o que obedece NÃO pode ser acusado —');
     for (const caso of NEGATIVOS) {
       const resultado = await medir(navegador, servidor, caso);
@@ -327,20 +460,21 @@ async function main() {
   }
 
   /* 3) Cobertura: cada um dos sete tem prova ou declaração explícita. */
-  const ITENS = ['T3', 'C1', 'F3', 'M2', 'R1', 'R3', 'X2'];
+  const ITENS = ['T2', 'T3', 'C1', 'F3', 'M2', 'R1', 'R3', 'X2'];
   const comProva = new Set([
+    ...CASOS_T2.map((c) => c.item),
     ...CASOS_T3.map((c) => c.item),
     ...CASOS_NAVEGADOR.map((c) => c.item),
     'M2', 'R3'
   ]);
   const semProva = ITENS.filter((i) => !comProva.has(i) && !NAO_PROVAVEIS.some((n) => n.item === i));
   registrar(semProva.length === 0,
-    `todos os 7 itens do runner têm prova ou declaração${semProva.length ? ` — faltam ${semProva.join(', ')}` : ''}`);
+    `todos os ${ITENS.length} itens do runner têm prova ou declaração${semProva.length ? ` — faltam ${semProva.join(', ')}` : ''}`);
 
   console.log('');
   NAO_PROVAVEIS.forEach((n) => console.log(`  n/p    ${n.item} declarado NÃO-PROVÁVEL: ${n.motivo}`));
   console.log(
-    `  ${ITENS.length} itens · ${CASOS_T3.length + CASOS_NAVEGADOR.length} defeitos plantados · `
+    `  ${ITENS.length} itens · ${CASOS_T2.length + CASOS_T3.length + CASOS_NAVEGADOR.length} defeitos plantados · `
     + `${NEGATIVOS.length} controle(s) negativo(s) · ${NAO_PROVAVEIS.length} não-provável(is)`
   );
   console.log(`\n[provas] itens do runner mordem: ${falhas === 0 ? 'ok' : `${falhas} check(s) sem prova de reprovação`}`);

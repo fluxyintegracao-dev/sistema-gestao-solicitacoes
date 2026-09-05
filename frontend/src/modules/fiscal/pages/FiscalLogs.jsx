@@ -145,7 +145,8 @@ export default function FiscalLogs() {
         vestido de sucesso que este projeto já registrou.
       */
       if (result?.ready) {
-        avisar.sucesso('Preflight concluido. Ambiente pronto para a proxima etapa controlada.');
+        // Resultado do preflight fica fixo no painel (StatusBadge/tabela) abaixo: o aviso pode sumir sozinho.
+        avisar.sucesso('Preflight concluido. Ambiente pronto para a proxima etapa controlada.', undefined, { efemero: true });
       } else {
         avisar.alerta('Preflight concluido com pendencias. Revise os checks antes de ativar SEFAZ.');
       }

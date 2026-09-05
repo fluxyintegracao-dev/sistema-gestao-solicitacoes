@@ -144,7 +144,8 @@ export default function FiscalDiagnostics() {
       setProbeResult(response);
       /* Tom pelo RESULTADO, não pelo fato de a chamada ter voltado. */
       if (response?.ok) {
-        avisar.sucesso('Storage fiscal validado: o backend conseguiu escrever no bucket configurado.');
+        // Resultado do teste fica fixo no painel (StatTile) abaixo: o aviso pode sumir sozinho.
+        avisar.sucesso('Storage fiscal validado: o backend conseguiu escrever no bucket configurado.', undefined, { efemero: true });
       } else {
         avisar.alerta('Teste de storage concluido SEM confirmacao de escrita. Revise bucket, regiao e permissao.');
       }
@@ -165,7 +166,8 @@ export default function FiscalDiagnostics() {
       });
       setFixtureResult(response);
       const processados = Number(response?.processed?.documents_processed || 0);
-      avisar.sucesso(`Fixture DFe processada: ${processados} documento(s) na Caixa de Entrada.`);
+      // Resultado do teste fica fixo no painel (StatTile) abaixo: o aviso pode sumir sozinho.
+      avisar.sucesso(`Fixture DFe processada: ${processados} documento(s) na Caixa de Entrada.`, undefined, { efemero: true });
       const refreshedDiagnostics = await getFiscalDiagnostics();
       setData(refreshedDiagnostics);
     } catch (err) {
@@ -185,7 +187,8 @@ export default function FiscalDiagnostics() {
       });
       setPreflightResult(response);
       if (response?.ready) {
-        avisar.sucesso('Preflight concluido. Ambiente pronto para a proxima etapa controlada.');
+        // Resultado do teste fica fixo no painel (StatTile/StatusBadge) abaixo: o aviso pode sumir sozinho.
+        avisar.sucesso('Preflight concluido. Ambiente pronto para a proxima etapa controlada.', undefined, { efemero: true });
       } else {
         avisar.alerta('Preflight concluido com pendencias. Revise os checks antes de ativar SEFAZ.');
       }

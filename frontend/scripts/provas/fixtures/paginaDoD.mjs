@@ -25,7 +25,22 @@ const SETA_VOLTAR = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true" wid
 /** Cabeçalho de coluna, igual ao CabecalhoColuna da TabelaPadrao. */
 function th(coluna, d) {
   const alinhamento = coluna.alinhamento || 'left';
-  const ordenavel = coluna.ordenavel !== false;
+  /*
+    ORDENÁVEL É EXCEÇÃO NESTA FIXTURE, NÃO REGRA (05/09, achado do T8).
+
+    Todas as colunas nasciam ordenáveis, com o indicador de ordem dentro do
+    botão. Esse `<svg>` é inline e ALTO: ele levanta a caixa de linha do
+    botão e, medido no componente real, empurra a linha de base do título
+    ~9px para baixo em relação à de um título estático. Com as quatro
+    colunas ordenáveis, a fixture tinha UMA linha de base só por acidente —
+    e o texto cru da coluna de ações caía exatamente sobre ela, então o
+    defeito do T8 plantado NÃO reproduzia.
+
+    Agora a fixture é uma listagem de títulos estáticos (o caso mais comum)
+    e quem precisa do botão ordenável liga por defeito. Fixture que não
+    reproduz o defeito prova o contrário do que se quer provar.
+  */
+  const ordenavel = coluna.ordenavel === true || Boolean(d.ordenavelSemIndicador && coluna.id === 'usuario');
   const indicador = d.ordenavelSemIndicador && coluna.id === 'usuario' ? '' : ICONE_ORDEM;
   const botaoTitulo = ordenavel
     ? `<button type="button" class="app-th-botao app-th-botao--ordenavel" title="Ordenar por ${esc(coluna.titulo)}">${esc(coluna.titulo)}${indicador}</button>`
@@ -36,11 +51,52 @@ function th(coluna, d) {
   const botaoAlinhar = semControle
     ? ''
     : `<button type="button" class="app-th-alinhar" title="${tooltipErrado ? 'Opções da coluna' : 'Alinhar / redimensionar'}" aria-label="Alinhar coluna ${esc(coluna.titulo)}" aria-haspopup="menu" aria-expanded="false">${ICONE_ALINHAR}</button>`;
+  /*
+    O `resizable-th-label` FALTAVA AQUI, e o T8 me cobrou (05/09).
+
+    O `ResizableTh` real embrulha QUALQUER filho num
+    `<span class="resizable-th-label">` antes de a coluna decidir o que
+    põe dentro. Sem esse embrulho, os cabeçalhos desta fixture tinham uma
+    caixa a menos que os da tela — e o primeiro T8 saiu com o veredito
+    INVERTIDO: o texto cru passava e o título embrulhado era acusado.
+    Fixture que erra a árvore prova o contrário do que se quis provar.
+  */
   return `<th class="resizable-th" title="${esc(coluna.titulo)}">`
+    + '<span class="resizable-th-label">'
     + `<span class="app-th-alinhavel" style="text-align:${alinhamento}">${botaoTitulo}${botaoAlinhar}</span>`
+    + '</span>'
     + '<span class="resizable-th-handle" role="separator" tabindex="0" aria-hidden="true"></span>'
     + '</th>';
 }
+
+/*
+  COLUNA DE AÇÕES — a única que a TabelaPadrao renderiza como TEXTO CRU
+  (05/09, item T8).
+
+  Na tela de Obras o cliente mediu: "AÇÕES" assenta numa linha de base
+  diferente das outras colunas. A causa está no componente:
+  `<ResizableTh columnKey="__acoes">Ações</ResizableTh>` entrega o título
+  como texto solto dentro do `th`, enquanto TODAS as outras passam pelo
+  `CabecalhoColuna`, que embrulha em `.app-th-alinhavel` > `.app-th-botao`
+  — e esse embrulho, sendo `display: block`, tem caixa de linha própria.
+
+  As duas formas estão aqui: o defeito (texto cru, como está hoje) e o
+  controle negativo (o mesmo título embrulhado como os vizinhos). O
+  `resizable-th-label` aparece nas duas porque é o que o `ResizableTh` real
+  põe em volta de qualquer filho — sem ele, a fixture provaria uma árvore
+  que não existe.
+*/
+function thAcoes(d) {
+  const titulo = d.acoesEnvelopada
+    ? '<span class="app-th-alinhavel"><span class="app-th-botao app-th-botao--estatico">Ações</span></span>'
+    : 'Ações';
+  return '<th class="resizable-th" title="Ações">'
+    + `<span class="resizable-th-label">${titulo}</span>`
+    + '<span class="resizable-th-handle" role="separator" tabindex="0" aria-hidden="true"></span>'
+    + '</th>';
+}
+
+const temColunaDeAcoes = (d) => Boolean(d.acoesTextoCru || d.acoesEnvelopada);
 
 /* As colunas da fixture espelham uma listagem real (Usuários):
    identidade + texto + selo + valor. */
@@ -82,6 +138,7 @@ function linha(d, dados) {
     + `<td style="text-align:left${estiloObra}">${dados.obra}</td>`
     + `<td style="text-align:left">${dados.status}</td>`
     + `<td class="celula-valor" style="text-align:right">${dados.valor}</td>`
+    + (temColunaDeAcoes(d) ? '<td><div class="app-actionbar"><button type="button" class="btn btn-outline btn-sm">Editar</button></div></td>' : '')
     + '</tr>';
 }
 
@@ -155,12 +212,17 @@ function tabela(d) {
      É a forma que o `scrollWidth > clientWidth` não enxerga. */
   if (d.moedaQuebradaEmLinhas) larguras = ['48%', '30%', '17%', '84px'];
 
+  /* Com a coluna de ações a soma tem de continuar fechando 100%: largura
+     que estoura inventaria sobra (T4) e a colateral apareceria no lugar do
+     item que se quer provar. */
+  if (temColunaDeAcoes(d)) larguras = ['30%', '27%', '15%', '18%', '10%'];
+
   const colgroup = `<colgroup>${larguras.map((w) => `<col style="width:${w}">`).join('')}</colgroup>`;
   return '<div class="app-table-shell app-tabela">'
     + '<div class="resizable-table-scroll" data-table-scroll role="region" aria-label="Tabela de usuários" tabindex="0">'
     + `<table class="resizable-table" style="${estiloTabela}">`
     + colgroup
-    + `<thead><tr>${cols.map((c) => th(c, d)).join('')}</tr></thead>`
+    + `<thead><tr>${cols.map((c) => th(c, d)).join('')}${temColunaDeAcoes(d) ? thAcoes(d) : ''}</tr></thead>`
     + `<tbody>${corpo(d)}</tbody>`
     + '</table></div></div>';
 }

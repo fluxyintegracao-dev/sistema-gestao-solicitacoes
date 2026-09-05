@@ -52,9 +52,17 @@ const CHAVE = 'tabela:prova-runner';
    nada que sobreviva à recarga.
    ------------------------------------------------------------------------ */
 const LARGURAS_DE_TODAS = { usuario: 300, obra: 420, status: 132, valor: 190 };
-if (D === 't3GravaTodas' || D === 't3NaoPersiste') {
+if (D === 't3GravaTodas' || D === 't3NaoPersiste' || D === 't2NaoPersiste') {
   const original = window.localStorage.setItem.bind(window.localStorage);
   window.localStorage.setItem = (chave, valor) => {
+    /*
+      `t2NaoPersiste` (05/09): o alinhamento escolhido é aplicado na hora —
+      o menu funciona, o th e o td mudam — e NÃO sobrevive à recarga. É a
+      metade do defeito que o T2 antigo jamais poderia ver, porque ele
+      parava na opacidade do ícone. A chave do alinhamento é
+      `<storageKey>:alinhar` (R14, TabelaPadrao).
+    */
+    if (/:alinhar$/.test(chave)) return D === 't2NaoPersiste' ? undefined : original(chave, valor);
     if (!/:v3$/.test(chave)) return original(chave, valor);
     if (D === 't3NaoPersiste') return undefined;
     let doUsuario = {};
@@ -84,8 +92,56 @@ const ESTILOS = {
   /* Transbordo à mostra: a tabela derrama para fora do bloco. O
      `scrollWidth` continua contando o transbordo, então o contêiner PARECE
      rolável para quem só compara scrollWidth com clientWidth. */
-  t3TransbordaVisivel: '.resizable-table-scroll { overflow: visible; }'
+  t3TransbordaVisivel: '.resizable-table-scroll { overflow: visible; }',
+
+  /*
+    T2 — O DEFEITO DE 05/09 E AS OUTRAS FORMAS DE "ABRE E NINGUÉM ALCANÇA".
+
+    O defeito que o cliente achou: o menu de alinhamento ABRE (o estado do
+    React muda, o nó entra no DOM) e fica INVISÍVEL, recortado por
+    `.resizable-table th { overflow: hidden }` (index.css, que existe para
+    dar reticências ao título), porque o menu era `position: absolute; top:
+    calc(100% + 4px)` — fora da caixa do `th`. O T2 antigo passava verde
+    porque media a OPACIDADE DO ÍCONE: presença da affordance, nunca efeito
+    do clique.
+
+    O componente foi consertado no MESMO dia (o menu saiu do fluxo por
+    `createPortal` para o `body`, como o autocomplete de apropriação já
+    fazia), então `overflow: hidden` no `th` não o alcança mais — e plantar
+    aquele CSS aqui não reproduziria nada. O que a prova precisa preservar
+    não é a PROPRIEDADE que recortava: é o MECANISMO do defeito, "o menu
+    tem caixa de layout e ninguém consegue clicar nele", que é o que o
+    check antigo não enxergava e o novo tem de pegar.
+
+    Por isso três formas, todas com a caixa intacta e o `getBoundingClientRect`
+    dizendo que está tudo bem:
+      - RECORTADO: `clip-path` corta o menu inteiro (mesmo efeito visual do
+        `overflow: hidden` de origem — nada é pintado, e a região cortada
+        não recebe ponteiro);
+      - ATRÁS: o menu é pintado abaixo da tabela, então quem recebe o clique
+        é a célula;
+      - FORA DA JANELA: a coordenada do menu fixo está errada e ele abre
+        onde ninguém vê. Rolar não resolve — é fixo.
+  */
+  t2MenuRecortado: '.app-th-menu { clip-path: inset(0 0 100% 0); }',
+  t2MenuAtras: '.app-th-menu { z-index: -1 !important; }',
+  /* Sobe o menu para fora da janela pelo TOPO: a largura dele hoje se
+     estica até a borda direita (o `.app-mais-menu` traz `right: 0` e o
+     portal só define `left`), então empurrar pela lateral não tiraria o
+     centro da janela — o eixo vertical é o que prova a guarda. */
+  t2MenuForaDaTela: '.app-th-menu { top: -600px !important; }',
+
+  /* O ícone existe, aparece no hover e NÃO recebe o ponteiro: clicar não
+     abre nada. É o "sinal sem capacidade" na sua forma mais crua. */
+  t2IconeMorto: '.app-th-alinhar { pointer-events: none !important; }',
+
+  /* O menu abre, está visível, recebe a escolha — e a folha da tela trava o
+     alinhamento. Menu que abre e não faz nada é capacidade ausente com
+     sinal a mais. */
+  t2NaoAplica: '.app-tabela .resizable-table th .app-th-alinhavel,'
+    + '.app-tabela .resizable-table td { text-align: left !important; }'
 };
+
 if (ESTILOS[D]) {
   const tag = document.createElement('style');
   tag.textContent = ESTILOS[D];
@@ -276,6 +332,18 @@ function Tela() {
                 itens={ITENS}
                 storageKey={CHAVE}
                 rotuloRolagem="Tabela de usuários"
+                /*
+                  COLUNA DE AÇÕES (05/09, T8 e a metade estática do T2): é a
+                  única coluna cujo cabeçalho a TabelaPadrao monta sozinha,
+                  sem passar pela lista de colunas da tela — e foi ali que o
+                  cliente achou o título fora da linha de base. Com a coluna
+                  ligada, a prova mede no COMPONENTE REAL que os títulos
+                  assentam na mesma linha e que a ausência do controle de
+                  alinhamento numa coluna de botões não é acusada.
+                */
+                acoesLinha={D === 'comAcoes' ? (() => (
+                  <button type="button" className="btn btn-outline btn-sm">Editar</button>
+                )) : undefined}
               />
             </BlocoConteudo>
             {inlineAberto ? (

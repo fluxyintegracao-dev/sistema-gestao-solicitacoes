@@ -1,406 +1,49 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { BlocoConteudo, Pagina, PageHeader } from '../components/padrao';
-import StatusBadge from '../components/StatusBadge';
-import {
-  canManageConfiguracoesArea,
-  hasEnabledModule,
-  isBusinessAdmin,
-  isSuperadmin
-} from '../utils/acessoProduto';
-
-const SECOES_CONFIG = [
-  {
-    title: 'Cadastros',
-    permissionArea: 'cadastros',
-    itens: [
-      {
-        title: 'Obras',
-        description: 'Cadastro e manutencao basica de obras usadas no modulo de solicitacoes.',
-        to: '/obras'
-      },
-      {
-        title: 'Setores',
-        description: 'Cadastro e manutencao de setores.',
-        to: '/setores'
-      },
-      {
-        title: 'Tipos (Macro)',
-        description: 'Cadastro dos tipos macro.',
-        to: '/tipos-solicitacao'
-      },
-      {
-        title: 'Cadastro de Pessoas',
-        description: 'Cadastro mestre de clientes, credores, fornecedores e corretores.',
-        to: '/parceiros'
-      },
-      {
-        title: 'Empresas do Grupo',
-        description: 'Cadastro central das empresas usado por financeiro, pagamentos e RH/DP.',
-        to: '/empresas-grupo',
-        requireSuperadmin: true
-      },
-      {
-        title: 'Categorias de Parceiro',
-        description: 'Cadastro de categorias para fornecedores.',
-        to: '/parceiros-categorias'
-      },
-      {
-        title: 'Subtipos de Contrato',
-        description: 'Cadastro de subtipos.',
-        to: '/tipos-sub-contrato'
-      },
-      {
-        title: 'Contratos',
-        description: 'Cadastro e manutencao de contratos.',
-        to: '/gestao-contratos',
-        requireModule: 'CONTRATOS'
-      },
-      {
-        title: 'Cartões de Recarga',
-        description: 'Cadastre os cartões Flash e vincule os usuários autorizados a solicitar recarga.',
-        to: '/configuracoes-cartoes-recarga',
-        requireSuperadmin: true,
-        strictSuperadmin: true
-      }
-    ]
-  },
-  {
-    title: 'Usuarios',
-    permissionArea: 'usuarios',
-    itens: [
-      {
-        title: 'Cadastro de Usuarios',
-        description: 'Cadastrar e gerenciar usuarios.',
-        to: '/usuarios'
-      }
-    ]
-  },
-  {
-    title: 'Suporte',
-    permissionArea: 'aparencia',
-    itens: [
-      {
-        title: 'WhatsApp do Suporte',
-        description: 'Configure o numero aberto pelo botao Suporte no topo do sistema.',
-        to: '/configuracoes-suporte'
-      },
-      {
-        title: 'Visibilidade de Dashboards e Tabelas',
-        description: 'Defina quais cards, dashboards e tabelas ficam visiveis nas telas do sistema.',
-        to: '/configuracoes-visibilidade-ui'
-      },
-      {
-        title: 'Notificacoes do Sistema',
-        description: 'Defina quais eventos podem gerar avisos no sino por modulo.',
-        to: '/configuracoes-notificacoes-sistema'
-      }
-    ]
-  },
-  {
-    title: 'Compras',
-    permissionArea: 'geral',
-    itens: [
-      {
-        title: 'Configuracoes de Cotacao',
-        description: 'Defina regras padrao de cotacao e encerramento.',
-        to: '/configuracoes-cotacao',
-        requireModule: 'COMPRAS'
-      },
-      {
-        title: 'Status dos Pedidos de Compra',
-        description: 'Cadastre status operacionais e bloqueios de edicao dos pedidos.',
-        to: '/configuracoes-status-pedidos-compra',
-        requireModule: 'COMPRAS'
-      },
-      {
-        title: 'Arquivos Modelos',
-        description: 'Crie paginas e defina admins com permissao de upload.',
-        to: '/arquivos-modelos-config',
-        requireSuperadmin: true,
-        strictSuperadmin: true,
-        requireModule: 'BIBLIOTECA_MODELOS'
-      }
-    ]
-  },
-  {
-    title: 'Comercial',
-    permissionArea: 'geral',
-    itens: [
-      {
-        title: 'Categorias do Contrato de Venda',
-        description: 'Defina quais categorias financeiras aparecem no contrato de venda e na comissao.',
-        to: '/configuracoes-comercial-categorias',
-        requireSuperadmin: true,
-        requireModule: 'COMERCIAL'
-      }
-    ]
-  },
-  {
-    title: 'Provisionamento',
-    permissionArea: 'geral',
-    itens: [
-      {
-        title: 'Fluxo do Provisionamento',
-        description: 'Configure o modo informativo, controlado ou integrado com solicitacoes.',
-        to: '/configuracoes-provisionamento-fluxo',
-        requireModule: 'PROVISOES'
-      }
-    ]
-  },
-  {
-    title: 'Status e Vinculos',
-    permissionArea: 'status_vinculos',
-    itens: [
-      {
-        title: 'Status por Setor',
-        description: 'Cadastro de status permitidos por setor.',
-        to: '/status-setor'
-      },
-      {
-        title: 'Permissoes por Setor',
-        description: 'Defina se usuarios podem assumir e atribuir.',
-        to: '/permissoes-setor'
-      },
-      {
-        title: 'Cores do Sistema',
-        description: 'Defina cores de botoes e status.',
-        to: '/cores-sistema',
-        permissionArea: 'aparencia'
-      },
-      {
-        title: 'Areas Visiveis para OBRA',
-        description: 'Controle as areas visiveis na nova solicitacao.',
-        to: '/areas-obra'
-      },
-      {
-        title: 'Apropriacao Padrao por Obra',
-        description: 'Defina a apropriacao preenchida automaticamente por obra e tipo de solicitacao.',
-        to: '/obra-tipo-apropriacao'
-      },
-      {
-        title: 'Categorias do Contrato de Obra',
-        description: 'Selecione quais categorias financeiras aparecem ao criar um contrato de obra.',
-        to: '/contrato-obra-categorias',
-        // Mesma area do endpoint e da rota: o card nao pode exigir permissao diferente
-        // da tela que ele abre.
-        permissionArea: 'geral'
-      },
-      {
-        title: 'Areas por Setor de Origem',
-        description: 'Defina quais setores cada setor pode selecionar na nova solicitacao.',
-        to: '/areas-por-setor-origem'
-      },
-      {
-        title: 'SLA de Solicitacoes por Setor',
-        description: 'Defina o prazo real em dias usado no relatorio operacional de solicitacoes.',
-        to: '/solicitacoes-sla-setor'
-      },
-      {
-        title: 'Setores Visiveis por Usuario',
-        description: 'Defina setores extras que cada usuario pode visualizar sem alterar regras de acao.',
-        to: '/setores-visiveis-usuario'
-      },
-      {
-        title: 'Recebimento por Setor',
-        description: 'Defina se as solicitacoes chegam primeiro ao admin ou ficam visiveis para todos.',
-        to: '/comportamento-recebimento-setor'
-      },
-      {
-        title: 'Tipos por Setor (Recebimento)',
-        description: 'Defina tipos por setor e o modo de recebimento para admin ou todos.',
-        to: '/tipos-solicitacao-por-setor'
-      },
-      {
-        title: 'Campos da Nova Solicitacao',
-        description: 'Defina campos visiveis e obrigatorios por tipo de solicitacao.',
-        to: '/nova-solicitacao-campos',
-        permissionArea: 'solicitacoes'
-      },
-      {
-        title: 'Formas de Pagamento da Nova Solicitacao',
-        description: 'Escolha as formas exibidas em contratos e nos demais tipos de solicitacao.',
-        to: '/configuracoes-formas-pagamento-solicitacao',
-        permissionArea: 'geral'
-      },
-      {
-        /*
-          DOIS DESTINOS, NAO UMA ROTA SOBRANDO (04/09).
-
-          Esta entrada e a de cima levam ao MESMO componente, e por um tempo
-          eu tratei a de baixo como duplicata para remover. Nao e: a tela le
-          o pathname e anuncia assunto diferente conforme o caminho — titulo,
-          descricao e qual bloco recebe a barra de cor. Se a tela muda o que
-          diz que é conforme a porta, sao duas portas de verdade, e o que
-          faltava era a segunda.
-
-          O rotulo nomeia o ASSUNTO QUE A PORTA ABRE, nao o arquivo que ela
-          carrega: quem clica precisa saber o que vai encontrar antes de
-          chegar. Os quatro blocos continuam visiveis nas duas — a diferenca
-          e o que a tela anuncia, nao o que ela esconde.
-        */
-        title: 'Alertas e Limites do Contrato',
-        description: 'Cortes e cores do alerta de saldo do contrato e o limite para analise juridica.',
-        to: '/configuracoes-contrato-alertas',
-        permissionArea: 'geral'
-      },
-      {
-        title: 'Automacao da Nova Solicitacao',
-        description: 'Redirecione tipos de solicitacao para telas especificas mantendo a obra selecionada.',
-        to: '/nova-solicitacao-automacao-destino',
-        permissionArea: 'solicitacoes'
-      },
-      {
-        title: 'Acesso a Prioridades Diretoria',
-        description: 'Defina se o usuario ve todos os lotes de prioridade ou apenas diretorias especificas.',
-        to: '/usuarios-acesso-prioridade-diretoria'
-      },
-      {
-        title: 'Tipos Compartilhados entre Setores',
-        description: 'Permita visibilidade adicional por tipo sem transferir a area responsavel da solicitacao.',
-        to: '/tipos-compartilhados-setor'
-      },
-      {
-        title: 'Automacao por Status',
-        description: 'Envie solicitacoes automaticamente para outro setor quando tipo e status forem atingidos.',
-        to: '/automacao-status-setor'
-      },
-      {
-        title: 'Envio Livre entre Setores',
-        description: 'Defina usuarios autorizados a enviar solicitacoes entre setores fora do fluxo comum.',
-        to: '/usuarios-envio-qualquer-setor'
-      },
-      {
-        title: 'Criacao em Todas as Obras',
-        description: 'Defina quais setores podem criar solicitacao em qualquer obra.',
-        to: '/setores-criacao-todas-obras'
-      },
-      {
-        title: 'Acesso em Todas as Obras',
-        description: 'Defina quais setores podem acessar recursos protegidos por obra sem vinculo manual.',
-        to: '/setores-acesso-todas-obras'
-      },
-      {
-        title: 'Acesso ao Financeiro',
-        description: 'Marque usuarios que devem acessar o modulo financeiro e operar todas as obras nesse modulo.',
-        to: '/usuarios-acesso-financeiro',
-        requireModule: 'FINANCEIRO'
-      },
-      {
-        title: 'Permissoes por Setor e Perfil',
-        description: 'Configure permissões padrão por setor e perfil para aplicar a todos os usuários daquele grupo.',
-        to: '/permissoes-areas-padroes',
-        permissionArea: 'permissoes'
-      },
-      {
-        title: 'Permissoes de Areas por Usuario',
-        description: 'Adicione exceções individuais quando um usuário precisar de permissões além do padrão do setor e perfil.',
-        to: '/permissoes-areas',
-        permissionArea: 'permissoes'
-      },
-      {
-        /*
-          PORTA ABERTA EM 04/09.
-
-          Esta tela existia, tinha rota e guarda de permissao, e nao tinha
-          link em lugar nenhum do sistema: chegava quem sabia a URL de cor.
-          Ferramenta administrativa de permissao nao pode depender de quem
-          lembra o endereco. Fica junto das outras duas telas de permissao
-          por usuario, no mesmo grupo e com a mesma area de permissao da
-          rota (status_vinculos).
-        */
-        title: 'Permissoes de RH e DP por Usuario',
-        description: 'Marque quais usuarios podem ver e operar cada area de RH e Departamento Pessoal.',
-        to: '/usuarios-permissoes-rh-dp',
-        requireModule: 'RH_DP'
-      },
-      {
-        title: 'Tempo de Inatividade',
-        description: 'Define o tempo para logout automatico por inatividade.',
-        to: '/timeout-inatividade'
-      }
-    ]
-  },
-  {
-    title: 'Instalacao',
-    permissionArea: 'modulos',
-    itens: [
-      {
-        title: 'Modulos e Planos',
-        description: 'Habilite ou desabilite dominios do produto para compor planos comerciais.',
-        to: '/configuracoes-modulos'
-      }
-    ]
-  }
-];
+import { getSecoesConfiguracoes } from '../navigation/navigationConfig';
 
 /*
-  HUB DE CONFIGURAÇÕES — a moldura é a mesma dos outros hubs (04/09)
+  HUB DE CONFIGURAÇÕES — as seções vêm da FONTE ÚNICA (05/09)
   ---------------------------------------------------------------------
-  Esta tela usava uma casca própria (`.config-page-header`,
-  `.config-page-title`, `.config-section*`, `.config-item*`, todas no
-  `index.css`) e por isso ficava de fora de tudo que os componentes padrão
-  já resolvem:
+  Esta tela carregava um `SECOES_CONFIG` com oito seções e 45 destinos
+  escritos à mão. Era a maior lista de navegação fora do
+  `navigation/navigationConfig.jsx`, e cobrava três preços conhecidos:
 
-  - C1/R13: `.config-page-header` NÃO declara `position: sticky` em
-    nenhuma das duas definições dela (index.css:1617 e index.css:9290) —
-    não existia faixa fixa. Ao rolar 45 destinos, título e contagem
-    sumiam. O `PageHeader` gruda abaixo da topbar e compacta.
-  - C2/M2: `.config-page-title` é `clamp(1.7rem, 2.5vw, 2.35rem)`
-    (index.css:8250), ou seja no MÍNIMO 27,2px, contra o degrau de 22px
-    do título de página. O título do `PageHeader` já está no degrau.
-  - B5: `.config-page-header` só definia flex/gap e border-radius —
-    título, apoio e contagem flutuavam sobre o canvas, sem fundo, borda
-    ou sombra. A faixa do `PageHeader` é a superfície deles.
-  - M2/R10: o ritmo vertical vinha de `space-y-5 md:space-y-6` na raiz
-    (20/24px); agora vem do `Pagina` (16px, um degrau).
+  1. PERMISSÃO COM REGRA PRÓPRIA. O filtro daqui olhava só a área de
+     configuração do card (`canManageConfiguracoesArea`), e por isso
+     divergia da guarda da rota em quatro destinos — o mais grave era o
+     SLA por setor, que a rota protege com `<BusinessAdminRoute>`: quem
+     gerenciava `status_vinculos` via o card e era redirecionado ao
+     clicar. As quatro divergências estão anotadas nos nós, no
+     `navigationConfig`.
+  2. RÓTULO QUE ENVELHECE SOZINHO. Nomear o destino duas vezes é aceitar
+     que um dos dois vai ficar velho, e o hub tinha nove rótulos já
+     diferentes dos da fonte única.
+  3. TODA PORTA NOVA VIRAVA DÍVIDA. É o que o trinco mediu: na rodada 1,
+     abrir duas portas que o responsável mandou abrir subiu o passivo de
+     43 para 45 destinos à mão e deixou o portão vermelho por dois dias.
+     Decisão certa punida por limitação de arquitetura.
 
-  O ARRANJO É O DA `ModuloRelatorios.jsx`, que é o outro hub do sistema já
-  reformado: seção = `BlocoConteudo` com contagem, destino = `Link` em
-  volta de um `BlocoConteudo` secundário. Dois hubs com dois arranjos
-  seriam duas referências para quem escrever o terceiro.
+  O agrupamento por seção passou a ser DECLARADO na fonte única: o
+  catálogo `SECOES_CONFIGURACOES` diz quais seções existem, em que ordem
+  e com que rótulo, e cada destino declara `secaoConfig`/`ordemConfig`
+  dizendo em qual delas aparece. Os 25 destinos que só existiam nesta
+  lista foram acrescentados lá (todos já tinham rota e guarda no
+  App.jsx) — nenhum deixou de ser alcançável, e de quebra passaram a
+  existir também no Ctrl+K, no breadcrumb e nos atalhos fixáveis.
 
-  O QUE ISTO NÃO MEXEU, DE PROPÓSITO: os 45 destinos, seus títulos,
-  descrições, rotas e regras de permissão. A navegação continua no CORPO,
-  em cards `<Link>` — que é exatamente onde a regra de 04/09 ("Onde a
-  NAVEGAÇÃO mora") manda o hub ficar. Hub é a porta dos módulos; não há
-  seta de voltar (C3 é N/A em listagem/hub) e não há busca nem filtro,
-  então F1–F4 não se aplicam.
-
-  O QUE DEPENDE DE ARQUIVO COMPARTILHADO (não feito aqui, index.css é
-  proibido para esta fatia): as classes `.config-*` que sobraram sem
-  consumidor nesta tela — `.config-page`, `.config-page-header`,
-  `.config-page-header-row`, `.config-page-title`, `.config-page-subtitle`,
-  `.config-page-meta`, `.config-section*`, `.config-grid`, `.config-item*`.
-  As de `summary` seguem em uso por outras três telas
-  (ConfiguracoesProvisionamentoFluxo, NovaSolicitacaoAutomacaoDestinoConfig,
-  NovaSolicitacaoCamposConfig); as de `page`/`section`/`item` ficam órfãs e
-  podem sair numa fatia que possa editar o `index.css`.
+  A MOLDURA NÃO MUDOU (é a de 04/09, mesma da `ModuloRelatorios.jsx`):
+  seção = `BlocoConteudo` com contagem, destino = `Link` em volta de um
+  `BlocoConteudo` secundário; navegação no CORPO, sem seta de voltar e
+  sem busca. O que mudou foi de ONDE vem a lista.
 */
 export default function Configuracoes() {
   const { user } = useAuth();
-  const superadmin = isSuperadmin(user);
-  const businessAdmin = isBusinessAdmin(user);
 
-  const secoesVisiveis = SECOES_CONFIG
-    .map((secao) => ({
-      ...secao,
-      itens: secao.itens.filter((item) => {
-        const areaPermissao = item.permissionArea || secao.permissionArea || 'geral';
-        const podeGerenciarArea = canManageConfiguracoesArea(user, areaPermissao);
-        if (item.strictSuperadmin && !superadmin) return false;
-        if (secao.requireSuperadmin && !superadmin && !podeGerenciarArea) return false;
-        if (secao.permissionArea && !podeGerenciarArea) return false;
-        if (item.requireSuperadmin && !superadmin && !podeGerenciarArea) return false;
-        if (item.permissionArea && !podeGerenciarArea) return false;
-        if (item.requireBusinessAdmin && !businessAdmin) return false;
-        if (item.requireModule && !hasEnabledModule(user, item.requireModule, { allowSuperadminBypass: false })) {
-          return false;
-        }
-        return true;
-      })
-    }))
-    .filter((secao) => secao.itens.length > 0);
+  // Nenhum filtro de permissão aqui: `getSecoesConfiguracoes` já devolve
+  // o que ESTE usuário pode abrir, pela mesma regra que o menu usa.
+  const secoesVisiveis = getSecoesConfiguracoes(user);
 
   // Quantos destinos ESTE usuário pode abrir — o mesmo número que a tela
   // desenha logo abaixo, e não o total do arquivo. Quem tem menos acesso
@@ -430,8 +73,8 @@ export default function Configuracoes() {
           informação para quem usa o hub: é nota de implementação. */}
       {secoesVisiveis.map((secao, indice) => (
         <BlocoConteudo
-          key={secao.title}
-          titulo={secao.title}
+          key={secao.id}
+          titulo={secao.label}
           /* B2: UM primário por tela — o primeiro grupo é por onde se
              começa a ler; os demais recuam em neutro. Mesma escolha da
              ModuloRelatorios, pelo mesmo motivo. */
@@ -442,11 +85,10 @@ export default function Configuracoes() {
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {secao.itens.map((item) => (
               <ConfigItem
-                key={item.to || item.title}
-                title={item.title}
-                description={item.description}
+                key={item.id}
+                title={item.label}
+                description={item.desc}
                 to={item.to}
-                disabled={item.disabled}
               />
             ))}
           </div>
@@ -464,32 +106,25 @@ export default function Configuracoes() {
   pelo `BlocoConteudo`: título de 18px e apoio de 14px, medidas do
   componente. A1 continua atendida — o card É um `<Link>`, focável por
   teclado, com foco visível pelo `focus-visible:outline`.
+
+  O ramo "indisponível" saiu em 05/09 junto com a lista à mão: nenhum
+  destino declarava `disabled`, e a fonte única não tem esse conceito —
+  lá, destino que o usuário não pode abrir não é desenhado apagado, ele
+  não vem.
 */
-function ConfigItem({ title, description, to, disabled }) {
-  const bloco = (
-    <BlocoConteudo
-      titulo={title}
-      descricao={description}
-      variante="secundario"
-      className="h-full"
-      /* `.config-item-disabled` marcava o indisponível com opacity 0.62,
-         que derruba o contraste abaixo do AA (M3). A etiqueta diz a mesma
-         coisa e continua legível. */
-      acoes={disabled ? <StatusBadge status="Indisponivel" kind="neutral" /> : null}
-    />
-  );
-
-  if (disabled) {
-    return <div className="h-full" aria-disabled="true">{bloco}</div>;
-  }
-
+function ConfigItem({ title, description, to }) {
   return (
     <Link
       to={to}
       title={`Abrir ${title}`}
       className="block h-full rounded-[var(--raio-3)] transition hover:shadow-[shadow:var(--ui-shadow-md)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-primary)]"
     >
-      {bloco}
+      <BlocoConteudo
+        titulo={title}
+        descricao={description}
+        variante="secundario"
+        className="h-full"
+      />
     </Link>
   );
 }

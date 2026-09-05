@@ -358,6 +358,18 @@ apontava.
   texto, nunca para valor).
 - **T7** O MAIOR valor monetário real da base não vaza nem trunca — NUNCA.
   Largura da coluna de valor dimensionada pelo pior caso real.
+- **T8** Os títulos da MESMA tabela assentam na MESMA linha de base (05/09,
+  achado do cliente na tela de Obras: "AÇÕES" ficava acima das vizinhas).
+  Título fora do embrulho padrão — ou dentro de caixa de linha diferente —
+  desalinha a fileira inteira, e o olho lê isso como descuido antes de ler
+  qualquer dado. Mede-se a linha de base do TEXTO, não a caixa do `th`, que
+  é igual por construção; tolerância de 1px.
+
+  A causa que originou o item vale como aviso: a coluna ordenável desenha o
+  título num `<button>` e a estática num `<span>`. Com altura mínima (o
+  alvo de clique da ordenação), o navegador centraliza o conteúdo do botão
+  e encosta o do span no topo — duas tags, duas caixas, 9,5px de desvio na
+  mesma fileira. Mesma tag ou mesma caixa: uma das duas.
 
 ## FILTROS E BUSCA
 
@@ -456,7 +468,7 @@ seção declara o que vale, o que NÃO vale, e o que se INVERTE.
   **14** delas hoje, e é a tela de um terceiro: `alert()` do Chrome numa
   página que representa a empresa para o fornecedor é o pior lugar do
   sistema para isso.
-- **B1–B5**, **X1**, **X3**, **R18**, **A1**, **T1–T7** onde houver tabela
+- **B1–B5**, **X1**, **X3**, **R18**, **A1**, **T1–T8** onde houver tabela
   (a Cotação Pública tem uma).
 
 **Uma exigência a mais, que só existe aqui:** estas telas são a primeira

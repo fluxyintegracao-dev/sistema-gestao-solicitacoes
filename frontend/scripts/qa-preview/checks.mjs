@@ -457,7 +457,7 @@ export function checksEstaticos({ tipo }) {
     const motivoSemTabela = vazia
       ? `a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "${(vazia.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 70)}") — capacidade NÃO PROVADA`
       : 'tela sem tabela visível';
-    ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].forEach((k) => {
+    ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'].forEach((k) => {
       r[k] = { estado: estadoSemTabela, motivo: motivoSemTabela };
     });
   } else {
@@ -478,6 +478,133 @@ export function checksEstaticos({ tipo }) {
     });
     r.T1 = t1.length ? { estado: 'FALHOU', motivo: t1.slice(0, 3).join(' | ') } : { estado: 'PASSOU' };
 
+    /*
+      T8 — OS TÍTULOS DA MESMA TABELA ASSENTAM NA MESMA LINHA DE BASE
+      (item novo, 05/09; achado do cliente na tela de Obras).
+
+      O DEFEITO: na Obras, "AÇÕES" fica visivelmente mais baixo que
+      "OBRA", "CLIENTE" e "VGV". A causa está no cabeçalho: a coluna de
+      ações é a ÚNICA que a TabelaPadrao renderiza como TEXTO CRU dentro do
+      `th` (`<ResizableTh columnKey="__acoes">Ações</ResizableTh>`); todas
+      as outras passam pelo `CabecalhoColuna`, que embrulha o título em
+      `.app-th-alinhavel` > `.app-th-botao`. Esse embrulho é `display:
+      block` e tem caixa de linha PRÓPRIA — o texto de dentro assenta numa
+      linha de base diferente da do texto solto ao lado. Não é uma diferença
+      de tamanho de fonte nem de alinhamento horizontal: é a linha em que a
+      letra pousa.
+
+      POR QUE ITEM NOVO E NÃO UM RAMO DA T1.
+
+      A T1 mede alinhamento HORIZONTAL e mede um PAR (th × td) coluna a
+      coluna: ela pergunta "o título e o conteúdo desta coluna apontam para
+      o mesmo lado?". Esta pergunta é VERTICAL e é sobre a LINHA INTEIRA de
+      cabeçalhos comparados ENTRE SI — sujeito diferente, eixo diferente,
+      população diferente. Enfiada na T1, a célula da matriz passaria a
+      significar duas coisas: uma T1 vermelha deixaria de dizer QUAL
+      capacidade quebrou, e é a célula que a pessoa lê para consertar. Some
+      a isso que a T1 exige uma linha no `tbody` para existir (sem registro
+      ela nem compara), enquanto a linha de base do cabeçalho é mensurável
+      com a tabela vazia — juntá-las apagaria a medição justamente nas
+      telas em que a base não devolveu registro.
+
+      COMO SE MEDE — a LINHA DE BASE DO TEXTO, não a caixa do `th`.
+
+      Comparar `th.getBoundingClientRect()` não mediria nada: as células da
+      mesma linha de cabeçalho têm a MESMA caixa por construção da tabela. O
+      que desalinha é onde a letra pousa dentro dela. Então mede-se o
+      retângulo do próprio NÓ DE TEXTO (Range sobre o nó, como a
+      `linhasDeTexto` já faz) e desconta-se a DESCIDA da fonte
+      (`fontBoundingBoxDescent` do canvas, com a mesma fonte computada do
+      elemento): `base = rect.bottom - descida`. Descontar a descida é o que
+      torna a medida honesta entre textos de tamanhos diferentes — sem
+      isso, um título 1px menor "assentaria" mais alto sem estar
+      desalinhado.
+
+      TOLERÂNCIA: 1px. Os retângulos são fracionários e as métricas de
+      fonte chegam com casa decimal, então diferenças de arredondamento
+      ficam bem abaixo de 1px; e nada abaixo de 1px é o que o cliente vê.
+      O defeito real da Obras é de vários pixels. Tolerar mais do que isso
+      seria escolher não enxergar o defeito que originou o item.
+    */
+    const TOLERANCIA_LINHA_BASE = 1;
+    const linhaDeBaseDoTexto = (raiz) => {
+      try {
+        const percorrer = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+        let no = percorrer.nextNode();
+        while (no) {
+          const conteudo = (no.nodeValue || '').trim();
+          // Pula o nó de texto INVISÍVEL (ícone com texto alternativo,
+          // espaço entre tags) — ele não tem retângulo com área.
+          if (conteudo) {
+            const intervalo = document.createRange();
+            intervalo.selectNodeContents(no);
+            const caixa = Array.from(intervalo.getClientRects())
+              .filter((c) => c.width > 0 && c.height > 0)[0];
+            if (caixa) {
+              const estilo = getComputedStyle(no.parentElement);
+              // Fallback proporcional só para o caso de o canvas não
+              // devolver métrica de fonte; a medida boa é a do canvas.
+              let descida = parseFloat(estilo.fontSize) * 0.21;
+              try {
+                const ctx = document.createElement('canvas').getContext('2d');
+                ctx.font = `${estilo.fontStyle} ${estilo.fontWeight} ${estilo.fontSize} / ${estilo.lineHeight} ${estilo.fontFamily}`;
+                const metrica = ctx.measureText(conteudo);
+                if (Number.isFinite(metrica.fontBoundingBoxDescent)) descida = metrica.fontBoundingBoxDescent;
+              } catch (_) { /* fica o fallback proporcional */ }
+              return {
+                base: caixa.bottom - descida,
+                texto: conteudo.replace(/\s+/g, ' ').slice(0, 24),
+                fonte: estilo.fontSize
+              };
+            }
+          }
+          no = percorrer.nextNode();
+        }
+      } catch (_) { /* cabeçalho sem texto mensurável */ }
+      return null;
+    };
+
+    const t8 = [];
+    tabelas.forEach((tab) => {
+      const linhaCabecalho = q('thead tr', tab);
+      if (!linhaCabecalho) return;
+      const medidas = qa('th', linhaCabecalho)
+        .filter(visivel)
+        .map((th) => {
+          const medida = linhaDeBaseDoTexto(th);
+          return medida ? { ...medida, th } : null;
+        })
+        .filter(Boolean);
+      // Coluna de marcar/expandir não tem título: não há linha de base a
+      // comparar, e isso não é defeito. Com menos de dois títulos não
+      // existe comparação nenhuma.
+      if (medidas.length < 2) return;
+      /* Agrupa por linha de base: o grupo MAIOR é a linha da tabela, e
+         quem está fora dele é o desalinhado. Comparar só maior×menor diria
+         que duas colunas estão erradas quando uma está. */
+      const grupos = [];
+      medidas.forEach((m) => {
+        const grupo = grupos.find((g) => Math.abs(g.base - m.base) <= TOLERANCIA_LINHA_BASE);
+        if (grupo) grupo.itens.push(m);
+        else grupos.push({ base: m.base, itens: [m] });
+      });
+      if (grupos.length < 2) return;
+      const maioria = grupos.reduce((a, b) => (b.itens.length > a.itens.length ? b : a));
+      const fora = grupos.filter((g) => g !== maioria).flatMap((g) => g.itens);
+      const desvio = fora[0].base - maioria.base;
+      t8.push({
+        motivo: `"${fora[0].texto}" assenta ${Math.abs(desvio).toFixed(1)}px `
+          + `${desvio > 0 ? 'ABAIXO' : 'ACIMA'} da linha de base das outras ${maioria.itens.length} coluna(s) `
+          + `(base ${fora[0].base.toFixed(1)}px contra ${maioria.base.toFixed(1)}px de "${maioria.itens[0].texto}")`
+          + `${fora.length > 1 ? ` — e mais ${fora.length - 1} título(s) fora da linha` : ''}`
+          + '; título fora de .app-th-alinhavel/.app-th-botao ganha caixa de linha própria',
+        seletor: cssPath(fora[0].th)
+      });
+    });
+    r.T8 = t8.length
+      ? { estado: 'FALHOU', motivo: t8.map((p) => p.motivo).join(' | '), seletor: t8[0].seletor }
+      : { estado: 'PASSOU' };
+
     /* T2 (parte estática): cada cabeçalho tem o CONTROLE PRÓPRIO de
        alinhamento, com tooltip. Desde a leva do componente (02/09) o clique
        no título ORDENA (quando a coluna é ordenável) e o alinhamento vive
@@ -486,10 +613,44 @@ export function checksEstaticos({ tipo }) {
        medida pelo runner. */
     const alinhadores = qa('.app-th-alinhar').filter(foraDeModal);
     const titulos = qa('.app-th-alinhavel').filter(foraDeModal);
+    /*
+      COLUNA DE BOTÕES NÃO TEM ALINHAMENTO A ESCOLHER (05/09).
+
+      A conta era por CONTAGEM: "menos ícones de alinhar do que títulos =
+      coluna sem controle". Ela quebrou no mesmo dia em que o cabeçalho da
+      coluna de AÇÕES parou de ser texto cru e passou a usar o mesmo
+      embrulho das outras (conserto da linha de base, T8): o embrulho
+      apareceu, o controle de alinhamento não — corretamente, porque não há
+      o que alinhar numa coluna de botões — e o T2 passou a reprovar TODA
+      tabela com ações, por um conserto.
+
+      Agora a pergunta é por COLUNA e olha o conteúdo dela: título sem
+      controle só é tolerado quando as células daquela coluna são barra de
+      ações (`.app-actionbar`). Coluna de conteúdo sem o controle continua
+      reprovando, que é o defeito que este ramo existe para pegar.
+    */
+    const ehColunaDeAcoes = (titulo) => {
+      const th = titulo.closest('th');
+      const tabela = th && th.closest('table');
+      if (!th || !tabela) return false;
+      const indice = Array.from(th.parentElement.children).indexOf(th);
+      const totalColunas = th.parentElement.children.length;
+      const celulas = qa('tbody tr', tabela)
+        .filter((tr) => tr.children.length === totalColunas)
+        .map((tr) => tr.children[indice])
+        .filter(Boolean)
+        .slice(0, 10);
+      return celulas.length > 0 && celulas.every((td) => td.querySelector('.app-actionbar'));
+    };
+    const semControle = titulos.filter((t) => !t.querySelector('.app-th-alinhar') && !ehColunaDeAcoes(t));
     if (!titulos.length) {
       r.T2 = { estado: 'FALHOU', motivo: 'tabela sem cabeçalho de coluna do padrão (app-th-alinhavel)' };
-    } else if (alinhadores.length < titulos.length) {
-      r.T2 = { estado: 'FALHOU', motivo: `${titulos.length - alinhadores.length} coluna(s) sem o controle de alinhamento no cabeçalho` };
+    } else if (semControle.length) {
+      r.T2 = {
+        estado: 'FALHOU',
+        motivo: `${semControle.length} coluna(s) sem o controle de alinhamento no cabeçalho — a primeira é "${(semControle[0].innerText || '').trim().replace(/\s+/g, ' ').slice(0, 30)}"`,
+        seletor: cssPath(semControle[0])
+      };
     } else if (!alinhadores.every((b) => (b.getAttribute('title') || '').toLowerCase().includes('alinhar'))) {
       r.T2 = { estado: 'FALHOU', motivo: 'controle de alinhamento sem tooltip "Alinhar / redimensionar"' };
     } else {

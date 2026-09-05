@@ -699,6 +699,7 @@ export const TELAS = [
     semDado: {
       T1: 'medida com token INVÁLIDO: um token válido só existe criando ou abrindo cotação no ambiente compartilhado, e o harness não cria registro. A tabela de itens NÃO FOI PROVADA',
       T2: 'idem T1', T3: 'idem T1', T4: 'idem T1', T5: 'idem T1', T6: 'idem T1', T7: 'idem T1',
+      T8: 'idem T1: sem tabela carregada não há linha de cabeçalho para medir',
       X1: 'idem T1: a virada da tabela para cards em 390px não foi exercitada',
       R1: 'idem T1: o formulário de proposta não renderiza sem cotação carregada',
       R2: 'idem T1',
@@ -1833,6 +1834,12 @@ export const TELAS = [
 export const ITENS_DOD = [
   'C1', 'C2', 'C3', 'C4', 'C5', 'C6',
   'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7',
+  // Leva do cabeçalho de tabela (05/09): os títulos da MESMA tabela têm de
+  // assentar na mesma linha de base. Item próprio, e não um ramo da T1,
+  // porque o eixo é outro (vertical), o sujeito é outro (os títulos entre
+  // si, não o par th × td) e a célula da matriz precisa continuar dizendo
+  // QUAL capacidade quebrou — a justificativa longa está em checks.mjs.
+  'T8',
   'F1', 'F2', 'F3', 'F4',
   'B1', 'B2', 'B3', 'B4', 'B5',
   'M1', 'M2', 'M3', 'M4',

@@ -14,13 +14,21 @@ marcado como *mitigação* — e mitigação não é conserto.
 
 ---
 
-## ⚠ ACHADO EM PRODUÇÃO AGORA — LEIA ANTES DOS DEMAIS
+## COMPORTAMENTOS CONFIRMADOS — NÃO SÃO DEFEITOS
 
-*Este é o único achado deste documento que pode estar, neste momento, deixando
-contrato passar sem análise jurídica. Está aqui em cima, separado, por decisão
-do cliente em 05/09.*
+*Itens que pareciam falha à primeira vista, mas foram levados ao responsável
+pela operação, checados e confirmados como comportamento **correto e
+proposital**. Cada um traz a data da confirmação e por quem. Não corrigir —
+se alguém achar que é bug no futuro, a resposta está registrada aqui.*
 
-### N40. O valor que decide o caminho do contrato não é o valor que a tela mostra
+### N40. A alçada do Jurídico usa o valor original do contrato; o cabeçalho da tela mostra o total com aditivos
+
+**Confirmado pelo cliente em 05/09/2026, decisão registrada do responsável
+pela operação: não é defeito, é regra do negócio.** A alçada — o critério que
+decide se o contrato precisa passar pelo Jurídico — considera o **valor
+original** do contrato. O cabeçalho da tela mostra o **total com aditivos**.
+Os dois números serem diferentes, num contrato que já recebeu aditivo, **é o
+esperado**. Ninguém deve "corrigir" isso para os dois números baterem.
 
 Quando um contrato é aprovado, o sistema escolhe entre dois caminhos:
 
@@ -29,28 +37,44 @@ Quando um contrato é aprovado, o sistema escolhe entre dois caminhos:
 - **acima do limite** → o contrato vai para o Jurídico e **nenhum título é
   criado** até a conferência.
 
-O cabeçalho da tela mostra `valor_total + valor_aditivos`. O código que decide
-o caminho compara **apenas `valor_total`** — sem os aditivos.
+O cabeçalho da tela mostra `valor_total + valor_aditivos` (o total com
+aditivos). O código que decide o caminho compara **apenas `valor_total`** (o
+valor original, sem aditivos) com o limite — por definição da alçada, não por
+falta de somar uma linha.
 
-**O que isso significa na prática:** um contrato que só ultrapassa o limite do
-Jurídico **por causa dos aditivos** é aprovado pelo caminho de baixo. Os
-títulos nascem, o dinheiro entra na fila de pagamento, e o Jurídico nunca vê.
+**Por que os dois números diferentes não indicam erro.** Quem aprova vê, no
+cabeçalho, o total com aditivos. Se esse total está acima do limite mas o
+valor original está abaixo, o contrato segue pelo caminho de baixo (ATIVO,
+títulos criados na hora) mesmo com o cabeçalho mostrando um número maior que
+o limite. Isso é a regra funcionando como definida — quem não conhece a regra
+é que pode, ao olhar os dois números, achar que o sistema errou.
 
-Quem aprova está olhando um número maior que o número que decide.
+**O que já foi feito:** a confirmação de aprovação, em tela, já declara os
+dois desfechos possíveis (abaixo e acima do limite), porque a tela não
+indica antecipadamente em qual ramo o contrato vai cair.
 
-**O que já foi feito:** nada no comportamento. A confirmação que a reforma
-acrescentou passou a declarar **os dois** desfechos possíveis, em vez de
-escolher um e arriscar afirmar o errado — porque a tela hoje não sabe em qual
-ramo o contrato vai cair.
+**O que falta — não é urgente, é melhoria de clareza:** deixar explícito, na
+própria tela, que o número do cabeçalho é o total com aditivos e que a
+alçada usa o valor original. Hoje essa distinção só está escrita neste
+documento. Proposta de tela em `docs/PENDENCIAS-REGISTRADAS.md`, seção
+"Deixar visível que a alçada usa o valor original do contrato (N40)".
 
-**A decisão que falta:** o critério de roteamento é regra de negócio, não
-layout. Ou o roteamento passa a somar os aditivos, ou fica registrado que a
-intenção é decidir pelo valor original. Enquanto não se decide, o contrato
-aditivado continua tendo dois números — um exibido, outro decisório.
+**Onde conferir no código — mantido para quem for mexer em qualquer um dos
+dois pontos entender o porquê antes de alterar:**
 
-**Onde conferir:** o serviço de aprovação de contrato compara
-`paraCentavos(contrato.valor_total)` com o limite; o cabeçalho da tela soma
-`valor_total + valor_aditivos`.
+- Alçada (valor original): `backend/src/services/contratoFluxoNovoService.js`,
+  variável `acimaDoLimite`, por volta da linha 1513 —
+  `paraCentavos(contrato.valor_total) > limiteCent`.
+- Cabeçalho (total com aditivos):
+  `frontend/src/pages/SolicitacaoDetalhe/AcoesContrato.jsx`, variável
+  `valorComAditivos`, linha 197 — `Number(contrato.valor_total) +
+  Number(contrato.valor_aditivos || 0)` —, exibida no cabeçalho do card na
+  linha 553.
+
+**Isto não é um item para a lista de correções.** Os dois números têm
+propósitos diferentes por definição de negócio, confirmada pelo cliente. Só
+a apresentação em tela está em aberto, e está tratada como proposta, não como
+defeito.
 
 ---
 

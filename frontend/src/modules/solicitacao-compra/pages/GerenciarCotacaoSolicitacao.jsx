@@ -1544,7 +1544,8 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                   className="btn btn-outline"
                   onClick={async () => {
                     const copiou = await copiarTexto(mensagemWhatsApp);
-                    if (copiou) avisar.sucesso('Mensagem copiada.');
+                    // Retorno trivial de clipboard: nada foi gravado, o botao ja diz o que aconteceu.
+                    if (copiou) avisar.sucesso('Mensagem copiada.', undefined, { efemero: true });
                     else avisar.erro('Nao foi possivel copiar a mensagem automaticamente.');
                   }}
                 >
@@ -4097,7 +4098,8 @@ export default function GerenciarCotacaoSolicitacao() {
                           type="button"
                           onClick={async () => {
                             const copiou = await copiarTexto(publicUrl);
-                            if (copiou) avisar.sucesso('Link da cotacao copiado.');
+                            // Retorno trivial de clipboard: nada foi gravado, o botao ja diz o que aconteceu.
+                            if (copiou) avisar.sucesso('Link da cotacao copiado.', undefined, { efemero: true });
                             else avisar.erro('Nao foi possivel copiar o link automaticamente.');
                           }}
                           title="Copiar link"

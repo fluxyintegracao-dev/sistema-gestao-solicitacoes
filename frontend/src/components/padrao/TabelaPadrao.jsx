@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ResizableTable, ResizableTh } from '../ResizableTable';
+import { createPortal } from 'react-dom';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import EmptyState from '../ui/EmptyState';
 
@@ -212,11 +213,68 @@ function IconeSeta({ aberta }) {
  * arranjo de Excel e Planilhas. Coluna sem `ordenavel` mantém o título como
  * texto (nada de affordance que não faz nada).
  */
+/*
+  O MENU DE ALINHAMENTO ABRIA E NINGUÉM VIA (05/09) — achado do cliente no
+  preview, em TODAS as tabelas do sistema.
+
+  O sintoma: o ícone aparece no cabeçalho, o tooltip "Alinhar /
+  redimensionar" aparece, e clicar não faz nada. A causa NÃO é o clique nem
+  o estado: o menu abre, o nó entra no DOM — e é RECORTADO.
+  `.resizable-table th { overflow: hidden }` (index.css) existe para dar
+  reticências ao título que não cabe, e o menu é `position: absolute; top:
+  calc(100% + 4px)`, ou seja, começa FORA da caixa do `th`. Recorte total.
+
+  É a R18 num lugar novo: `overflow: hidden` não mata só `position:
+  sticky` — recorta qualquer coisa posicionada para fora da caixa, e um
+  menu suspenso é exatamente isso. A regra que estava escrita falava de
+  faixa fixa e coluna fixa; o mecanismo é maior que os dois exemplos.
+
+  A saída é a mesma que o projeto já usa para o autocomplete de apropriação
+  (`ApropriacaoAutocomplete`): o menu sai do fluxo por `createPortal` e se
+  posiciona por coordenada medida do botão. Nenhum ancestral pode recortar
+  o que está no `body`.
+
+  Capacidade anunciada e inexistente é o defeito que a DoD chama de sinal
+  sem capacidade. O item T2 media a OPACIDADE do ícone com o ponteiro em
+  cima — presença, não efeito — e por isso passou verde em 189 telas com
+  isto quebrado. O check está sendo reescrito como prova de comportamento.
+*/
 function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
   const [aberto, setAberto] = useState(false);
+  const [caixaDoBotao, setCaixaDoBotao] = useState(null);
   const ref = useRef(null);
-  useFecharAoSair(ref, aberto, () => setAberto(false));
+  const botaoRef = useRef(null);
+  const menuRef = useRef(null);
+  /*
+    O clique fora precisa olhar o cabeçalho E o menu: com o portal, o menu
+    deixou de ser descendente do `th`, então `ref.current.contains(alvo)`
+    passaria a ser falso para o próprio menu — clicar numa opção fecharia o
+    menu ANTES do `onClick` dela e o alinhamento nunca seria aplicado.
+    Trocar um defeito por outro do mesmo tamanho.
+  */
+  const dentroDoMenuOuDoCabecalho = useRef(null);
+  dentroDoMenuOuDoCabecalho.current = {
+    contains: (alvo) => Boolean(ref.current?.contains(alvo) || menuRef.current?.contains(alvo))
+  };
+  useFecharAoSair(dentroDoMenuOuDoCabecalho, aberto, () => setAberto(false));
   const direcao = ordem?.coluna === coluna.id ? ordem.direcao : null;
+
+  // A coordenada é medida na hora de abrir e ao rolar/redimensionar: o menu
+  // é `fixed`, então ele não acompanha a rolagem sozinho.
+  useEffect(() => {
+    if (!aberto) return undefined;
+    const medir = () => {
+      const r = botaoRef.current?.getBoundingClientRect();
+      if (r) setCaixaDoBotao({ esquerda: r.left, base: r.bottom });
+    };
+    medir();
+    window.addEventListener('scroll', medir, true);
+    window.addEventListener('resize', medir);
+    return () => {
+      window.removeEventListener('scroll', medir, true);
+      window.removeEventListener('resize', medir);
+    };
+  }, [aberto]);
 
   return (
     <span
@@ -241,6 +299,7 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
       <button
         type="button"
         className="app-th-alinhar"
+        ref={botaoRef}
         title="Alinhar / redimensionar"
         aria-label={`Alinhar coluna ${coluna.titulo}`}
         aria-haspopup="menu"
@@ -250,8 +309,13 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
         <IconeAlinhar />
       </button>
 
-      {aberto && (
-        <span className="app-mais-menu app-th-menu" role="menu">
+      {aberto && caixaDoBotao && typeof document !== 'undefined' && createPortal((
+        <span
+          className="app-mais-menu app-th-menu"
+          role="menu"
+          ref={menuRef}
+          style={{ left: caixaDoBotao.esquerda, top: caixaDoBotao.base + 4 }}
+        >
           {OPCOES_ALINHAMENTO.map(([valor, rotulo]) => (
             <button
               key={valor}
@@ -268,7 +332,7 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
             </button>
           ))}
         </span>
-      )}
+      ), document.body)}
     </span>
   );
 }
@@ -411,7 +475,24 @@ export default function TabelaPadrao({
   */
   total,                // number|undefined — total do conjunto, além da fatia à vista
   rotuloRegistro = 'linha',
-  rodapeContagem = true // saída explícita para a tabela em que o rodapé é ruído
+  rodapeContagem = true, // saída explícita para a tabela em que o rodapé é ruído
+  /*
+    ROLAGEM INFINITA POR PADRÃO, COM A ESCOLHA SALVA POR LISTA (decisão do
+    cliente, 05/09) — o mesmo arranjo que já valia na listagem de
+    Solicitações, agora para as tabelas do componente.
+
+    Aqui a rolagem é LOCAL: a tabela recebe a lista inteira e mostra uma
+    fatia, que cresce quando a pessoa chega ao fim. Isso resolve as duas
+    coisas ao mesmo tempo — desenhar 1.200 linhas de uma vez trava a tela, e
+    obrigar a pessoa a paginar para ver o resto é trabalho que ela não pediu.
+
+    Tabela que já vem PAGINADA DO SERVIDOR não é afetada: ela entrega uma
+    página por vez (50 linhas, tipicamente), fica abaixo do limiar e nada
+    muda — o alternador nem aparece. Foi de propósito: quem pagina no
+    servidor tem a própria navegação, e duas navegações na mesma tela é pior
+    que uma.
+  */
+  paginaLocal = 50      // linhas por fatia; 0 desliga a rolagem infinita local
 }) {
   const ehMovel = useEhMovel();
   const shellRef = useRef(null);
@@ -857,16 +938,51 @@ export default function TabelaPadrao({
   const temTotalConhecido = Number.isFinite(Number(total)) && Number(total) >= itens.length;
 
   /* ---- Agrupamento: linhas de grupo intercaladas ---------------------- */
+  /* ---- Rolagem infinita LOCAL, com a escolha salva por lista ---------- */
+  /*
+    A fatia corta DEPOIS da ordenação e ANTES do agrupamento: cortar antes
+    de ordenar mostraria as 50 primeiras da ordem antiga, e cortar depois de
+    agrupar deixaria um grupo pela metade sem dizer.
+  */
+  const chaveModoLista = storageKey ? `${storageKey}:modo-lista` : null;
+  const [paginacaoNumerada, setPaginacaoNumerada] = useState(
+    () => Boolean(lerJson(chaveModoLista, { numerada: false }).numerada)
+  );
+  const rolagemLocalPossivel = paginaLocal > 0 && itensOrdenados.length > paginaLocal;
+  const [fatia, setFatia] = useState(paginaLocal);
+  // Lista nova (filtro, busca, outra consulta) volta ao começo: continuar
+  // com a fatia esticada mostraria 300 linhas de um resultado de 300 e
+  // esconderia que a lista mudou.
+  useEffect(() => { setFatia(paginaLocal); }, [itensOrdenados.length, paginaLocal]);
+  const sentinelaRef = useRef(null);
+  useEffect(() => {
+    if (paginacaoNumerada || !rolagemLocalPossivel) return undefined;
+    if (fatia >= itensOrdenados.length) return undefined;
+    const el = sentinelaRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const observador = new IntersectionObserver((entradas) => {
+      if (entradas.some((e) => e.isIntersecting)) {
+        setFatia((atual) => Math.min(atual + paginaLocal, itensOrdenados.length));
+      }
+    }, { rootMargin: '400px' });
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [paginacaoNumerada, rolagemLocalPossivel, fatia, itensOrdenados.length, paginaLocal]);
+
+  const itensAVista = (!rolagemLocalPossivel || paginacaoNumerada)
+    ? itensOrdenados
+    : itensOrdenados.slice(0, fatia);
+
   const blocos = agruparPor
     ? Array.from(
-      itensOrdenados.reduce((mapa, item) => {
+      itensAVista.reduce((mapa, item) => {
         const chave = agruparPor.chave(item);
         if (!mapa.has(chave)) mapa.set(chave, []);
         mapa.get(chave).push(item);
         return mapa;
       }, new Map())
     ).map(([chave, lista]) => ({ chave, itens: lista }))
-    : [{ chave: null, itens: itensOrdenados }];
+    : [{ chave: null, itens: itensAVista }];
 
   const renderLinha = (item) => {
     const tom = urgencia?.(item);
@@ -1061,7 +1177,24 @@ export default function TabelaPadrao({
               </ResizableTh>
             ))}
             {acoesLinha ? (
-              <ResizableTh columnKey="__acoes">Ações</ResizableTh>
+              /*
+                "AÇÕES" ERA A ÚNICA COLUNA COM TÍTULO DE TEXTO CRU (05/09) —
+                achado do cliente na tela de Obras: o título ficava numa
+                linha de base diferente das outras colunas.
+
+                Todas as demais embrulham o título em `.app-th-alinhavel` e
+                `.app-th-botao`, que têm caixa de linha própria (o botão tem
+                `appearance: none` e altura de linha de botão). Texto solto
+                dentro do `th` alinha por outra caixa — duas estruturas, duas
+                linhas de base, na mesma fileira. Agora é a mesma estrutura,
+                sem o menu de alinhamento: não há o que alinhar numa coluna
+                de botões.
+              */
+              <ResizableTh columnKey="__acoes">
+                <span className="app-th-alinhavel">
+                  <span className="app-th-botao app-th-botao--estatico">Ações</span>
+                </span>
+              </ResizableTh>
             ) : null}
           </tr>
         </thead>
@@ -1105,12 +1238,53 @@ export default function TabelaPadrao({
         paginação. Fora da tabela de propósito: `tfoot` entraria na conta de
         largura das colunas e no arrasto.
       */}
+      {/* Sentinela da rolagem infinita: fora da tabela, para não entrar na
+          conta de largura das colunas nem no arrasto. */}
+      {rolagemLocalPossivel && !paginacaoNumerada && fatia < itensOrdenados.length ? (
+        <span ref={sentinelaRef} aria-hidden="true" className="app-tabela-sentinela" />
+      ) : null}
       {rodapeContagem && itens.length ? (
-        <p className="app-tabela-rodape" role="status">
-          {temTotalConhecido
-            ? `${itens.length} de ${total} ${rotuloRegistro}${Number(total) === 1 ? '' : 's'}`
-            : `${itens.length} ${rotuloRegistro}${itens.length === 1 ? '' : 's'}`}
-        </p>
+        <div className="app-tabela-rodape-linha">
+          <p className="app-tabela-rodape" role="status">
+            {/*
+              O rodapé conta o que ESTÁ À VISTA contra o que existe — e com
+              rolagem local o que está à vista é a fatia, não a lista toda.
+              Dizer "1.200 de 1.200" com 50 linhas desenhadas seria o rodapé
+              mentindo justamente sobre a pergunta que ele existe para
+              responder.
+            */}
+            {temTotalConhecido
+              ? `${itensAVista.length} de ${total} ${rotuloRegistro}${Number(total) === 1 ? '' : 's'}`
+              : (rolagemLocalPossivel && !paginacaoNumerada
+                ? `${itensAVista.length} de ${itensOrdenados.length} ${rotuloRegistro}${itensOrdenados.length === 1 ? '' : 's'}`
+                : `${itensAVista.length} ${rotuloRegistro}${itensAVista.length === 1 ? '' : 's'}`)}
+          </p>
+          {/* Alternador: o RÓTULO mostra o modo ATUAL e o tooltip diz o que o
+              clique faz — mesmo vocabulário da listagem de Solicitações,
+              onde o cliente já aprovou este arranjo. */}
+          {rolagemLocalPossivel ? (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm app-tabela-modo"
+              onClick={() => {
+                setPaginacaoNumerada((atual) => {
+                  const proximo = !atual;
+                  gravarJson(chaveModoLista, { numerada: proximo });
+                  // Voltar para a rolagem recomeça a fatia: manter a fatia
+                  // esticada deixaria a pessoa sem saber onde parou.
+                  if (!proximo) setFatia(paginaLocal);
+                  return proximo;
+                });
+              }}
+              title={paginacaoNumerada ? 'Alternar para rolagem infinita' : 'Alternar para lista inteira'}
+              aria-label={paginacaoNumerada
+                ? 'Modo atual: lista inteira. Alternar para rolagem infinita'
+                : 'Modo atual: rolagem infinita. Alternar para lista inteira'}
+            >
+              {paginacaoNumerada ? 'Lista inteira' : 'Rolagem'}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

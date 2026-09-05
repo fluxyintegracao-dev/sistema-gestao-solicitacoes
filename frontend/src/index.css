@@ -98,6 +98,15 @@
   --z-dropdown: 25;
   --z-sticky: 20;
   --z-sidebar: 30;
+  /*
+    Menu suspenso que sai por PORTAL (05/09): ele vive no `body`, fora de
+    qualquer contexto de empilhamento da tela, e precisa ficar acima da
+    barra lateral (30) e abaixo do modal (100) — um menu não pode cobrir
+    uma caixa de confirmação. Existia como `var(--z-dropdown-portal, 90)`
+    em dois lugares, com o 90 escrito na mão nos dois: token só existe de
+    verdade quando é declarado.
+  */
+  --z-dropdown-portal: 90;
   --z-modal: 100;
   --z-toast: 120;
   /* Modal tokens */

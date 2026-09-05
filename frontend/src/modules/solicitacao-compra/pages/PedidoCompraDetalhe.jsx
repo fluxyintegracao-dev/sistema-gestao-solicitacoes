@@ -38,6 +38,7 @@ import { useSafeNavigateBack } from '../../../utils/navigation';
 import { isValidCpfCnpj, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import OverlayModal from '../../../components/ui/OverlayModal';
+import '../../../styles/compras-relatorio-apoio.css';
 import {
   Pagina,
   PageHeader,
@@ -1619,8 +1620,14 @@ export default function PedidoCompraDetalhe() {
     { label: 'Criado por', valor: pedido.criador?.nome || '' }
   ];
 
+  /*
+    C1 (05/09): o apoio longo empurrava a barra de acoes para uma SEGUNDA
+    linha da faixa — 94px onde o teto e 72. Mesma causa e mesmo conserto dos
+    tres relatorios de Compras: a conta de quebra do flex usa o texto
+    INTEIRO do apoio, porque ele e `nowrap` para poder truncar.
+  */
   return (
-    <Pagina>
+    <Pagina className="apoio-linha-unica">
       <PageHeader
         titulo={pedido.fornecedor?.nome ? `${pedido.fornecedor.nome} — ${codigoPedido}` : codigoPedido}
         contagem={`${resumoItens.total} item(ns)`}

@@ -573,7 +573,8 @@ export default function FinanceiroBoletos() {
       const data = await gerarAmostraBoletoTitulo(titulo.id);
       setDetalhe(data);
       setPreviewOpen(true);
-      avisar.sucesso(`Amostra do titulo #${titulo.id} gerada com sucesso.`);
+      // Amostra nao grava nada (nao entra na lista, sem carregarTitulos): o preview que abre ja mostra o resultado.
+      avisar.sucesso(`Amostra do titulo #${titulo.id} gerada com sucesso.`, undefined, { efemero: true });
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao gerar amostra de boleto');
     } finally {
@@ -594,7 +595,8 @@ export default function FinanceiroBoletos() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      avisar.sucesso(`PDF do titulo #${titulo.id} baixado com sucesso.`);
+      // Download simples: o navegador ja mostra que baixou, nada foi gravado no sistema.
+      avisar.sucesso(`PDF do titulo #${titulo.id} baixado com sucesso.`, undefined, { efemero: true });
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao baixar PDF do boleto');
     } finally {
@@ -770,7 +772,8 @@ export default function FinanceiroBoletos() {
       limparAvisos();
       const data = await baixarBoletoCaixaHomologacaoCsv(item.id);
       await salvarBlob(data);
-      avisar.sucesso(`Relatorio de homologacao da remessa #${item.numero_remessa} baixado.`);
+      // Download simples, sem checagem de hash: o navegador ja mostra que baixou.
+      avisar.sucesso(`Relatorio de homologacao da remessa #${item.numero_remessa} baixado.`, undefined, { efemero: true });
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao baixar relatorio de homologacao Caixa');
     } finally {

@@ -258,7 +258,8 @@ export default function FiscalDocuments() {
 
     try {
       await navigator.clipboard.writeText(text);
-      avisar.sucesso('Lista de erros copiada para a area de transferencia.');
+      // Retorno trivial de clipboard: nada foi gravado, o texto ja esta na area de transferencia.
+      avisar.sucesso('Lista de erros copiada para a area de transferencia.', undefined, { efemero: true });
     } catch {
       avisar.erro('Nao foi possivel copiar a lista de erros automaticamente.');
     }

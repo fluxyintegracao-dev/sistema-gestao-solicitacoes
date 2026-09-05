@@ -20,6 +20,12 @@
 //            depois operação diária, consultas/relatórios e por último
 //            o raro/arquivo/configuração. A ordem dos cards vem SÓ
 //            daqui — nunca da antiga sidebar.
+//   secaoConfig / ordemConfig
+//          - quando o destino também é uma porta do HUB DE CONFIGURAÇÕES
+//            (/configuracoes), declara AQUI em que seção dele o card
+//            aparece (id de SECOES_CONFIGURACOES) e em que posição.
+//            O hub não tem lista própria: ele lê estes dois campos.
+//            Destino sem `secaoConfig` simplesmente não aparece lá.
 //   fixavel- todo destino com rota é fixável como atalho (estrela no
 //            topo da tela). Marque `fixavel: 'acao'` quando o destino
 //            abre PRONTO PARA USO (formulários "Novo/Nova", upload):
@@ -227,6 +233,33 @@ function sstChildrenFull() {
     { id: 'sst-configuracoes', ordem: 350, label: 'Configurações', desc: 'Configurações gerais do módulo SST.', icon: HiOutlineCog6Tooth, to: '/sst/configuracoes', can: manage('configuracoes') }
   ];
 }
+
+/*
+  SEÇÕES DO HUB DE CONFIGURAÇÕES (05/09)
+  ---------------------------------------------------------------------
+  O agrupamento do /configuracoes mora AQUI, e não na tela. Até 05/09 o
+  `Configuracoes.jsx` carregava as oito seções e os 45 destinos escritos à
+  mão, e por isso: reavaliava permissão com regra PRÓPRIA (que já divergia
+  da rota em quatro destinos), envelhecia sozinho quando um rótulo mudava
+  aqui, e — o que o trinco mediu — fazia com que TODA porta nova aberta
+  pelo responsável aumentasse a dívida da fonte única. Foi o que aconteceu
+  na rodada 1: abrir duas portas subiu o trinco de 43 para 45.
+
+  Seção é só rótulo e ordem; QUEM pertence a ela é declarado no próprio
+  destino (`secaoConfig`), porque o destino já mora no módulo dele — as
+  telas de cadastro continuam sendo filhas de `cadastros`, e não ganham
+  uma segunda cópia aqui só para aparecer no hub.
+*/
+export const SECOES_CONFIGURACOES = [
+  { id: 'cadastros', label: 'Cadastros', ordem: 10 },
+  { id: 'usuarios', label: 'Usuarios', ordem: 20 },
+  { id: 'suporte', label: 'Suporte', ordem: 30 },
+  { id: 'compras', label: 'Compras', ordem: 40 },
+  { id: 'comercial', label: 'Comercial', ordem: 50 },
+  { id: 'provisionamento', label: 'Provisionamento', ordem: 60 },
+  { id: 'status-vinculos', label: 'Status e Vinculos', ordem: 70 },
+  { id: 'instalacao', label: 'Instalacao', ordem: 80 }
+];
 
 // ---------------------------------------------------------------------
 // Árvore de módulos (nível 1) e subitens (nível 2)
@@ -493,15 +526,15 @@ export const NAV_MODULES = [
     icon: HiOutlineIdentification,
     gate: (user) => canManageUsers(user) || isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros'),
     children: [
-      { id: 'cad-usuarios', ordem: 10, label: 'Usuários', desc: 'Usuários e perfis de acesso.', icon: HiOutlineUsers, to: '/usuarios', can: (user) => canManageUsers(user) },
+      { id: 'cad-usuarios', ordem: 10, secaoConfig: 'usuarios', ordemConfig: 10, label: 'Usuários', desc: 'Usuários e perfis de acesso.', icon: HiOutlineUsers, to: '/usuarios', can: (user) => canManageUsers(user) },
       { id: 'cad-usuarios-novo', fixavel: 'acao', ordem: 20, label: 'Novo Usuário', desc: 'Cadastre um usuário com perfil e permissões.', icon: HiOutlineUserPlus, to: '/usuarios/novo', can: (user) => canManageUsers(user) },
-      { id: 'cad-empresas', ordem: 80, label: 'Empresas do Grupo', desc: 'Empresas que compõem o grupo.', icon: HiOutlineBuildingOffice2, to: '/empresas-grupo', can: (user) => isSuperadmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
-      { id: 'cad-obras', ordem: 30, label: 'Obras', desc: 'Obras e centros de custo.', icon: HiOutlineBuildingOffice2, to: '/obras', can: (user) => (isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros')) && canAccessCadastroObras(user) },
+      { id: 'cad-empresas', ordem: 80, secaoConfig: 'cadastros', ordemConfig: 50, label: 'Empresas do Grupo', desc: 'Empresas que compõem o grupo.', icon: HiOutlineBuildingOffice2, to: '/empresas-grupo', can: (user) => isSuperadmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cad-obras', ordem: 30, secaoConfig: 'cadastros', ordemConfig: 10, label: 'Obras', desc: 'Obras e centros de custo.', icon: HiOutlineBuildingOffice2, to: '/obras', can: (user) => (isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros')) && canAccessCadastroObras(user) },
       { id: 'cad-apropriacoes', ordem: 90, label: 'Gestão de Apropriações', desc: 'Apropriações de custo por obra.', icon: HiOutlineAdjustmentsHorizontal, to: '/gestao-apropriacoes', can: (user) => isBusinessAdmin(user) && canAccessCadastroObras(user) },
-      { id: 'cad-setores', ordem: 40, label: 'Setores', desc: 'Setores do fluxo de solicitações.', icon: HiOutlineRectangleGroup, to: '/setores', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
-      { id: 'cad-tipos', ordem: 50, label: 'Tipos de Solicitação', desc: 'Tipos e subtipos de solicitação.', icon: HiOutlineClipboardDocumentList, to: '/tipos-solicitacao', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
-      { id: 'cad-parceiros', ordem: 60, label: 'Cadastro de Pessoas', desc: 'Parceiros, credores e clientes.', icon: HiOutlineUsers, to: '/parceiros', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
-      { id: 'cad-parceiros-categorias', ordem: 70, label: 'Categorias de Parceiro', desc: 'Categorias para classificar pessoas.', icon: HiOutlineArchiveBox, to: '/parceiros-categorias', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') }
+      { id: 'cad-setores', ordem: 40, secaoConfig: 'cadastros', ordemConfig: 20, label: 'Setores', desc: 'Setores do fluxo de solicitações.', icon: HiOutlineRectangleGroup, to: '/setores', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cad-tipos', ordem: 50, secaoConfig: 'cadastros', ordemConfig: 30, label: 'Tipos de Solicitação', desc: 'Tipos e subtipos de solicitação.', icon: HiOutlineClipboardDocumentList, to: '/tipos-solicitacao', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cad-parceiros', ordem: 60, secaoConfig: 'cadastros', ordemConfig: 40, label: 'Cadastro de Pessoas', desc: 'Parceiros, credores e clientes.', icon: HiOutlineUsers, to: '/parceiros', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cad-parceiros-categorias', ordem: 70, secaoConfig: 'cadastros', ordemConfig: 60, label: 'Categorias de Parceiro', desc: 'Categorias para classificar pessoas.', icon: HiOutlineArchiveBox, to: '/parceiros-categorias', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') }
     ]
   },
   {
@@ -512,7 +545,7 @@ export const NAV_MODULES = [
     gate: (user) => canAccessContratos(user),
     children: [
       { id: 'contratos-relatorios', ordem: 30, label: 'Relatórios', desc: 'Relatórios operacionais de contratos.', icon: HiOutlineChartBar, to: '/contratos/relatorios', can: SEMPRE },
-      { id: 'contratos-gestao', ordem: 10, label: 'Gestão de Contratos', desc: 'Contratos, aditivos e medições.', icon: HiOutlineDocumentCheck, to: '/gestao-contratos', can: SEMPRE },
+      { id: 'contratos-gestao', ordem: 10, secaoConfig: 'cadastros', ordemConfig: 80, label: 'Gestão de Contratos', desc: 'Contratos, aditivos e medições.', icon: HiOutlineDocumentCheck, to: '/gestao-contratos', can: SEMPRE },
       { id: 'contratos-novo', fixavel: 'acao', ordem: 20, label: 'Novo Contrato', desc: 'Crie um contrato do fluxo com parcelas.', icon: HiOutlinePlusCircle, to: '/contratos/novo', can: SEMPRE }
     ]
   },
@@ -535,21 +568,91 @@ export const NAV_MODULES = [
     gate: (user) => canAccessConfiguracoes(user),
     children: [
       { id: 'cfg-central', ordem: 10, label: 'Configurações', desc: 'Central de configurações do sistema.', icon: HiOutlineCog6Tooth, to: '/configuracoes', can: SEMPRE },
-      { id: 'cfg-acesso-prioridades', ordem: 20, label: 'Acesso Prioridades', desc: 'Usuários com acesso às prioridades.', icon: HiOutlineUsers, to: '/usuarios-acesso-prioridade-diretoria', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
-      { id: 'cfg-envio-livre', ordem: 30, label: 'Envio Livre por Usuário', desc: 'Usuários que enviam a qualquer setor.', icon: HiOutlineUsers, to: '/usuarios-envio-qualquer-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
-      { id: 'cfg-tipos-compartilhados', ordem: 40, label: 'Tipos Compartilhados', desc: 'Tipos de solicitação compartilhados.', icon: HiOutlineClipboardDocumentList, to: '/tipos-compartilhados-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
-      { id: 'cfg-automacao-status', ordem: 50, label: 'Automação por Status', desc: 'Envio automático ao mudar status.', icon: HiOutlinePaperAirplane, to: '/automacao-status-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
-      { id: 'cfg-acoes-principais', ordem: 54, label: 'Ação Principal por Setor', desc: 'Ação em destaque no detalhe da solicitação.', icon: HiOutlineStar, to: '/configuracoes-acoes-principais', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
-      { id: 'cfg-atalhos-setor', ordem: 56, label: 'Atalhos por Setor', desc: 'Atalhos sugeridos e obrigatórios de cada setor.', icon: HiOutlineStar, to: '/configuracoes-atalhos-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
-      { id: 'cfg-detalhe-layout', ordem: 58, label: 'Layout do Detalhe por Setor', desc: 'Blocos da Home e do detalhe da solicitação por setor.', icon: HiOutlineRectangleGroup, to: '/configuracoes-detalhe-layout', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
-      { id: 'cfg-contrato-alertas-formas', ordem: 60, label: 'Formas da Nova Solicitação', desc: 'Alertas de contrato e formas de pagamento exibidas na Nova Solicitação.', icon: HiOutlineAdjustmentsHorizontal, to: '/configuracoes-formas-pagamento-solicitacao', can: (user) => canManageConfiguracoesArea(user, 'geral') },
-      { id: 'cfg-cartoes-recarga', ordem: 62, label: 'Cartões de Recarga', desc: 'Cadastro dos cartões usados no fluxo de recarga.', icon: HiOutlineCreditCard, to: '/configuracoes-cartoes-recarga', can: (user) => isSuperadmin(user) },
-      { id: 'cfg-cotacao', ordem: 70, label: 'Config. Cotações', desc: 'Parâmetros do fluxo de cotação.', icon: HiOutlineAdjustmentsHorizontal, to: '/configuracoes-cotacao', can: (user) => hasEnabledModule(user, 'COTACOES') && canManageComprasConfiguracoes(user) },
-      { id: 'cfg-status-pedidos', ordem: 80, label: 'Status dos Pedidos', desc: 'Status dos pedidos de compra.', icon: HiOutlineClipboardDocumentList, to: '/configuracoes-status-pedidos-compra', can: (user) => canManageComprasConfiguracoes(user) },
-      { id: 'cfg-comercial-categorias', ordem: 90, label: 'Categorias Comerciais', desc: 'Categorias do módulo comercial.', icon: HiOutlineArchiveBox, to: '/configuracoes-comercial-categorias', can: (user) => canManageConfiguracoesArea(user, 'geral') && canAccessComercial(user) },
-      { id: 'cfg-modulos', ordem: 100, label: 'Módulos e Planos', desc: 'Ativação de módulos do sistema.', icon: HiOutlineCog6Tooth, to: '/configuracoes-modulos', can: (user) => canManageConfiguracoesArea(user, 'modulos') },
-      { id: 'cfg-notificacoes', ordem: 110, label: 'Notificações Sistema', desc: 'Eventos que geram notificações.', icon: HiOutlineBell, to: '/configuracoes-notificacoes-sistema', can: (user) => canManageConfiguracoesArea(user, 'aparencia') },
-      { id: 'cfg-arquivos-modelos', ordem: 120, label: 'Arquivos Modelos', desc: 'Gestão da biblioteca de modelos.', icon: HiOutlineFolderOpen, to: '/arquivos-modelos-config', can: (user) => isSuperadmin(user) && hasEnabledModule(user, 'BIBLIOTECA_MODELOS') }
+      { id: 'cfg-acesso-prioridades', ordem: 20, secaoConfig: 'status-vinculos', ordemConfig: 160, label: 'Acesso Prioridades', desc: 'Usuários com acesso às prioridades.', icon: HiOutlineUsers, to: '/usuarios-acesso-prioridade-diretoria', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-envio-livre', ordem: 30, secaoConfig: 'status-vinculos', ordemConfig: 190, label: 'Envio Livre por Usuário', desc: 'Usuários que enviam a qualquer setor.', icon: HiOutlineUsers, to: '/usuarios-envio-qualquer-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-tipos-compartilhados', ordem: 40, secaoConfig: 'status-vinculos', ordemConfig: 170, label: 'Tipos Compartilhados', desc: 'Tipos de solicitação compartilhados.', icon: HiOutlineClipboardDocumentList, to: '/tipos-compartilhados-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-automacao-status', ordem: 50, secaoConfig: 'status-vinculos', ordemConfig: 180, label: 'Automação por Status', desc: 'Envio automático ao mudar status.', icon: HiOutlinePaperAirplane, to: '/automacao-status-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-acoes-principais', ordem: 54, secaoConfig: 'status-vinculos', ordemConfig: 270, label: 'Ação Principal por Setor', desc: 'Ação em destaque no detalhe da solicitação.', icon: HiOutlineStar, to: '/configuracoes-acoes-principais', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-atalhos-setor', ordem: 56, secaoConfig: 'status-vinculos', ordemConfig: 280, label: 'Atalhos por Setor', desc: 'Atalhos sugeridos e obrigatórios de cada setor.', icon: HiOutlineStar, to: '/configuracoes-atalhos-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-detalhe-layout', ordem: 58, secaoConfig: 'status-vinculos', ordemConfig: 290, label: 'Layout do Detalhe por Setor', desc: 'Blocos da Home e do detalhe da solicitação por setor.', icon: HiOutlineRectangleGroup, to: '/configuracoes-detalhe-layout', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-contrato-alertas-formas', ordem: 60, secaoConfig: 'status-vinculos', ordemConfig: 130, label: 'Formas da Nova Solicitação', desc: 'Alertas de contrato e formas de pagamento exibidas na Nova Solicitação.', icon: HiOutlineAdjustmentsHorizontal, to: '/configuracoes-formas-pagamento-solicitacao', can: (user) => canManageConfiguracoesArea(user, 'geral') },
+      { id: 'cfg-cartoes-recarga', ordem: 62, secaoConfig: 'cadastros', ordemConfig: 90, label: 'Cartões de Recarga', desc: 'Cadastro dos cartões usados no fluxo de recarga.', icon: HiOutlineCreditCard, to: '/configuracoes-cartoes-recarga', can: (user) => isSuperadmin(user) },
+      { id: 'cfg-cotacao', ordem: 70, secaoConfig: 'compras', ordemConfig: 10, label: 'Config. Cotações', desc: 'Parâmetros do fluxo de cotação.', icon: HiOutlineAdjustmentsHorizontal, to: '/configuracoes-cotacao', can: (user) => hasEnabledModule(user, 'COTACOES') && canManageComprasConfiguracoes(user) },
+      { id: 'cfg-status-pedidos', ordem: 80, secaoConfig: 'compras', ordemConfig: 20, label: 'Status dos Pedidos', desc: 'Status dos pedidos de compra.', icon: HiOutlineClipboardDocumentList, to: '/configuracoes-status-pedidos-compra', can: (user) => canManageComprasConfiguracoes(user) },
+      { id: 'cfg-comercial-categorias', ordem: 90, secaoConfig: 'comercial', ordemConfig: 10, label: 'Categorias Comerciais', desc: 'Categorias do módulo comercial.', icon: HiOutlineArchiveBox, to: '/configuracoes-comercial-categorias', can: (user) => canManageConfiguracoesArea(user, 'geral') && canAccessComercial(user) },
+      { id: 'cfg-modulos', ordem: 100, secaoConfig: 'instalacao', ordemConfig: 10, label: 'Módulos e Planos', desc: 'Ativação de módulos do sistema.', icon: HiOutlineCog6Tooth, to: '/configuracoes-modulos', can: (user) => canManageConfiguracoesArea(user, 'modulos') },
+      { id: 'cfg-notificacoes', ordem: 110, secaoConfig: 'suporte', ordemConfig: 30, label: 'Notificações Sistema', desc: 'Eventos que geram notificações.', icon: HiOutlineBell, to: '/configuracoes-notificacoes-sistema', can: (user) => canManageConfiguracoesArea(user, 'aparencia') },
+      { id: 'cfg-arquivos-modelos', ordem: 120, secaoConfig: 'compras', ordemConfig: 30, label: 'Arquivos Modelos', desc: 'Gestão da biblioteca de modelos.', icon: HiOutlineFolderOpen, to: '/arquivos-modelos-config', can: (user) => isSuperadmin(user) && hasEnabledModule(user, 'BIBLIOTECA_MODELOS') },
+      /*
+        OS 25 DESTINOS QUE SÓ EXISTIAM NA LISTA À MÃO DO HUB (05/09).
+
+        Todos já tinham rota e guarda no App.jsx; o que faltava era existir
+        AQUI. Enquanto viviam só no `Configuracoes.jsx`, ficavam fora do
+        Ctrl+K, fora dos atalhos fixáveis e fora do breadcrumb — e a
+        permissão deles era reavaliada por área de configuração, o que já
+        divergia da guarda da rota em quatro casos (ver o comentário do
+        `cfg-sla-setor`).
+
+        O `can` de cada um reusa a MESMA função que a rota correspondente
+        usa no App.jsx, que é a regra da casa deste arquivo. `ordem` os
+        coloca depois dos que já estavam no módulo (o hub do módulo não
+        muda de cara); a posição dentro do hub de Configurações é o
+        `ordemConfig`, que preserva a ordem que a lista à mão tinha.
+      */
+      { id: 'cfg-tipos-sub-contrato', ordem: 200, secaoConfig: 'cadastros', ordemConfig: 70, label: 'Subtipos de Contrato', desc: 'Cadastro de subtipos.', icon: HiOutlineDocumentCheck, to: '/tipos-sub-contrato', can: (user) => canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cfg-suporte-whatsapp', ordem: 210, secaoConfig: 'suporte', ordemConfig: 10, label: 'WhatsApp do Suporte', desc: 'Configure o número aberto pelo botão Suporte no topo do sistema.', icon: HiOutlineChatBubbleOvalLeft, to: '/configuracoes-suporte', can: (user) => canManageConfiguracoesArea(user, 'aparencia') },
+      { id: 'cfg-visibilidade-ui', ordem: 220, secaoConfig: 'suporte', ordemConfig: 20, label: 'Visibilidade de Dashboards e Tabelas', desc: 'Defina quais cards, dashboards e tabelas ficam visíveis nas telas do sistema.', icon: HiOutlineRectangleGroup, to: '/configuracoes-visibilidade-ui', can: (user) => canManageConfiguracoesArea(user, 'aparencia') },
+      { id: 'cfg-provisionamento-fluxo', ordem: 230, secaoConfig: 'provisionamento', ordemConfig: 10, label: 'Fluxo do Provisionamento', desc: 'Configure o modo informativo, controlado ou integrado com solicitações.', icon: HiOutlineCalendarDays, to: '/configuracoes-provisionamento-fluxo', can: (user) => hasEnabledModule(user, 'PROVISOES') && canManageConfiguracoesArea(user, 'geral') },
+      { id: 'cfg-status-setor', ordem: 240, secaoConfig: 'status-vinculos', ordemConfig: 10, label: 'Status por Setor', desc: 'Cadastro de status permitidos por setor.', icon: HiOutlineClipboardDocumentList, to: '/status-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-permissoes-setor', ordem: 250, secaoConfig: 'status-vinculos', ordemConfig: 20, label: 'Permissões por Setor', desc: 'Defina se usuários podem assumir e atribuir.', icon: HiOutlineShieldCheck, to: '/permissoes-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-cores-sistema', ordem: 260, secaoConfig: 'status-vinculos', ordemConfig: 30, label: 'Cores do Sistema', desc: 'Defina cores de botões e status.', icon: HiOutlineSparkles, to: '/cores-sistema', can: (user) => canManageConfiguracoesArea(user, 'aparencia') },
+      { id: 'cfg-areas-obra', ordem: 270, secaoConfig: 'status-vinculos', ordemConfig: 40, label: 'Areas Visiveis para OBRA', desc: 'Controle as áreas visíveis na nova solicitação.', icon: HiOutlineBuildingOffice2, to: '/areas-obra', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-obra-tipo-apropriacao', ordem: 280, secaoConfig: 'status-vinculos', ordemConfig: 50, label: 'Apropriação Padrão por Obra', desc: 'Defina a apropriação preenchida automaticamente por obra e tipo de solicitação.', icon: HiOutlineAdjustmentsHorizontal, to: '/obra-tipo-apropriacao', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-contrato-obra-categorias', ordem: 290, secaoConfig: 'status-vinculos', ordemConfig: 60, label: 'Categorias do Contrato de Obra', desc: 'Selecione quais categorias financeiras aparecem ao criar um contrato de obra.', icon: HiOutlineArchiveBox, to: '/contrato-obra-categorias', can: (user) => canManageConfiguracoesArea(user, 'geral') },
+      { id: 'cfg-areas-setor-origem', ordem: 300, secaoConfig: 'status-vinculos', ordemConfig: 70, label: 'Areas por Setor de Origem', desc: 'Defina quais setores cada setor pode selecionar na nova solicitação.', icon: HiOutlineRectangleGroup, to: '/areas-por-setor-origem', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      /*
+        A PERMISSÃO DIVERGIA, E QUEM ESTAVA ERRADO ERA O HUB (05/09).
+
+        A lista à mão mostrava este card para quem gerencia a área
+        `status_vinculos`. A ROTA é `<BusinessAdminRoute>`: quem não é
+        administrador do negócio clicava e era mandado embora. Card que
+        promete porta e entrega redirecionamento é pior que card ausente,
+        então aqui vale a guarda da rota — que é a regra deste arquivo.
+        Ninguém perde acesso: quem não passava no guarda nunca abriu a
+        tela.
+      */
+      { id: 'cfg-sla-setor', ordem: 310, secaoConfig: 'status-vinculos', ordemConfig: 80, label: 'SLA de Solicitações por Setor', desc: 'Defina o prazo real em dias usado no relatório operacional de solicitações.', icon: HiOutlineCalendarDays, to: '/solicitacoes-sla-setor', can: (user) => isBusinessAdmin(user) },
+      { id: 'cfg-setores-visiveis-usuario', ordem: 320, secaoConfig: 'status-vinculos', ordemConfig: 90, label: 'Setores Visiveis por Usuario', desc: 'Defina setores extras que cada usuário pode visualizar sem alterar regras de ação.', icon: HiOutlineUsers, to: '/setores-visiveis-usuario', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-recebimento-setor', ordem: 330, secaoConfig: 'status-vinculos', ordemConfig: 100, label: 'Recebimento por Setor', desc: 'Defina se as solicitações chegam primeiro ao admin ou ficam visíveis para todos.', icon: HiOutlineInboxStack, to: '/comportamento-recebimento-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-tipos-por-setor', ordem: 340, secaoConfig: 'status-vinculos', ordemConfig: 110, label: 'Tipos por Setor (Recebimento)', desc: 'Defina tipos por setor e o modo de recebimento para admin ou todos.', icon: HiOutlineClipboardDocumentList, to: '/tipos-solicitacao-por-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-nova-solicitacao-campos', ordem: 350, secaoConfig: 'status-vinculos', ordemConfig: 120, label: 'Campos da Nova Solicitação', desc: 'Defina campos visíveis e obrigatórios por tipo de solicitação.', icon: HiOutlineTableCells, to: '/nova-solicitacao-campos', can: (user) => canManageConfiguracoesArea(user, 'solicitacoes') },
+      /*
+        DOIS DESTINOS, NÃO UMA ROTA SOBRANDO (04/09, vindo do hub).
+
+        Este destino e o `cfg-contrato-alertas-formas` levam ao MESMO
+        componente, e por um tempo o hub tratou um deles como duplicata a
+        remover. Não é: a tela lê o pathname e anuncia assunto diferente
+        conforme o caminho — título, descrição e qual bloco recebe a barra
+        de cor. Se a tela muda o que diz que é conforme a porta, são duas
+        portas de verdade.
+      */
+      { id: 'cfg-contrato-alertas', ordem: 360, secaoConfig: 'status-vinculos', ordemConfig: 140, label: 'Alertas e Limites do Contrato', desc: 'Cortes e cores do alerta de saldo do contrato e o limite para análise jurídica.', icon: HiOutlineExclamationTriangle, to: '/configuracoes-contrato-alertas', can: (user) => canManageConfiguracoesArea(user, 'geral') },
+      { id: 'cfg-nova-solicitacao-automacao', ordem: 370, secaoConfig: 'status-vinculos', ordemConfig: 150, label: 'Automação da Nova Solicitação', desc: 'Redirecione tipos de solicitação para telas específicas mantendo a obra selecionada.', icon: HiOutlinePaperAirplane, to: '/nova-solicitacao-automacao-destino', can: (user) => canManageConfiguracoesArea(user, 'solicitacoes') },
+      { id: 'cfg-setores-criacao-todas-obras', ordem: 380, secaoConfig: 'status-vinculos', ordemConfig: 200, label: 'Criação em Todas as Obras', desc: 'Defina quais setores podem criar solicitação em qualquer obra.', icon: HiOutlineBuildingOffice2, to: '/setores-criacao-todas-obras', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-setores-acesso-todas-obras', ordem: 390, secaoConfig: 'status-vinculos', ordemConfig: 210, label: 'Acesso em Todas as Obras', desc: 'Defina quais setores podem acessar recursos protegidos por obra sem vínculo manual.', icon: HiOutlineKey, to: '/setores-acesso-todas-obras', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-usuarios-acesso-financeiro', ordem: 400, secaoConfig: 'status-vinculos', ordemConfig: 220, label: 'Acesso ao Financeiro', desc: 'Marque usuários que devem acessar o módulo financeiro e operar todas as obras nesse módulo.', icon: HiOutlineBanknotes, to: '/usuarios-acesso-financeiro', can: (user) => hasEnabledModule(user, 'FINANCEIRO') && canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-permissoes-areas-padroes', ordem: 410, secaoConfig: 'status-vinculos', ordemConfig: 230, label: 'Permissões por Setor e Perfil', desc: 'Configure permissões padrão por setor e perfil para aplicar a todos os usuários daquele grupo.', icon: HiOutlineShieldCheck, to: '/permissoes-areas-padroes', can: (user) => canManageConfiguracoesArea(user, 'permissoes') },
+      { id: 'cfg-permissoes-areas', ordem: 420, secaoConfig: 'status-vinculos', ordemConfig: 240, label: 'Permissões de Areas por Usuario', desc: 'Adicione exceções individuais quando um usuário precisar de permissões além do padrão do setor e perfil.', icon: HiOutlineIdentification, to: '/permissoes-areas', can: (user) => canManageConfiguracoesArea(user, 'permissoes') },
+      /*
+        PORTA ABERTA EM 04/09 (decisão do responsável).
+
+        Esta tela existia, tinha rota e guarda de permissão, e não tinha
+        link em lugar nenhum do sistema: chegava quem sabia a URL de cor.
+        Ferramenta administrativa de permissão não pode depender de quem
+        lembra o endereço.
+      */
+      { id: 'cfg-usuarios-permissoes-rh-dp', ordem: 430, secaoConfig: 'status-vinculos', ordemConfig: 250, label: 'Permissões de RH e DP por Usuario', desc: 'Marque quais usuários podem ver e operar cada área de RH e Departamento Pessoal.', icon: HiOutlineUserGroup, to: '/usuarios-permissoes-rh-dp', can: (user) => hasEnabledModule(user, 'RH_DP') && canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-timeout-inatividade', ordem: 440, secaoConfig: 'status-vinculos', ordemConfig: 260, label: 'Tempo de Inatividade', desc: 'Define o tempo para logout automático por inatividade.', icon: HiOutlineKey, to: '/timeout-inatividade', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') }
     ]
   },
   {
@@ -604,6 +707,30 @@ export function getVisibleItems(user) {
       moduleLabel: mod.label
     }))
   ));
+}
+
+/*
+  SEÇÕES DO HUB DE CONFIGURAÇÕES, JÁ FILTRADAS PELO USUÁRIO (05/09).
+
+  É a única leitura que o `pages/Configuracoes.jsx` faz — ele não conhece
+  mais destino nenhum. Sai daqui pronto: seção com rótulo e ordem
+  declarados em SECOES_CONFIGURACOES, itens já com o rótulo resolvido e
+  filtrados pela MESMA permissão do menu (`gate` do módulo + `can` do
+  destino), na ordem declarada em `ordemConfig`. Seção sem item visível
+  não volta — igual ao que o hub fazia com a lista à mão.
+*/
+export function getSecoesConfiguracoes(user) {
+  const itens = getVisibleItems(user).filter((item) => item.secaoConfig);
+  return SECOES_CONFIGURACOES
+    .slice()
+    .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999))
+    .map((secao) => ({
+      ...secao,
+      itens: itens
+        .filter((item) => item.secaoConfig === secao.id)
+        .sort((a, b) => (a.ordemConfig ?? a.ordem ?? 999) - (b.ordemConfig ?? b.ordem ?? 999))
+    }))
+    .filter((secao) => secao.itens.length > 0);
 }
 
 // Todos os destinos da árvore, sem filtro de permissão e cobrindo as

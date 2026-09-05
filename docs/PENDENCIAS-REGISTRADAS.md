@@ -2691,3 +2691,223 @@ o que a encerra, e quem a cancela. Se eu não consigo dizer as duas coisas na
 hora de criar, ela não deve existir. E gatilho que faz coisa irreversível
 (publicar, escrever, apagar) é cancelado assim que a razão dele acaba, não
 quando alguém repara nele.
+
+---
+
+## PROPOSTA AGUARDANDO DECISÃO — 05/09
+
+### Deixar visível que a alçada usa o valor original do contrato (N40)
+
+**Contexto.** Ver `ACHADOS-DE-NEGOCIO.md`, seção "COMPORTAMENTOS CONFIRMADOS
+— NÃO SÃO DEFEITOS", item N40. Em 05/09 o cliente confirmou que a alçada do
+Jurídico usa o **valor original** do contrato, e que o cabeçalho da tela
+mostra o **total com aditivos** — os dois números serem diferentes é
+esperado, não é defeito. O próprio cliente pediu esta proposta: *"se houver
+como deixar explícito na tela que o cabeçalho mostra o total com aditivos e
+a alçada usa o original, me traga a proposta"*.
+
+**Esta seção é só proposta. Nenhum código foi alterado.**
+
+#### Onde isso aparece hoje
+
+A tela de ações do contrato — a mesma onde se aprova, devolve ou cancela um
+contrato do fluxo novo — mostra, logo abaixo do título, uma linha assim:
+
+> **Contrato CT-000123 — Aguardando aprovação**
+> **Valor R$ 180.000,00** · Ao aprovar, as previsões de parcela viram
+> títulos financeiros com a categoria informada aqui.
+
+O número em negrito é o **total com aditivos**. Em nenhum ponto dessa tela
+aparece o valor original, nem qual dos dois números decide se o contrato
+precisa passar pelo Jurídico.
+
+- Arquivo: `frontend/src/pages/SolicitacaoDetalhe/AcoesContrato.jsx`.
+- O número mostrado vem da variável `valorComAditivos` (linha 197:
+  `Number(contrato.valor_total) + Number(contrato.valor_aditivos || 0)`) e é
+  exibido no cabeçalho do card na linha 553.
+- O número que decide a alçada é só `contrato.valor_total` (o original),
+  comparado no backend em `backend/src/services/contratoFluxoNovoService.js`
+  (variável `acimaDoLimite`, linha ~1513). Esse valor **não aparece em tela
+  em lugar nenhum** hoje — só o total com aditivos aparece.
+
+#### Opções
+
+**Opção 1 — Mostrar os dois números no cabeçalho, cada um com seu rótulo.**
+Trocar "Valor R$ 180.000,00" por "Valor original R$ 150.000,00 · Com
+aditivos R$ 180.000,00". Em contrato sem aditivo os dois números são iguais
+e pode-se mostrar só um, sem mudar o visual de hoje.
+- **Custo:** baixo. É trocar o texto que a linha 553 já monta — não cria
+  tela nova nem componente novo.
+- **O que resolve:** o número que decide a alçada fica visível toda vez que
+  alguém abre essa tela, sem precisar clicar em nada. É a opção mais difícil
+  de passar despercebida.
+- **Limite:** em contrato com muitos aditivos o texto fica um pouco mais
+  longo — não chega a quebrar o layout do card, mas é a opção com o texto
+  mais extenso das três.
+
+**Opção 2 — Explicar a regra por escrito, sem mudar o número mostrado.**
+Manter "Valor R$ 180.000,00" como está e completar a frase de apoio que já
+aparece ao lado (hoje: "Ao aprovar, as previsões de parcela viram títulos
+financeiros...") com algo como: "A análise do Jurídico considera o valor
+original do contrato, sem os aditivos."
+- **Custo:** mínimo. Muda só o texto de ajuda de cada estado do contrato — a
+  lista `ESTADOS`, no início do arquivo. Nenhum cálculo novo.
+- **O que resolve:** avisa que existe uma regra, sem obrigar a pessoa a
+  comparar dois números — suficiente para quem só quer saber que o sistema
+  não errou.
+- **Limite:** não mostra o valor original do contrato. Quem quiser conferir
+  se aquele contrato específico está perto do limite ainda precisa ir a
+  outra tela ou perguntar.
+
+**Opção 3 — Ícone de informação ao lado do valor, com o detalhamento.**
+Manter o número único no cabeçalho e acrescentar um ícone "i" que, ao passar
+o mouse ou tocar, mostra: "Valor original: R$ 150.000,00 · Aditivos: R$
+30.000,00 · Total: R$ 180.000,00. A alçada do Jurídico usa o valor
+original."
+- **Custo:** médio. É a única das três que precisa de um componente novo
+  (um tooltip/balão de informação) — hoje essa tela não tem nenhum.
+- **O que resolve:** mantém o cabeçalho curto como está e concentra todo o
+  detalhamento — inclusive o valor do aditivo isolado, que nenhuma das
+  outras duas opções mostra separadamente — num só lugar.
+- **Limite:** tooltip por toque, no celular, é menos confiável do que texto
+  fixo na tela — quem usa o sistema pelo celular pode não notar que o ícone
+  existe.
+
+#### Recomendação
+
+**Opção 1, com o texto da Opção 2 mantido como está** — as duas não são
+excludentes e podem ser feitas juntas sem custo adicional relevante.
+
+Motivo: a Opção 1 é a única que resolve o problema em qualquer forma que a
+pessoa use a tela — mouse, toque ou leitor de tela — sem depender de alguém
+reparar num ícone ou de ler até o fim uma frase de apoio. É também a mudança
+mais barata: não cria componente novo, só troca o texto que a tela já
+monta. A Opção 3 fica como reforço possível mais adiante, se o Jurídico
+pedir também o valor do aditivo isolado em destaque — hoje nem a Opção 1 nem
+a Opção 2 mostram esse valor separado, só o original e o total.
+
+**Status: proposta aguardando decisão do cliente. Nada foi implementado.**
+
+---
+
+## 05/09 — `process.exit()` truncava a saída do validador, e o M2 lia o pedaço
+
+O defeito mais silencioso que este validador já teve, e ele só apareceu
+porque uma prova começou a oscilar.
+
+### O sintoma
+
+A prova de mordida das regras (`regrasMordem.mjs`) passou a acusar uma regra
+DIFERENTE a cada corrida, sem nenhuma mudança de código no meio: R1, depois
+R17 e R19, depois R19 e R18, depois nenhuma. Prova que oscila é pior que
+prova vermelha — ela ensina a ignorar o resultado.
+
+### O que eu fiz de errado antes de achar
+
+Duas vezes atribuí a causa antes de medir. Primeiro culpei a corrida com o
+agente que rodava provas em paralelo (era verdade em parte, e consertei: a
+prova escrevia no manifesto compartilhado, e passou a usar `--extra`, que
+existe exatamente para isso e que eu tinha consertado horas antes sem
+usar). Depois culpei o `maxBuffer`. Só na terceira tentativa instrumentei a
+prova para DIZER o que ela mediu — e a resposta veio na primeira corrida.
+
+### A causa
+
+`process.exit(1)` no fim do validador. Quando a saída vai para um
+**terminal**, o Node escreve de forma síncrona e não se perde nada. Quando
+vai para um **pipe** — que é como todo mundo aqui consome o validador — a
+escrita é **assíncrona**, e `process.exit()` derruba o processo com bytes
+ainda na fila.
+
+Medido: a corrida completa emite **95.977 bytes**, sempre o mesmo número. As
+corridas que falhavam recebiam **51.444, 52.443, 55.796, 60.842 e 88.746
+bytes** — cortadas em pontos diferentes. Não era a regra que não mordia: era
+a mordida que não chegava ao papel.
+
+### Por que isso é maior que a prova
+
+O pior consumidor não era a prova. É o **item M2 da matriz**, que roda o
+validador por `execSync` e lê a saída **para cada uma das 189 telas**. Com a
+saída truncada, uma tela com FALHA de verdade podia ser lida como limpa — o
+check dizendo "passou" porque não recebeu a linha que a reprovava.
+
+**Silêncio por truncamento é indistinguível de aprovação.** É a mesma
+família do zero que veio de varredura que não varreu, e da concordância que
+não é cobertura: o resultado parece bom porque a medição não aconteceu.
+
+O conserto é `process.exitCode = 1` em vez de `process.exit(1)` — marca o
+código de saída e deixa o Node terminar naturalmente, depois de esvaziar a
+fila. Depois dele: 8 corridas seguidas da prova, todas verdes, e o tamanho
+da saída constante.
+
+**Consequência que assumo:** as células M2 da matriz de hoje foram medidas
+com o defeito ativo. A matriz final roda depois deste conserto — e é ela que
+vale.
+
+**A regra que fica:** processo que escreve em pipe nunca termina com
+`process.exit()`. E quando uma prova oscila, a primeira coisa a fazer é
+mandá-la dizer o que mediu — não adivinhar de que lado está o defeito.
+
+---
+
+## 05/09 — Duas capacidades anunciadas e inexistentes nas tabelas, e o check que dormia em cima de uma
+
+O cliente achou as duas no preview, olhando a tela. Nenhuma das duas
+aparecia em matriz nenhuma.
+
+### 1. O menu de alinhamento abria e ninguém via
+
+O ícone aparecia no cabeçalho, o tooltip "Alinhar / redimensionar"
+aparecia, e clicar não fazia nada. **O menu abria** — o estado mudava, o nó
+entrava no DOM. Ele era RECORTADO: `.resizable-table th { overflow: hidden }`
+existe para dar reticências ao título, e o menu é posicionado ABAIXO da
+caixa do `th`. Recorte total.
+
+É a R18 num lugar que a regra não tinha previsto. Ela estava escrita em
+termos de `position: sticky` — faixa fixa, coluna fixa. O mecanismo é maior
+que os dois exemplos: `overflow: hidden` recorta qualquer coisa posicionada
+para fora da caixa, e um menu suspenso é exatamente isso.
+
+Conserto: o menu sai por `createPortal` para o `body` e se posiciona por
+coordenada medida, como o autocomplete de apropriação já fazia.
+
+**No caminho eu introduzi um defeito novo e a prova nova o pegou**: ao
+trocar `absolute` por `fixed` perdi o `right: auto`, e como o
+`.app-mais-menu` traz `right: 0`, o menu nascia com **1403px de largura**
+para quatro opções.
+
+### 2. O item T2 media presença, não efeito — e por isso passou verde em 189 telas
+
+O T2 passava o ponteiro sobre o cabeçalho e media a **opacidade do ícone**.
+Nunca clicava. Com a capacidade quebrada em todas as tabelas do sistema, ele
+reportou PASSOU em 189 telas.
+
+Agora é prova de comportamento em 8 passos, cada um com veredito próprio:
+o ponteiro pousa, a affordance aparece, o ícone RECEBE o clique, o menu
+abre, o menu está **visível** (área, dentro da janela, e o centro dele
+devolve o próprio menu — porque o defeito real era "existe no DOM e está
+recortado"), escolhe outra opção, o `text-align` muda **no `th` e no `td`**,
+e persiste depois de recarregar.
+
+**A regra que fica:** check que mede a affordance não prova a capacidade.
+Ícone, tooltip e rótulo são o ANÚNCIO; o check tem de exercitar o que foi
+anunciado. Onde o projeto media presença, ele estava medindo a promessa.
+
+### 3. E um item novo, T8, do segundo achado do cliente
+
+"AÇÕES" assentava numa linha de base diferente das outras colunas. Causa: é
+a única coluna cujo título era **texto cru**; as demais embrulham em
+`.app-th-alinhavel`/`.app-th-botao`.
+
+Consertar o "Ações" expôs a causa maior, que a prova mediu: a coluna
+ordenável desenha o título num `<button>` e a estática num `<span>`, os dois
+com altura mínima (o alvo de clique da ordenação). O navegador **centraliza
+o conteúdo do botão** e **encosta o do span no topo** — 9,5px de desvio, em
+toda tabela que misture os dois tipos.
+
+O conserto foi escolhido por MEDIÇÃO, e ainda bem: `flex + align-items:
+center` zerava a linha de base **e quebrava o `text-align` herdado** — a
+coluna alinhada à direita ficou 217px fora do lugar. `display: grid` +
+`align-content: center` zera a linha de base e preserva o alinhamento
+horizontal. Pelo hábito eu teria escolhido o flex e desalinhado toda coluna
+monetária do sistema.

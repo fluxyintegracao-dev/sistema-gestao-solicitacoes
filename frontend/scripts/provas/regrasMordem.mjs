@@ -28,7 +28,6 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const MANIFESTO = path.join(RAIZ, 'scripts', 'telas-reformadas.json');
 /*
   NOME ÚNICO POR PROCESSO (04/09).
 
@@ -102,35 +101,72 @@ const CASOS_ARQUIVO_INTEIRO = [
   }
 ];
 
-const manifestoOriginal = fs.readFileSync(MANIFESTO, 'utf8');
 let falhas = 0;
 
+/*
+  `--extra` EM VEZ DE ESCREVER NO MANIFESTO (05/09) — a prova era instável e
+  a instabilidade era dela, não das regras.
+
+  Esta prova plantava o defeito acrescentando o arquivo-fixture ao
+  `telas-reformadas.json`, que é ESTADO COMPARTILHADO. Enquanto um agente
+  rodava as provas dele em paralelo, as duas corridas faziam
+  ler-modificar-escrever no mesmo arquivo e a restauração "cirúrgica" de uma
+  apagava a entrada da outra. Medido em 05/09: três corridas seguidas
+  acusaram regras DIFERENTES (R1, depois R17+R19, depois R19+R18) sem
+  nenhuma mudança de código no meio. Prova que oscila é pior que prova
+  vermelha: ela ensina a ignorar o resultado.
+
+  E a saída já existia no repositório, escrita com este propósito exato: o
+  `--extra` do validador mede um arquivo FORA do manifesto, sem tocar no
+  compartilhado. Eu tinha até consertado a bandeira hoje (ela lia só um
+  caminho) e continuei usando o caminho que causa corrida.
+*/
 function rodarValidador() {
   try {
-    execFileSync('node', [path.join(RAIZ, 'scripts', 'validarLayout.mjs')], { cwd: RAIZ, encoding: 'utf8' });
+    execFileSync('node', [path.join(RAIZ, 'scripts', 'validarLayout.mjs'), '--extra', ALVO_REL], { cwd: RAIZ, encoding: 'utf8' });
     return '';
   } catch (erro) {
     return `${erro.stdout || ''}${erro.stderr || ''}`;
   }
 }
 
+/*
+  QUANDO ESTA PROVA FALHA, ELA TEM DE DIZER POR QUÊ (05/09).
+
+  Em 05/09 ela começou a oscilar: três corridas seguidas acusaram regras
+  DIFERENTES, sem nenhuma mudança de código no meio, enquanto um agente
+  rodava provas em paralelo. A mensagem era sempre a mesma — "a regra
+  existe e não morde" — e ela é uma AFIRMAÇÃO sobre a regra, quando o que
+  havia era o verificador não tendo o que ler.
+
+  Prova que oscila ensina a ignorar o resultado, e mensagem que atribui a
+  causa errada é pior que mensagem nenhuma. Agora, quando não morde, ela
+  separa os casos e mostra o que mediu: fixture no disco? validador
+  respondeu? a saída cita o arquivo? cita a regra?
+*/
 function provar(regra, porque, conteudo) {
   fs.writeFileSync(ALVO, conteudo);
+  const noDisco = fs.existsSync(ALVO) ? fs.readFileSync(ALVO, 'utf8').length : -1;
   const saida = rodarValidador();
-  const mordeu = saida.includes(`[${regra}]`) && saida.includes(ALVO_REL);
-  if (mordeu) {
+  const citaArquivo = saida.includes(ALVO_REL);
+  const citaRegra = saida.includes(`[${regra}]`);
+  if (citaRegra && citaArquivo) {
     console.log(`  ok    ${regra} reprova ${porque}`);
-  } else {
-    falhas += 1;
-    console.log(`  FALHA ${regra} NÃO reprovou ${porque} — a regra existe e não morde`);
+    return;
   }
+  falhas += 1;
+  const diagnostico = noDisco <= 0
+    ? `a FIXTURE não estava no disco na hora da medição (${noDisco} bytes) — defeito desta prova, não da regra`
+    : (!saida
+      ? 'o validador saiu com 0 e não devolveu saída nenhuma — ele não chegou a medir a fixture'
+      : (!citaArquivo
+        ? `o validador respondeu (${saida.length} bytes) e NÃO citou ${ALVO_REL} — a fixture não entrou na medição`
+        : `o validador citou o arquivo mas não a regra [${regra}] — aí sim a regra não mordeu`));
+  console.log(`  FALHA ${regra} NÃO reprovou ${porque} — ${diagnostico}`);
 }
 
 try {
-  const manifesto = JSON.parse(manifestoOriginal);
-  if (!manifesto.telas.includes(ALVO_REL)) manifesto.telas.push(ALVO_REL);
-  fs.writeFileSync(MANIFESTO, `${JSON.stringify(manifesto, null, 2)}\n`);
-
+  // O manifesto NÃO é mais tocado: a fixture entra pela bandeira `--extra`.
   for (const caso of CASOS) provar(caso.regra, caso.porque, CABECA + caso.corpo + RABO);
   for (const caso of CASOS_ARQUIVO_INTEIRO) provar(caso.regra, caso.porque, caso.arquivo);
 
@@ -145,17 +181,14 @@ try {
   }
 } finally {
   /*
-    Restauração CIRÚRGICA, não byte a byte: escrever o manifesto original
-    de volta apagaria as entradas que OUTRA corrida acrescentou enquanto
-    esta rodava. Remove-se apenas a própria.
+    Nada a restaurar no manifesto — ele deixou de ser tocado. Sobra a
+    fixture, que é do PID desta corrida e some com ela.
+
+    A "restauração cirúrgica" que existia aqui era uma tentativa honesta de
+    conviver com corridas paralelas, e não bastava: ler-modificar-escrever
+    não é atômico, então duas corridas ainda se derrubavam. A lição é que o
+    conserto de corrida não é restaurar melhor — é não compartilhar.
   */
-  try {
-    const atual = JSON.parse(fs.readFileSync(MANIFESTO, 'utf8'));
-    atual.telas = atual.telas.filter((t) => t !== ALVO_REL);
-    fs.writeFileSync(MANIFESTO, `${JSON.stringify(atual, null, 2)}\n`);
-  } catch {
-    fs.writeFileSync(MANIFESTO, manifestoOriginal);
-  }
   if (fs.existsSync(ALVO)) fs.unlinkSync(ALVO);
 }
 

@@ -529,33 +529,171 @@ async function checarFaixa(page, resultado) {
     : { estado: 'PASSOU' };
 }
 
-async function checarAffordanceAlinhamento(page, resultado) {
-  if (resultado.T2?.estado !== 'PASSOU') return; // estático já reprovou/N-A
-  const th = page.locator('.resizable-th:has(.app-th-alinhavel)').first();
-  if (!(await th.count())) return;
+/*
+  T2 — DE "O ÍCONE APARECE" PARA "O ALINHAMENTO MUDA E FICA" (05/09).
 
+  O QUE ESTE ITEM MEDIA ATÉ HOJE, e o que isso custou: o check passava o
+  ponteiro sobre o cabeçalho e lia a OPACIDADE do ícone `.app-th-alinhar`.
+  Ou seja, media a PRESENÇA da affordance — nunca o EFEITO do clique. Com
+  isso o T2 saiu VERDE em 189 telas enquanto o menu de alinhamento estava
+  QUEBRADO em todas elas: ele abre (o estado do React muda, o nó entra no
+  DOM) e fica INVISÍVEL, recortado por `.resizable-table th { overflow:
+  hidden }` (src/index.css, que existe para dar reticências ao título)
+  porque o menu é `position: absolute; top: calc(100% + 4px)` — cai FORA da
+  caixa do `th`.
+
+  Sinal sem capacidade é exatamente o defeito que a DoD existe para pegar
+  (é a R15 ao contrário, e a própria DoD já registra isso em outros itens).
+  O check estava do lado errado dele: media o sinal e chamava de capacidade.
+
+  A SEQUÊNCIA QUE ESTE CHECK PROVA AGORA — a que o cliente pediu, na ordem:
+    1. o ponteiro pousa no cabeçalho da coluna (o ícone só fica clicável com
+       `:hover`, por desenho: `.resizable-th:hover .app-th-alinhar`);
+    2. a affordance aparece (opacidade — a medida antiga, mantida, porque
+       continua sendo exigência da R15; só deixou de ser a ÚNICA);
+    3. o ícone recebe o clique (mira confirmada por `elementFromPoint`);
+    4. o menu ABRE (entra no DOM);
+    5. o menu está VISÍVEL — área > 0 E o ponto central dele devolve o
+       PRÓPRIO menu em `elementFromPoint`. Existir no DOM não basta: o
+       defeito de hoje é literalmente "existe no DOM e está recortado", e
+       `getBoundingClientRect` sozinho NÃO enxerga recorte (ele devolve a
+       caixa de layout, clipada ou não). Quem enxerga é o teste de acerto:
+       se o ponto central do menu entrega outra coisa, o clique de uma
+       pessoa de verdade também cairia nessa outra coisa;
+    6. escolhe-se uma opção DIFERENTE da atual;
+    7. o `text-align` computado MUDA no `th` E no `td` da mesma coluna —
+       os dois, porque alinhar só o título é meio conserto (e é o que a T1
+       cobraria depois, na tela do cliente, não aqui);
+    8. recarrega e o alinhamento PERSISTE (R14: a escolha é do usuário e é
+       gravada por lista).
+
+  O COMPONENTE FOI CONSERTADO NO MESMO DIA (o menu saiu do fluxo por
+  `createPortal`, no `body`, para que nenhum ancestral possa recortá-lo).
+  Isso NÃO torna o check menos necessário — torna-o a única coisa que
+  garante que o conserto continue de pé: o item passou 189 telas sem
+  perceber a ausência da capacidade, e a mesma cegueira voltaria com
+  qualquer mudança de posicionamento. Por isso o check mede COMPORTAMENTO
+  e não árvore: ele procura o menu no documento inteiro e o amarra a esta
+  coluna pelo `aria-expanded` do ícone dela.
+
+  CADA PASSO QUE FALHA DIZ QUAL PASSO FALHOU, COM O VALOR MEDIDO. "T2
+  falhou" manda procurar; "passo 5: o menu abriu com 140×96px mas o centro
+  dele entrega `td celula-identidade` — está recortado" manda consertar.
+*/
+async function checarAlinhamentoDaColuna(page, resultado) {
+  if (resultado.T2?.estado !== 'PASSOU') return; // estático já reprovou / N-A / SEM DADO
+
+  const norm = (a) => (a === 'start' ? 'left' : a === 'end' ? 'right' : a);
+  const ROTULOS = { esquerda: 'left', centro: 'center', direita: 'right' };
+
+  /* Mede o alinhamento da coluna escolhida — o do TÍTULO (que mora no
+     wrapper, como a T1 lê) e o da CÉLULA. */
+  const medirColuna = (indice) => page.evaluate((i) => {
+    const normaliza = (a) => (a === 'start' ? 'left' : a === 'end' ? 'right' : a);
+    const tab = document.querySelector('.resizable-table');
+    if (!tab) return null;
+    const ths = Array.from(tab.querySelectorAll('thead th'));
+    const th = ths[i];
+    if (!th) return null;
+    const linha = Array.from(tab.querySelectorAll('tbody tr'))
+      .find((tr) => tr.children.length === ths.length && !tr.classList.contains('app-tabela-detalhe'));
+    const td = linha ? linha.children[i] : null;
+    return {
+      titulo: (th.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 40),
+      th: normaliza(getComputedStyle(th.querySelector('.app-th-alinhavel') || th).textAlign),
+      td: td ? normaliza(getComputedStyle(td).textAlign) : null
+    };
+  }, indice);
+
+  /* Escolhe a coluna: a primeira de CONTEÚDO (as de marcar/expandir não
+     têm cabeçalho de coluna, e a de ações não tem controle de alinhamento
+     — cobrar alinhamento delas seria cobrar o que não existe). */
+  const escolha = await page.evaluate(() => {
+    const tab = document.querySelector('.resizable-table');
+    if (!tab) return { erro: 'semTabela' };
+    const ths = Array.from(tab.querySelectorAll('thead th'));
+    const indice = ths.findIndex((th) => th.querySelector('.app-th-alinhar') && th.querySelector('.app-th-alinhavel'));
+    if (indice < 0) return { erro: 'semColunaDeConteudo' };
+    const linha = Array.from(tab.querySelectorAll('tbody tr'))
+      .find((tr) => tr.children.length === ths.length && !tr.classList.contains('app-tabela-detalhe'));
+    if (!linha) {
+      const vazio = document.querySelector('.empty-state, .app-empty-card, .app-tabela-vazia');
+      return { erro: 'semLinha', vazio: vazio ? String(vazio.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 90) : null };
+    }
+    return { indice };
+  });
+
+  if (escolha.erro === 'semTabela') {
+    resultado.T2 = {
+      estado: 'SEM DADO',
+      motivo: 'passo 0: a tabela não estava no DOM na hora de exercitar o alinhamento — a capacidade NÃO FOI PROVADA'
+    };
+    return;
+  }
+  if (escolha.erro === 'semColunaDeConteudo') {
+    resultado.T2 = {
+      estado: 'N/A',
+      motivo: 'tabela sem coluna de conteúdo com controle de alinhamento (só colunas de controle/ações) — não há alinhamento a escolher'
+    };
+    return;
+  }
+  if (escolha.erro === 'semLinha') {
+    /*
+      BASE VAZIA É *SEM DADO*, NÃO *FALHOU* — a mesma distinção que a T3 e a
+      T5 já fazem no arquivo. Sem uma linha no `tbody` não existe `td` para
+      medir o EFEITO do alinhamento, e o passo 7 é metade do item. Reprovar
+      aqui seria acusar a tela pela base do preview.
+    */
+    resultado.T2 = {
+      estado: 'SEM DADO',
+      motivo: `passo 0: a tela TEM tabela, mas a base do preview não devolveu linha${escolha.vazio ? ` (mostrou "${escolha.vazio}")` : ''} — o EFEITO do alinhamento no td NÃO PÔDE ser medido`
+    };
+    return;
+  }
+
+  const indice = escolha.indice;
+  const th = page.locator('.resizable-table thead th').nth(indice);
+  const icone = th.locator('.app-th-alinhar').first();
+  const antes = await medirColuna(indice);
+  const daColuna = `coluna "${antes?.titulo || indice + 1}"`;
+  // Marca que uma escolha CHEGOU a ser aplicada: é o que decide se a
+  // limpeza precisa recarregar a tela para os checks seguintes.
+  let aplicou = false;
+
+  const limpar = async () => {
+    /*
+      LIMPA A ESCOLHA ANTES DE SAIR — a mesma lição que a T3 aprendeu caro:
+      este check GRAVA alinhamento no localStorage (é assim que ele prova a
+      persistência), e os checks seguintes rodam na MESMA sessão. Sem a
+      limpeza, a T1 e a T4 passariam a medir uma tabela alinhada pelo
+      próprio harness.
+    */
+    await page.evaluate(() => {
+      Object.keys(window.localStorage)
+        .filter((chave) => /:alinhar$/.test(chave))
+        .forEach((chave) => window.localStorage.removeItem(chave));
+    }).catch(() => {});
+    if (!aplicou) return;
+    await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    await esperarCarregar(page);
+    await page.evaluate(() => {
+      document.querySelectorAll('.app-bloco-recolher[aria-expanded="false"]').forEach((b) => b.click());
+    }).catch(() => {});
+    await page.waitForTimeout(300);
+  };
+
+  /* ---- passo 1: o ponteiro pousa no cabeçalho -------------------------- */
   /*
-    MEDIÇÃO QUE NÃO REPRODUZ NÃO É MEDIÇÃO (04/09).
+    MEDIÇÃO QUE NÃO REPRODUZ NÃO É MEDIÇÃO (04/09, mantido).
 
-    Este check reprovou a `usuarios` numa execução e passou na seguinte,
-    com o MESMO código dos dois lados. Não era a tela: o `hover` não
-    pegava. A faixa fixa ainda assenta depois do carregamento e o cabeçalho
-    se desloca alguns pixels; o ponteiro pousava onde o `th` estava, não
-    onde ele ficou.
-
-    FALHOU intermitente é pior que check nenhum: gasta o tempo de quem
-    investiga e some quando se vai olhar, ensinando a não confiar na
-    matriz. Duas mudanças, e as duas são de honestidade da medida:
-
-    1. Confirma que o ponteiro está SOBRE o cabeçalho (`:hover` de fato
-       casando) antes de julgar a opacidade — e tenta de novo se não
-       estiver. Sem isso, o check media o próprio erro de mira.
-    2. Se depois disso o ponteiro ainda não estiver lá, o item não vira
-       FALHOU: vira SEM DADO, porque a capacidade não foi exercitada.
-       Reprovar a tela por falha do harness é atribuir defeito a quem não
-       o tem.
+    Este check reprovou a `usuarios` numa execução e passou na seguinte com
+    o MESMO código: o `hover` não pegava. A faixa fixa assenta depois do
+    carregamento e o cabeçalho se desloca alguns pixels — o ponteiro pousava
+    onde o `th` estava, não onde ele ficou. FALHOU intermitente é pior que
+    check nenhum. Por isso: confirma o `:hover` antes de julgar, tenta de
+    novo, e se ainda assim não pousar não vira FALHOU — vira SEM DADO,
+    porque a capacidade não foi exercitada.
   */
-  const alinhar = th.locator('.app-th-alinhar').first();
   let sobre = false;
   let opacidade = 0;
   for (let tentativa = 0; tentativa < 2 && !sobre; tentativa += 1) {
@@ -564,22 +702,262 @@ async function checarAffordanceAlinhamento(page, resultado) {
     await th.hover({ force: tentativa > 0 }).catch(() => {});
     await page.waitForTimeout(300);
     sobre = await th.evaluate((el) => el.matches(':hover')).catch(() => false);
-    opacidade = await alinhar
-      .evaluate((el) => parseFloat(getComputedStyle(el).opacity)).catch(() => 0);
+    opacidade = await icone.evaluate((el) => parseFloat(getComputedStyle(el).opacity)).catch(() => 0);
   }
   if (!sobre) {
     resultado.T2 = {
       estado: 'SEM DADO',
-      motivo: 'o ponteiro não chegou a pousar sobre o cabeçalho da coluna em duas tentativas — a affordance de alinhamento (R15) NÃO FOI EXERCITADA'
+      motivo: `passo 1 (pousar o ponteiro): o ponteiro não chegou a pousar sobre o cabeçalho da ${daColuna} em duas tentativas — o menu de alinhamento NÃO FOI EXERCITADO`
     };
-  } else if (opacidade < 0.5) {
-    resultado.T2 = { estado: 'FALHOU', motivo: `affordance do alinhamento não aparece com o ponteiro SOBRE o cabeçalho (opacidade ${opacidade}) — R15` };
+    await page.mouse.move(4, 4);
+    return;
   }
-  await page.mouse.move(4, 4);
+
+  /* ---- passo 2: a affordance aparece (R15) ----------------------------- */
+  if (!(opacidade >= 0.5)) {
+    resultado.T2 = {
+      estado: 'FALHOU',
+      motivo: `passo 2 (a affordance aparece): com o ponteiro SOBRE o cabeçalho da ${daColuna}, o ícone de alinhamento está com opacidade ${opacidade} (esperado ≥ 0.5) — capacidade sem sinal não existe (R15)`
+    };
+    await page.mouse.move(4, 4);
+    return;
+  }
+
+  /* ---- passo 3: o ícone recebe o clique -------------------------------- */
+  const miraIcone = await mirarAlvo(page, icone, {
+    seletorAlvo: '.app-th-alinhar',
+    textos: {
+      semCaixa: `passo 3 (mirar o ícone): o ícone de alinhamento da ${daColuna} não tem caixa visível para clicar`,
+      coberto: (quem) => `passo 3 (mirar o ícone): o ícone de alinhamento da ${daColuna} NÃO RECEBE o ponteiro — quem recebe naquele ponto é "${quem}". O clique de qualquer pessoa cai nele também`,
+      foraDaJanela: `passo 3 (mirar o ícone): o ícone de alinhamento da ${daColuna} não coube na janela em quatro tentativas — o menu NÃO FOI EXERCITADO`,
+      cobertoTeimoso: (quem) => `passo 3 (mirar o ícone): o ícone de alinhamento da ${daColuna} seguiu coberto pela moldura do sistema ("${quem}") em quatro tentativas — o menu NÃO FOI EXERCITADO`
+    }
+  });
+  if (!miraIcone.ponto) {
+    resultado.T2 = { estado: miraIcone.estado, motivo: miraIcone.motivo };
+    await page.mouse.move(4, 4);
+    return;
+  }
+  await page.mouse.move(miraIcone.ponto.x, miraIcone.ponto.y);
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.waitForTimeout(350);
+
+  /* ---- passo 4: o menu ABRE (entra no DOM) ----------------------------- */
+  /*
+    O MENU É PROCURADO NO DOCUMENTO INTEIRO, NÃO DENTRO DO `th` (05/09).
+
+    A primeira versão deste check procurava `.app-th-menu` DENTRO do
+    cabeçalho e reprovou a fixture obediente com "nenhum menu entrou no
+    DOM" — o menu estava lá, aberto e visível, só que no `body`. É que o
+    conserto do componente, feito no mesmo dia, tirou o menu do fluxo com
+    `createPortal` justamente porque nenhum ancestral pode recortar o que
+    está no `body`. Check que assume a ÁRVORE do conserto anterior mede o
+    passado; o que amarra o menu a esta coluna é o `aria-expanded` do ícone
+    dela, e é isso que se confere.
+  */
+  const menu = page.locator('.app-th-menu').first();
+  const abriu = await menu.count();
+  const marcouAberto = await icone.getAttribute('aria-expanded');
+  if (!abriu) {
+    resultado.T2 = {
+      estado: 'FALHOU',
+      motivo: `passo 4 (o menu abre): o ícone de alinhamento da ${daColuna} recebeu o clique e NENHUM menu (.app-th-menu) entrou no DOM (o ícone ficou com aria-expanded="${marcouAberto}")`
+    };
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.mouse.move(4, 4);
+    return;
+  }
+
+  /* ---- passo 5: o menu está VISÍVEL, não só presente ------------------- */
+  const geometria = await menu.evaluate((el) => {
+    const caixa = el.getBoundingClientRect();
+    const estilo = getComputedStyle(el);
+    return {
+      largura: Math.round(caixa.width),
+      altura: Math.round(caixa.height),
+      x: caixa.x + caixa.width / 2,
+      y: caixa.y + caixa.height / 2,
+      display: estilo.display,
+      visibility: estilo.visibility,
+      opacidade: parseFloat(estilo.opacity),
+      janelaL: window.innerWidth,
+      janelaA: window.innerHeight
+    };
+  });
+  const reprovarMenu = async (motivo) => {
+    resultado.T2 = { estado: 'FALHOU', motivo };
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.mouse.move(4, 4);
+  };
+  if (!(geometria.largura > 0 && geometria.altura > 0)) {
+    await reprovarMenu(`passo 5 (o menu está visível): o menu da ${daColuna} entrou no DOM com ÁREA ZERO (${geometria.largura}×${geometria.altura}px, display ${geometria.display})`);
+    return;
+  }
+  /*
+    MENU QUE ABRE FORA DA JANELA É DEFEITO, NÃO ERRO DE MIRA (05/09).
+
+    Esta guarda vem ANTES da mira de propósito. O menu é `position: fixed`
+    posicionado por coordenada medida do botão: se a coordenada estiver
+    errada (medida velha depois de rolar, por exemplo), ele abre fora da
+    janela — e ROLAR NÃO TRAZ DE VOLTA o que é fixo. Sem esta guarda, a
+    mira tentaria rolar quatro vezes e devolveria SEM DADO ("não coube na
+    janela"), transformando um defeito da tela em lacuna de evidência —
+    exatamente o erro que a mira da alça já cometeu uma vez.
+  */
+  if (geometria.x < 0 || geometria.y < 0 || geometria.x > geometria.janelaL || geometria.y > geometria.janelaA) {
+    await reprovarMenu(`passo 5 (o menu está visível): o menu da ${daColuna} abriu FORA da janela — centro em (${Math.round(geometria.x)}, ${Math.round(geometria.y)}) numa janela de ${geometria.janelaL}×${geometria.janelaA}px. O menu é fixo: rolar não o traz de volta`);
+    return;
+  }
+  if (geometria.visibility === 'hidden' || !(geometria.opacidade > 0.1)) {
+    await reprovarMenu(`passo 5 (o menu está visível): o menu da ${daColuna} entrou no DOM com ${geometria.largura}×${geometria.altura}px mas invisível (visibility ${geometria.visibility}, opacidade ${geometria.opacidade})`);
+    return;
+  }
+  /*
+    O TESTE QUE PEGA O DEFEITO DE HOJE: quem recebe o ponto CENTRAL do menu.
+    `getBoundingClientRect` devolve a caixa de LAYOUT — ela continua igual
+    quando um ancestral com `overflow: hidden` recorta o que seria pintado.
+    O `elementFromPoint` é o que a pessoa vive: se o centro do menu entrega
+    a célula da tabela, é a célula que está pintada ali, e o menu está
+    recortado. Mesma separação da mira da alça (T3): moldura do sistema por
+    cima é erro de mira do harness (rola e tenta de novo); qualquer outra
+    coisa por cima é defeito da tela.
+  */
+  const miraMenu = await mirarAlvo(page, menu, {
+    seletorAlvo: '.app-th-menu',
+    textos: {
+      semCaixa: `passo 5 (o menu está visível): o menu da ${daColuna} não tem caixa visível`,
+      coberto: (quem) => `passo 5 (o menu está visível): o menu da ${daColuna} ABRIU (está no DOM, ${geometria.largura}×${geometria.altura}px) mas o ponto central dele entrega "${quem}" — o menu está RECORTADO ou COBERTO, e ninguém consegue escolher nada nele`,
+      foraDaJanela: `passo 5 (o menu está visível): o menu da ${daColuna} não coube na janela em quatro tentativas — a escolha do alinhamento NÃO FOI EXERCITADA`,
+      cobertoTeimoso: (quem) => `passo 5 (o menu está visível): o menu da ${daColuna} seguiu coberto pela moldura do sistema ("${quem}") em quatro tentativas — a escolha do alinhamento NÃO FOI EXERCITADA`
+    }
+  });
+  if (!miraMenu.ponto) {
+    resultado.T2 = { estado: miraMenu.estado, motivo: miraMenu.motivo };
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.mouse.move(4, 4);
+    return;
+  }
+
+  /* ---- passo 6: escolher uma opção DIFERENTE da atual ------------------ */
+  const opcoes = menu.locator('[role="menuitem"]');
+  const total = await opcoes.count();
+  const atual = antes?.th || null;
+  let escolhida = null;
+  for (let i = 0; i < total; i += 1) {
+    const rotulo = (await opcoes.nth(i).innerText()).replace(/[✓\s]+/g, ' ').trim().toLowerCase();
+    const marcada = await opcoes.nth(i).getAttribute('aria-pressed');
+    const valor = ROTULOS[rotulo] || null;
+    if (marcada === 'true') continue;
+    if (valor && valor === atual) continue;
+    escolhida = { indice: i, valor, rotulo };
+    break;
+  }
+  if (!escolhida) {
+    await reprovarMenu(`passo 6 (escolher outra opção): o menu da ${daColuna} abriu com ${total} opção(ões) e NENHUMA diferente do alinhamento atual (${atual}) — não há o que escolher`);
+    return;
+  }
+  const miraOpcao = await mirarAlvo(page, opcoes.nth(escolhida.indice), {
+    seletorAlvo: '.app-th-menu',
+    textos: {
+      semCaixa: `passo 6 (escolher outra opção): a opção "${escolhida.rotulo}" não tem caixa visível`,
+      coberto: (quem) => `passo 6 (escolher outra opção): a opção "${escolhida.rotulo}" do menu da ${daColuna} não recebe o ponteiro — quem recebe é "${quem}"`,
+      foraDaJanela: `passo 6 (escolher outra opção): a opção "${escolhida.rotulo}" não coube na janela em quatro tentativas — a escolha NÃO FOI EXERCITADA`,
+      cobertoTeimoso: (quem) => `passo 6 (escolher outra opção): a opção "${escolhida.rotulo}" seguiu coberta pela moldura do sistema ("${quem}") — a escolha NÃO FOI EXERCITADA`
+    }
+  });
+  if (!miraOpcao.ponto) {
+    resultado.T2 = { estado: miraOpcao.estado, motivo: miraOpcao.motivo };
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.mouse.move(4, 4);
+    return;
+  }
+  await page.mouse.click(miraOpcao.ponto.x, miraOpcao.ponto.y);
+  await page.waitForTimeout(400);
+  aplicou = true;
+
+  /* ---- passo 7: o text-align MUDA no th E no td ------------------------ */
+  const depois = await medirColuna(indice);
+  const esperado = escolhida.valor;
+  const problemas = [];
+  if (!depois) {
+    problemas.push(`a coluna sumiu do DOM depois da escolha "${escolhida.rotulo}"`);
+  } else {
+    const mudouTh = depois.th !== antes.th;
+    const mudouTd = depois.td !== antes.td;
+    const certoTh = esperado ? depois.th === esperado : mudouTh;
+    const certoTd = esperado ? depois.td === esperado : mudouTd;
+    if (!certoTh) {
+      problemas.push(`o TÍTULO continua ${depois.th} (era ${antes.th}${esperado ? `, esperado ${esperado}` : ', esperava mudar'})`);
+    }
+    if (!certoTd) {
+      problemas.push(`a CÉLULA continua ${depois.td} (era ${antes.td}${esperado ? `, esperado ${esperado}` : ', esperava mudar'})`);
+    }
+  }
+  if (problemas.length) {
+    resultado.T2 = {
+      estado: 'FALHOU',
+      motivo: `passo 7 (o alinhamento muda): o menu da ${daColuna} abriu, recebeu a escolha "${escolhida.rotulo}" e ${problemas.join(' e ')} — menu que abre e não faz nada é a mesma capacidade ausente, com sinal a mais`
+    };
+    await limpar();
+    return;
+  }
+
+  /* ---- passo 8: persiste ao recarregar (R14) --------------------------- */
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await esperarCarregar(page);
+  await page.evaluate(() => {
+    document.querySelectorAll('.app-bloco-recolher[aria-expanded="false"]').forEach((b) => b.click());
+  });
+  const voltou = await page.locator('.resizable-table thead th').first()
+    .waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+  await page.waitForTimeout(400);
+  if (!voltou) {
+    /* Mesmo desenlace da T3: tabela ausente por falta de linha é lacuna de
+       evidência, não defeito da tela. */
+    const vazioNaTela = await page.evaluate(() => {
+      const alvo = document.querySelector('.empty-state, .app-empty-card, .app-tabela-vazia');
+      if (!alvo) return null;
+      const texto = String(alvo.innerText || '').trim().replace(/\s+/g, ' ');
+      return /carregando/i.test(texto) ? null : texto.slice(0, 120);
+    });
+    resultado.T2 = vazioNaTela
+      ? {
+        estado: 'SEM DADO',
+        motivo: `passo 8 (persistência): depois de recarregar, a base não devolveu linha (mostrou "${vazioNaTela}") — a persistência do alinhamento NÃO FOI PROVADA`
+      }
+      : {
+        estado: 'FALHOU',
+        motivo: 'passo 8 (persistência): depois de recarregar, a tabela não voltou a aparecer em 15s — a persistência do alinhamento não pôde ser medida'
+      };
+    await limpar();
+    return;
+  }
+  const recarregado = await medirColuna(indice);
+  const persistiuTh = recarregado && (esperado ? recarregado.th === esperado : recarregado.th === depois.th);
+  const persistiuTd = recarregado && (esperado ? recarregado.td === esperado : recarregado.td === depois.td);
+  if (!persistiuTh || !persistiuTd) {
+    resultado.T2 = {
+      estado: 'FALHOU',
+      motivo: `passo 8 (persistência): o alinhamento "${escolhida.rotulo}" foi aplicado (título ${depois.th}, célula ${depois.td}) e NÃO sobreviveu à recarga — voltou para título ${recarregado?.th ?? 'nenhum'}, célula ${recarregado?.td ?? 'nenhuma'} (R14: a escolha é do usuário e fica gravada por lista)`
+    };
+    await limpar();
+    return;
+  }
+
+  resultado.T2 = {
+    estado: 'PASSOU',
+    motivo: `menu aberto e VISÍVEL na ${daColuna} (${geometria.largura}×${geometria.altura}px), escolha "${escolhida.rotulo}": título e célula foram de ${antes.th}/${antes.td} para ${depois.th}/${depois.td} e persistiram à recarga`
+  };
+  await limpar();
 }
 
 /*
-  MIRA A ALÇA ANTES DE ARRASTAR — e diz quem recebeu o ponteiro (05/09).
+  MIRA O ALVO ANTES DE DISPARAR O PONTEIRO — e diz quem recebeu (05/09).
+
+  Vale para a ALÇA de redimensionamento (T3) e para o ÍCONE e o MENU de
+  alinhamento (T2): todos são "aponte uma coordenada e clique", e todos
+  erram do mesmo jeito.
 
   O T3 pegava o `boundingBox()` da alça e mandava o mouse para o centro
   dele, sem rolar nada e sem conferir quem estava por cima. Nas telas de
@@ -599,25 +977,32 @@ async function checarAffordanceAlinhamento(page, resultado) {
   confirma, ANTES, que a coordenada é do alvo — e, quando não consegue,
   diz QUEM recebeu, em vez de acusar a tela de um defeito que é dele.
 */
-async function mirarAlca(page, alca) {
-  await alca.scrollIntoViewIfNeeded().catch(() => {});
+async function mirarAlvo(page, alvo, { seletorAlvo, textos }) {
+  /* Prazo curto nas duas esperas: alvo RECORTADO (o menu de alinhamento
+     de hoje) ou coberto ainda tem caixa de layout, mas quando não tem, o
+     prazo padrão de 30s multiplicado por quatro tentativas transformaria
+     uma medição em minutos de espera — e o veredito é o mesmo. */
+  await alvo.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(150);
   let ultimo = null;
   for (let tentativa = 0; tentativa < 4; tentativa += 1) {
-    const caixa = await alca.boundingBox();
+    const caixa = await alvo.boundingBox({ timeout: 5000 }).catch(() => null);
     if (!caixa) {
-      return { ponto: null, estado: 'FALHOU', motivo: 'alça de redimensionamento invisível' };
+      return { ponto: null, estado: 'FALHOU', motivo: textos.semCaixa };
     }
     const ponto = { x: caixa.x + caixa.width / 2, y: caixa.y + caixa.height / 2 };
-    const quemRecebe = await page.evaluate(({ x, y }) => {
+    const quemRecebe = await page.evaluate(({ x, y, seletor }) => {
       if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
         return { fora: true };
       }
-      const alvo = document.elementFromPoint(x, y);
-      if (!alvo) return { fora: true };
-      if (alvo.classList.contains('resizable-th-handle')) return null;
-      const r = alvo.getBoundingClientRect();
-      const nome = alvo.getAttribute('class') || alvo.tagName.toLowerCase();
+      const noPonto = document.elementFromPoint(x, y);
+      if (!noPonto) return { fora: true };
+      // `closest` e não `classList`: quem recebe o ponteiro costuma ser um
+      // FILHO do alvo (o <svg> dentro do botão, o rótulo dentro do item de
+      // menu) — e acertar o filho é acertar o alvo.
+      if (noPonto.closest(seletor)) return null;
+      const r = noPonto.getBoundingClientRect();
+      const nome = noPonto.getAttribute('class') || noPonto.tagName.toLowerCase();
       /*
         QUEM COBRE DIZ DE QUEM É A CULPA (05/09) — a prova de mordida me
         pegou.
@@ -634,27 +1019,23 @@ async function mirarAlca(page, alca) {
         sistema (a faixa fixa, a topbar), o problema é onde eu mirei: basta
         rolar. Se quem cobre é qualquer outra coisa, o clique de uma pessoa
         de verdade também cairia nela — e aí a affordance não funciona,
-        que é exatamente o que o T3 existe para pegar.
+        que é exatamente o que estes itens existem para pegar.
       */
-      const molduraDoSistema = alvo.closest('.app-page-header, .fx-topbar, .fx-breadcrumb, .fx-atalhos-fileira, .sidebar, .topbar-shell');
+      const molduraDoSistema = noPonto.closest('.app-page-header, .fx-topbar, .fx-breadcrumb, .fx-atalhos-fileira, .sidebar, .topbar-shell');
       return {
         fora: false,
         daMoldura: Boolean(molduraDoSistema),
         quem: String(nome).slice(0, 80),
         base: Math.round(r.bottom)
       };
-    }, ponto);
+    }, { ...ponto, seletor: seletorAlvo });
     if (!quemRecebe) return { ponto };
     if (quemRecebe.fora === false && !quemRecebe.daMoldura) {
-      return {
-        ponto: null,
-        estado: 'FALHOU',
-        motivo: `a alça de redimensionamento da coluna está COBERTA por "${quemRecebe.quem}" — o ponteiro (o de qualquer pessoa, não só o do robô) não chega nela, e arrastar não faz nada`
-      };
+      return { ponto: null, estado: 'FALHOU', motivo: textos.coberto(quemRecebe.quem) };
     }
     ultimo = quemRecebe;
     // Coberto por elemento fixo (a faixa) → rola PARA CIMA o tanto que
-    // falta para a alça sair de baixo dele. Fora da janela → aproxima.
+    // falta para o alvo sair de baixo dele. Fora da janela → aproxima.
     const recuo = quemRecebe.fora ? 160 : Math.max(12, quemRecebe.base - ponto.y + 16);
     await page.evaluate((d) => window.scrollBy(0, -d), recuo);
     await page.waitForTimeout(150);
@@ -662,10 +1043,22 @@ async function mirarAlca(page, alca) {
   return {
     ponto: null,
     estado: 'SEM DADO',
-    motivo: ultimo?.fora
-      ? 'o ponto de arrasto da coluna não coube na janela em quatro tentativas — o redimensionamento NÃO FOI EXERCITADO'
-      : `o ponto de arrasto da coluna está coberto por outro elemento ("${ultimo?.quem}") em quatro tentativas — o redimensionamento NÃO FOI EXERCITADO`
+    motivo: ultimo?.fora ? textos.foraDaJanela : textos.cobertoTeimoso(ultimo?.quem)
   };
+}
+
+/** A mira da ALÇA de redimensionamento (T3) — as mensagens dela, palavra
+    por palavra, porque a prova de mordida cobra o RAMO pelo texto. */
+async function mirarAlca(page, alca) {
+  return mirarAlvo(page, alca, {
+    seletorAlvo: '.resizable-th-handle',
+    textos: {
+      semCaixa: 'alça de redimensionamento invisível',
+      coberto: (quem) => `a alça de redimensionamento da coluna está COBERTA por "${quem}" — o ponteiro (o de qualquer pessoa, não só o do robô) não chega nela, e arrastar não faz nada`,
+      foraDaJanela: 'o ponto de arrasto da coluna não coube na janela em quatro tentativas — o redimensionamento NÃO FOI EXERCITADO',
+      cobertoTeimoso: (quem) => `o ponto de arrasto da coluna está coberto por outro elemento ("${quem}") em quatro tentativas — o redimensionamento NÃO FOI EXERCITADO`
+    }
+  });
 }
 
 async function checarRedimensionamento(page, tela, resultado) {
@@ -1525,7 +1918,7 @@ const errosDeJs = [];
         fundir(resultado.itens, await page.evaluate(checksEstaticos, { tipo: tela.tipo }));
         fundir(resultado.itens, await page.evaluate(checkStickyEAcessibilidade));
         await checarFaixa(page, resultado.itens);
-        await checarAffordanceAlinhamento(page, resultado.itens);
+        await checarAlinhamentoDaColuna(page, resultado.itens);
         await checarEtiquetasFiltro(page, tela, resultado.itens);
         await checarRedimensionamento(page, tela, resultado.itens);
         await checarModalCadastro(page, tela, resultado.itens);
@@ -1579,7 +1972,7 @@ const errosDeJs = [];
           await page.waitForTimeout(600);
           fundirVariante(await page.evaluate(checksEstaticos, { tipo: tela.tipo }), 'blocos expandidos');
           if (resultado.itens.T3?.estado === 'N/A' && await page.locator('.resizable-table').count()) {
-            await checarAffordanceAlinhamento(page, resultado.itens);
+            await checarAlinhamentoDaColuna(page, resultado.itens);
             await checarRedimensionamento(page, tela, resultado.itens);
           }
         }
@@ -1603,7 +1996,7 @@ const errosDeJs = [];
 
           if ((!resultado.itens.T3 || resultado.itens.T3.estado === 'N/A') && await page.locator('.resizable-table').count()) {
             resultado.itens.T3 = undefined;
-            await checarAffordanceAlinhamento(page, resultado.itens);
+            await checarAlinhamentoDaColuna(page, resultado.itens);
             await checarRedimensionamento(page, tela, resultado.itens);
             if (resultado.itens.T3) resultado.itens.T3.motivo = `[${sufixo}] ${resultado.itens.T3.motivo || ''}`.trim() || undefined;
           }
@@ -1916,6 +2309,6 @@ if (EXECUTADO_DIRETO) {
 /* Exportadas para a prova de mordida do runner (provas/itensDoRunner...). */
 export {
   checarFaixa, checarRedimensionamento, checarEtiquetasFiltro,
-  checarModalCadastro, checarMobile, checarAffordanceAlinhamento,
+  checarModalCadastro, checarMobile, checarAlinhamentoDaColuna,
   r3Para, m2Para, login, esperarCarregar
 };

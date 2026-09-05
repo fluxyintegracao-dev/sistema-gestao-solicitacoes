@@ -687,6 +687,28 @@
   padding-right: var(--esp-4);
 }
 
+/*
+  T8 — TÍTULO ORDENÁVEL E TÍTULO ESTÁTICO NA MESMA LINHA DE BASE (05/09).
+
+  A coluna ordenável desenha o título num `<button>` e a estática num
+  `<span>`, os dois com esta classe e com `min-height: var(--alvo-clique)`
+  (o alvo mínimo de clique da ordenação, R2). Com `display: block`, o
+  navegador CENTRALIZA o conteúdo do botão dentro da altura mínima — é
+  comportamento próprio do `<button>` — e encosta o do `<span>` no topo.
+  Duas caixas de linha diferentes: 7px de desvio medidos aqui, 9,5px no
+  componente real, na mesma fileira de títulos.
+
+  `display: grid` + `align-content: center` dá a mesma centralização às
+  DUAS, sem depender da tag.
+
+  Por que grid e não flex — MEDIDO, não escolhido por hábito: com `flex`,
+  o texto vira item de flex e o `text-align` herdado deixa de posicioná-lo;
+  a coluna alinhada à direita ficou 217px fora do lugar no teste. Com
+  `grid`, o texto vira item anônimo que estica na coluna e o `text-align`
+  continua valendo — 0px de desvio nos dois alinhamentos. Eu teria
+  escolhido o flex pelo hábito e desalinhado toda coluna monetária do
+  sistema.
+*/
 .app-th-botao {
   appearance: none;
   border: 0;
@@ -697,7 +719,8 @@
   letter-spacing: inherit;
   text-transform: inherit;
   color: inherit;
-  display: block;
+  display: grid;
+  align-content: center;
   width: 100%;
   min-height: var(--alvo-clique);
   text-align: inherit;
@@ -785,14 +808,33 @@
   height: 14px;
 }
 
+/*
+  O MENU DE ALINHAMENTO VIVE NO `body` (05/09).
+
+  Ele era `position: absolute` dentro do `th`, e o `th` tem `overflow:
+  hidden` para dar reticências ao título — então o menu, que começa ABAIXO
+  da caixa do `th`, era recortado inteiro. Anunciado e invisível.
+
+  Agora sai por portal e se posiciona por coordenada medida do botão, então
+  precisa ser `fixed` (a coordenada é de viewport) e ficar acima do
+  conteúdo. Nenhum ancestral do `body` recorta.
+*/
 .app-th-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
+  position: fixed;
+  /*
+    `right: auto` — e a ausência dele foi um defeito MEU no conserto do
+    portal (05/09). O `.app-mais-menu` que esta classe estende traz
+    `right: 0`; com o portal fixando `left` inline, os dois lados ficavam
+    presos e a caixa esticava até a borda direita da janela: 1403px de menu
+    para quatro opções. A versão anterior tinha `right: auto` e eu o perdi
+    ao trocar `absolute` por `fixed`. Achado pela prova de comportamento do
+    T2, que mede o menu de verdade.
+  */
   right: auto;
   min-width: 140px;
   text-transform: none;
   letter-spacing: normal;
+  z-index: var(--z-dropdown-portal, 90);
 }
 
 /* M3 — cabeçalho de tabela legada (.table, ex.: pivô de apropriação) em
@@ -1262,9 +1304,34 @@ fieldset.form-section {
   informação: onde a pessoa está dentro do conjunto. Alinhado à direita, sob
   a borda da tabela, e sem borda própria — é rodapé, não é bloco.
 */
+/* Rodapé: contagem à esquerda, alternador de modo à direita. */
+.app-tabela-rodape-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  flex-wrap: wrap;
+  margin-top: var(--esp-2);
+}
+
+/* O alternador rolagem ⇄ lista inteira. O botão já é `btn btn-outline
+   btn-sm`; esta classe existe para o rótulo de estado não quebrar em duas
+   linhas quando o rodapé aperta — e para o verificador ter onde mirar.
+   Classe usada e não declarada é fantasma: parece intenção e não é. */
+.app-tabela-modo {
+  white-space: nowrap;
+}
+
+/* Sentinela da rolagem infinita: não ocupa espaço, só serve de alvo para o
+   observador de interseção. */
+.app-tabela-sentinela {
+  display: block;
+  height: 1px;
+}
+
 .app-tabela-rodape {
-  margin: var(--esp-2) 0 0;
-  text-align: right;
+  margin: 0;
+  text-align: left;
   font-size: var(--fonte-corpo);
   line-height: var(--lh-corpo);
   color: var(--c-muted);

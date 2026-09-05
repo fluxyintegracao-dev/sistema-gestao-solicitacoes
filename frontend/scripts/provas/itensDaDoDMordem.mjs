@@ -21,15 +21,20 @@
  * IMPORTANTE: esta prova importa e executa as FUNÇÕES REAIS de
  * `scripts/qa-preview/checks.mjs`. Provar uma cópia não prova nada.
  *
- * ESCOPO DECLARADO: os 27 itens que `checks.mjs` mede num DOM parado —
- * C2 C3 C4 C5 C6 · T1 T2 T4 T5 T6 T7 · F1 F2 F4 · B1 B2 B3 B4 B5 ·
- * M1 M3 M4 · R2 · R18 · X1 X3 · A1. Ficam DE FORA, e continuam sem prova de
- * reprovação, os itens que só existem na interação e moram no runner
- * (`verificar.mjs`): C1 (faixa na rolagem), T3 (arrasto de coluna), F3
+ * ESCOPO DECLARADO: os 28 itens que `checks.mjs` mede num DOM parado —
+ * C2 C3 C4 C5 C6 · T1 T2 T4 T5 T6 T7 T8 · F1 F2 F4 · B1 B2 B3 B4 B5 ·
+ * M1 M3 M4 · R2 · R18 · X1 X3 · A1. Ficam DE FORA os itens que só existem
+ * na interação e moram no runner (`verificar.mjs`): C1 (faixa na rolagem),
+ * T2 (a sequência do menu de alinhamento), T3 (arrasto de coluna), F3
  * (filtro aplicado), M2 (validador estático), R1 (cadastro em modal), R3
- * (sem caixa do navegador) e X2 (faixa fixa no mobile) — mais a metade
- * interativa da T2 (a affordance de alinhamento no hover). Lacuna
- * declarada, não cobertura.
+ * (sem caixa do navegador) e X2 (faixa fixa no mobile) — todos provados na
+ * irmã `itensDoRunnerMordem.mjs`, que desde 05/09 cobre também o T2. Aqui
+ * o T2 tem prova só da metade ESTÁTICA (o controle existe no cabeçalho,
+ * com tooltip); o EFEITO do clique é provado lá.
+ *
+ * O T8 (05/09) entra nesta prova, e não na do runner, porque é medida de
+ * DOM parado: a linha de base do texto dos títulos, comparada entre as
+ * colunas da mesma tabela.
  *
  * Rode com `npm run provas` ou `node scripts/provas/itensDaDoDMordem.mjs`.
  */
@@ -97,6 +102,12 @@ const CASOS = [
   { item: 'T2', defeito: 'semControleAlinhar', planta: 'coluna sem o controle de alinhamento', ramo: 'sem o controle de alinhamento' },
   { item: 'T2', defeito: 'alinharSemTooltip', planta: 'controle de alinhamento sem o tooltip "Alinhar"', ramo: 'sem tooltip' },
   { item: 'T2', defeito: 'ordenavelSemIndicador', planta: 'título ordenável sem indicador de ordem', ramo: 'sem indicador de ordem' },
+  {
+    item: 'T8',
+    defeito: 'acoesTextoCru',
+    planta: 'coluna "Ações" com o título em TEXTO CRU no th (como a TabelaPadrao renderiza hoje), enquanto as vizinhas embrulham em .app-th-alinhavel/.app-th-botao',
+    ramo: 'da linha de base das outras'
+  },
   { item: 'T4', defeito: 'sobraNaoDistribuida', planta: 'tabela deixando ~1400px de sobra parada à direita', ramo: 'de sobra não distribuída' },
   { item: 'T4', defeito: 'sobraNaColunaErrada', planta: 'coluna com folga larga enquanto a vizinha quebra', ramo: 'a sobra foi para a coluna errada' },
   { item: 'T5', defeito: 'identidadeSemMaiusculas', planta: 'coluna de identificação sem caixa alta' },
@@ -147,6 +158,11 @@ const CASOS = [
    demais é tão inútil quanto um que não morde: aqui a página tem a forma do
    defeito, e o item NÃO pode reprovar. */
 const NEGATIVOS = [
+  {
+    item: 'T8',
+    defeito: 'acoesEnvelopada',
+    planta: 'a MESMA coluna "Ações", com o título embrulhado como o das vizinhas — a forma consertada não pode ser acusada'
+  },
   {
     item: 'C6',
     defeito: 'linkDeSubRota',
@@ -289,10 +305,10 @@ try {
 
   /* 3) Cobertura: nenhum item da lista pode ficar sem prova nem sem
      declaração explícita de não-provável. */
-  const ITENS = 'C2 C3 C4 C5 C6 T1 T2 T4 T5 T6 T7 F1 F2 F4 B1 B2 B3 B4 B5 M1 M3 M4 R2 R18 X1 X3 A1'.split(' ');
+  const ITENS = 'C2 C3 C4 C5 C6 T1 T2 T4 T5 T6 T7 T8 F1 F2 F4 B1 B2 B3 B4 B5 M1 M3 M4 R2 R18 X1 X3 A1'.split(' ');
   const semProva = ITENS.filter((i) => !porItem.has(i) && !NAO_PROVAVEIS.some((n) => n.item === i));
   registrar(semProva.length === 0,
-    `todos os 27 itens têm prova ou declaração${semProva.length ? ` — faltam ${semProva.join(', ')}` : ''}`);
+    `todos os ${ITENS.length} itens têm prova ou declaração${semProva.length ? ` — faltam ${semProva.join(', ')}` : ''}`);
 
   console.log('');
   NAO_PROVAVEIS.forEach((n) => console.log(`  n/p    ${n.item} declarado NÃO-PROVÁVEL: ${n.motivo}`));

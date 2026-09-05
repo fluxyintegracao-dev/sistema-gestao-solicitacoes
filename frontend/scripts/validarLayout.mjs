@@ -1670,8 +1670,33 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (falhas.length > 0) {
     falhas.forEach((falha) => console.error('FALHA', falha));
     console.error(`\n[layout] ${falhas.length} violação(ões) em ${telas} tela(s) do manifesto.`);
-    process.exit(1);
-  }
+    /*
+      `process.exitCode`, NUNCA `process.exit()` (05/09) — e este era o
+      defeito mais silencioso que este validador já teve.
+
+      Quando a saída vai para um TERMINAL, o Node escreve de forma síncrona
+      e `process.exit()` não perde nada. Quando vai para um PIPE — que é
+      como todo mundo aqui consome este validador — a escrita é
+      ASSÍNCRONA, e `process.exit()` derruba o processo com bytes ainda na
+      fila. A saída chega CORTADA, num ponto que varia a cada corrida.
+
+      Como isso apareceu: a prova de mordida das regras passou a oscilar,
+      acusando uma regra diferente a cada corrida sem nenhuma mudança de
+      código. Medido: a corrida limpa emite 96KB; as que falhavam recebiam
+      51KB, 55KB, 60KB, 88KB. Não era a regra que não mordia — era a
+      mordida que não chegava ao papel.
+
+      E o pior consumidor não era a prova: é o item M2 da matriz, que lê
+      esta saída por `execSync` para cada uma das 189 telas. Com a saída
+      truncada, uma tela com FALHA de verdade podia ser lida como limpa —
+      o check dizendo "passou" porque não recebeu a linha que reprovava.
+      Silêncio por truncamento é indistinguível de aprovação.
+
+      `process.exitCode` marca o código de saída e deixa o Node terminar
+      naturalmente, depois de esvaziar a fila.
+    */
+    process.exitCode = 1;
+  } else {
   /*
     O RESUMO CHAMAVA AVISO DE "EXCECAO REGISTRADA" (04/09).
 
@@ -1710,4 +1735,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     `[layout] ok — ${telas} tela(s) do manifesto dentro das regras`
     + (avisos.length ? ` (${avisos.length} aviso(s): ${detalhe}).` : '.')
   );
+  }
 }

@@ -6,23 +6,10 @@
 > capacidade, a base do preview não deu registro para exercitá-la — NÃO PROVADA)
 > · — N/A (a regra não se aplica; motivo registrado).
 
-- Verificação: **2026-09-05 08:02** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `f32d1364a7bccb5a9cc5910061b1315b040f566b`
+- Verificação: **2026-09-05 09:20** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `552752c6ecb2473c386031ee05f88e1c30d52e9e`
 - Telas verificadas: 189 · Itens: C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1
-- **TELAS QUE NÃO ABRIRAM: 12** — nada nelas foi medido, e rodada com tela que não abre NÃO fecha:
-  - `sst-dashboard` — redirecionada de /sst para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-rel-operacional` — redirecionada de /sst/relatorios/operacional para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-executivo` — redirecionada de /sst/relatorios/executivo para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-centro-operacional` — redirecionada de /sst/relatorios/centro-operacional para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-heatmap` — redirecionada de /sst/relatorios/heatmap para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-observabilidade` — redirecionada de /sst/observabilidade para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-producao` — redirecionada de /sst/producao para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-observabilidade-avancada` — redirecionada de /sst/observabilidade-avancada para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-timeline` — redirecionada de /sst/timeline para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-esocial` — redirecionada de /sst/esocial para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `sst-configuracoes` — redirecionada de /sst/configuracoes para /sst/pgr — acesso/política bloqueando o usuário de QA
-  - `pedido-compra-detalhe` — nenhuma forma de abrir o registro levou a /\/pedidos-compra\/\d+$/ a partir de /pedidos-compra — tentadas: clique na própria linha; a URL ficou em /pedidos-compra
-- **Células FALHOU: 43** (justificativas abaixo)
-- **Células SEM DADO: 307** — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)
+- **Células FALHOU: 1** (justificativas abaixo)
+- **Células SEM DADO: 682** — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)
 
 | Tela | C1 | C2 | C3 | C4 | C5 | C6 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | F1 | F2 | F3 | F4 | B1 | B2 | B3 | B4 | B5 | M1 | M2 | M3 | M4 | R1 | R2 | R3 | X1 | X2 | X3 | R18 | A1 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -51,7 +38,7 @@
 | rhdp-pessoal | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | rhdp-colaboradores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | rhdp-documentos | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
-| rhdp-importacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| rhdp-importacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | rhdp-fechamentos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | rhdp-relatorio-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | modulo-relatorios | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
@@ -84,7 +71,7 @@
 | financeiro-fluxo-consolidado | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | financeiro-intercompany | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | financeiro-obras | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| financeiro-relatorio-analitico | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| financeiro-relatorio-analitico | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | financeiro-resultado-centros-custo | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | financeiro-resultado-obras | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | comprovantes-pendentes | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
@@ -120,7 +107,7 @@
 | config-permissoes-areas | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | config-hub | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | config-cartoes-recarga | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| contratos-gestao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| contratos-gestao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | comercial-contratos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | comercial-empreendimentos | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | comercial-unidades | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
@@ -137,39 +124,39 @@
 | crm-novo-lead | ✅ | ✅ | ✅ | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 | crm-lead-detalhe | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | crm-carteira | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
-| crm-kanban | ✅ | ✅ | — | — | ✅ | ❌ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| crm-kanban | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | crm-tarefas | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | crm-inbox | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 | crm-automacoes | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | crm-admin-canais | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | crm-admin-numeros | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | crm-admin-integracoes | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
-| compras-rel-categorias-insumos | ❌ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| compras-rel-ciclo | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| compras-rel-compras-diretas | ❌ | ✅ | ❌ | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
-| compras-rel-compras-fornecedor | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| compras-rel-demanda-pedidos | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| compras-rel-economia-cotacoes | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| compras-rel-evolucao | ❌ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| compras-rel-fornecedores | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| compras-rel-pendencias-cotacoes | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| compras-rel-precos-insumos | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-categorias-insumos | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-ciclo | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-compras-diretas | ✅ | ✅ | ✅ | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
+| compras-rel-compras-fornecedor | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-demanda-pedidos | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-economia-cotacoes | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-evolucao | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-fornecedores | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-pendencias-cotacoes | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compras-rel-precos-insumos | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | gestao-categorias | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | gestao-unidades | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gestao-apropriacoes | ✅ | ❌ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
-| sst-dashboard | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-rel-operacional | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-executivo | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-centro-operacional | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-heatmap | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-observabilidade | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-producao | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-observabilidade-avancada | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-timeline | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-esocial | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| sst-configuracoes | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
+| gestao-apropriacoes | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+| sst-dashboard | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-rel-operacional | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-executivo | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-centro-operacional | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-heatmap | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-observabilidade | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-producao | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-observabilidade-avancada | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-timeline | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-esocial | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
+| sst-configuracoes | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
 | sst-crud | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
-| solicitacoes | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ❌ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| solicitacoes | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | nova-solicitacao | ✅ | ✅ | ✅ | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 | fiscal-dashboard | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | fiscal-documentos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
@@ -191,7 +178,7 @@
 | custos-recebiveis | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | solicitacao-detalhe | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | inicio | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| dashboard | ✅ | ✅ | — | — | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| dashboard | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | treinamento | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | prioridades-diretoria | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | perfil | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
@@ -200,7 +187,7 @@
 | contratos-rel-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | comercial-rel-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | solicitacoes-compra | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| cotacoes | ❌ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ❌ | ✅ | ❌ | — |
+| cotacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | pedidos-compra | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | compras-delegacao | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 | gestao-fornecedores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -210,57 +197,15 @@
 | revisar-solicitacao-compra | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
 | revisar-compra-direta | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ |
 | solicitacao-compra-detalhe | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
-| hub-modulo | ❌ | ❌ | — | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ❌ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ❌ | ✅ | — | — |
-| solicitacoes-arquivadas | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ❌ | — | ✅ | ✅ | ✅ | — | ✅ | ❌ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| pedido-compra-detalhe | ❌ | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
-| compra-finalizada | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| hub-modulo | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| solicitacoes-arquivadas | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ⚠ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| pedido-compra-detalhe | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| compra-finalizada | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | gerenciar-cotacao | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 
 ## FALHOU — cada célula, justificada
 
-- **financeiro-relatorio-analitico · T6**: texto cortado sem tooltip: "TIT-MTJLBFMT4DL0-V1…" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td.celula-identidade.app-celula-token`)_
-- **contratos-gestao · T6**: texto cortado sem tooltip: "CT-MTJLBFMT4DL0-0…" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td.celula-identidade.app-celula-token`)_
-- **crm-kanban · C6**: link de navegação como ação: "+ Novo Lead" → /crm/leads/novo _(seletor: `div.page.solicitacoes-page > header.app-page-header > div.app-page-header-row > div.app-actionbar > a.btn.btn-primary`)_
-- **compras-rel-categorias-insumos · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-categorias-insumos · C1**: faixa compacta com 94px de altura (muito vazio para uma linha)
-- **compras-rel-ciclo · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-compras-diretas · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-compras-diretas · C1**: faixa compacta com 94px de altura (muito vazio para uma linha)
-- **compras-rel-compras-fornecedor · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-demanda-pedidos · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-economia-cotacoes · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-economia-cotacoes · T7**: valor truncado: "09.016.666 LEANDRO REBOLI DE LYRIO · R$ 5,00" (largura 166px < conteúdo 280px) _(seletor: `tbody > tr.app-tabela-linha > td.celula-valor > div.app-celula-dupla > span.app-celula-dupla-sub`)_
-- **compras-rel-evolucao · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-evolucao · T7**: valor monetário QUEBRADO em 3 linhas: "05/2026: R$ 150,00 | 06/2026: R$ 5.132.627,00 | 07/2026: R$ 10.919,30" (145px de largura) _(seletor: `table.resizable-table > tbody > tr.app-tabela-linha > td > span.text-xs.text-[var(--c-muted)]`)_
-- **compras-rel-evolucao · C1**: faixa compacta com 94px de altura (muito vazio para uma linha)
-- **compras-rel-fornecedores · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-pendencias-cotacoes · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **compras-rel-precos-insumos · C3**: seta de voltar em tela de LISTAGEM (R11: redundante)
-- **gestao-apropriacoes · C2**: contagem ausente no apoio _(seletor: `div.layout-shell.fluxy-app-shell > main.layout-main.flex-1 > div.layout-content-shell.compras-responsive-scope > div.page.solicitacoes-page > header.app-page-header`)_
-- **sst-dashboard · C1**: a tela NÃO ABRIU: redirecionada de /sst para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-rel-operacional · C1**: a tela NÃO ABRIU: redirecionada de /sst/relatorios/operacional para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-executivo · C1**: a tela NÃO ABRIU: redirecionada de /sst/relatorios/executivo para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-centro-operacional · C1**: a tela NÃO ABRIU: redirecionada de /sst/relatorios/centro-operacional para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-heatmap · C1**: a tela NÃO ABRIU: redirecionada de /sst/relatorios/heatmap para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-observabilidade · C1**: a tela NÃO ABRIU: redirecionada de /sst/observabilidade para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-producao · C1**: a tela NÃO ABRIU: redirecionada de /sst/producao para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-observabilidade-avancada · C1**: a tela NÃO ABRIU: redirecionada de /sst/observabilidade-avancada para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-timeline · C1**: a tela NÃO ABRIU: redirecionada de /sst/timeline para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-esocial · C1**: a tela NÃO ABRIU: redirecionada de /sst/esocial para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **sst-configuracoes · C1**: a tela NÃO ABRIU: redirecionada de /sst/configuracoes para /sst/pgr — acesso/política bloqueando o usuário de QA
-- **solicitacoes · M1**: 2 alvo(s) < 32px; primeiro: div.la-root > div.la-nivel1 > div.la-vis-controles > div.la-modo > button.ativo (81×30px)
-- **dashboard · C6**: link de navegação como ação: "Abrir solicitacoes" → /solicitacoes _(seletor: `div.page.solicitacoes-page > section.app-bloco > div.app-bloco-corpo > div.app-actionbar > a.btn.btn-outline`)_
-- **cotacoes · R18**: overflow hidden mata o sticky: div.layout-shell.fluxy-app-shell > main.layout-main.flex-1 > div.layout-content-shell.compras-responsive-scope > div.page.solicitacoes-page (overflow hidden) sobre a faixa fixa main.layout-main.flex-1 > div.layout-content-shell.compras-responsive-scope > div.page.solicitacoes-page > header.app-page-header — use overflow: clip _(seletor: `div.layout-shell.fluxy-app-shell > main.layout-main.flex-1 > div.layout-content-shell.compras-responsive-scope > div.page.solicitacoes-page (overflow hidden) sobre a faixa fixa main.layout-main.flex-1 > div.layout-content-shell.compras-responsive-scope > div.page.solicitacoes-page > header.app-page-header`)_
-- **cotacoes · C1**: faixa sumiu na rolagem; faixa sobrepõe a topbar em 493.4px
-- **cotacoes · X2**: faixa sumiu na rolagem
-- **hub-modulo · C2**: faixa .app-page-header ausente
-- **hub-modulo · B1**: nenhum bloco na tela
-- **hub-modulo · C1**: faixa .app-page-header ausente
-- **hub-modulo · X2**: faixa ausente dentro de .layout-main no 390 — 0 .app-page-header no documento inteiro, .layout-main existe, contêineres: main.layout-main.flex-1 | div.layout-content-shell; começo da página: "Início Compras L Compras Solicitações, cotações e pedidos de compra. Solicitações de Compr"
-- **solicitacoes-arquivadas · M1**: 2 alvo(s) < 32px; primeiro: div.la-root > div.la-nivel1 > div.la-vis-controles > div.la-modo > button.ativo (81×30px)
-- **solicitacoes-arquivadas · F3**: filtro abriu sem opções de MARCAÇÃO (checkbox/radio)
-- **pedido-compra-detalhe · C1**: a tela NÃO ABRIU: nenhuma forma de abrir o registro levou a /\/pedidos-compra\/\d+$/ a partir de /pedidos-compra — tentadas: clique na própria linha; a URL ficou em /pedidos-compra
-- **compra-finalizada · C3**: tela de detalhe/registro sem a seta de voltar à esquerda
+- **pedido-compra-detalhe · C1**: faixa compacta com 94px de altura (muito vazio para uma linha)
 
 ## SEM DADO — capacidades que NÃO foram provadas
 
@@ -294,6 +239,17 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **crm-admin-numeros** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum numero cadastrado Cadastre o primeiro numero para separar insti") — capacidade NÃO PROVADA
 - **crm-admin-integracoes** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum evento registrado Assim que o webhook receber o primeiro evento") — capacidade NÃO PROVADA
 - **compras-rel-compras-diretas** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Sem dados no periodo.") — capacidade NÃO PROVADA
+- **sst-dashboard** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst para /sst/pgr)
+- **sst-rel-operacional** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/relatorios/operacional para /sst/pgr)
+- **sst-executivo** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/relatorios/executivo para /sst/pgr)
+- **sst-centro-operacional** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/relatorios/centro-operacional para /sst/pgr)
+- **sst-heatmap** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/relatorios/heatmap para /sst/pgr)
+- **sst-observabilidade** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/observabilidade para /sst/pgr)
+- **sst-producao** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/producao para /sst/pgr)
+- **sst-observabilidade-avancada** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/observabilidade-avancada para /sst/pgr)
+- **sst-timeline** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/timeline para /sst/pgr)
+- **sst-esocial** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/esocial para /sst/pgr)
+- **sst-configuracoes** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: nao e politica de acesso: o MODO SIMPLIFICADO do SST esta ligado (SST_SIMPLIFIED_MODE em src/modules/sst/constants/sstResources.js) e manda estas telas para /sst/pgr. Elas saíram do menu na mesma leva, pela mesma constante. Enquanto o modo estiver ligado a capacidade existe e nao e alcancavel — lacuna declarada, nao defeito. Se o modo for desligado o redirecionamento some, esta declaracao para de valer sozinha (ela so dispensa a medicao quando o destino do desvio e exatamente /sst/pgr) e as telas voltam a ser medidas (redirecionou de /sst/configuracoes para /sst/pgr)
 - **sst-crud** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum registro encontrado.") — capacidade NÃO PROVADA
 - **fiscal-documento-detalhe** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum vinculo registrado nesta fase.") — capacidade NÃO PROVADA
 - **fiscal-divergencias** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhuma divergencia fiscal encontrada.") — capacidade NÃO PROVADA
@@ -302,9 +258,10 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **solicitacao-detalhe** — T1, T2, T4, T5, T6, T7: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum titulo financeiro foi gerado para esta solicitacao.") — capacidade NÃO PROVADA
 - **treinamento** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum conteudo encontrado Nenhum conteudo para os filtros atuais. Lim") — capacidade NÃO PROVADA
 - **comercial-rel-operacional** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum contrato encontrado no período.") — capacidade NÃO PROVADA
-- **revisar-solicitacao-compra** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: etapa de fluxo: os dados vêm do rascunho que a tela "nova" grava no NAVEGADOR, não do servidor — sem rascunho a tela devolve a pessoa para /solicitacoes-compra/nova, que é o comportamento certo. Não é medida por URL porque o passo seguinte dela CRIA a solicitação no ambiente compartilhado, e esta bateria clica em botões (redirecionou de /solicitacoes-compra/revisar para /solicitacoes-compra/nova)
+- **revisar-solicitacao-compra** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: etapa de fluxo: os dados vêm do rascunho que a tela "nova" grava no NAVEGADOR, não do servidor — sem rascunho a tela devolve a pessoa para a "nova", que é o comportamento certo. Não é medida por URL porque o passo seguinte dela CRIA a solicitação no ambiente compartilhado, e esta bateria clica em botões (redirecionou de /solicitacoes-compra/revisar para /solicitacoes-compra/nova)
 - **revisar-compra-direta** — C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1: a tela NÃO FOI MEDIDA: mesma coisa da revisão de solicitação: o rascunho da compra direta vive no navegador e o passo seguinte CRIA a compra no ambiente compartilhado (redirecionou de /solicitacoes-compra-direta/revisar para /solicitacoes-compra-direta/nova)
 - **solicitacao-compra-detalhe** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum item informado nesta solicitacao.") — capacidade NÃO PROVADA
+- **solicitacoes-arquivadas** — F3: dimensão sem opção na base do preview — declarado no manifesto (as dimensoes saem dos registros carregados e a base do preview nao tem nenhuma solicitacao arquivada) e dito à pessoa na tela: "Nenhum registro de status disponível para filtrar."
 
 ## N/A — motivos
 
@@ -333,7 +290,7 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **rhdp-pessoal**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T4 (sobra distribuída para UMA coluna só é limite do TabelaPadrao, não da tela: Obra e Empresa precisam as duas de espaço e dar peso a uma inverte o defeito (medido em 04/09). Exceção com dono: leva do TabelaPadrao); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro)
 - **rhdp-colaboradores**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); T3 (tabela com menos de 2 colunas)
 - **rhdp-documentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T3 (tabela com menos de 2 colunas); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro)
-- **rhdp-importacoes**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); T3 (tabela com menos de 2 colunas); R1 (ação principal não é cadastro ("Selecionar planilha"))
+- **rhdp-importacoes**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Selecionar planilha"))
 - **rhdp-fechamentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro)
 - **rhdp-relatorio-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório"))
 - **modulo-relatorios**: C3 (hub de entrada do módulo, não é tela de detalhe); C4 (idem C3); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (hub de cartões: não há listagem com recorte); F2 (idem F1); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
@@ -479,7 +436,8 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **nova-solicitacao-compra**: C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
 - **nova-compra-direta**: C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
 - **solicitacao-compra-detalhe**: T3 (tabela com menos de 2 colunas); F1 (tela sem busca); F4 (tela sem linha de filtros); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Abrir PDF"))
-- **hub-modulo**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem faixa e sem botões a medir); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
+- **hub-modulo**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
 - **solicitacoes-arquivadas**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro)
-- **compra-finalizada**: T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Abrir PDF")); X1 (tela sem tabela/lista tabular)
+- **pedido-compra-detalhe**: M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); T3 (tabela com menos de 2 colunas); R1 (ação principal não é cadastro ("Enviar pedido"))
+- **compra-finalizada**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Abrir PDF")); X1 (tela sem tabela/lista tabular)
 - **gerenciar-cotacao**: T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (tela sem grid de campos); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Abrir PDF")); X1 (tela sem tabela/lista tabular)
