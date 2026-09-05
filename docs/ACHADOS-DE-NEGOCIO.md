@@ -543,6 +543,39 @@ falha virou condição visível.
 Quem tinha exatamente dois nunca soube que existia uma lista completa, e nada
 dizia que os dois exibidos eram um recorte. **Corrigido.**
 
+## PARTE 10 — FILTROS QUE ESCONDEM SEM DIZER
+
+### N45. "Nenhum status marcado" não significa "todos" na lista de pedidos
+
+Sem filtro de status, o serviço aplica silenciosamente `status ≠ CANCELADO`. A
+pessoa lê "todos" e vê "todos menos cancelados" — e só enxerga um pedido
+cancelado se marcar **Cancelado** explicitamente.
+
+Se a intenção é essa, ela precisa estar escrita na tela. Hoje não está em
+lugar nenhum.
+
+### N46. A delegação de compras some com cartões sem avisar
+
+Compras cujos pedidos ativos estão todos fechados são omitidas da lista
+(exceto em fechamento parcial), e a contagem de "Abertas" já vem descontada.
+O cartão desaparece sem nenhum sinal de que desapareceu **por isso**.
+
+### N47. "Usuário #12" onde deveria estar um nome
+
+Na delegação, quando o responsável anterior saiu do setor de Compras e o
+registro não traz o nome, a tela exibe `Usuario #12`. É o contrário do que o
+histórico da mesma tela faz, que grava nome. O conserto é no backend.
+
+### N48. A auditoria era desenhada com fonte de 9px
+
+A folha de estilo do módulo de auditoria tinha 23 declarações de fonte abaixo
+do piso de 12px — a menor com 9px — e o alternador de visão com botões de
+30px, abaixo do mínimo de clique. **Corrigido**, subindo tudo para os degraus
+do sistema.
+
+O critério vigente desde 02/09 é seu: entre "cabe mais" e "lê-se melhor",
+vence a leitura. Aplicar isso muda o arranjo da tela, e é o esperado.
+
 ## RESUMO PARA DECIDIR
 
 | # | Achado | Classe | Urgência |

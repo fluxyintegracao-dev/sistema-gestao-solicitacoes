@@ -234,7 +234,20 @@ const RESOLVEDORES = {
   async abrirPiorRegistro(page, rotaLista, padraoDetalhe) {
     await page.goto(`${BASE}${rotaLista}`, { waitUntil: 'domcontentloaded' });
     await esperarCarregar(page);
-    const linhas = page.locator('.app-tabela tbody tr');
+    /*
+      DUAS TABELAS, NÃO UMA (05/09) — bug meu, pego pela matriz.
+
+      Escrevi o resolvedor procurando `.app-tabela tbody tr` e mandei-o abrir
+      /solicitacoes, que é a listagem PRINCIPAL do módulo e por isso usa
+      `ListaAvancada` (`.la-tabela`), não `TabelaPadrao`. Ele esperou 30s por
+      um seletor que nunca ia existir e a tela do detalhe voltou como "NÃO
+      ABRIU" — acusando a tela de um defeito do verificador.
+
+      É a pergunta permanente aplicada a mim de novo: "de quantos jeitos isso
+      é feito aqui?". Listagem tem DOIS componentes neste repositório, e a
+      regra registrada diz exatamente quando cada um vale.
+    */
+    const linhas = page.locator('.app-tabela tbody tr, .la-tabela tbody tr');
     await linhas.first().waitFor({ timeout: 30000 });
     const total = await linhas.count();
     let alvo = 0; let maior = -1;
@@ -1159,6 +1172,14 @@ async function main() {
     mais nenhuma".
   */
   const caixasDoNavegador = [];
+/* Erros de JS da pagina: uma tela que quebra tem de dizer o que quebrou. */
+const errosDeJs = [];
+  page.on('pageerror', (erro) => {
+    errosDeJs.push(`${erro.name || 'Error'}: ${String(erro.message || erro).slice(0, 300)}`);
+  });
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errosDeJs.push(`console.error: ${msg.text().slice(0, 300)}`);
+  });
   page.on('dialog', async (dialog) => {
     caixasDoNavegador.push({ tipo: dialog.type(), mensagem: dialog.message() });
     await dialog.dismiss().catch(() => {});
@@ -1248,6 +1269,37 @@ async function main() {
         }
         const bloqueada = await page.evaluate(() => /acesso negado|sem permiss|não autorizado|nao autorizado/i.test(document.body.innerText.slice(0, 3000)));
         if (bloqueada) throw new Error('tela bloqueada por permissão para o usuário de QA');
+
+        /*
+          O boundary de erro do app tem markup proprio e reconhecivel. Se ele
+          esta na tela, a tela caiu — e medir os 34 itens sobre o boundary
+          produz motivos que descrevem o boundary, nao a tela.
+        */
+        const caiu = await page.locator('.min-h-screen .rounded-\\[28px\\]').count();
+        if (caiu) {
+          const motivo = errosDeJs.length
+            ? errosDeJs[0]
+            : 'sem erro de JS capturado — pode ter quebrado antes do listener ou dentro de um efeito';
+          throw new Error(`a tela CAIU e o boundary de erro assumiu. Erro: ${motivo}`);
+        }
+
+        /*
+          TELA QUE QUEBRA TEM DE DIZER O QUE QUEBROU (05/09).
+
+          A `fiscal-diagnostico` voltou da matriz com "faixa .app-page-header
+          ausente", "nenhum bloco na tela" e "alvo < 32px" — três motivos que
+          apontam defeitos de layout numa tela que na verdade **caiu**: o que
+          o harness mediu foi o AppErrorBoundary, e o `btn-primary` de 93×21px
+          era o botão do proprio boundary.
+
+          Três motivos errados custam mais que nenhum: mandam consertar coisa
+          que não existe. É a mesma lição já registrada na X2 — motivo que não
+          deixa consertar é meio motivo.
+
+          Agora o erro de JS da página é capturado e vira o motivo. Um erro que
+          derruba a tela é O defeito; os outros itens nem foram medidos.
+        */
+        errosDeJs.length = 0;
 
         // Zera antes da tela: o que for capturado daqui em diante é DESTA
         // tela, não sobra da anterior.

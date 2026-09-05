@@ -539,7 +539,9 @@ export default function AuditoriaOperacional() {
         descricao={canDetails
           ? `Pagina ${events.page || 1} de ${events.pages || 1} — a trilha completa do recorte esta paginada no servidor.`
           : 'Detalhamento protegido.'}
-        variante="primario"
+        /* B2 (matriz): um primario por tela. "Movimento do periodo" e a
+           pergunta central; a linha do tempo e o detalhe dela. */
+        variante="secundario"
         cor="var(--sem-info)"
       >
         {canDetails ? (

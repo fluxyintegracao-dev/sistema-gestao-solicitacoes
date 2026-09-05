@@ -502,10 +502,20 @@ export default function SstCrudPage() {
       <PageHeader
         titulo={config.title}
         descricao={config.subtitle}
-        /* R11 — a seta de retorno ao painel SST substitui o link "Voltar ao
-           dashboard" que morava solto na faixa. A capacidade é a mesma; o
-           lugar é o do componente. */
-        voltar={{ to: '/sst', title: 'Voltar ao painel SST' }}
+        /* C2: a faixa carrega a contagem do recorte — o numero que a pessoa
+           veio conferir, sem depender de achar o bloco certo. */
+        contagem={`${rows.length} registro(s)`}
+        /*
+          SEM SETA DE VOLTAR (05/09, apontado pela matriz).
+
+          Eu tinha movido para ca o link "Voltar ao dashboard" que morava
+          solto na faixa, achando que so mudava de lugar. A matriz reprovou
+          na C3, e com razao: seta de voltar e de tela de DETALHE, que tem um
+          registro-pai a que retornar. Esta e uma LISTAGEM — e o painel SST e
+          destino do menu. Seta aqui e o mesmo "caminho para outra tela
+          vestido de acao" que a R11 tira da faixa; so tinha trocado o botao
+          pela seta.
+        */
         acaoPrincipal={resource === 'eventos' && canManage ? {
           rotulo: syncingEvents ? 'Sincronizando...' : 'Atualizar vencimentos',
           onClick: syncEvents,

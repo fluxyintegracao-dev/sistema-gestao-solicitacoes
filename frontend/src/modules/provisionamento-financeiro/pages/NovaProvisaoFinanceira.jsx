@@ -168,6 +168,10 @@ export default function NovaProvisaoFinanceira() {
       */}
       <PageHeader
         titulo="Nova Provisao"
+        /* C3 (apontado pela matriz): tela de CADASTRO com rota propria tem
+           registro-pai a que voltar — a listagem de onde se veio. E o inverso
+           da listagem, onde a seta e redundante. */
+        voltar={{ to: '/provisoes-financeiras', title: 'Voltar para provisoes' }}
         contagem={`${obrasCriacao.length} obra(s) disponivel(is)`}
         descricao="Registre uma previsao gerencial de desembolso com os dados essenciais do compromisso."
       />

@@ -1177,6 +1177,11 @@ function validarOverflow() {
     arquivo onde o defeito mais aparece. Com trinco, porque o passivo é
     grande e a leva não é de CSS.
   */
+  const caminhoTrincoFonte = path.join(frontendRoot, 'scripts', 'trinco-fonte-minima.json');
+  const trincoFonte = fs.existsSync(caminhoTrincoFonte)
+    ? JSON.parse(fs.readFileSync(caminhoTrincoFonte, 'utf8')).arquivos || {}
+    : {};
+  const fontesPequenasVistas = new Map();
   const alvos = [path.join('src', 'index.css')];
 
   const varrer = (dir) => {
@@ -1221,6 +1226,43 @@ function validarOverflow() {
     // IDIOMA DE TRUNCAGEM de texto — recorta a própria caixa e não é
     // ancestral de sticky. Marcar isso seria ruído, e regra que vira ruído
     // deixa de ser lida.
+    /*
+      PISO DE 12px EM CSS DE MODULO (05/09) — a lacuna que a matriz expos.
+
+      O piso ("nada abaixo de 12px em conteudo", criterio do cliente de 02/09)
+      era conferido na R10, que le JSX. Folha de modulo passava batido — e foi
+      la que ele estava sendo violado em massa: 24 declaracoes no CSS de
+      Compras (a menor com 9,28px, na TOPBAR que 13 rotas veem) e 23 no da
+      auditoria (a menor com 9px).
+
+      Nenhuma das duas apareceu em check nenhum. Quem pegou foi a matriz no
+      preview, item M1, e SO porque um dos elementos era clicavel — as fontes
+      de 9px teriam passado inteiras.
+
+      ENTRA COM TRINCO, E O MOTIVO E UM ERRO MEU: eu ia liga-lo duro dizendo
+      que o passivo era zero. A medicao que me deu zero rodou num diretorio
+      que nao existia, e `os.walk` devolve vazio SEM ERRO — varredura que nao
+      varre devolve zero igualzinho a varredura limpa. O check real achou
+      196, em quatro folhas. E a mesma familia de "concordancia nao e
+      cobertura": ausencia de achado nao e ausencia de defeito quando o
+      instrumento nao olhou.
+
+      Passivo congelado em scripts/trinco-fonte-minima.json, por arquivo. O
+      numero SO DESCE, e declaracao NOVA abaixo do piso reprova na hora.
+    */
+    for (const bloco of codigo.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const seletorFonte = bloco[1].trim().split('\n').pop().trim().slice(0, 60);
+      for (const medida of bloco[2].matchAll(/font-size:\s*([\d.]+)(px|rem)/g)) {
+        const px = parseFloat(medida[1]) * (medida[2] === 'rem' ? 16 : 1);
+        if (px >= 12) continue;
+        const linhaFonte = codigo.slice(0, bloco.index).split('\n').length;
+        fontesPequenasVistas.set(rel, (fontesPequenasVistas.get(rel) || 0) + 1);
+        const mensagemFonte = `${rel}:${linhaFonte} [R10] fonte de ${px.toFixed(2)}px em "${seletorFonte}" — o piso e 12px (criterio de CONFORTO E CLAREZA DE LEITURA, 02/09: entre "cabe mais" e "le-se melhor", vence a leitura). Use um degrau: var(--fonte-detalhe) 12px, var(--fonte-corpo) 14px.`;
+        if ((trincoFonte[rel] || 0) === 0) falhas.push(`${mensagemFonte} [NOVO — arquivo fora do trinco]`);
+        else avisos.push(`AVISO ${mensagemFonte} (congelado no trinco)`);
+      }
+    }
+
     for (const bloco of codigo.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       const seletor = bloco[1].trim();
       const corpo = bloco[2];
@@ -1258,6 +1300,15 @@ function validarOverflow() {
       falhas.push(mensagem);
     }
   });
+
+  for (const [rel, congelado] of Object.entries(trincoFonte)) {
+    const agora = fontesPequenasVistas.get(rel) || 0;
+    if (agora > congelado) {
+      falhas.push(`${rel}:0 [R10] o passivo de fonte abaixo de 12px SUBIU de ${congelado} para ${agora} — o trinco so desce.`);
+    } else if (agora < congelado) {
+      avisos.push(`AVISO [R10] "${rel}" caiu de ${congelado} para ${agora} fonte(s) abaixo do piso — atualize scripts/trinco-fonte-minima.json.`);
+    }
+  }
 
   for (const seletor of trincoOverflow) {
     if (!vistosNoTrinco.has(seletor)) {

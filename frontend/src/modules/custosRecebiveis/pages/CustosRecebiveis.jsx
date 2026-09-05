@@ -543,7 +543,11 @@ export default function CustosRecebiveis() {
       <Pagina className="cr-page">
         <PageHeader
           titulo="Custos e Recebiveis"
-          descricao="Planeje o mes, acompanhe medicoes e compare com os lancamentos financeiros."
+          /* C2 (matriz): mesmo o estado sem area liberada carrega apoio na
+             faixa — quem chega aqui precisa saber POR QUE a tela esta vazia,
+             e o apoio e o unico lugar que sobrevive a rolagem. */
+          contagem="Nenhuma area liberada"
+          descricao="Solicite ao administrador pelo menos uma permissao de visualizacao deste modulo."
         />
         <BlocoConteudo titulo="Nenhuma area do modulo foi liberada">
           <div className="cr-empty-state cr-empty-state--large">

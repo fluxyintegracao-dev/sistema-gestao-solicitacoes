@@ -2295,3 +2295,40 @@ Todos os seis foram para o componente:
 **A regra que fica**: quando um agente relatar "precisei disso e o componente
 não tem", isso é dívida do componente, não da tela — e cobrar dele é mais
 barato do que deixar cada tela resolver por fora, que é como nasce dialeto.
+
+## 05/09 — Zero de varredura que não varreu não é zero
+
+A matriz reprovou a auditoria operacional na M1: botão de 30px. Ao abrir a
+folha, achei mais do que o botão — **23 declarações de fonte abaixo de 12px, a
+menor com 9px**. E o CSS de Compras tinha outras 24, a menor com 9,28px, na
+**topbar que 13 rotas veem**.
+
+O piso de 12px é critério do cliente desde 02/09 e é conferido pela R10 — que
+lê **JSX**. Folha de CSS passava batido. Quem pegou foi a matriz no preview, no
+item M1, e **só porque um dos elementos era clicável**: as fontes de 9px
+teriam passado inteiras.
+
+### O erro que quase entrou junto com o conserto
+
+Escrevi o check e fui medir o passivo para decidir entre trinco e regra dura.
+A medição devolveu **zero**, e eu ia ligar o check duro afirmando que não havia
+dívida.
+
+A medição rodou num diretório que não existia. `os.walk` sobre caminho
+inexistente devolve **vazio, sem erro** — varredura que não varre devolve zero
+igualzinho a varredura limpa. O check real, quando rodou, achou **196
+declarações em quatro folhas**.
+
+É a mesma família de "concordância não é cobertura", que este projeto já
+registrou: **ausência de achado não é ausência de defeito quando o instrumento
+não olhou.** E é a segunda vez no mesmo dia que eu escrevo um detector e caio
+na armadilha dele — a primeira foi o detector de porta fechada, que conhecia
+uma forma e achou 12 de 13.
+
+**A regra que fica**: toda varredura que puder devolver vazio por não ter
+olhado precisa **abortar em vez de reportar zero**. O script de medição agora
+sai com erro se o diretório não existir; e o número que vale é o do check, que
+roda de dentro do próprio validador.
+
+Passivo congelado em `scripts/trinco-fonte-minima.json`, por arquivo, em 196.
+Só desce. Declaração nova abaixo do piso reprova na hora.
