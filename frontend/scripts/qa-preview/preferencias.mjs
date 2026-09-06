@@ -996,45 +996,96 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
     Título é a identidade estável: sobrevive ao clique, ao re-render e à
     recarga, que é justamente o que este item atravessa.
   */
-  const titulosAbertos = await page.evaluate(() => Array.from(
-    document.querySelectorAll('.app-bloco-recolher[aria-expanded="true"]')
-  ).map((b) => String(b.querySelector('.app-bloco-titulo')?.innerText || '')
-    .trim().replace(/\s+/g, ' ').slice(0, 60)).filter(Boolean));
-  const total = titulosAbertos.length;
-  if (!total) {
-    const recolhidos = await page.locator('.app-bloco-recolher').count();
+  /*
+    OS DOIS SENTIDOS, E O FIM DO "SEM DADO" QUE NUNCA SAÍA DO CINZA (06/09).
+
+    Este item só sabia medir UM sentido: achar um bloco ABERTO e recolhê-lo.
+    Quando todos nasciam recolhidos — que é o caso de todo bloco com
+    `recolhidoPadrao` sem desvio salvo — ele devolvia SEM DADO. Só que
+    SEM DADO aqui não era "hoje não deu": era PARA SEMPRE, porque o estado
+    de partida daquela tela nunca muda sozinho. Foram 10 células assim na
+    corrida de 06/09.
+
+    Pior que isso, e é o que decidiu a mudança: as 4 telas que o item
+    conseguiu medir naquela corrida só foram medidas POR ACASO — havia um
+    `{desvio:true}` gravado de uma corrida anterior, e por isso o bloco
+    estava aberto. Era o acaso escolhendo qual célula é medida e qual fica
+    cinza, e "SEM DADO não é aprovação" está escrito no topo deste arquivo.
+
+    Agora o item mede nos dois sentidos, e o sentido é escolhido pelo que a
+    tela oferece: se há bloco ABERTO, recolhe (comportamento de sempre,
+    intacto); se não há, ABRE um recolhido. Abrir é desvio como recolher é
+    desvio — a mesma gravação, o mesmo F5, a mesma restauração.
+
+    O QUE ISSO ESCREVE NO AMBIENTE COMPARTILHADO, dito por extenso porque a
+    decisão é do cliente (06/09): preferência de interface do usuário de QA,
+    nunca registro de negócio. As duas condições dele estão implementadas
+    logo abaixo e não são enfeite: RESTAURAÇÃO OBRIGATÓRIA ao estado em que
+    o bloco foi encontrado, e FALHA DE RESTAURAÇÃO REPROVA O ITEM em vez de
+    passar calada.
+  */
+  const porEstado = await page.evaluate(() => {
+    const titulo = (b) => String(b.querySelector('.app-bloco-titulo')?.innerText || '')
+      .trim().replace(/\s+/g, ' ').slice(0, 60);
+    const todos = Array.from(document.querySelectorAll('.app-bloco-recolher'));
+    return {
+      abertos: todos.filter((b) => b.getAttribute('aria-expanded') === 'true').map(titulo).filter(Boolean),
+      recolhidos: todos.filter((b) => b.getAttribute('aria-expanded') !== 'true').map(titulo).filter(Boolean),
+      quantos: todos.length
+    };
+  });
+
+  if (!porEstado.abertos.length && !porEstado.recolhidos.length) {
     resultado.P3 = {
-      estado: recolhidos
-        ? 'SEM DADO'
-        : 'N/A',
-      motivo: recolhidos
-        ? `a tela tem ${recolhidos} bloco(s) recolhível(is) e TODOS nasceram recolhidos — não houve bloco aberto para recolher e medir`
+      estado: porEstado.quantos ? 'SEM DADO' : 'N/A',
+      motivo: porEstado.quantos
+        ? `a tela tem ${porEstado.quantos} bloco(s) recolhível(is) e NENHUM deles tem título legível (.app-bloco-titulo vazio) — sem identidade estável eu não consigo reencontrar o bloco depois da recarga para medir nem para restaurar`
         : 'tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar'
     };
     return;
   }
 
+  /*
+    O SENTIDO. Preferir os abertos não é gosto: recolher é o gesto que a
+    pessoa faz para tirar da frente o que não quer ver, e era o que este
+    item já media. Abrir entra quando não há o que recolher.
+  */
+  const daVez = porEstado.abertos.length
+    ? { titulos: porEstado.abertos, deOnde: 'true', paraOnde: 'false', verbo: 'recolher', fiz: 'recolhi', naoFez: 'NÃO recolheu', voltouErrado: 'voltou ABERTO', ficouCerto: 'continua recolhido' }
+    : { titulos: porEstado.recolhidos, deOnde: 'false', paraOnde: 'true', verbo: 'abrir', fiz: 'abri', naoFez: 'NÃO abriu', voltouErrado: 'voltou RECOLHIDO', ficouCerto: 'continua aberto' };
+  const total = daVez.titulos.length;
+
   const declara = Boolean(declaraChaveDeBloco);
-  let recolhidoAgora = null; // { titulo }
+  let mexido = null; // { titulo, gravou } — o bloco que eu mexi, e como o achei
+  /*
+    RESTAURAÇÃO VERIFICADA, NUNCA PRESUMIDA.
+
+    Ela devolve o bloco ao estado em que EU O ENCONTREI (`daVez.deOnde`) —
+    não a "aberto", que era o que a versão anterior fazia porque só existia
+    um sentido. E ela CONFERE o resultado: se o estado final não bater com o
+    encontrado, o item REPROVA dizendo isso, em vez de passar calada. Um
+    instrumento que "acha que restaurou" já custou caro nesta leva: o próprio
+    P3 reabria o bloco no fim, o que regravava o desvio, e a corrida seguinte
+    encontrava o mesmo estado e reprovava de novo — uma reprovação que se
+    auto-alimentava e ninguém via.
+  */
   const restaurar = async () => {
-    if (!recolhidoAgora) return { ok: true, motivo: null };
-    const botao = page.locator('.app-bloco-recolher')
-      .filter({ hasText: recolhidoAgora.titulo }).first();
+    if (!mexido) return { ok: true, motivo: null };
+    const botao = page.locator('.app-bloco-recolher').filter({ hasText: mexido.titulo }).first();
     if (!(await botao.count())) {
-      return { ok: false, motivo: `não encontrei de volta o bloco "${recolhidoAgora.titulo}" para reabri-lo — o recolhimento pode ter ficado gravado para o usuário de QA` };
+      return { ok: false, motivo: `não encontrei de volta o bloco "${mexido.titulo}" para devolvê-lo ao estado em que o achei (aria-expanded="${daVez.deOnde}") — a preferência pode ter ficado gravada para o usuário de QA` };
     }
-    if ((await botao.getAttribute('aria-expanded')) === 'false') {
+    if ((await botao.getAttribute('aria-expanded')) !== daVez.deOnde) {
       await botao.click({ timeout: 5000 }).catch(() => {});
       await page.waitForTimeout(1200);
-    } else if (recolhidoAgora.gravou) {
+    } else if (mexido.gravou) {
       /*
-        O CASO QUE PARECE LIMPO E NÃO ESTÁ: a tela GRAVOU o recolhimento e
-        não o LEU na recarga (é o defeito que o item acabou de reprovar).
-        O bloco está aberto na tela, então "reabrir" não faz nada — e a
-        preferência recolhida CONTINUA no banco, esperando o dia em que a
-        leitura for consertada, para reaparecer numa corrida futura como
-        estado que ninguém pediu. Recolher e reabrir devolve o par de
-        gravações que apaga a entrada.
+        O CASO QUE PARECE LIMPO E NÃO ESTÁ: a tela GRAVOU e não LEU na
+        recarga (é o defeito que o item acabou de reprovar). Na tela o bloco
+        está no estado de origem, então "desfazer" não faz nada — e a
+        preferência CONTINUA no banco, esperando o dia em que a leitura for
+        consertada, para reaparecer numa corrida futura como estado que
+        ninguém pediu. O par de cliques devolve a gravação que apaga.
       */
       await botao.click({ timeout: 5000 }).catch(() => {});
       await page.waitForTimeout(900);
@@ -1042,9 +1093,9 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
       await page.waitForTimeout(1200);
     }
     const estado = await botao.getAttribute('aria-expanded');
-    return estado === 'true'
+    return estado === daVez.deOnde
       ? { ok: true, motivo: null }
-      : { ok: false, motivo: `o bloco "${recolhidoAgora.titulo}" não voltou a abrir (aria-expanded="${estado}") — o recolhimento fica gravado para o usuário de QA` };
+      : { ok: false, motivo: `o bloco "${mexido.titulo}" NÃO voltou ao estado em que eu o encontrei (esperado aria-expanded="${daVez.deOnde}", está "${estado}") — a preferência fica gravada para o usuário de QA e a próxima corrida começa suja` };
   };
 
   try {
@@ -1056,23 +1107,23 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
     const tentativas = Math.min(total, 3);
     const semGravacao = [];
     for (let i = 0; i < tentativas; i += 1) {
-      const titulo = titulosAbertos[i];
+      const titulo = daVez.titulos[i];
       const botao = page.locator('.app-bloco-recolher').filter({ hasText: titulo }).first();
       if (!(await botao.count())) break;
       const marca = espia.marcar();
       await botao.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
       await botao.click({ timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(500);
-      const fechou = (await botao.getAttribute('aria-expanded')) === 'false';
-      if (!fechou) {
+      const virou = (await botao.getAttribute('aria-expanded')) === daVez.paraOnde;
+      if (!virou) {
         resultado.P3 = {
           estado: 'FALHOU',
-          motivo: `o bloco "${titulo || i + 1}" recebeu o clique de recolher e NÃO recolheu (aria-expanded continua "${await botao.getAttribute('aria-expanded')}")`
+          motivo: `o bloco "${titulo || i + 1}" recebeu o clique de ${daVez.verbo} e ${daVez.naoFez} (aria-expanded continua "${await botao.getAttribute('aria-expanded')}")`
         };
-        recolhidoAgora = { titulo };
+        mexido = { titulo, gravou: false };
         return;
       }
-      recolhidoAgora = { titulo, gravou: false };
+      mexido = { titulo, gravou: false };
       /*
         `aceitaReset`: recolher pode ser a IDA (desvio → PUT) ou a VOLTA ao
         padrão (registro apagado → DELETE). As duas são a escolha indo para
@@ -1080,15 +1131,19 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
         está inteiro no `esperarGravacao`.
       */
       const gravacao = await espia.esperarGravacao(marca, 'blocos', 3500, { aceitaReset: true });
-      if (gravacao) recolhidoAgora.gravou = true;
+      if (gravacao) mexido.gravou = true;
       if (!gravacao) {
         semGravacao.push(titulo || `bloco ${i + 1}`);
-        /* Reabre e tenta o próximo: bloco sem chave não é o sujeito do item. */
+        /* Desfaz e tenta o próximo: bloco sem chave não é o sujeito do item.
+           O `mexido` só é zerado DEPOIS de o desfazer ser conferido — largar
+           `null` sem olhar é presumir restauração, que é o que este item
+           deixou de fazer. */
         await botao.click({ timeout: 5000 }).catch(() => {});
         await page.waitForTimeout(400);
-        recolhidoAgora = null;
-        continue;
+        if ((await botao.getAttribute('aria-expanded')) === daVez.deOnde) mexido = null;
+        else return;
       }
+      if (!gravacao) continue;
 
       /* ---- a recarga é o item inteiro ---------------------------------- */
       await page.reload({ waitUntil: 'domcontentloaded' });
@@ -1098,7 +1153,7 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
       if (!(await depois.count())) {
         resultado.P3 = {
           estado: 'SEM DADO',
-          motivo: `recolhi "${titulo}" e a gravação saiu (PUT .../preferencias/blocos), mas depois da recarga o bloco não voltou à tela para eu conferir o estado dele`
+          motivo: `${daVez.fiz} "${titulo}" e a gravação saiu (${gravacao.metodo} .../preferencias/blocos), mas depois da recarga o bloco não voltou à tela para eu conferir o estado dele`
         };
         return;
       }
@@ -1110,19 +1165,19 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
       */
       const rastro = `${gravacao.metodo} ${new URL(gravacao.url).pathname}`;
       const sentido = gravacao.metodo === 'DELETE'
-        ? ' — recolher devolveu o bloco ao padrão da tela, e o componente grava DESVIO e não estado: voltar ao padrão APAGA o registro'
+        ? ` — ${daVez.verbo} devolveu o bloco ao padrão da tela, e o componente grava DESVIO e não estado: voltar ao padrão APAGA o registro`
         : '';
       const estado = await depois.getAttribute('aria-expanded');
-      if (estado !== 'false') {
+      if (estado !== daVez.paraOnde) {
         resultado.P3 = {
           estado: 'FALHOU',
-          motivo: `recolhi "${titulo}", a preferência FOI GRAVADA (${rastro}) e depois da recarga o bloco voltou ABERTO (aria-expanded="${estado}") — grava e não lê é a mesma coisa que não guardar`
+          motivo: `${daVez.fiz} "${titulo}", a preferência FOI GRAVADA (${rastro}) e depois da recarga o bloco ${daVez.voltouErrado} (aria-expanded="${estado}") — grava e não lê é a mesma coisa que não guardar`
         };
         return;
       }
       resultado.P3 = {
         estado: 'PASSOU',
-        motivo: `recolhi "${titulo}", a escolha foi para o banco (${rastro})${sentido} e depois da recarga o bloco continua recolhido`
+        motivo: `${daVez.fiz} "${titulo}", a escolha foi para o banco (${rastro})${sentido} e depois da recarga o bloco ${daVez.ficouCerto}`
       };
       return;
     }
@@ -1131,13 +1186,13 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
     if (declara) {
       resultado.P3 = {
         estado: 'FALHOU',
-        motivo: `recolhi ${semGravacao.length} bloco(s) (${semGravacao.join(', ')}) e NENHUMA gravação de preferência do tipo "blocos" saiu (nem PUT do desvio, nem DELETE da volta ao padrão) — e o arquivo da tela declara chavePreferencia. A tela diz que ligou a persistência e o recolhimento não guarda nada: no F5 volta tudo aberto`
+        motivo: `${daVez.fiz} ${semGravacao.length} bloco(s) (${semGravacao.join(', ')}) e NENHUMA gravação de preferência do tipo "blocos" saiu (nem PUT do desvio, nem DELETE da volta ao padrão) — e o arquivo da tela declara chavePreferencia. A tela diz que ligou a persistência e o recolhimento não guarda nada: no F5 volta tudo ao padrão do código`
       };
       return;
     }
     resultado.P3 = {
       estado: 'N/A',
-      motivo: `a tela tem ${total} bloco(s) recolhível(is), nenhum ligado à preferência do usuário (recolher ${semGravacao.length} deles não gravou nada e ${tela.arquivo} não passa chavePreferencia) — o recolhimento aqui é de sessão, por decisão da tela`
+      motivo: `a tela tem ${porEstado.quantos} bloco(s) recolhível(is), nenhum ligado à preferência do usuário (${daVez.verbo} ${semGravacao.length} deles não gravou nada e ${tela.arquivo} não passa chavePreferencia) — o recolhimento aqui é de sessão, por decisão da tela`
     };
   } finally {
     const volta = await restaurar();

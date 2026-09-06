@@ -157,6 +157,26 @@ const CASOS = [
     ramo: 'voltou ABERTO'
   },
   {
+    /*
+      A RESTAURAÇÃO QUE FALHA (06/09).
+
+      O item passou a MEXER na tela para poder medi-la: quando não há bloco
+      aberto, ele ABRE um recolhido. A licença para isso veio com duas
+      condições do cliente, e esta é a segunda: restauração obrigatória, e
+      falha de restauração REPROVA em vez de passar calada.
+
+      Aqui está plantado o bloco que sai do padrão e nunca volta. Tudo o mais
+      dá certo — abre, grava, sobrevive ao F5 —, e o item ainda assim tem de
+      reprovar, porque a preferência do usuário de QA fica mexida e a corrida
+      seguinte começa suja. Sem este caso, "eu acho que restaurei" passaria
+      por restauração: foi assim que nasceu, em 06/09, a reprovação que se
+      auto-alimentava e que ninguém via.
+    */
+    item: 'P3', caso: 'blocos', d: 'p3RestauraNao', declara: true,
+    planta: 'bloco que sai do padrão e NUNCA volta: mede certo, grava certo, sobrevive ao F5 — e deixa a preferência do usuário de QA mexida para a próxima corrida',
+    ramo: 'NÃO voltou ao estado em que eu o encontrei'
+  },
+  {
     item: 'P3', caso: 'blocos', d: 'p3NaoGrava', declara: true,
     planta: 'recolhimento que não grava NADA, numa tela cujo arquivo DECLARA chavePreferencia — o silêncio que, sem este braço, sairia como N/A cinza',
     ramo: 'NENHUMA gravação de preferência'
@@ -269,6 +289,25 @@ const NEGATIVOS = [
     */
     item: 'P3', caso: 'blocos', d: 'p3VoltaAoPadrao', declara: true,
     planta: 'bloco cujo padrão é recolhido, aberto por desvio salvo: recolher devolve ao padrão e APAGA o registro (DELETE) — é o contrato do componente, não defeito',
+    estados: ['PASSOU']
+  },
+  {
+    /*
+      A TELA QUE ANTES FICAVA CINZA PARA SEMPRE (06/09).
+
+      Bloco com `recolhidoPadrao` e NENHUM desvio salvo: nasce recolhido, e
+      não há nada aberto para recolher. O item devolvia SEM DADO — e não era
+      "hoje não deu", era para sempre, porque o estado de partida daquela
+      tela nunca muda sozinho. Foram 10 células assim na corrida de 06/09, e
+      as 4 telas que ele CONSEGUIU medir só foram medidas por acaso, porque
+      havia um desvio de uma corrida anterior.
+
+      Agora o sentido vira sozinho: sem bloco aberto, o item ABRE um
+      recolhido, mede a persistência e restaura. Este caso é a trava — se
+      alguém devolver o SEM DADO, ele reprova aqui.
+    */
+    item: 'P3', caso: 'blocos', d: 'p3TodosRecolhidos', declara: true,
+    planta: 'tela cujo ÚNICO bloco recolhível nasce recolhido e sem desvio salvo — a que ficava em SEM DADO para sempre; agora o item abre, mede e restaura',
     estados: ['PASSOU']
   },
   {

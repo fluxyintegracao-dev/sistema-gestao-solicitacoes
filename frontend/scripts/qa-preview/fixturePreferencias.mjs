@@ -590,7 +590,7 @@ async function montarBlocos() {
     DELETE. Com dois blocos na mesma lista sobraria a chave do outro e o
     caminho seria um PUT — a fixture estaria desenhando outra coisa.
   */
-  if (D === 'p3VoltaAoPadrao' || D === 'p3ResetNaoLe') {
+  if (D === 'p3VoltaAoPadrao' || D === 'p3ResetNaoLe' || D === 'p3TodosRecolhidos' || D === 'p3RestauraNao') {
     const titulo = 'Histórico';
     const chave = 'b0';
     const PADRAO_RECOLHIDO = true;
@@ -604,9 +604,16 @@ async function montarBlocos() {
       recarga mostraria o bloco aberto de novo — a fixture plantando um
       defeito que ninguém pediu.
     */
+    /*
+      SEM SEMENTE nos dois casos novos: eles existem justamente para desenhar
+      a tela que o item NAO conseguia medir — bloco com recolhidoPadrao e
+      NENHUM desvio salvo, que nasce recolhido e nao oferece nada para
+      recolher. Ali o sentido do item tem de virar sozinho para ABRIR.
+    */
+    const SEMEAR = D === 'p3VoltaAoPadrao' || D === 'p3ResetNaoLe';
     let jaSemeado = false;
     try { jaSemeado = sessionStorage.getItem('prova:blocos:semeado') === '1'; } catch { jaSemeado = false; }
-    if (!jaSemeado) {
+    if (SEMEAR && !jaSemeado) {
       try { sessionStorage.setItem('prova:blocos:semeado', '1'); } catch { /* sem sessionStorage: segue sem marca */ }
       salvo[chave] = true;
       gravar('blocos', { ...salvo });
@@ -629,6 +636,16 @@ async function montarBlocos() {
       bloco.classList.toggle('app-bloco--recolhido', recolhido);
     };
     botao.addEventListener('click', () => {
+      /*
+        p3RestauraNao — A RESTAURACAO QUE FALHA, plantada de proposito.
+
+        O bloco sai do padrao e NUNCA volta: medir funciona, gravar funciona,
+        o F5 funciona, e o item ainda assim tem de REPROVAR — porque deixar a
+        preferencia do usuario de QA mexida faz a proxima corrida comecar
+        suja. Foi exatamente esse buraco que produziu, em 06/09, a reprovacao
+        que se auto-alimentava e que ninguem via.
+      */
+      if (D === 'p3RestauraNao' && recolhido !== PADRAO_RECOLHIDO) return;
       recolhido = !recolhido;
       pintar();
       if (recolhido !== PADRAO_RECOLHIDO) {
