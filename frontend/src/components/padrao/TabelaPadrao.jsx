@@ -43,17 +43,21 @@ export function CelulaDupla({ principal, sub, title }) {
  * registrada no manifesto (validarLayout reprova sem registro).
  * urgencia(item): 'danger' | 'warning' | null → tarja lateral.
  *
- * CAPACIDADES OPCIONAIS (leva do componente, 02/09 — decisão do cliente
- * de estender o padrão em vez de manter 20 exceções permanentes). Todas
- * são opt-in: tabela que não as declara se comporta exatamente como antes.
+ * CAPACIDADES DO COMPONENTE (leva de 02/09 — decisão do cliente de estender
+ * o padrão em vez de manter 20 exceções permanentes). Quatro delas são
+ * opt-in: tabela que não as declara se comporta exatamente como antes. A
+ * quinta (colunas do usuário) passou a ser LIGADA POR PADRÃO em 05/09.
  *   1. ORDENAÇÃO      — coluna com `ordenavel`: clique no título ordena
  *                       (asc → desc → sem ordem). O menu de alinhamento sai
  *                       do título e vira ícone próprio (ver R14/R15 abaixo).
  *                       Em lista PAGINADA NO SERVIDOR, passe `aoOrdenar`: a
  *                       tela reconsulta e o componente não ordena local —
  *                       ordenar só a página mente sobre o conjunto.
- *   2. COLUNAS DO USUÁRIO — `colunasConfiguraveis`: painel para mostrar,
- *                       esconder e reordenar; escolha salva por lista.
+ *   2. COLUNAS DO USUÁRIO — painel para mostrar, esconder e reordenar
+ *                       (arrastando OU pelos botões ↑/↓); escolha salva por
+ *                       lista. LIGADA POR PADRÃO desde 05/09 — é a única
+ *                       das cinco que não é opt-in; ver `colunasConfiguraveis`
+ *                       e `LIMIAR_COLUNAS_PAINEL` mais abaixo.
  *   3. SELEÇÃO EM LOTE — `selecao`: coluna de marcação com "todos" no
  *                       cabeçalho.
  *   4. LINHA EXPANSÍVEL / AGRUPADORA — `linhaExpansivel(item)` e
@@ -123,6 +127,27 @@ const TIPOS_COLUNA = {
   para mais em telas estreitas — o que é o lado seguro (sobra, não corta).
   Medir no canvas custaria um reflow por coluna a cada render.
 */
+/*
+  DE QUANTAS COLUNAS PARA CIMA O PAINEL DE COLUNAS FAZ SENTIDO (05/09).
+
+  Com a capacidade ligada por padrão, esta é a primeira das três regras que
+  decidem se o painel aparece — e ela é do COMPONENTE, não da tela: pedir
+  que 268 tabelas declarassem "aqui não" é o mesmo erro de pedir que 248
+  declarassem "aqui sim".
+
+  Abaixo de três colunas não há escolha a oferecer. A de identidade é
+  travada (ver `colunaTravada`), então numa tabela de duas colunas o painel
+  abriria com UM checkbox e um par de setas que trocam duas linhas de lugar
+  — um botão "Colunas" a mais na barra para não decidir nada. Medido em
+  05/09: 20 das 268 tabelas do sistema têm duas colunas ou menos, quase
+  todas ranking de painel ("rótulo | quantidade"), que é exatamente o
+  formato onde escolher coluna é ruído.
+
+  A segunda regra vive junto: pelo menos DUAS colunas ocultáveis. Uma
+  tabela de três colunas em que duas estão travadas cai no mesmo caso.
+*/
+const LIMIAR_COLUNAS_PAINEL = 3;
+
 const LARGURA_CONTROLES_TH = 54;
 const LARGURA_CARACTERE_TH = 7.3;
 
@@ -211,6 +236,91 @@ function IconeSeta({ aberta }) {
   );
 }
 
+/*
+  POSIÇÃO DE CAMADA FLUTUANTE, MEDIDA — UM CÁLCULO SÓ PARA OS DOIS MENUS
+  (05/09).
+
+  Este cálculo nasceu dentro do `CabecalhoColuna`, para o menu de
+  alinhamento. Hoje o PAINEL DE COLUNAS precisa exatamente do mesmo, e pelo
+  mesmo motivo (ver o comentário do `PainelColunas`). A lição do
+  `useFecharAoSair`, escrita neste arquivo em 05/09, é que contorno copiado
+  é como o defeito volta — então ele vira hook em vez de virar cópia.
+
+  O que ele faz: decide a posição com o TAMANHO REAL do menu, não com uma
+  estimativa. Se não cabe embaixo do botão, vira para cima; se não cabe de
+  nenhum dos dois lados (janela baixa), encosta na borda com folga. A
+  horizontal recebe o mesmo tratamento. A primeira medição roda antes de o
+  menu existir no DOM e posiciona embaixo; o `useLayoutEffect` remede com o
+  menu montado e corrige ANTES da pintura — o usuário não vê o salto.
+
+  `ancorarADireita`: o menu de alinhamento alinha a borda ESQUERDA ao botão
+  (é estreito e nasce de um ícone dentro do `th`); o painel de colunas
+  alinha a borda DIREITA, porque nasce de um botão encostado à direita da
+  barra e tem 260px de largura mínima — alinhar pela esquerda o empurraria
+  para fora da janela em toda tabela.
+*/
+const FOLGA_JANELA = 8;
+
+function usePosicaoFlutuante(ancoraRef, menuRef, aberto, { ancorarADireita = false } = {}) {
+  const [caixa, setCaixa] = useState(null);
+
+  const medir = useCallback(() => {
+    const r = ancoraRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const menu = menuRef.current?.getBoundingClientRect();
+    const alturaMenu = menu?.height || 0;
+    const larguraMenu = menu?.width || 0;
+    const alturaJanela = window.innerHeight;
+    const larguraJanela = window.innerWidth;
+
+    let topo = r.bottom + 4;
+    if (alturaMenu && topo + alturaMenu > alturaJanela - FOLGA_JANELA) {
+      const acima = r.top - 4 - alturaMenu;
+      topo = acima >= FOLGA_JANELA
+        ? acima                                                        // vira para cima
+        : Math.max(FOLGA_JANELA, alturaJanela - alturaMenu - FOLGA_JANELA); // encosta
+    }
+
+    let esquerda = (ancorarADireita && larguraMenu) ? r.right - larguraMenu : r.left;
+    if (larguraMenu && esquerda + larguraMenu > larguraJanela - FOLGA_JANELA) {
+      esquerda = larguraJanela - larguraMenu - FOLGA_JANELA;
+    }
+    esquerda = Math.max(FOLGA_JANELA, esquerda);
+
+    // Mesma posição = mesmo objeto: sem isto a remedição do scroll pediria
+    // um render novo a cada evento, com a caixa parada no mesmo lugar.
+    setCaixa((atual) => (atual && atual.esquerda === esquerda && atual.topo === topo
+      ? atual
+      : { esquerda, topo }));
+  }, [ancoraRef, menuRef, ancorarADireita]);
+
+  // Abrir, rolar e redimensionar: o menu é `fixed` e não acompanha sozinho.
+  useEffect(() => {
+    if (!aberto) {
+      setCaixa(null);
+      return undefined;
+    }
+    medir();
+    window.addEventListener('scroll', medir, true);
+    window.addEventListener('resize', medir);
+    return () => {
+      window.removeEventListener('scroll', medir, true);
+      window.removeEventListener('resize', medir);
+    };
+  }, [aberto, medir]);
+
+  // Segunda medição, com o menu já no DOM: é esta que sabe se ele cabe.
+  useLayoutEffect(() => {
+    if (aberto && caixa && menuRef.current) medir();
+    // `caixa` fora das dependências de propósito: ela é o RESULTADO desta
+    // medição, e realimentá-la aqui criaria laço. O que precisa disparar a
+    // remedição é o menu passar a existir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, Boolean(menuRef.current), medir]);
+
+  return caixa;
+}
+
 /**
  * CABEÇALHO DE COLUNA.
  *
@@ -253,7 +363,6 @@ function IconeSeta({ aberta }) {
 */
 function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
   const [aberto, setAberto] = useState(false);
-  const [caixaDoBotao, setCaixaDoBotao] = useState(null);
   const ref = useRef(null);
   const botaoRef = useRef(null);
   const menuRef = useRef(null);
@@ -281,67 +390,13 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
     como ele é `fixed`, ROLAR NÃO O TRAZ DE VOLTA — o menu fica inalcançável
     até a pessoa fechar e reabrir com a tabela em outra posição.
 
-    A causa é simples e é a mesma de todo posicionamento por portal feito
-    pela metade: eu colava o menu embaixo do botão (`base + 4`) e não
-    perguntava se cabia. Enquanto a tabela estava no alto da tela, cabia.
-
-    Agora a posição é decidida com o TAMANHO REAL do menu, não com uma
-    estimativa: se não cabe embaixo, o menu vira para cima do botão; se não
-    cabe nem de um lado nem do outro (janela muito baixa), encosta na borda
-    com folga. A largura recebe o mesmo tratamento na horizontal.
-
-    A primeira medição acontece antes de o menu existir no DOM, então ela
-    posiciona embaixo; o `useLayoutEffect` logo abaixo remede com o menu já
-    montado e corrige ANTES da pintura — o usuário não vê o salto.
+    O cálculo que resolve isso mora no `usePosicaoFlutuante` desde 05/09,
+    porque o painel de colunas passou a precisar do mesmo. Um detalhe mudou
+    na mudança e é de propósito: o menu ficava 4px abaixo do que a própria
+    medição usava para decidir se cabia (a soma `base + 4` acontecia no
+    JSX, depois da conta). Agora a coordenada devolvida é a definitiva.
   */
-  const FOLGA = 8;
-  const medir = useCallback(() => {
-    const r = botaoRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const menu = menuRef.current?.getBoundingClientRect();
-    const alturaMenu = menu?.height || 0;
-    const larguraMenu = menu?.width || 0;
-    const alturaJanela = window.innerHeight;
-    const larguraJanela = window.innerWidth;
-
-    let topo = r.bottom + 4;
-    if (alturaMenu) {
-      if (topo + alturaMenu > alturaJanela - FOLGA) {
-        const acima = r.top - 4 - alturaMenu;
-        topo = acima >= FOLGA
-          ? acima                                                   // vira para cima
-          : Math.max(FOLGA, alturaJanela - alturaMenu - FOLGA);     // encosta na borda
-      }
-    }
-
-    let esquerda = r.left;
-    if (larguraMenu && esquerda + larguraMenu > larguraJanela - FOLGA) {
-      esquerda = Math.max(FOLGA, larguraJanela - larguraMenu - FOLGA);
-    }
-
-    setCaixaDoBotao({ esquerda, base: topo });
-  }, []);
-
-  // Abrir, rolar e redimensionar: o menu é `fixed` e não acompanha sozinho.
-  useEffect(() => {
-    if (!aberto) return undefined;
-    medir();
-    window.addEventListener('scroll', medir, true);
-    window.addEventListener('resize', medir);
-    return () => {
-      window.removeEventListener('scroll', medir, true);
-      window.removeEventListener('resize', medir);
-    };
-  }, [aberto, medir]);
-
-  // Segunda medição, com o menu já no DOM: é esta que sabe se ele cabe.
-  useLayoutEffect(() => {
-    if (aberto && caixaDoBotao && menuRef.current) medir();
-    // `caixaDoBotao` fora das dependências de propósito: ele é o RESULTADO
-    // desta medição, e realimentá-lo aqui criaria laço. O que precisa
-    // disparar a remedição é o menu passar a existir.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aberto, Boolean(menuRef.current), medir]);
+  const caixaDoBotao = usePosicaoFlutuante(botaoRef, menuRef, aberto);
 
   return (
     <span
@@ -381,7 +436,7 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
           className="app-mais-menu app-th-menu"
           role="menu"
           ref={menuRef}
-          style={{ left: caixaDoBotao.esquerda, top: caixaDoBotao.base + 4 }}
+          style={{ left: caixaDoBotao.esquerda, top: caixaDoBotao.topo }}
         >
           {OPCOES_ALINHAMENTO.map(([valor, rotulo]) => (
             <button
@@ -404,35 +459,164 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
   );
 }
 
-/** Painel "Colunas": mostrar/esconder e reordenar, salvo por lista. */
-function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoRestaurar }) {
+/*
+  A COLUNA TRAVADA — a que o painel mostra mas não deixa esconder.
+
+  DECISÃO REGISTRADA (05/09), tomada quando o painel deixou de ser opt-in:
+  a coluna de IDENTIDADE é SEMPRE travada, e continua travada por ser de
+  identidade — não por a tela declarar nada. O motivo é o alcance: o painel
+  vale agora para 246 tabelas medidas, e esconder a coluna que NOMEIA o
+  registro deixa a linha anônima — a pessoa fica com um valor e uma data
+  sem saber de quem são, e não tem como ligar uma coisa à outra. Exigir que
+  cada uma das 246 declarasse a trava seria pedir que 246 telas acertassem
+  a mesma coisa; a que esquecesse quebraria em silêncio.
+
+  `sempreVisivel` NÃO foi removida — ela ganhou o uso que não tinha (era
+  lida aqui e nenhuma tela a passava; medido: 0 ocorrências fora deste
+  arquivo). Ela é a trava DECLARADA, para o caso que a identidade não
+  cobre: coluna que carrega AÇÃO em vez de dado (um `checkbox`, um campo
+  editável, um botão). Medido em 05/09: 89 colunas assim, em 38 tabelas —
+  esconder uma delas não some com uma informação, some com o único caminho
+  de fazer a coisa. Quem tem uma dessas declara `sempreVisivel: true` na
+  coluna e ela passa a aparecer no painel travada, como a de identidade.
+*/
+function colunaTravada(coluna) {
+  return Boolean(coluna.sempreVisivel || coluna.__identidade);
+}
+
+/**
+ * Painel "Colunas": mostrar/esconder e reordenar, salvo por lista.
+ *
+ * DUAS FORMAS DE REORDENAR, E AS DUAS FICAM (05/09).
+ *
+ * Arrastar é o gesto melhor e é o que a `ListaAvancada` já faz — mover uma
+ * coluna de sétima para segunda são seis cliques no ↑ e um arrasto. Mas
+ * arrastar NÃO substitui os botões, por duas razões que não são de gosto:
+ *   - o arrasto nativo do HTML5 não dispara por TOQUE (o navegador não
+ *     traduz `touchmove` em `dragover`), então num tablet o painel ficaria
+ *     sem nenhuma forma de reordenar;
+ *   - arrasto não tem caminho de TECLADO. Quem navega por Tab precisa dos
+ *     botões — tirá-los seria remover a capacidade de quem não usa mouse,
+ *     que é a regressão que a leva de 02/09 já pagou uma vez.
+ * Por isso o item tem alça (⋮⋮) E os dois botões, e as duas formas gravam
+ * pelo mesmo caminho.
+ *
+ * O `draggable` fica na ALÇA, não no item inteiro: o item contém um
+ * checkbox e dois botões, e um `mousedown` neles seguido de um tremor do
+ * mouse iniciaria um arrasto no lugar do clique. A alça liga o `draggable`
+ * no `mousedown` e o desliga no fim — fora dela o item não arrasta, e
+ * checkbox e botões continuam sendo só checkbox e botões. A alça é também a
+ * affordance que a R15 exige: capacidade sem sinal visível não existe.
+ *
+ * O PAINEL É `fixed` E MEDIDO, NÃO `absolute` (05/09) — mesmo mecanismo do
+ * menu de alinhamento, motivo diferente. Ele era `position: absolute` e
+ * ficava, portanto, preso ao contêiner: dentro de um MODAL (9 tabelas
+ * medidas) o corpo rolante tem `overflow-y: auto`, e um painel de 320px de
+ * altura que abre perto do rodapé era recortado pela caixa do modal — a
+ * lista de colunas simplesmente não aparecia inteira. `position: fixed`
+ * tem a janela como bloco continente e nenhum ancestral com `overflow` o
+ * recorta.
+ *
+ * E ele NÃO sai por `createPortal`, ao contrário do menu de alinhamento:
+ * o portal manda o nó para o `body`, onde ele precisa de um z-index
+ * próprio — e o nosso é `--z-dropdown-portal: 90`, ABAIXO de
+ * `--z-modal: 100`. Dentro de um modal o painel portado ficaria ATRÁS
+ * dele. Renderizado no lugar, o painel herda o contexto de empilhamento do
+ * modal e fica por cima do conteúdo dele, que é onde ele tem de estar.
+ */
+function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoReordenar, aoRestaurar }) {
   const [aberto, setAberto] = useState(false);
+  // Id do item que a alça liberou para arrasto, e id do item sob o ponteiro.
+  const [arrastando, setArrastando] = useState(null);
+  const [alvo, setAlvo] = useState(null);
   const ref = useRef(null);
+  const botaoRef = useRef(null);
+  const menuRef = useRef(null);
   useFecharAoSair(ref, aberto, () => setAberto(false));
+  const posicao = usePosicaoFlutuante(botaoRef, menuRef, aberto, { ancorarADireita: true });
   const ordenadas = ordem.map((id) => colunas.find((c) => c.id === id)).filter(Boolean);
+
+  const encerrarArrasto = () => {
+    setArrastando(null);
+    setAlvo(null);
+  };
 
   return (
     <span className="app-mais-wrap app-colunas-wrap" ref={ref}>
       <button
         type="button"
         className="btn btn-outline btn-sm"
+        ref={botaoRef}
         aria-haspopup="menu"
         aria-expanded={aberto}
         onClick={() => setAberto((atual) => !atual)}
       >
         Colunas
       </button>
-      {aberto && (
-        <span className="app-mais-menu app-colunas-menu" role="menu">
+      {aberto && posicao && (
+        <span
+          className="app-mais-menu app-colunas-menu"
+          role="menu"
+          ref={menuRef}
+          style={{ left: posicao.esquerda, top: posicao.topo }}
+        >
           {ordenadas.map((coluna, indice) => {
-            const travada = coluna.sempreVisivel || coluna.__identidade;
+            const travada = colunaTravada(coluna);
+            const visivel = visiveis.includes(coluna.id);
+            /* Piso de UMA coluna: esconder a última visível deixaria a
+               tabela sem nenhuma, e o caminho de volta seria adivinhar que
+               "Restaurar padrão" resolve. Numa tabela com `semIdentidade`
+               não há trava de identidade para impedir isso. */
+            const ultima = visivel && visiveis.length <= 1;
+            const classes = [
+              'app-colunas-item',
+              arrastando === coluna.id && 'app-colunas-item--arrastando',
+              arrastando && alvo === coluna.id && alvo !== arrastando && 'app-colunas-item--alvo'
+            ].filter(Boolean).join(' ');
             return (
-              <span className="app-colunas-item" key={coluna.id}>
+              <span
+                className={classes}
+                key={coluna.id}
+                draggable={arrastando === coluna.id}
+                onDragStart={(evento) => {
+                  evento.dataTransfer.effectAllowed = 'move';
+                  // O Firefox só INICIA o arrasto se houver dado no
+                  // `dataTransfer` — sem esta linha ele não arrasta nada.
+                  evento.dataTransfer.setData('text/plain', String(coluna.id));
+                }}
+                onDragOver={(evento) => {
+                  if (!arrastando) return;
+                  // Sem o `preventDefault` o navegador recusa o alvo e o
+                  // `onDrop` nunca chega.
+                  evento.preventDefault();
+                  evento.dataTransfer.dropEffect = 'move';
+                  setAlvo(coluna.id);
+                }}
+                onDragLeave={() => setAlvo((atual) => (atual === coluna.id ? null : atual))}
+                onDrop={(evento) => {
+                  evento.preventDefault();
+                  aoReordenar(arrastando, coluna.id);
+                  encerrarArrasto();
+                }}
+                onDragEnd={encerrarArrasto}
+              >
+                <span
+                  className="app-colunas-arrastar"
+                  aria-hidden="true"
+                  title="Arraste para reordenar"
+                  onMouseDown={() => setArrastando(coluna.id)}
+                  onMouseUp={encerrarArrasto}
+                >
+                  ⋮⋮
+                </span>
                 <label className="app-colunas-rotulo">
                   <input
                     type="checkbox"
-                    checked={visiveis.includes(coluna.id)}
-                    disabled={travada}
+                    checked={visivel}
+                    disabled={travada || ultima}
+                    title={travada
+                      ? 'Esta coluna identifica a linha e fica sempre visível'
+                      : (ultima ? 'A tabela precisa de pelo menos uma coluna' : undefined)}
                     onChange={() => aoAlternar(coluna.id)}
                   />
                   <span>{coluna.titulo}</span>
@@ -516,7 +700,29 @@ export default function TabelaPadrao({
   linhaExpansivel,      // (item) => ReactNode | null
   rotuloDetalhe,        // (item) => string — nomeia o detalhe para leitor de tela
   agruparPor,           // { chave(item), titulo(chave, itens) }
-  colunasConfiguraveis = false,
+  /*
+    COLUNAS DO USUÁRIO: LIGADA POR PADRÃO (05/09, decisão do cliente).
+
+    Ela nasceu `false` em 02/09 junto com as outras quatro capacidades, e a
+    razão foi a mesma das outras quatro — "todas opt-in: tabela que não as
+    declara se comporta exatamente como antes" (mensagem do commit
+    `10e831f`). Ou seja: cautela de quem introduziu a leva, não motivo
+    técnico. Não há restrição registrada em `docs/` nem no manifesto; a
+    R16b descreve a capacidade e nada diz sobre o padrão dela.
+
+    E a cautela cobrou: com o padrão em `false`, a capacidade chegou a 20
+    tabelas das 268 que existem (medido em 05/09) — as 248 restantes teriam
+    de acrescentar a prop uma a uma. Ligar aqui é UMA LINHA e leva o painel
+    de 20 para 246 tabelas (medido depois da mudança: 20 ficam de fora pela
+    regra das colunas, e 2 montam as colunas em execução e são decididas
+    lá). Quem precisar do contrário declara `colunasConfiguraveis={false}`,
+    que é a exceção rara e explícita, do jeito certo.
+
+    O que impede o estrago de ligar em 248 de uma vez não é a tela declarar
+    nada — é o COMPONENTE decidir sozinho onde o painel não faz sentido.
+    São três regras, logo abaixo, em `painelDeColunas`.
+  */
+  colunasConfiguraveis = true,
   aoMudarColunas,       // (idsVisiveis[]) => void — a tela precisa saber (ex.: exportar CSV só do que está à vista)
   aoOrdenar,            // (coluna, direcao|null) => void — LISTA PAGINADA NO SERVIDOR: a tela reconsulta; o componente NÃO ordena local
   linhaSelecionada,     // (item) => boolean — realce e aria-selected da linha
@@ -571,6 +777,36 @@ export default function TabelaPadrao({
 
   /* ---- Colunas escolhidas pelo usuário (visibilidade + ordem) --------- */
   const idsPadrao = colunasDeclaradas.map((c) => c.id);
+
+  /*
+    ONDE O PAINEL DE COLUNAS APARECE — as três regras, todas do componente
+    (05/09). Medido sobre as 268 tabelas do sistema:
+
+      1. a tela não recusou (`colunasConfiguraveis={false}`) — nenhuma
+         recusa hoje;
+      2. a tabela tem ONDE SALVAR (`storageKey`). Sem chave, o
+         `PreferenciasContext` não registra nada: `obter` devolve null e
+         `gravar` é um no-op silencioso. O painel funcionaria durante a
+         sessão e esqueceria tudo ao recarregar — capacidade que mente é
+         pior que capacidade ausente. Hoje as 268 têm chave (a última sem
+         chave, a de "Títulos do lote" da PrioridadesDiretoria, ganhou a
+         sua em `07b0ada`); a regra fica porque é ela que impede a próxima
+         tabela sem chave de nascer com um painel que não guarda;
+      3. há o que escolher: `LIMIAR_COLUNAS_PAINEL` colunas declaradas e
+         pelo menos duas ocultáveis — 20 tabelas ficam de fora por aqui, e
+         nenhuma das 20 que já declaravam a prop cai nesse caso (todas têm
+         4 colunas ou mais; a menor tem 4, a maior 23).
+
+    O MESMO portão governa `colunasBase`. Não é detalhe: se a preferência
+    salva continuasse valendo com o painel escondido, uma tabela que
+    encolheu para duas colunas seguiria filtrada pela escolha antiga e sem
+    nenhum caminho de desfazer.
+  */
+  const colunasOcultaveis = colunasDeclaradas.filter((c) => !colunaTravada(c)).length;
+  const painelDeColunas = Boolean(colunasConfiguraveis)
+    && Boolean(storageKey)
+    && colunasDeclaradas.length >= LIMIAR_COLUNAS_PAINEL
+    && colunasOcultaveis >= 2;
   /*
     Leitura SÍNCRONA, como sempre foi: o valor sai do contexto já no
     primeiro render, então a tabela nasce com a escolha do usuário em vez
@@ -607,6 +843,10 @@ export default function TabelaPadrao({
   };
 
   const alternarColuna = (id) => {
+    // Piso de UMA coluna visível: o painel já desabilita a caixa da última,
+    // mas a regra mora aqui também porque é aqui que a preferência é
+    // gravada — e tabela sem coluna nenhuma não é uma escolha, é um defeito.
+    if (visiveisColunas.includes(id) && visiveisColunas.length <= 1) return;
     const visiveis = visiveisColunas.includes(id)
       ? visiveisColunas.filter((x) => x !== id)
       : [...visiveisColunas, id];
@@ -627,6 +867,28 @@ export default function TabelaPadrao({
   };
 
   /*
+    ARRASTO: leva a coluna PARA A POSIÇÃO da coluna solta em cima, em vez
+    de trocar as duas de lugar. É a diferença entre `splice` e swap, e ela
+    importa: quem arrasta a sétima coluna para cima da segunda espera ver
+    as cinco do meio descerem um lugar, não a segunda ir parar na sétima.
+    Os botões ↑/↓ continuam com a troca — em passo de um, splice e swap dão
+    o mesmo resultado, e a troca é o que o botão promete.
+
+    Mesmo `salvarPrefColunas` das outras duas ações: as duas formas de
+    reordenar gravam pelo mesmo caminho, então não há um "arrastar" que
+    salva diferente do "botão".
+  */
+  const reordenarColunas = (id, alvoId) => {
+    if (!id || !alvoId || id === alvoId) return;
+    const atual = [...ordemColunas];
+    const de = atual.indexOf(id);
+    const para = atual.indexOf(alvoId);
+    if (de < 0 || para < 0) return;
+    atual.splice(para, 0, atual.splice(de, 1)[0]);
+    salvarPrefColunas({ ordem: atual, visiveis: visiveisColunas, ocultas: prefColunas?.ocultas || [] });
+  };
+
+  /*
     "Restaurar padrão" APAGA — e é a única coisa aqui que apaga. É ATO
     EXPLÍCITO do usuário, pedido no painel de colunas. O que nunca se apaga
     é a preferência de quem só perdeu uma coluna do padrão da tela: essa se
@@ -640,11 +902,11 @@ export default function TabelaPadrao({
   };
 
   const colunasBase = useMemo(() => {
-    if (!colunasConfiguraveis) return colunasDeclaradas;
+    if (!painelDeColunas) return colunasDeclaradas;
     return ordemColunas
       .map((id) => colunasDeclaradas.find((c) => c.id === id))
       .filter((c) => c && visiveisColunas.includes(c.id));
-  }, [colunasConfiguraveis, ordemColunas, visiveisColunas, colunas]);
+  }, [painelDeColunas, ordemColunas, visiveisColunas, colunas]);
 
   /*
     A escolha também precisa CHEGAR À TELA: sem isto, depois de um F5 a tela
@@ -663,13 +925,13 @@ export default function TabelaPadrao({
   */
   const ultimoAvisoColunas = useRef(null);
   useEffect(() => {
-    if (!colunasConfiguraveis || !aoMudarColunas) return;
+    if (!painelDeColunas || !aoMudarColunas) return;
     const visiveis = ordemColunas.filter((id) => visiveisColunas.includes(id));
     const assinatura = visiveis.join('|');
     if (ultimoAvisoColunas.current === assinatura) return;
     ultimoAvisoColunas.current = assinatura;
     aoMudarColunas(visiveis);
-  }, [colunasConfiguraveis, aoMudarColunas, ordemColunas, visiveisColunas]);
+  }, [painelDeColunas, aoMudarColunas, ordemColunas, visiveisColunas]);
 
   /* ---- R14 — alinhamento escolhido pelo usuário, salvo por lista ------ */
   /*
@@ -1170,16 +1432,17 @@ export default function TabelaPadrao({
 
   return (
     <div className="app-table-shell app-tabela" ref={shellRef} data-piso-largura={pisoDaTabela}>
-      {(colunasConfiguraveis || acoesTabela) ? (
+      {(painelDeColunas || acoesTabela) ? (
         <div className="app-tabela-barra">
           {acoesTabela}
-          {colunasConfiguraveis ? (
+          {painelDeColunas ? (
             <PainelColunas
               colunas={colunasDeclaradas}
               visiveis={visiveisColunas}
               ordem={ordemColunas}
               aoAlternar={alternarColuna}
               aoMover={moverColuna}
+              aoReordenar={reordenarColunas}
               aoRestaurar={restaurarColunas}
             />
           ) : null}

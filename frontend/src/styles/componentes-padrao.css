@@ -1260,7 +1260,29 @@ fieldset.form-section {
 
 .app-colunas-wrap { position: relative; }
 
+/*
+  O PAINEL DE COLUNAS É `fixed` E POSICIONADO POR MEDIDA (05/09).
+
+  Ele era `position: absolute` (herdado do `.app-mais-menu`) e ficava preso
+  ao contêiner. Dentro de MODAL — 9 tabelas medidas em 05/09 — o corpo do
+  modal rola com `overflow-y: auto` e tem teto de altura; um painel de
+  320px aberto perto do rodapé era recortado pela caixa do modal. Com
+  `fixed`, o bloco continente é a janela e nenhum ancestral com `overflow`
+  recorta.
+
+  `right: auto` PRECISA estar aqui: o `.app-mais-menu` que esta classe
+  estende traz `right: 0`, e com o `left` vindo inline os dois lados
+  ficariam presos — a caixa esticaria até a borda direita da janela. É
+  literalmente o defeito que o `.app-th-menu` já pagou em 05/09.
+
+  Sem portal, de propósito: o `--z-dropdown-portal` (90) é MENOR que o
+  `--z-modal` (100), então um painel mandado para o `body` ficaria atrás do
+  modal que o abriu. No lugar, ele herda o contexto de empilhamento do
+  modal e fica por cima do conteúdo dele.
+*/
 .app-colunas-menu {
+  position: fixed;
+  right: auto;
   min-width: 260px;
   max-height: 320px;
   overflow-y: auto;
@@ -1301,6 +1323,35 @@ fieldset.form-section {
   display: inline-flex;
   gap: var(--esp-1);
   flex-shrink: 0;
+}
+
+/*
+  ALÇA DE ARRASTO (05/09) — o sinal da R15 para a capacidade de reordenar
+  arrastando, e também o gatilho dela: o `draggable` só liga enquanto o
+  ponteiro está NESTA alça, para que o checkbox e os botões ↑/↓ do mesmo
+  item continuem clicáveis. `user-select: none` impede que o arrasto vire
+  seleção de texto.
+*/
+.app-colunas-arrastar {
+  flex-shrink: 0;
+  color: var(--c-muted);
+  font-size: var(--fonte-detalhe);
+  line-height: 1;
+  letter-spacing: -0.1em;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.app-colunas-arrastar:active { cursor: grabbing; }
+
+.app-colunas-item--arrastando { opacity: 0.45; }
+
+/* Linha de inserção no alvo: diz ONDE a coluna vai cair, e não só que o
+   item está sob o ponteiro. */
+.app-colunas-item--alvo {
+  background: var(--ui-surface-2);
+  box-shadow: inset 0 2px 0 0 var(--c-primary);
 }
 
 /* Mobile: marcação e detalhe dentro do card, com as mesmas colunas. */
