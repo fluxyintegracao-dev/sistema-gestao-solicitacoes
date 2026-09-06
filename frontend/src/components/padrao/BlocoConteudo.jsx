@@ -84,6 +84,11 @@ function Seta() {
    ===================================================================== */
 export const ContextoControlesDoBloco = createContext(null);
 
+/* Invólucro que existe só para receber evento: `display: contents` não gera
+   caixa, então o arranjo do cabeçalho é o mesmo com ele e sem ele. Constante
+   de módulo para não criar objeto novo a cada render. */
+const SEM_CAIXA = { display: 'contents' };
+
 /**
  * O slot de controles do bloco mais próximo — `{ no, temAcoes }` ou `null`
  * quando não há bloco em volta (ou quando ele não tem título, e portanto
@@ -161,19 +166,43 @@ export default function BlocoConteudo({
     passado uma chave — e é o caso do `BlocosPersonalizaveis`, que arranja
     blocos com a preferência da TELA inteira.
   */
+  /*
+    `recolhido` SEM `aoAlternarRecolhido` É UM BOTÃO QUE MENTE (06/09).
+
+    O par `recolhido` + `aoAlternarRecolhido` só é contrato enquanto os DOIS
+    chegam: com o valor e sem o ouvinte, o componente obedece à prop, o
+    clique não tem para onde ir e o `aria-expanded` fica preso — a mesma
+    cara do defeito que a matriz achou por outro caminho. Como não há tela
+    assim hoje (medido: 0 de 655 montagens passam `recolhido`), a escolha
+    aqui é a que não deixa a armadilha existir: SÓ É CONTROLADO QUEM MANDA O
+    PAR. Com o valor sozinho, a prop continua mandando a cada MUDANÇA dela
+    (o eco se re-alinha em render, padrão de estado derivado do React) e o
+    clique anda entre as mudanças — a tela não perde o comando e o botão não
+    vira enfeite. O portão acusa a montagem meia-boca (regra R34), para que
+    isso seja escolha e não descuido.
+  */
   const [recolhidoInterno, setRecolhidoInterno] = useState(recolhivel && recolhidoPadrao);
-  const controlado = typeof recolhido === 'boolean';
+  const temParceiro = typeof aoAlternarRecolhido === 'function';
+  const pedeControle = typeof recolhido === 'boolean';
+  const controlado = pedeControle && temParceiro;
+  const ecoSemParceiro = pedeControle && !temParceiro;
+  const [eco, setEco] = useState({ prop: recolhido, valor: recolhido });
+  if (ecoSemParceiro && eco.prop !== recolhido) setEco({ prop: recolhido, valor: recolhido });
   // Chave só tem sentido com `recolhivel`: bloco que não recolhe não tem
   // estado nenhum a guardar, e registrar a entrada criaria linha morta.
   const [preferencia, gravarPreferencia] = usePreferenciaDeLista(
     recolhivel && chavePreferencia ? chavePreferencia : '',
     TIPO_BLOCOS
   );
-  const persistente = Boolean(recolhivel && chavePreferencia && !controlado);
+  const persistente = Boolean(recolhivel && chavePreferencia && !pedeControle);
   const padraoRecolhido = Boolean(recolhidoPadrao);
   const salvoRecolhido = preferencia?.desvio === true ? !padraoRecolhido : padraoRecolhido;
   const estaRecolhido = recolhivel && (
-    controlado ? recolhido : (persistente ? salvoRecolhido : recolhidoInterno)
+    controlado
+      ? recolhido
+      : ecoSemParceiro
+        ? Boolean(eco.valor)
+        : (persistente ? salvoRecolhido : recolhidoInterno)
   );
 
   const alternarRecolhido = () => {
@@ -182,6 +211,7 @@ export default function BlocoConteudo({
     // hoje). Com controle externo quem decide é quem controla — não guardamos
     // uma cópia local que possa divergir.
     if (persistente) gravarPreferencia(proximo === padraoRecolhido ? null : { desvio: true });
+    else if (ecoSemParceiro) setEco((e) => ({ ...e, valor: proximo }));
     else if (!controlado) setRecolhidoInterno(proximo);
     if (aoAlternarRecolhido) aoAlternarRecolhido(proximo);
   };
@@ -217,8 +247,38 @@ export default function BlocoConteudo({
           cabeçalho de todas elas por nada. O que muda com `controles` é só
           ONDE as ações ficam: elas saem daqui e vão para o fim da faixa,
           depois dos controles. */}
-      <span className="app-bloco-acoes" onClick={(e) => recolhivel && e.stopPropagation()}>
-        {temControles ? null : acoes}
+      {/*
+        O `stopPropagation` MORAVA AQUI, E ERA ELE QUE ENGOLIA O CLIQUE DE
+        RECOLHER (06/09, medido).
+
+        A `.app-bloco-acoes` tem `flex: 1 1 auto` (R3, para a busca crescer):
+        dentro do botão de recolher ela ocupa TUDO do fim do título até a
+        borda direita — 149px..1150px num bloco de 1150px, 87% da faixa. Com
+        o `onClick` de `stopPropagation` no span inteiro, todo clique nessa
+        região morria antes de chegar ao `onClick` do botão, INCLUSIVE o
+        clique na própria seta (ela é filha do span). Sobrava só o texto do
+        título como alvo vivo — e o `.click()` do Playwright, como o dedo do
+        usuário, cai no CENTRO do botão, que é vazio e pertence ao span.
+        Sintoma medido em 23 telas: "recebeu o clique e NÃO recolheu".
+
+        O `stopPropagation` continua existindo, porque ele resolve um caso
+        real: `acoes` carrega badge, botão e menu, e clicar num deles não
+        pode recolher o bloco. O que muda é o ALCANCE — ele passa a cobrir só
+        o CONTEÚDO de `acoes`, num invólucro `display: contents`, que não cria
+        caixa nenhuma (o layout do cabeçalho fica idêntico ao de hoje) e
+        mesmo assim está na árvore, então o evento do filho passa por ele.
+        A faixa vazia e a seta voltam a ser do botão, que é o que a R2 do CSS
+        promete: "o cabeçalho inteiro é o alvo do clique".
+
+        Bloco NÃO recolhível sai byte a byte igual: sem botão não há o que
+        proteger, e o invólucro nem é desenhado.
+      */}
+      <span className="app-bloco-acoes">
+        {temControles ? null : (
+          recolhivel && acoes
+            ? <span style={SEM_CAIXA} onClick={(e) => e.stopPropagation()}>{acoes}</span>
+            : acoes
+        )}
         {recolhivel ? <Seta /> : null}
       </span>
     </>

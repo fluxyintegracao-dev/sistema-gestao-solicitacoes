@@ -688,6 +688,11 @@ export function validarLayout() {
   falhas.push(...r32.falhas);
   avisos.push(...r32.avisos);
 
+  // R34 — bloco com `recolhido` e sem `aoAlternarRecolhido`: o botão de
+  // recolher fica lá, recebe o clique e não muda nada.
+  const r34 = validarBlocoControladoSemOuvinte();
+  falhas.push(...r34.falhas);
+
   // R25 — cor fora do sistema de tokens (decisão do cliente, 03/09).
   const r25 = validarCoresForaDoToken();
   falhas.push(...r25.falhas);
@@ -1325,6 +1330,101 @@ function validarMedidaNaCasca() {
     }
   }
   return { falhas, avisos };
+}
+
+/**
+ * R34 — BLOCO CONTROLADO SEM O OUVINTE: O BOTÃO QUE MENTE (06/09).
+ *
+ * Nasceu da matriz que reprovou 23 telas com "o bloco recebeu o clique de
+ * recolher e NÃO recolheu". A causa daquele dia era outra (o
+ * `stopPropagation` da faixa de ações engolindo o clique no centro do
+ * botão), mas ela expôs a família inteira do defeito: um botão de recolher
+ * que está desenhado, recebe o clique e deixa o `aria-expanded` parado. Do
+ * lado do usuário é a MESMA tela — capacidade que mente, que é pior que
+ * capacidade ausente, porque ninguém procura outro caminho.
+ *
+ * O contrato do `BlocoConteudo` tem uma porta aberta para isso: `recolhido`
+ * torna o estado controlado PELA TELA, e `aoAlternarRecolhido` é o caminho
+ * de volta. Com o primeiro e sem o segundo, o componente obedece à prop
+ * (como deve) e o clique não tem para onde ir.
+ *
+ * Medido em 06/09, antes de escrever a regra: das 655 montagens de
+ * `BlocoConteudo` em `src/`, ZERO passam `recolhido`. Ou seja, a regra entra
+ * com passivo zero e não precisa de trinco — ela existe para que a armadilha
+ * não nasça. O componente também cobre o caso por dentro (o valor sozinho
+ * vira eco, e o clique volta a andar), então isto aqui é a segunda rede: a
+ * primeira impede o botão de mentir, esta impede a montagem meia-boca de
+ * entrar sem ninguém ver.
+ */
+function validarBlocoControladoSemOuvinte() {
+  const falhas = [];
+
+  /* A tag de abertura inteira, com chaves/aspas aninhadas respeitadas: um
+     `recolhido={a ? b : c}` não pode cortar a montagem no meio. */
+  const montagens = (texto) => {
+    const achados = [];
+    let i = 0;
+    for (;;) {
+      const k = texto.indexOf('<BlocoConteudo', i);
+      if (k === -1) break;
+      const seguinte = texto[k + 14];
+      if (seguinte && /[A-Za-z0-9_]/.test(seguinte)) { i = k + 14; continue; }
+      let j = k + 14;
+      let chaves = 0;
+      let aspa = null;
+      let fim = -1;
+      while (j < texto.length) {
+        const c = texto[j];
+        if (aspa) {
+          if (c === '\\') { j += 2; continue; }
+          if (c === aspa) aspa = null;
+        } else if (c === '"' || c === "'" || c === '`') aspa = c;
+        else if (c === '{') chaves += 1;
+        else if (c === '}') chaves -= 1;
+        else if (c === '>' && chaves === 0) { fim = j; break; }
+        j += 1;
+      }
+      if (fim === -1) break;
+      achados.push({ inicio: k, tag: texto.slice(k, fim + 1) });
+      i = fim + 1;
+    }
+    return achados;
+  };
+
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        if (item.name === 'node_modules' || item.name === 'dist') continue;
+        varrer(caminho);
+        continue;
+      }
+      if (!item.name.endsWith('.jsx')) continue;
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      if (ehFixtureDeOutraProva(item.name, rel)) continue;
+      /* O próprio componente declara as duas props: ele é a definição do
+         contrato, não uma montagem dele. */
+      if (rel.endsWith('src/components/padrao/BlocoConteudo.jsx')) continue;
+      const texto = fs.readFileSync(caminho, 'utf8');
+      if (!texto.includes('<BlocoConteudo')) continue;
+      for (const { inicio, tag } of montagens(texto)) {
+        const temValor = /\srecolhido=/.test(tag);
+        if (!temValor) continue;
+        if (/\saoAlternarRecolhido[=\s/>]/.test(tag)) continue;
+        const linha = texto.slice(0, inicio).split('\n').length;
+        falhas.push(
+          `${rel}:${linha} [R34] <BlocoConteudo> passa \`recolhido\` e NÃO passa `
+          + '`aoAlternarRecolhido`. Com o valor e sem o ouvinte, o botão de recolher '
+          + 'fica desenhado, recebe o clique e o `aria-expanded` não muda — é a cara '
+          + 'do defeito que reprovou 23 telas em 06/09. Passe o par completo, ou tire '
+          + 'o `recolhido` e use `recolhidoPadrao`/`chavePreferencia`.'
+        );
+      }
+    }
+  };
+  varrer(path.join(frontendRoot, 'src'));
+  return { falhas };
 }
 
 /**

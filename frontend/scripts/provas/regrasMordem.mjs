@@ -199,6 +199,33 @@ const CASOS_ARQUIVO_INTEIRO = [
     naoPodeReprovar: true,
     arquivo: `import { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  return (\n    <Pagina>\n      <div className="fixed inset-0 z-modal" />\n      <div style={{ position: 'fixed', zIndex: 'var(--z-toast)' }} />\n    </Pagina>\n  );\n}\n`
   },
+  /*
+    R34 — BLOCO CONTROLADO SEM O OUVINTE (06/09).
+
+    A matriz reprovou 23 telas com "o bloco recebeu o clique de recolher e
+    NAO recolheu". A causa daquele dia era o stopPropagation da faixa de
+    acoes engolindo o clique, e foi corrigida no componente — mas a familia
+    do defeito e maior que a causa: qualquer bloco cujo botao recebe o
+    clique e nao muda o aria-expanded tem a mesma cara para quem usa. O
+    contrato deixa essa porta aberta em `recolhido` sem
+    `aoAlternarRecolhido`, e a R34 fecha a porta.
+
+    O negativo e a outra metade: `recolhidoPadrao` (sozinho, sem
+    `recolhido`) e o jeito normal de um bloco nascer recolhido, esta em 40+
+    montagens do sistema e NAO pode reprovar — se reprovasse, a regra
+    tiraria a capacidade que ela existe para proteger.
+  */
+  {
+    regra: 'R34',
+    porque: 'bloco com `recolhido` e sem `aoAlternarRecolhido` — botao que recebe o clique e nao muda nada',
+    arquivo: `import { Pagina, BlocoConteudo } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  const recolhido = true;\n  return (\n    <Pagina>\n      <BlocoConteudo titulo="Historico" recolhivel recolhido={recolhido}>\n        <p>corpo</p>\n      </BlocoConteudo>\n    </Pagina>\n  );\n}\n`
+  },
+  {
+    regra: 'R34',
+    porque: 'NEGATIVO: `recolhidoPadrao` sozinho e o par completo `recolhido`+`aoAlternarRecolhido` — os dois jeitos certos',
+    naoPodeReprovar: true,
+    arquivo: `import { useState } from 'react';\nimport { Pagina, BlocoConteudo } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  const [recolhido, setRecolhido] = useState(true);\n  return (\n    <Pagina>\n      <BlocoConteudo titulo="Nasce recolhido" recolhivel recolhidoPadrao>\n        <p>corpo</p>\n      </BlocoConteudo>\n      <BlocoConteudo titulo="Par completo" recolhivel recolhido={recolhido} aoAlternarRecolhido={setRecolhido}>\n        <p>corpo</p>\n      </BlocoConteudo>\n    </Pagina>\n  );\n}\n`
+  },
   {
     regra: 'R22',
     porque: 'hook usado sem import',

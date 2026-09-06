@@ -95,9 +95,22 @@ const CSS = `
                      border-bottom: 1px solid #d8dee8; }
   .layout-main { padding: 24px; }
   .app-bloco { background: #fff; border-radius: 12px; margin-bottom: 16px; padding: 4px 16px 16px; }
-  .app-bloco-recolher { display: block; width: 100%; text-align: left; background: none;
+  /* A ANATOMIA REAL DO CABECALHO RECOLHIVEL, e nao um botao com o titulo
+     dentro. O defeito de 06/09 que reprovou 23 telas vivia justamente no que
+     esta fixture nao desenhava: a faixa de acoes (flex: 1 1 auto) ocupa do
+     fim do titulo ate a borda direita — 87% do botao, medido — e leva a seta
+     dentro dela. Sem essas duas regras o defeito p3CliqueEngolido nao teria
+     onde acontecer, e o check continuaria provado contra uma anatomia que a
+     tela nao tem. */
+  .app-bloco-recolher { display: flex; align-items: center; justify-content: space-between;
+                        gap: 10px; width: 100%; text-align: left; background: none;
                         border: 0; padding: 12px 0; cursor: pointer; }
   .app-bloco-titulo { font-size: 18px; margin: 0; }
+  .app-bloco-acoes { display: flex; align-items: center; justify-content: flex-end;
+                     gap: 8px; flex: 1 1 auto; min-width: 0; }
+  .app-bloco-recolher-seta { flex-shrink: 0; width: 16px; height: 16px;
+                             border-left: 2px solid #6b7a90; border-bottom: 2px solid #6b7a90;
+                             transform: rotate(-45deg); }
   .app-bloco--recolhido .app-bloco-corpo { display: none; }
   .app-filtros { background: #fff; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; }
   .app-filtros-campos { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -562,6 +575,42 @@ async function montarBlocos() {
     const botao = el('button', 'app-bloco-recolher');
     botao.type = 'button';
     botao.appendChild(el('h2', 'app-bloco-titulo', titulo));
+
+    /*
+      O CABEÇALHO INTEIRO, COMO A TELA O DESENHA (06/09).
+
+      Antes daqui o botão tinha só o <h2> dentro, e por isso a fixture não
+      conseguia reproduzir o defeito que a matriz achou em 23 telas: a faixa
+      .app-bloco-acoes cresce (flex: 1 1 auto) do fim do título até a borda
+      direita e LEVA A SETA DENTRO DELA; um stopPropagation posto nessa
+      faixa mata todo clique do centro do botão para a direita — inclusive o
+      clique na própria seta — e o aria-expanded fica preso em "true". O
+      botão está lá, recebe o clique, e o estado não vira. (Sem crase aqui:
+      este bloco vive DENTRO de um template literal.)
+
+      É um defeito de ALCANCE do stopPropagation, não de handler ausente: o
+      p3NaoRecolhe (que planta um return no handler) passa longe dele.
+      Por isso a fixture desenha a faixa SEMPRE, e o defeito novo muda só
+      ONDE o stopPropagation mora.
+    */
+    const acoes = el('span', 'app-bloco-acoes');
+    const conteudoDaAcao = el('span', 'badge', 'auditoria');
+    const engoleTudo = D === 'p3CliqueEngolido';
+    if (engoleTudo) {
+      // O DEFEITO: a faixa inteira engole — a seta e o vazio junto.
+      acoes.appendChild(conteudoDaAcao);
+      acoes.addEventListener('click', (e) => e.stopPropagation());
+    } else {
+      // O CERTO: só o conteúdo da ação engole, num invólucro sem caixa.
+      const estojo = el('span', '');
+      estojo.style.display = 'contents';
+      estojo.addEventListener('click', (e) => e.stopPropagation());
+      estojo.appendChild(conteudoDaAcao);
+      acoes.appendChild(estojo);
+    }
+    acoes.appendChild(el('span', 'app-bloco-recolher-seta'));
+    botao.appendChild(acoes);
+
     const corpo = el('div', 'app-bloco-corpo', 'Conteúdo de ' + titulo);
     const pintar = () => {
       botao.setAttribute('aria-expanded', String(!recolhido));

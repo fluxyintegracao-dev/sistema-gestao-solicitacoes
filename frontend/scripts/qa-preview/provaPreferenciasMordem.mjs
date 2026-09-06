@@ -118,6 +118,29 @@ const CASOS = [
     ramo: 'NÃO recolheu'
   },
   {
+    /*
+      O CASO QUE A MATRIZ ACHOU E A FIXTURE NÃO TINHA (06/09).
+
+      23 telas reprovaram com "recebeu o clique de recolher e NÃO recolheu",
+      e nenhuma delas tem handler ausente: o `stopPropagation` da faixa
+      `.app-bloco-acoes` — que existe para o clique num botão de ação não
+      recolher o bloco — cobria a faixa INTEIRA. Como essa faixa cresce do
+      fim do título até a borda direita (87% do botão, medido) e leva a
+      SETA dentro dela, o clique no centro do botão (que é onde o Playwright
+      e o dedo caem) morria antes do handler. Só o texto do título ainda
+      recolhia — e as telas de título longo passavam, o que fez o defeito
+      parecer aleatório.
+
+      O `p3NaoRecolhe` acima NÃO cobre isto: ele planta um `return` no
+      handler, e um check que só soubesse olhar handler continuaria verde
+      aqui. O que prova o braço é a ANATOMIA, e é por isso que a fixture
+      passou a desenhar a faixa e a seta como a tela desenha.
+    */
+    item: 'P3', caso: 'blocos', d: 'p3CliqueEngolido',
+    planta: 'botão de recolher cujo clique é ENGOLIDO por um `stopPropagation` na faixa de ações — a faixa cobre o centro do botão e a própria seta, e o `aria-expanded` fica preso em "true". É o defeito das 23 telas, plantado com a anatomia real do cabeçalho',
+    ramo: 'NÃO recolheu'
+  },
+  {
     item: 'P3', caso: 'blocos', d: 'p3NaoLe',
     planta: 'recolhimento que é GRAVADO e não é LIDO — no F5 volta tudo aberto',
     ramo: 'voltou ABERTO'
@@ -205,8 +228,15 @@ const NEGATIVOS = [
     estados: ['N/A']
   },
   {
+    /*
+      O PAR DO `p3CliqueEngolido`: a MESMA anatomia (faixa de ações cobrindo o
+      centro do botão, com a seta dentro dela e uma ação que não pode recolher
+      o bloco), feita do jeito certo — o `stopPropagation` só no CONTEÚDO da
+      ação, num invólucro sem caixa. Sem este par, "reprovar todo bloco que
+      tem faixa de ações" passaria por rigor.
+    */
     item: 'P3', caso: 'blocos', d: '',
-    planta: 'bloco que obedece: recolhe, grava e continua recolhido depois da recarga',
+    planta: 'bloco que obedece, com a faixa de ações e a seta dentro dela: o clique no centro do botão recolhe, grava e continua recolhido depois da recarga',
     estados: ['PASSOU']
   },
   {
