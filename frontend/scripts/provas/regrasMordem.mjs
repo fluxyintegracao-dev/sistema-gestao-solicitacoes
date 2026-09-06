@@ -163,6 +163,36 @@ const CASOS_ARQUIVO_INTEIRO = [
     formas, nao pode ser acusada. Sem este caso a regra passaria acusando
     tambem o jeito certo — e o jeito certo e o que ela existe para exigir.
   */
+  /*
+    R33 — CAMADA ANCORADA A MAO, SEM O HOOK QUE MEDE SE ELA CABE (06/09).
+
+    A regra entrou no portao antes de ter prova, e a prova manual que eu
+    fiz primeiro NAO ACUSOU — mas o defeito era do teste, nao da regra: eu
+    plantava o estilo num `<span` que nem existia no arquivo escolhido.
+    Errei tres vezes antes de instrumentar em vez de adivinhar. Fica aqui
+    para nao depender da minha memoria: a mordida passa a rodar sozinha.
+
+    O caso positivo reproduz o defeito real da captura do cliente — menu
+    ancorado por `right: 0`, que prende a borda DIREITA da caixa no botao e
+    joga a esquerda para fora quando o botao esta na borda esquerda. Foram
+    305px fora da janela, nas tres larguras.
+
+    O negativo e a outra metade, e sem ele a regra acusaria o jeito certo:
+    `left: 0` E `right: 0` juntos dao a largura do ancora, nao deslocam a
+    caixa, e por isso nao podem reprovar — sao os 20 autocompletes que ja
+    cabiam por construcao.
+  */
+  {
+    regra: 'R33',
+    porque: 'camada ancorada por UMA borda, em arquivo sem usePosicaoFlutuante',
+    arquivo: `import { useRef, useState } from 'react';\nimport { useFecharAoSair } from '../hooks/useFecharAoSair';\nimport { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  const ref = useRef(null);\n  const [aberto, setAberto] = useState(false);\n  useFecharAoSair(ref, aberto, () => setAberto(false));\n  return (\n    <Pagina>\n      <div ref={ref}>\n        <div style={{ position: 'absolute', right: 0 }} />\n      </div>\n    </Pagina>\n  );\n}\n`
+  },
+  {
+    regra: 'R33',
+    porque: 'NEGATIVO: camada com as DUAS bordas (largura do ancora) — nao desloca, nao pode reprovar',
+    naoPodeReprovar: true,
+    arquivo: `import { useRef, useState } from 'react';\nimport { useFecharAoSair } from '../hooks/useFecharAoSair';\nimport { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  const ref = useRef(null);\n  const [aberto, setAberto] = useState(false);\n  useFecharAoSair(ref, aberto, () => setAberto(false));\n  return (\n    <Pagina>\n      <div ref={ref}>\n        <div className="absolute left-0 right-0" />\n      </div>\n    </Pagina>\n  );\n}\n`
+  },
   {
     regra: 'R32',
     porque: 'NEGATIVO: camada pelo token nas tres formas — nao pode reprovar',
