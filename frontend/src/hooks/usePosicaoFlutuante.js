@@ -134,15 +134,32 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
       const r = no.getBoundingClientRect();
       natural.current = { altura: r.height, largura: r.width, medido: true };
     }
+    /*
+      A LARGURA JÁ VALE NA MEDIÇÃO, e não só no fim — corrigido em 06/09
+      pela própria prova, que pegou a lista do autocomplete abrindo 648px
+      abaixo do campo e saindo 234px pela borda de baixo.
+
+      A causa: a posição de medição deixava a camada com a janela inteira de
+      largura disponível. Para uma lista de 18 rótulos longos isso é MENOS
+      ALTURA (cada opção cabe numa linha só), e a altura medida ali não era
+      a altura que ela teria depois, com os 260px do campo. O cálculo
+      decidia "cabe embaixo" com um número que nunca ia existir.
+
+      Medir com a largura final é o que torna a medida verdadeira. Para as
+      camadas que não impõem largura não muda nada: a largura final delas É
+      a que a medição encontrar.
+    */
+    const larguraNaMedicao = larguraDaAncora ? Math.min(ancora.width, tetoLargura) : null;
+
     if (!natural.current.medido) {
       /* A camada ainda não existe no DOM (primeiro render) OU acabou de
          entrar. Devolve a POSIÇÃO DE MEDIÇÃO para que ela seja desenhada e
          possa ser medida no efeito de layout seguinte, antes da pintura. */
-      setCaixa((atual) => (atual && atual.medindo ? atual : {
+      setCaixa((atual) => (atual && atual.medindo && atual.largura === larguraNaMedicao ? atual : {
         medindo: true,
         esquerda: folga,
         topo: folga,
-        largura: null,
+        largura: larguraNaMedicao,
         alturaMaxima: tetoAltura,
         larguraMaxima: tetoLargura,
         estilo: {
@@ -152,7 +169,8 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
           right: 'auto',
           bottom: 'auto',
           maxHeight: tetoAltura,
-          maxWidth: tetoLargura
+          maxWidth: tetoLargura,
+          ...(larguraNaMedicao === null ? {} : { width: larguraNaMedicao })
         }
       }));
       return;
@@ -166,9 +184,7 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
       pela âncora, e não medida na camada (ela seria consequência do que o
       próprio hook acabou de escrever).
     */
-    const largura = larguraDaAncora
-      ? Math.min(ancora.width, tetoLargura)
-      : natural.current.largura;
+    const largura = larguraDaAncora ? larguraNaMedicao : natural.current.largura;
 
     /* ---- vertical ----------------------------------------------------- */
     const abaixo = ancora.bottom + afastamento;

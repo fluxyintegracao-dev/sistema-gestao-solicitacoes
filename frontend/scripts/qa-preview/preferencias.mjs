@@ -31,12 +31,15 @@
  *    porque só isso prova que o valor foi limpo e a consulta refeita;
  *  - P3 não pergunta se o bloco tem botão de recolher: recolhe, RECARREGA
  *    e confere que continua recolhido;
- *  - P4 não pergunta se a camada tem hook de fechamento: abre, clica longe,
- *    confere que saiu; abre, aperta Esc, confere que saiu; e — a terceira,
- *    que é a que ninguém lembra — abre e CLICA NUMA OPÇÃO, conferindo que a
- *    seleção aconteceu. Sem essa terceira, o caminho mais barato para fazer
- *    uma camada "fechar" é quebrar a seleção dela, e o check ficaria verde
- *    com a tela pior do que estava.
+ *  - P4 não pergunta se a camada tem hook de fechamento: abre, MEDE SE ELA
+ *    CABE INTEIRA NA JANELA, clica longe e confere que saiu; abre, aperta
+ *    Esc, confere que saiu; e — a que ninguém lembra — abre e CLICA NUMA
+ *    OPÇÃO, conferindo que a seleção aconteceu. Sem a da seleção, o caminho
+ *    mais barato para fazer uma camada "fechar" é quebrar a seleção dela, e
+ *    o check ficaria verde com a tela pior do que estava. Sem a da
+ *    geometria (acrescentada em 06/09), o item aprovava um painel cortado
+ *    pela borda da janela — foi o cliente quem achou isso numa captura,
+ *    com o P4 verde na mesma tela.
  *
  * ----------------------------------------------------------------------------
  * O QUE ESTES CHECKS PODEM E NÃO PODEM FAZER NO AMBIENTE COMPARTILHADO.
@@ -1151,7 +1154,32 @@ const FAMILIAS_DE_CAMADA = [
   }
 ];
 
-/** Estado pintado da camada: presente no DOM E realmente à vista. */
+/*
+  A CAMADA ABERTA TEM DE CABER INTEIRA NA JANELA (06/09) — a medida que
+  faltava neste item.
+
+  O DEFEITO QUE A PEDIU, achado pelo cliente numa captura do preview: o
+  painel "Filtros visíveis" abria PARA FORA DA BORDA ESQUERDA da janela e
+  ficava cortado pela metade. A causa era `right: 0` com `min-width: 260px`
+  num botão que fica à esquerda da faixa de filtros — a borda esquerda do
+  painel caía em x negativo. Metade do conteúdo, inclusive o aviso que
+  explica a consequência do clique, ficava INALCANÇÁVEL: a camada é
+  posicionada, então rolar a página não a traz de volta.
+
+  E o P4 passava VERDE nesse painel. Ele media que a camada ABRE, FECHA ao
+  clicar fora, FECHA com Esc e SELECIONA — quatro coisas certas sobre uma
+  camada que ninguém consegue ler. É a mesma família do T2 antigo, que
+  media a opacidade de um ícone e não o efeito do clique: o item media o
+  comportamento e nunca a GEOMETRIA.
+
+  A medida é a mais crua possível, e é de propósito: os quatro cantos da
+  caixa dentro de `0..innerWidth` e `0..innerHeight`. Sem tolerância para
+  "só um pouquinho fora" — pixel fora da janela é pixel que não existe para
+  quem está olhando. A folga de 1px abaixo é só para o arredondamento de
+  subpixel do próprio navegador, não licença de vazamento.
+*/
+
+/** Estado pintado da camada: presente no DOM, à vista E dentro da janela. */
 const lerCamada = (seletor) => {
   const el = document.querySelector(seletor);
   if (!el) return { existe: false };
@@ -1160,11 +1188,29 @@ const lerCamada = (seletor) => {
   const visivel = caixa.width > 0 && caixa.height > 0
     && estilo.display !== 'none' && estilo.visibility !== 'hidden'
     && parseFloat(estilo.opacity) > 0.1;
+
+  const T = 1; // tolerância de subpixel; a função roda no navegador, sem escopo daqui
+  const vazamentos = [];
+  if (caixa.left < -T) vazamentos.push(`${Math.round(-caixa.left)}px além da borda ESQUERDA`);
+  if (caixa.top < -T) vazamentos.push(`${Math.round(-caixa.top)}px além da borda DE CIMA`);
+  if (caixa.right > window.innerWidth + T) {
+    vazamentos.push(`${Math.round(caixa.right - window.innerWidth)}px além da borda DIREITA`);
+  }
+  if (caixa.bottom > window.innerHeight + T) {
+    vazamentos.push(`${Math.round(caixa.bottom - window.innerHeight)}px além da borda DE BAIXO`);
+  }
+
   return {
     existe: true,
     visivel,
     largura: Math.round(caixa.width),
     altura: Math.round(caixa.height),
+    esquerda: Math.round(caixa.left),
+    topo: Math.round(caixa.top),
+    direita: Math.round(caixa.right),
+    base: Math.round(caixa.bottom),
+    janela: { largura: window.innerWidth, altura: window.innerHeight },
+    vazamentos,
     display: estilo.display,
     visibility: estilo.visibility,
     opacidade: parseFloat(estilo.opacity)
@@ -1263,6 +1309,20 @@ export async function checarCamadaFlutuante(page, tela, resultado, ctx) {
       resultado.P4 = {
         estado: 'FALHOU',
         motivo: `passo 1 (abrir): a ${familia.nome} entrou no DOM invisível — ${aberta.largura}×${aberta.altura}px, display ${aberta.display}, visibility ${aberta.visibility}, opacidade ${aberta.opacidade}`
+      };
+      return;
+    }
+
+    /* ---- passo 1b: A CAMADA ABERTA CABE INTEIRA NA JANELA -------------- */
+    if (aberta.vazamentos.length) {
+      resultado.P4 = {
+        estado: 'FALHOU',
+        motivo: `passo 1b (cabe na janela): a ${familia.nome} abriu ${aberta.largura}×${aberta.altura}px`
+          + ` em x ${aberta.esquerda}..${aberta.direita}, y ${aberta.topo}..${aberta.base},`
+          + ` numa janela de ${aberta.janela.largura}×${aberta.janela.altura} — ela VAZA `
+          + aberta.vazamentos.join(' e ')
+          + '. Camada posicionada que sai da janela fica cortada e INALCANÇÁVEL: rolar a página não'
+          + ' a traz de volta, e o conteúdo que ficou fora não tem outro caminho'
       };
       return;
     }
@@ -1372,7 +1432,12 @@ export async function checarCamadaFlutuante(page, tela, resultado, ctx) {
 
     resultado.P4 = {
       estado: 'PASSOU',
-      motivo: `${familia.nome}: abriu visível (${aberta.largura}×${aberta.altura}px), fechou ao clicar em (${ponto.x}, ${ponto.y}) sobre "${ponto.quem}", fechou com Esc, e ao reabrir a escolha de uma opção mudou a marcação de ${escolhida.marcada ? 'marcada' : 'desmarcada'} para ${agora ? 'marcada' : 'desmarcada'} — fecha sem perder a seleção`
+      motivo: `${familia.nome}: abriu visível (${aberta.largura}×${aberta.altura}px) INTEIRA na janela`
+        + ` (x ${aberta.esquerda}..${aberta.direita}, y ${aberta.topo}..${aberta.base} em`
+        + ` ${aberta.janela.largura}×${aberta.janela.altura}), fechou ao clicar em (${ponto.x}, ${ponto.y})`
+        + ` sobre "${ponto.quem}", fechou com Esc, e ao reabrir a escolha de uma opção mudou a marcação de`
+        + ` ${escolhida.marcada ? 'marcada' : 'desmarcada'} para ${agora ? 'marcada' : 'desmarcada'}`
+        + ' — cabe, fecha e não perde a seleção'
     };
   } finally {
     await restaurar();

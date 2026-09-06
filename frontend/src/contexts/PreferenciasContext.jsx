@@ -100,6 +100,29 @@ export const TIPO_BLOCOS = 'blocos';
 export const TIPO_FILTROS = 'filtros';
 
 /*
+  TIPO `geral` — O ÚLTIMO FILTRO CONSULTADO (06/09, decisão do cliente).
+
+  Até hoje a consulta de títulos guardava os VALORES do último filtro no
+  localStorage, e oferecia uma caixa "Salvar filtro neste navegador" para a
+  pessoa escolher se queria isso. O cliente mandou tirar a caixa, com a
+  frase que resolve o desenho: "não é escolha que o usuário precise fazer:
+  ele espera que a configuração dele acompanhe".
+
+  Isso fecha o achado N53, que era o mais grave do levantamento — a
+  preferência ficava presa ao NAVEGADOR, então a mesma pessoa, no notebook
+  e no monitor, reabria a mesma tela com consultas diferentes; e a caixa
+  transformava um defeito em pergunta ao usuário.
+
+  Por que `geral` e não `filtros`: `filtros` guarda QUAIS filtros aparecem
+  (a escolha de visibilidade). Este guarda O QUE ESTÁ ESCRITO NELES — o
+  valor consultado. São duas coisas diferentes sobre o mesmo campo, e
+  misturá-las faria uma sobrescrever a outra. `geral` já existe no conjunto
+  fechado do backend (`listaPreferenciasValidators.js`), com teto de 32KB,
+  e não tinha dono no frontend.
+*/
+export const TIPO_GERAL = 'geral';
+
+/*
   700ms, o MESMO valor que a ListaAvancada já usa
   (`components/lista-avancada/ListaAvancada.jsx:158`). Arrastar uma coluna
   ou clicar três vezes no menu de alinhamento não pode virar uma requisição

@@ -245,9 +245,33 @@ async function montarColunas() {
 
   const semPainel = D === 'p1SemPainel';
   const duasColunas = D === 'p1DuasColunas';
+  const travadas = D === 'p1ColunasTravadas';
   if (duasColunas) { COLUNAS.length = 2; }
 
-  if (!semPainel && !duasColunas) {
+  /*
+    A CASCA PRECISA DIZER O QUE A P1 LÊ (06/09).
+
+    A "TabelaPadrao" passou a publicar "data-colunas-declaradas" e
+    "data-colunas-ocultaveis" para que a P1 MEÇA quantas colunas são
+    travadas, em vez de deduzir. Esta fixture foi escrita antes disso e não
+    publicava nada — resultado: o caso "p1SemPainel" deixou de cair no ramo
+    "não oferece o painel" e passou a cair no ramo "o preview serve build
+    velho". A prova continuava REPROVANDO, mas pelo motivo errado, o que é
+    quase pior: mordida que acusa outra coisa não prova o que diz provar.
+
+    "p1ColunasTravadas" é o caso da Setores, que motivou o atributo: quatro
+    colunas declaradas e só uma ocultável, porque as outras são a de
+    identidade e duas "sempreVisivel" (os campos do formulário de edição na
+    linha). Ali a ausência do painel é a decisão CERTA do componente, e a
+    P1 tem de devolver N/A — não FALHOU.
+  */
+  const declaradas = COLUNAS.length;
+  const ocultaveis = travadas ? 1 : Math.max(0, declaradas - 1);
+  shell.setAttribute('data-colunas-declaradas', String(declaradas));
+  shell.setAttribute('data-colunas-ocultaveis', String(ocultaveis));
+  shell.setAttribute('data-painel-colunas', (semPainel || duasColunas || travadas) ? 'nao' : 'sim');
+
+  if (!semPainel && !duasColunas && !travadas) {
     const botao = el('button', 'btn btn-outline btn-sm', 'Colunas');
     botao.type = 'button';
     botao.setAttribute('aria-haspopup', 'menu');
@@ -290,6 +314,24 @@ async function montarColunas() {
       barra.appendChild(menu);
       aberto = true;
       botao.setAttribute('aria-expanded', 'true');
+      /*
+        O DEFEITO DA CAPTURA DO CLIENTE, plantado como ele nasceu no
+        sistema (06/09): o menu ancora a borda DIREITA no botão
+        (right: 0, que e o que a classe .app-mais-menu do sistema traz)
+        e tem largura minima de 260px. O abridor desta fixture fica na
+        borda ESQUERDA da pagina — entao a borda esquerda do menu cai em x
+        NEGATIVO e metade do painel fica fora da janela, exatamente como no
+        painel "Filtros visiveis".
+
+        Nada de coordenada inventada: o defeito e uma ancoragem legitima
+        num lugar onde ela nao cabe, que e o caso real que o passo 1b tem
+        de pegar. (Sem crase neste bloco: ele vive dentro de um template
+        literal.)
+      */
+      if (D === 'p4VazaDaJanela') {
+        menu.style.left = 'auto';
+        menu.style.right = '0';
+      }
       if (D === 'p1PainelRecortado' || D === 'p4Recortado') {
         // Caixa de layout intacta, nada dela pintado: é o defeito de 05/09
         // que o T2 antigo deixava passar, agora no painel de colunas.

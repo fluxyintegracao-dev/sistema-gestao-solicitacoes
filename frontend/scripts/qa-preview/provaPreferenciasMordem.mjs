@@ -152,6 +152,11 @@ const CASOS = [
     item: 'P4', caso: 'colunas', d: 'p4SelecaoMorta',
     planta: 'camada que fecha certo e cuja opção não muda de estado ao ser clicada',
     ramo: 'a marcação NÃO mudou'
+  },
+  {
+    item: 'P4', caso: 'colunas', d: 'p4VazaDaJanela',
+    planta: 'camada que abre PARA FORA DA BORDA ESQUERDA da janela e fica cortada pela metade — o defeito que o cliente achou na captura do painel "Filtros visíveis", plantado como ele nasceu: menu ancorado pela borda direita, com 260px de largura mínima, num botão colado na borda esquerda da página. A camada abre, fecha ao clicar fora, fecha com Esc e seleciona: as quatro medidas antigas ficavam VERDES nela',
+    ramo: 'ela VAZA'
   }
 ];
 
@@ -167,6 +172,21 @@ const NEGATIVOS = [
   {
     item: 'P1', caso: 'colunas', d: 'p1DuasColunas',
     planta: 'tabela com 2 colunas — abaixo do limiar do painel, e por isso sem painel (decisão do componente, não defeito)',
+    estados: ['N/A']
+  },
+  {
+    /*
+      O CASO DA SETORES (06/09). Quatro colunas declaradas e SÓ UMA
+      ocultável: as outras três são a de identidade e duas `sempreVisivel`,
+      que ali são os campos do formulário de edição na linha — escondê-las
+      tiraria a forma de editar o registro. Abaixo do mínimo de duas, o
+      componente corretamente não oferece o painel, e a P1 tem de devolver
+      N/A. Antes do atributo `data-colunas-ocultaveis`, a P1 REPROVAVA este
+      caso dizendo "só a de identidade travada" — afirmando o que não tinha
+      como medir. São 24 telas com esse padrão.
+    */
+    item: 'P1', caso: 'colunas', d: 'p1ColunasTravadas',
+    planta: 'tabela com 4 colunas e só 1 ocultável (identidade + duas sempreVisivel) — sem painel por decisão certa do componente',
     estados: ['N/A']
   },
   {
@@ -218,7 +238,26 @@ const registrar = (ok, texto) => {
   console.log(`${ok ? '  ok   ' : '  FALHA'} ${texto}`);
 };
 
-async function medir(navegador, servidor, caso) {
+/*
+  AS TRÊS LARGURAS DO HARNESS (06/09) — e o motivo de o P4 rodar nas três.
+
+  O harness fotografa cada tela em 1920, 1366 e 390, e a geometria de uma
+  camada flutuante é a medida que MAIS muda entre elas: um painel de 260px
+  de largura mínima cabe folgado numa janela de 1920 e não cabe do lado
+  errado de um botão numa de 390. Medir só na largura larga é como não
+  medir — o vazamento que o cliente fotografou aparece justamente quando a
+  janela aperta.
+
+  A altura acompanha a largura do dispositivo real (1080 / 900 / 844), pelo
+  mesmo motivo: o "vira para cima" e o "rola por dentro" dependem dela.
+*/
+const LARGURAS = [
+  { rotulo: '1920', width: 1920, height: 1080 },
+  { rotulo: '1366', width: 1366, height: 900 },
+  { rotulo: '390', width: 390, height: 844 }
+];
+
+async function medir(navegador, servidor, caso, viewport) {
   servidor.zerar();
   /*
     UM CONTEXTO NOVO POR CASO. O `localStorage` é do contexto, e o defeito
@@ -226,7 +265,9 @@ async function medir(navegador, servidor, caso) {
     seguinte abriria com a coluna já escondida pelo anterior e mediria outra
     coisa. A prova irmã já foi mordida exatamente por isso.
   */
-  const contexto = await navegador.newContext({ viewport: { width: 1600, height: 900 } });
+  const contexto = await navegador.newContext({
+    viewport: viewport ? { width: viewport.width, height: viewport.height } : { width: 1600, height: 900 }
+  });
   const pagina = await contexto.newPage();
   const espia = criarEspiaDePreferencias(pagina);
   const ctx = {
@@ -266,23 +307,35 @@ async function main() {
       if (!doItem.length) continue;
       console.log(`\n— ${item}: defeitos plantados —`);
       for (const caso of doItem) {
-        const resultado = await medir(navegador, servidor, caso);
-        const obtido = resultado[caso.item] || { estado: 'AUSENTE' };
-        const ramoCerto = !caso.ramo || String(obtido.motivo || '').includes(caso.ramo);
-        const mordeu = obtido.estado === 'FALHOU' && ramoCerto;
-        registrar(mordeu, `${caso.item} ← ${caso.planta} :: ${obtido.estado}`
-          + (obtido.motivo ? ` — ${String(obtido.motivo).slice(0, 240)}` : '')
-          + (!ramoCerto && obtido.estado === 'FALHOU' ? ` (ramo esperado: "${caso.ramo}")` : ''));
+        /* O P4 é o item de GEOMETRIA: ele roda nas três larguras do
+           harness, e um defeito que só morde na larga não é prova. Os
+           outros três medem efeito, não caixa, e uma largura basta. */
+        const larguras = item === 'P4' ? LARGURAS : [null];
+        for (const viewport of larguras) {
+          const resultado = await medir(navegador, servidor, caso, viewport);
+          const obtido = resultado[caso.item] || { estado: 'AUSENTE' };
+          const ramoCerto = !caso.ramo || String(obtido.motivo || '').includes(caso.ramo);
+          const mordeu = obtido.estado === 'FALHOU' && ramoCerto;
+          registrar(mordeu, `${caso.item}${viewport ? ` @${viewport.rotulo}` : ''} ← ${caso.planta} :: ${obtido.estado}`
+            + (obtido.motivo ? ` — ${String(obtido.motivo).slice(0, 240)}` : '')
+            + (!ramoCerto && obtido.estado === 'FALHOU' ? ` (ramo esperado: "${caso.ramo}")` : ''));
+        }
       }
     }
 
     console.log('\n— sentido inverso: o que obedece NÃO pode ser acusado —');
     for (const caso of NEGATIVOS) {
-      const resultado = await medir(navegador, servidor, caso);
-      const obtido = resultado[caso.item] || { estado: 'AUSENTE' };
-      registrar(caso.estados.includes(obtido.estado),
-        `${caso.item} = ${caso.estados.join('/')} ← ${caso.planta} :: ${obtido.estado}`
-        + (obtido.motivo ? ` — ${String(obtido.motivo).slice(0, 240)}` : ''));
+      /* O controle negativo do P4 também vai às três larguras: um check de
+         geometria que reprovasse a página CERTA numa janela estreita
+         obrigaria a tela a mudar para agradar o instrumento. */
+      const larguras = caso.item === 'P4' ? LARGURAS : [null];
+      for (const viewport of larguras) {
+        const resultado = await medir(navegador, servidor, caso, viewport);
+        const obtido = resultado[caso.item] || { estado: 'AUSENTE' };
+        registrar(caso.estados.includes(obtido.estado),
+          `${caso.item}${viewport ? ` @${viewport.rotulo}` : ''} = ${caso.estados.join('/')} ← ${caso.planta} :: ${obtido.estado}`
+          + (obtido.motivo ? ` — ${String(obtido.motivo).slice(0, 240)}` : ''));
+      }
     }
   } finally {
     await navegador.close();

@@ -52,6 +52,7 @@ import {
   useConfirmacao
 } from '../components/padrao';
 import PainelFiltrosVisiveis, { useFiltrosVisiveis } from '../components/padrao/PainelFiltrosVisiveis';
+import { usePreferenciaDeLista, TIPO_GERAL } from '../contexts/PreferenciasContext';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -993,7 +994,26 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     : fixedTipo === 'RECEBER'
       ? 'Consulte, baixe e acompanhe os recebimentos em aberto ou quitados.'
       : 'Filtre a carteira antes de operar baixas, boletos e integracoes.';
-  const [saveFilterCache, setSaveFilterCache] = useState(true);
+  /*
+    O ULTIMO FILTRO CONSULTADO AGORA E DO USUARIO, NAO DO NAVEGADOR (06/09).
+
+    Aqui morava `saveFilterCache`, o estado da caixa "Salvar filtro neste
+    navegador", e o valor consultado ia para o localStorage. Decisao do
+    cliente, com a frase que resolve o desenho: "nao e escolha que o usuario
+    precise fazer: ele espera que a configuracao dele acompanhe".
+
+    Isso fecha o achado N53. O defeito nao era so o armazenamento: era
+    transformar um defeito em pergunta. A pessoa nao tem como saber que
+    marcar aquela caixa NAO faz o filtro acompanha-la para outra maquina —
+    o rotulo diz "neste navegador", mas a expectativa e a contraria.
+
+    Precedencia, a mesma do resto da leva: banco > espelho local > padrao.
+    O espelho continua sendo escrito na chave ANTIGA, e por isso a migracao
+    e automatica: quem ja tinha filtro guardado nesta maquina o encontra na
+    primeira abertura, e a partir dai ele viaja.
+  */
+  const chavePreferencias = `tabela:financeiro-titulos:${fixedTipo ? String(fixedTipo).toLowerCase() : 'geral'}`;
+  const [filtroGravado, definirFiltroGravado] = usePreferenciaDeLista(chavePreferencias, TIPO_GERAL);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [draftFilters, setDraftFilters] = useState(() => {
     /* Sem a máscara de visibilidade aqui (05/09): ela precisa da escolha do
@@ -1706,11 +1726,12 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
 
     setAppliedFilters(normalized);
     setPagination((current) => ({ ...current, page: 1, total: 0, total_pages: 0 }));
-    if (saveFilterCache) {
+    /* Banco (viaja com a pessoa) E espelho local (semeia o proximo desenho
+       antes da carga unica responder, e e a rede de rollback). */
+    definirFiltroGravado({ valores: normalized });
+    try {
       localStorage.setItem(filterStorageKey, JSON.stringify(normalized));
-    } else {
-      localStorage.removeItem(filterStorageKey);
-    }
+    } catch { /* sem storage: o banco ja tem */ }
   }
 
   function clearFilters() {
@@ -1724,7 +1745,10 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setLoading(false);
     setError('');
     setSelectedTituloIds([]);
-    localStorage.removeItem(filterStorageKey);
+    /* "Limpar" apaga o registro nos DOIS, senao a proxima abertura
+       ressuscitaria do banco o filtro que a pessoa acabou de limpar. */
+    definirFiltroGravado(null);
+    try { localStorage.removeItem(filterStorageKey); } catch { /* sem storage */ }
   }
 
   function toggleTituloSelecionado(titulo, checked) {
@@ -2724,17 +2748,6 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               </button>
             </div>
           </>
-        )}
-        acoes={(
-          <label className="inline-flex items-center gap-2 text-sm text-[var(--c-text)]">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-[var(--c-primary)]"
-              checked={saveFilterCache}
-              onChange={(event) => setSaveFilterCache(event.target.checked)}
-            />
-            Salvar filtro neste navegador
-          </label>
         )}
       >
       <form className="relative overflow-visible" onSubmit={submitFilters}>

@@ -14,6 +14,7 @@ import {
   HiPaperClip
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import { usePosicaoFlutuante } from '../hooks/usePosicaoFlutuante';
 import { canSendComunicacao } from '../utils/acessoProduto';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
 import { getSetores } from '../services/setores';
@@ -280,7 +281,7 @@ export default function ComunicacaoInterna() {
   const [isMobile, setIsMobile] = useState(false);
   const [participantesLeitura, setParticipantesLeitura] = useState([]);
   const [menuMsgId, setMenuMsgId] = useState(null);
-  const [menuMsgOpenUpward, setMenuMsgOpenUpward] = useState(true);
+
   /* ITEM 6 DA LEVA (06/09) — Esc fechava em 26 telas e NAO fechava aqui.
      O clique fora ja fechava, mas por outro caminho: um veu de tela cheia
      (`position: fixed; inset: 0`) logo abaixo do menu. O veu resolve o
@@ -291,6 +292,29 @@ export default function ComunicacaoInterna() {
      `menuMsgId` garante que existe no maximo UM menu aberto na lista. */
   const menuMsgRef = useRef(null);
   useFecharAoSair(menuMsgRef, menuMsgId !== null, () => setMenuMsgId(null));
+  /*
+    O TERCEIRO JEITO DE POSICIONAR CAMADA SAIU DAQUI (06/09).
+
+    O que estava escrito: `setMenuMsgOpenUpward(rect.top > 200)` no clique do
+    botao, e `bottom: 100%` ou `top: 100%` conforme esse booleano. Nao era
+    medicao — era um CHUTE de 200px que nao conhece a altura do menu nem a
+    da janela: numa janela baixa o menu "para baixo" saia pelo rodape, e
+    perto do topo o "para cima" saia pelo cabecalho. E o `right: 0` do menu
+    saia pela borda esquerda nas bolhas encostadas na esquerda da conversa,
+    que e o mesmo defeito do painel "Filtros visiveis".
+
+    A regra desta casa: antes de criar qualquer coisa nova, medir de quantos
+    jeitos isso ja e feito aqui. Eram DOIS (o hook e a medicao a mao do
+    autocomplete de apropriacao) mais este chute; os tres viraram um.
+
+    UM REF SO PARA O BOTAO, pelo mesmo motivo que o `menuMsgRef` e um so: o
+    `menuMsgId` garante no maximo UM menu aberto na lista, e o ref e ligado
+    apenas no botao da mensagem aberta.
+  */
+  const botaoMsgRef = useRef(null);
+  const posicaoMsg = usePosicaoFlutuante(botaoMsgRef, menuMsgRef, menuMsgId !== null, {
+    ancorarADireita: true
+  });
   const [infoMsg, setInfoMsg] = useState(null);
   const [mensagemRespondendo, setMensagemRespondendo] = useState(null);
   const [alturaPaineis, setAlturaPaineis] = useState(null);
@@ -1154,10 +1178,9 @@ export default function ComunicacaoInterna() {
                               title="Ações da mensagem"
                               aria-label="Ações da mensagem"
                               aria-expanded={menuAberto}
+                              ref={menuAberto ? botaoMsgRef : undefined}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setMenuMsgOpenUpward(rect.top > 200);
                                 setMenuMsgId(menuAberto ? null : msg.id);
                               }}
                               style={{
@@ -1181,13 +1204,9 @@ export default function ComunicacaoInterna() {
                             >▾</button>
 
                             {/* Dropdown menu — direção dinâmica */}
-                            {menuAberto && (
+                            {menuAberto && posicaoMsg && (
                               <div ref={menuMsgRef} style={{
-                                position: 'absolute',
-                                ...(menuMsgOpenUpward
-                                  ? { bottom: '100%', marginBlockEnd: 'var(--esp-1)' }
-                                  : { top: '100%', marginBlockStart: 'var(--esp-1)' }),
-                                right: 0,
+                                ...posicaoMsg.estilo,
                                 zIndex: 'var(--z-conteudo-topo)',
                                 background: 'var(--ui-surface)',
                                 border: '1px solid var(--ui-border)',
