@@ -222,6 +222,15 @@ export default function CrPlanningImportModal({
 
         <div className="cr-import-modal__table">
           <TabelaPadrao
+            /*
+              GRADE DE LANÇAMENTO, NÃO LISTA DE CONSULTA (05/09).
+              A maioria das colunas aqui é campo de digitação, não dado a ler.
+              Oferecer "escolher colunas" numa grade assim dá ao usuário como
+              esconder o campo que ele precisa preencher — e ele não descobre por
+              que o lançamento parou de funcionar. A capacidade sai DAQUI, não do
+              sistema: nas 246 tabelas de consulta ela continua.
+            */
+            colunasConfiguraveis={false}
             colunas={[
               {
                 id: 'etapa',
