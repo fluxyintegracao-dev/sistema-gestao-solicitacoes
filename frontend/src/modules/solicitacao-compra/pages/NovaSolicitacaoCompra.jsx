@@ -211,6 +211,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const importacaoEmAndamentoRef = useRef(false);
   const buscaCredorRequestRef = useRef(0);
   const buscaCredorFreteRequestRef = useRef(0);
+  const campoCredorRef = useRef(null);
+  const campoCredorFreteRef = useRef(null);
   const [obras, setObras] = useState([]);
   const [insumos, setInsumos] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -264,6 +266,31 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const formasPagamentoRef = useRef(null);
   const [formasPagamentoAberto, setFormasPagamentoAberto] = useState(false);
   useFecharAoSair(formasPagamentoRef, formasPagamentoAberto, () => setFormasPagamentoAberto(false));
+  /*
+    AS DUAS LISTAS DE CREDOR FECHAM AO CLICAR FORA, NAO AO PERDER O FOCO (05/09).
+
+    As duas (credor da compra e credor do frete) fechavam por `onBlur` com
+    `setTimeout(120)` — e o atraso nao era desenho, era a corrida entre o
+    fechamento por perda de foco e a escolha da opcao. O que ficava de fora:
+    rolar a pagina, clicar num rotulo ou abrir o painel de "Formas de
+    pagamento" (que e `absolute` e cai logo acima do campo de credor) com o
+    foco preso no input NAO fechavam a lista — duas camadas empilhadas em
+    cima do formulario. O `Esc` ja existia, mas so com o foco dentro do
+    input; agora vale no documento inteiro, e continua no `onKeyDown` para
+    quem digita.
+
+    POR QUE A SELECAO SOBREVIVE: cada ref cobre o `div` que embrulha o input
+    E a lista, entao clicar numa opcao e clique DENTRO e o hook nao fecha no
+    `mousedown`. E a opcao ja escolhia no proprio `onMouseDown` com
+    `preventDefault()` — que roda antes do listener do documento e ainda
+    segura o foco no campo.
+
+    Fechar aqui e so `setAutocomplete...Aberto(false)`: o texto do campo e o
+    `parceiro_id` sao guardados por `selecionarCredor...`, e nada mais depende
+    do fechamento.
+  */
+  useFecharAoSair(campoCredorRef, autocompleteCredorAberto, () => setAutocompleteCredorAberto(false));
+  useFecharAoSair(campoCredorFreteRef, autocompleteFreteAberto, () => setAutocompleteFreteAberto(false));
   const { avisos, avisar, fechar } = useAvisos();
   const { confirmar, elementoConfirmacao } = useConfirmacao();
   /*
@@ -1710,7 +1737,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           {modoCompraDireta && (
             <CampoForm label="Credor" linha erro={errosCampo.credor}>
               <div className="flex flex-wrap gap-2">
-                <div className="relative min-w-0 flex-1 app-busca">
+                <div ref={campoCredorRef} className="relative min-w-0 flex-1 app-busca">
                   <input
                     className="input w-full"
                     value={parceiroBusca}
@@ -1722,7 +1749,6 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                       setAutocompleteCredorAberto(true);
                     }}
                     onFocus={() => setAutocompleteCredorAberto(true)}
-                    onBlur={() => window.setTimeout(() => setAutocompleteCredorAberto(false), 120)}
                     onKeyDown={tratarTecladoCredor}
                     placeholder="Digite nome, CPF ou CNPJ"
                     autoComplete="off"
@@ -1895,7 +1921,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
             {freteTipo === 'TERCEIRO' && (
               <>
                 <CampoForm label="Credor do frete" obrigatorio linha erro={errosCampo.frete_parceiro}>
-                  <div className="relative">
+                  <div ref={campoCredorFreteRef} className="relative">
                     <input
                       className="input w-full"
                       value={freteParceiroBusca}
@@ -1907,7 +1933,6 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                         setAutocompleteFreteAberto(true);
                       }}
                       onFocus={() => setAutocompleteFreteAberto(true)}
-                      onBlur={() => window.setTimeout(() => setAutocompleteFreteAberto(false), 120)}
                       onKeyDown={tratarTecladoCredorFrete}
                       placeholder="Digite nome, CPF ou CNPJ"
                       autoComplete="off"

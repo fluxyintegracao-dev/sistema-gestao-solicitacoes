@@ -13,6 +13,7 @@ import {
   HiOutlineXMark
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 import StatusBadge from '../components/StatusBadge';
 import {
   baixarTituloFinanceiro,
@@ -231,6 +232,7 @@ function FinanceiroFilterAutocomplete({
   browseDescription = 'Pesquise ou percorra todas as opcoes disponiveis.',
   browseListClassName = ''
 }) {
+  const campoRef = useRef(null);
   const selected = useMemo(
     () => options.find((item) => String(item?.id) === String(value || '')) || null,
     [options, value]
@@ -284,6 +286,29 @@ function FinanceiroFilterAutocomplete({
     };
   }, [browseOpen]);
 
+  /*
+    O FILTRO FECHA AO CLICAR FORA, NAO AO PERDER O FOCO (05/09).
+
+    Era `onBlur` com `setTimeout(120)`, e o atraso so existia para a opcao
+    (que escolhe no proprio `onMouseDown`) ganhar do fechamento por foco.
+    Fechar por foco deixava de fora o uso comum desta barra: rolar a lista de
+    titulos, clicar num rotulo de outro filtro ou abrir outra caixa com o
+    foco preso no campo mantinham a camada aberta — e ela sobe o `z-index` da
+    coluna inteira (`z-[60]`), tapando os filtros vizinhos. Nao havia `Esc`
+    para o autocomplete (so para o modal "ver todas"); agora ha.
+
+    POR QUE A SELECAO SOBREVIVE: o ref cobre a coluna inteira do filtro —
+    input, botao de lupa e lista —, entao clicar numa opcao e clique DENTRO e
+    o hook nao fecha no `mousedown`. Cada opcao ja escolhia no proprio
+    `onMouseDown` com `preventDefault()`, que roda antes do listener do
+    documento e segura o foco no campo.
+
+    Fechar e so `setOpen(false)`: o input mostra `selectedLabel` quando
+    fechado e o efeito acima devolve a `query` ao rotulo do que esta
+    selecionado, entao nao fica texto de busca solto no filtro.
+  */
+  useFecharAoSair(campoRef, open && !disabled, () => setOpen(false));
+
   const handleSelect = (nextValue, nextLabel = '') => {
     onChange(nextValue);
     setQuery(nextLabel);
@@ -292,7 +317,7 @@ function FinanceiroFilterAutocomplete({
   };
 
   return (
-    <div key={label} className={`${className} relative ${open ? 'z-[60]' : 'z-0'}`}>
+    <div key={label} ref={campoRef} className={`${className} relative ${open ? 'z-[60]' : 'z-0'}`}>
       <span className="app-filter-label">{label}</span>
       <div className="relative">
         <input
@@ -308,9 +333,6 @@ function FinanceiroFilterAutocomplete({
               onChange('');
             }
             setOpen(true);
-          }}
-          onBlur={() => {
-            window.setTimeout(() => setOpen(false), 120);
           }}
           placeholder={placeholder}
           disabled={disabled}

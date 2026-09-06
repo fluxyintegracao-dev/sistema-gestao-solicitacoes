@@ -314,6 +314,38 @@ export default function TratamentoItemManual({ item, solicitacaoId, onCatalogado
         <div className="compra-item-tratamento-body">
           <div className="compra-item-field compra-item-field-wide">
             <label htmlFor={`insumo-autocomplete-${item.id}`}><span>Pesquisar cadastro oficial</span></label>
+            {/*
+              MEDIDO EM 05/09 E MANTIDO COMO ESTA — a leva que trocou o
+              `onBlur` com `setTimeout` pelo `useFecharAoSair` em 10 camadas
+              parou aqui, de proposito.
+
+              1) ESTA CAIXA NAO E CAMADA FLUTUANTE. `.compra-item-autocomplete-options`
+                 nao tem `position: absolute` nem `z-index`
+                 (compras-responsive.css): e um bloco EM FLUXO que empurra o
+                 resto do formulario para baixo, dentro da linha ja expandida
+                 do item. Ela nao cobre nada, e por isso o defeito que a leva
+                 conserta — camada por cima do formulario que so fecha
+                 perdendo o foco — nao existe aqui.
+
+              2) O FECHAMENTO DAQUI NAO TEM A CORRIDA DOS 120ms. Nao e
+                 `blur` + `setTimeout`: e `focusout` com `relatedTarget`,
+                 conferindo se o foco foi para DENTRO deste mesmo `div`.
+                 Escolher uma opcao mantem o foco dentro (o botao tem
+                 `tabIndex={-1}` e recebe o foco no clique), entao nao fecha;
+                 sair para qualquer outro lugar da pagina fecha na hora, sem
+                 espera. E o mecanismo mais completo do projeto, e foi dele
+                 que veio a ideia de conferir contencao.
+
+              3) FECHAR AQUI FAZ DUAS COISAS: desliga a lista E desliga o
+                 indicador "Buscando...". Trocar por um `fechar` cru deixaria
+                 o indicador pendurado — o mesmo tipo de perda que o
+                 `restaurarSelecao` do CategoriaFinanceiraAutocomplete sofreria.
+
+              Unificar aqui trocaria um mecanismo sem corrida por dois
+              mecanismos convivendo, para ganhar um caso que esta caixa nao
+              tem. O que o hook acrescentaria de verdade — fechar sem que o
+              foco mude — nao se aplica a um bloco que nao cobre nada.
+            */}
             <div
               className="compra-item-autocomplete"
               onBlur={(event) => {

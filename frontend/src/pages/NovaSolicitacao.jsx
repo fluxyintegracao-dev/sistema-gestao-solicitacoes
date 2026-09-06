@@ -25,6 +25,7 @@ import { buscarParceiros, criarCredorNovaSolicitacao } from '../services/parceir
 import { listarApropriacoes } from '../services/apropriacoes';
 import { getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 import { HiOutlineArrowUturnLeft, HiOutlineClock, HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
 import OverlayModal from '../components/ui/OverlayModal';
@@ -246,9 +247,46 @@ export default function NovaSolicitacao() {
   const [modalAditivoAberto, setModalAditivoAberto] = useState(false);
   const anexosRef = useRef(null);
   const boletoRef = useRef(null);
-  const obraBuscaBlurTimeoutRef = useRef(null);
+  const campoObraRef = useRef(null);
+  const campoCredorContratoRef = useRef(null);
   const automacaoDestinoExecutadaRef = useRef('');
   const criandoSolicitacaoRef = useRef(false);
+
+  /*
+    AS DUAS CAMADAS DE SUGESTAO FECHAM AO CLICAR FORA (05/09).
+
+    Sao duas nesta tela: as sugestoes de OBRA/CENTRO DE CUSTO e a lista de
+    CREDORES DO CONTRATO. As duas fechavam por perda de foco com
+    `setTimeout` (120ms na do credor, 120ms na da obra, esta ultima com um
+    `obraBuscaBlurTimeoutRef` para o foco de volta cancelar o fechamento
+    agendado). O atraso nao era desenho: as opcoes escolhem no `onClick`, que
+    so dispara no `mouseup`, e sem a espera o fechamento por foco derrubava a
+    linha antes do clique terminar.
+
+    O que o mecanismo antigo nao cobria: rolar a pagina, clicar num rotulo ou
+    abrir outro painel com o foco preso no campo — a camada ficava aberta por
+    cima do formulario, que aqui e longo e cheio de blocos. Na obra nem `Esc`
+    havia.
+
+    Agora quem fecha e o `useFecharAoSair`: `mousedown`/`touchstart` fora e
+    `Escape` no documento inteiro (na lista do credor o `Esc` do `onKeyDown`
+    continua, para quem esta digitando).
+
+    POR QUE A SELECAO SOBREVIVE: cada ref cobre o `div` que embrulha o input
+    E a lista de sugestoes, entao o `mousedown` sobre uma opcao e DENTRO — o
+    hook nao fecha, a linha continua montada ate o `mouseup` e o `onClick`
+    (`selecionarObra` / `selecionarParceiro`) roda. As opcoes ja tinham
+    `onMouseDown={e => e.preventDefault()}`, que segura o foco no input.
+
+    Fechar e so desligar a camada: `selecionarObra` e `selecionarParceiro`
+    e que gravam o valor e o texto do campo, e nao dependem do fechamento.
+  */
+  useFecharAoSair(campoObraRef, obraBuscaAtiva, () => setObraBuscaAtiva(false));
+  useFecharAoSair(
+    campoCredorContratoRef,
+    credorContratoSugestoesAbertas,
+    () => setCredorContratoSugestoesAbertas(false)
+  );
 
   const [form, setForm] = useState({
     obra_id: '',
@@ -320,14 +358,6 @@ export default function NovaSolicitacao() {
     }
     load();
   }, []);
-
-  useEffect(() => (
-    () => {
-      if (obraBuscaBlurTimeoutRef.current) {
-        clearTimeout(obraBuscaBlurTimeoutRef.current);
-      }
-    }
-  ), []);
 
   useEffect(() => {
     if (!form.tipo_solicitacao_id) {
@@ -1345,16 +1375,7 @@ export default function NovaSolicitacao() {
     }
   }
 
-  function handleBlurBuscaObra() {
-    obraBuscaBlurTimeoutRef.current = setTimeout(() => {
-      setObraBuscaAtiva(false);
-    }, 120);
-  }
-
   function handleFocusBuscaObra() {
-    if (obraBuscaBlurTimeoutRef.current) {
-      clearTimeout(obraBuscaBlurTimeoutRef.current);
-    }
     setObraBuscaAtiva(true);
   }
 
@@ -2130,7 +2151,7 @@ export default function NovaSolicitacao() {
       >
         {restringirCredorAoContrato ? (
           <>
-            <div className="relative">
+            <div ref={campoCredorContratoRef} className="relative">
               <div className="flex gap-2 nova-solicitacao-inline-actions">
                 <input
                   className="input input-sm min-w-0 flex-1"
@@ -2143,9 +2164,6 @@ export default function NovaSolicitacao() {
                   disabled={inputCredorContratoDesabilitado}
                   aria-label="Pesquisar credor"
                   onFocus={() => setCredorContratoSugestoesAbertas(true)}
-                  onBlur={() => {
-                    window.setTimeout(() => setCredorContratoSugestoesAbertas(false), 120);
-                  }}
                   onChange={(e) => {
                     setParceiroBusca(e.target.value);
                     setParceiroBuscaExecutada(false);
@@ -2172,6 +2190,11 @@ export default function NovaSolicitacao() {
                   title="Listar credores do contrato"
                   aria-label="Listar credores do contrato"
                   onClick={() => {
+                    // O botao mora DENTRO do ref do campo (para o hook nao
+                    // fechar a lista quando ele recebe o clique), entao e ele
+                    // que fecha a camada — senao as sugestoes ficariam abertas
+                    // atras do modal que acabou de abrir (05/09).
+                    setCredorContratoSugestoesAbertas(false);
                     setCredorContratoModalBusca(parceiroBusca);
                     setModalCredoresContratoAberto(true);
                   }}
@@ -2488,14 +2511,13 @@ export default function NovaSolicitacao() {
               erro={errosCampo.obra_id}
               hint={`Digite parte do nome ou do código para filtrar obras e centros de custo enquanto você preenche.${obrasFiltradas.length === 1 && mostrarSugestoesObra ? ' Pressione Enter para selecionar o único resultado.' : ''}`}
             >
-              <div className="relative nova-solicitacao-obra-field">
+              <div ref={campoObraRef} className="relative nova-solicitacao-obra-field">
                 <input
                   className="input input-sm nova-solicitacao-obra-input"
                   placeholder="Digite o código ou nome da obra/centro de custo"
                   value={obraBusca}
                   onChange={e => handleChangeBuscaObra(e.target.value)}
                   onFocus={handleFocusBuscaObra}
-                  onBlur={handleBlurBuscaObra}
                   onKeyDown={handleKeyDownBuscaObra}
                 />
 
