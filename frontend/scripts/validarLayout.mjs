@@ -678,6 +678,11 @@ export function validarLayout() {
   falhas.push(...r31.falhas);
   avisos.push(...r31.avisos);
 
+  // R32 — camada fora da escala: o conteúdo passando por cima da barra fixa.
+  const r32 = validarCamadaForaDaEscala();
+  falhas.push(...r32.falhas);
+  avisos.push(...r32.avisos);
+
   // R25 — cor fora do sistema de tokens (decisão do cliente, 03/09).
   const r25 = validarCoresForaDoToken();
   falhas.push(...r25.falhas);
@@ -1071,6 +1076,97 @@ function lerJsonDoDisco(relativo, padrao) {
   try {
     return JSON.parse(fs.readFileSync(path.join(frontendRoot, relativo), 'utf8'));
   } catch { return padrao; }
+}
+
+/**
+ * R32 — CAMADA FORA DA ESCALA (06/09).
+ *
+ * O cliente viu botão e bloco passando POR CIMA da barra do topo ao rolar.
+ * A causa não é uma tela: a escala de camadas EXISTE em `index.css`
+ * (--z-sticky 20, --z-dropdown 25, --z-sidebar 30, --z-dropdown-portal 90,
+ * --z-modal 100, --z-toast 120) e é CONTORNADA em 131 lugares — 72 `z-index`
+ * crus em CSS com mais de 20 valores distintos, 59 classes `z-*` do Tailwind
+ * e 3 `zIndex` inline. Entre elas, 11 usos de `z-50` contra uma barra fixa que
+ * vale 20: conteúdo em 50 passa por cima de barra em 20, e é exatamente isso
+ * que aparece na captura.
+ *
+ * A regra não tenta adivinhar a ordem certa — ela proíbe o NÚMERO SOLTO, que
+ * é o que permite a qualquer tela furar a fila. Camada se declara pelo token.
+ *
+ * TRINCO, e não falha imediata: são 131 lugares, e derrubar o portão hoje
+ * pararia todo o resto da leva. O número congelado SÓ DESCE. Quem converter,
+ * atualiza o trinco; quem acrescentar número novo, reprova na hora.
+ *
+ * O QUE ESTA REGRA NÃO PEGA, e precisa ficar dito: `z-index` só compara
+ * dentro do mesmo CONTEXTO DE EMPILHAMENTO. Um ancestral com `transform`,
+ * `filter`, `opacity < 1`, `will-change` ou `contain` cria contexto novo, e
+ * ali o filho com valor maior não vence a barra de fora — trocar número por
+ * token sem conferir isso conserta a metade fácil e deixa a difícil de pé.
+ */
+function validarCamadaForaDaEscala() {
+  const falhas = [];
+  const avisos = [];
+  const trinco = lerJsonDoDisco('scripts/trinco-camadas.json', { nomes: {} });
+
+  /*
+    NENHUM ARQUIVO FICA DE FORA — nem o que declara a escala.
+
+    A primeira versão desta regra excluía `src/index.css` inteiro, "porque
+    é ele a fonte". Medido: o arquivo tem 40 declarações de `z-index`, e só
+    SEIS são as definições dos tokens. As outras 34 são regras comuns que
+    furam a fila igual às demais — a exclusão dava passe livre justamente
+    ao maior infrator. E era desnecessária: a definição de um token
+    (`--z-sticky: 20`) não contém a string `z-index:`, então ela nunca foi
+    apanhada por este padrão.
+  */
+  const CSS_CRU = /z-index\s*:\s*(-?\d+)/g;
+  const JSX_INLINE = /zIndex\s*:\s*(-?\d+)/g;
+  const JSX_TAILWIND = /(?:^|[\s"'`{])(-?z-(?:\[-?\d+\]|\d+))(?=[\s"'`}]|$)/g;
+
+  const varrer = (dir, exts, saida) => {
+    if (!fs.existsSync(dir)) return saida;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) { varrer(caminho, exts, saida); continue; }
+      if (!exts.some((e) => item.name.endsWith(e))) continue;
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      if (ehFixtureDeOutraProva(item.name, rel)) continue;
+      const codigo = fs.readFileSync(caminho, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, (t) => t.replace(/[^\n]/g, ' '))
+        .replace(/^\s*\/\/.*$/gm, '');
+      const ondes = [];
+      codigo.split('\n').forEach((linha, i) => {
+        for (const m of linha.matchAll(CSS_CRU)) ondes.push(`${rel}:${i + 1} z-index: ${m[1]}`);
+        for (const m of linha.matchAll(JSX_INLINE)) ondes.push(`${rel}:${i + 1} zIndex: ${m[1]}`);
+        for (const m of linha.matchAll(JSX_TAILWIND)) ondes.push(`${rel}:${i + 1} ${m[1]}`);
+      });
+      if (ondes.length) saida.push({ rel, total: ondes.length, ondes });
+    }
+    return saida;
+  };
+
+  const medidos = varrer(path.join(frontendRoot, 'src'), ['.css', '.jsx'], []);
+
+  for (const { rel, total, ondes } of medidos) {
+    const congelado = Number(trinco.nomes?.[rel] || 0);
+    if (total > congelado) {
+      falhas.push(
+        `${rel} [R32] ${total} camada(s) com número solto, contra ${congelado} `
+        + `congelada(s) no trinco. O número SÓ DESCE — camada se declara pelo `
+        + `token (--z-sticky, --z-dropdown, --z-sidebar, --z-dropdown-portal, `
+        + `--z-modal, --z-toast), nunca pelo valor. `
+        + `Ex.: ${ondes.slice(congelado, congelado + 2).join(' · ')}`
+      );
+    } else if (total < congelado) {
+      avisos.push(`[R32] ${rel} desceu de ${congelado} para ${total} — atualize scripts/trinco-camadas.json.`);
+    }
+  }
+  for (const rel of Object.keys(trinco.nomes || {})) {
+    if (!medidos.some((m) => m.rel === rel)) {
+      avisos.push(`[R32] ${rel} zerou — remova a linha de scripts/trinco-camadas.json.`);
+    }
+  }
+  return { falhas, avisos };
 }
 
 function validarMedidaNaCasca() {

@@ -3,9 +3,9 @@
 Pedido em três itens, todos "valem para todo o sistema". Aqui está o que
 **medi** antes de mexer, para nenhum agente começar por suposição.
 
-Observação de método: as capturas do cliente não chegaram ao canal de
-trabalho. Tudo abaixo foi medido no código; onde a medida depender do que
-aparece na tela, está marcado como **a confirmar no preview**.
+Observação de método: as capturas chegaram depois da primeira versão deste
+documento. O que elas confirmaram e o que elas **corrigiram** está marcado
+abaixo. Tudo o mais foi medido no código.
 
 ---
 
@@ -27,15 +27,33 @@ cabeçalhos do sistema não declaram ação nenhuma** — a barra de ações é
 desenhada, mede 0px, e o `space-between` deixa o vazio à direita. É o mesmo
 vazio que o cliente agora quer preenchido.
 
-**A confirmar no preview:** quantos blocos hoje têm controles empilhados
-abaixo do título tendo espaço livre ao lado dele.
+**O que a captura mostra, medido nela:** a tela gasta **quatro linhas** onde
+caberiam duas. Linha 1: título + subtítulo, com a caixa "Salvar filtro neste
+navegador" à direita e vazio entre os dois. Linha 2: só o par
+"Carteira · A receber | A pagar". Linhas 3–4: os campos, sendo que
+"N. documento" fica **sozinho numa linha inteira** enquanto a de cima tem
+quatro campos. Linha 5: "Mais filtros", "Filtros visíveis (7/15)", "Limpar" à
+esquerda e "Consultar" à direita.
+
+Na captura do arranjo desejado, Carteira, Mais filtros, Filtros visíveis e
+Limpar sobem todos para a linha do título, e os campos ficam logo abaixo. O
+cliente escreveu que o "Consultar" **continua à direita, no fim** — na captura
+do desejado ele aparece embaixo à esquerda, mas isso é do recorte que ele
+montou à mão; vale o texto.
 
 ---
 
 ## Item 2 — Painel que abre para fora da janela
 
-**O que o cliente descreve:** a caixa "Mais filtros" abre para fora da lateral
-esquerda e fica cortada; metade do conteúdo fica inalcançável.
+**O que o cliente descreve:** a caixa abre para fora da lateral esquerda e
+fica cortada; metade do conteúdo fica inalcançável.
+
+**Correção pela captura:** o painel aberto **não é o "Mais filtros"** — é o
+**"Filtros visíveis (7/15)"**. É esse o botão com o anel de foco, e o texto
+cortado que se lê na captura ("…preenchido: esconder limpa e refaz a
+consulta", "…to início", "…to fim") é do painel de filtros visíveis. Isso
+localiza o defeito: está no `PainelFiltrosVisiveis`, componente **novo desta
+leva**. Conserto na origem vale para toda tela que o use, de uma vez.
 
 **A regra:** todo painel, menu e lista suspensa se reposiciona para caber — se
 não couber de um lado, abre para o outro; se não couber em lado nenhum, alinha
@@ -59,6 +77,10 @@ as camadas flutuantes do sistema. Cada uma precisa ser conferida contra o
 **O que o cliente descreve:** ao rolar, botões e blocos passam POR CIMA da
 barra do topo e do cabeçalho fixo.
 
+**Confirmado na captura:** o par "Carteira · A receber | A pagar" e a fileira
+inteira de campos aparecem desenhados **sobre** a barra do topo, cobrindo o
+logo, o botão "Início" e a trilha de navegação.
+
 **A causa, medida — e não é uma tela, são 131 lugares.**
 
 A escala de camadas **já existe**, em `index.css`:
@@ -72,13 +94,26 @@ A escala de camadas **já existe**, em `index.css`:
 --z-toast: 120
 ```
 
-E é contornada em **131 lugares**:
+E é contornada em **110 lugares, em 29 arquivos** — número da regra R32, que
+tira comentários antes de contar. (A primeira versão deste documento dizia
+131: era `grep` cru, que contava menção em comentário. O número certo é 110.)
 
-| onde | quantos | o que aparece |
-|---|---|---|
-| CSS (`z-index:` cru) | **72** | mais de 20 valores distintos: 1, 2, 3, 4, 6, 8, 12, 15, 20, 25, 30, 39, 40, 60, 79, 80, 130, 1000, 1100 |
-| Tailwind (`z-*`) | **59** | `z-20` (21×), `z-50` (11×), `z-10` (7×), `z-[60]`, `z-[110]`, `z-[90]`, `z-[80]`, `z-40`, `z-[70]`, `z-[1]` |
-| `style` inline (`zIndex:`) | **3** | 19, 20, 30 |
+Os piores, medidos:
+
+| arquivo | ocorrências |
+|---|---|
+| `src/index.css` | **35** |
+| `src/pages/FinanceiroConciliacao.jsx` | 9 |
+| `src/modules/custosRecebiveis/styles/custos-recebiveis.css` | 8 |
+| `src/pages/FinanceiroTitulos.jsx` | 8 |
+| `src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx` | 7 |
+| `src/styles/componentes-padrao.css` | 4 |
+
+O `index.css` liderar não é detalhe: é o arquivo que **declara** a escala. Ele
+tem 40 `z-index`, dos quais só 6 são as definições dos tokens — as outras 34
+furam a própria fila que ele define. A primeira versão da regra R32 excluía
+esse arquivo inteiro "por ser a fonte", e com isso dava passe livre justamente
+ao maior infrator. Corrigido: nenhum arquivo fica de fora.
 
 **Aqui está o defeito do cliente, em uma linha:** a barra fixa vale **20**, e
 há **11 usos de `z-50`** e outros acima disso em conteúdo comum. Conteúdo em 50
