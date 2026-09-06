@@ -155,12 +155,39 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
       /* A camada ainda não existe no DOM (primeiro render) OU acabou de
          entrar. Devolve a POSIÇÃO DE MEDIÇÃO para que ela seja desenhada e
          possa ser medida no efeito de layout seguinte, antes da pintura. */
+      /*
+        A POSIÇÃO DE MEDIÇÃO NÃO IMPÕE TETO DE ALTURA (06/09, tarde) — e o
+        `maxWidth` continua aqui, porque os dois tetos existem por motivos
+        DIFERENTES e só um deles é obrigatório.
+
+        `maxWidth` é o que torna a medição independente da posição: sem ele
+        a largura da caixa `fixed` responde ao `left` e os dois correm atrás
+        um do outro (React #185, 06/09, registrado acima). Ele fica.
+
+        `maxHeight` não fazia nada disso — altura não realimenta o `top` —,
+        e cobrava caro: estilo inline vence a folha, então o teto da janela
+        SUBSTITUÍA o `max-height: 320px` da `.app-colunas-menu` JUSTAMENTE
+        NA HORA DE MEDIR. O hook guardava 713px como "tamanho natural" de
+        uma caixa que pinta 320px, e o cabeçalho deste arquivo já dizia, em
+        letra de forma, que o natural é "a caixa PINTADA". Não era.
+
+        O preço, medido na prova: com o botão a 851px numa janela de 1080, o
+        painel de colunas virava para cima e parava em y=232 — 267px acima
+        de onde ele pinta, um vão que ninguém pediu. E, antes do conserto do
+        eixo vertical, era esse número inflado que empurrava a caixa para
+        fora da janela. Medindo sem o teto, o painel para em y=495: colado
+        no botão, que é a resposta 1 do cliente.
+
+        A resposta 3 (rolar por dentro) não se perde: ela é decidida no fim,
+        por `rolaV`, comparando o natural com o teto da janela — e agora
+        compara um natural que não foi cortado por esse mesmo teto.
+      */
       setCaixa((atual) => (atual && atual.medindo && atual.largura === larguraNaMedicao ? atual : {
         medindo: true,
         esquerda: folga,
         topo: folga,
         largura: larguraNaMedicao,
-        alturaMaxima: tetoAltura,
+        alturaMaxima: null,
         larguraMaxima: tetoLargura,
         estilo: {
           position: 'fixed',
@@ -168,7 +195,6 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
           top: folga,
           right: 'auto',
           bottom: 'auto',
-          maxHeight: tetoAltura,
           maxWidth: tetoLargura,
           ...(larguraNaMedicao === null ? {} : { width: larguraNaMedicao })
         }
@@ -186,20 +212,44 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
     */
     const largura = larguraDaAncora ? larguraNaMedicao : natural.current.largura;
 
-    /* ---- vertical ----------------------------------------------------- */
+    /*
+      ---- vertical -------------------------------------------------------
+      OS DOIS EIXOS TÊM A MESMA FORMA, e desde 06/09 (tarde) eles são
+      escritos do mesmo jeito. Não é simetria por gosto: é o conserto de
+      48 células da matriz, e a diferença entre os dois textos ERA o
+      defeito.
+
+      O QUE ESTAVA AQUI: o vertical media ESPAÇO ("cabe do lado de baixo?
+      cabe do lado de cima?") em vez de medir a CAIXA RESULTANTE ("a caixa
+      posta aqui fica dentro da janela?"). Enquanto a âncora está dentro da
+      janela as duas perguntas dão a mesma resposta — e é por isso que o
+      defeito atravessou uma leva inteira sem aparecer.
+
+      Elas param de dar a mesma resposta quando a ÂNCORA SAI DA JANELA, que
+      é o que o harness produz o tempo todo (ele rola até o botão, clica, e
+      a página se acomoda depois) e o que qualquer pessoa produz rolando a
+      página com o painel aberto. Com o botão em y=1671 numa janela de 1080,
+      "cabe do lado de cima?" responde SIM — sobram 1659px acima dele — e a
+      camada é posta em 1084, 324px ABAIXO DA BORDA DE BAIXO. Medido na
+      `provaCamadasCabem` (âncora `fora`), e é exatamente a assinatura das
+      39 telas do passo 1b: `topo = ancora.top - afastamento - altura`, com
+      a âncora fora da janela.
+
+      O horizontal nunca teve esse defeito porque ele já perguntava pela
+      caixa (`cabe(x)` confere OS DOIS lados dela). O vertical passa a usar
+      a mesma função, com o mesmo `else` que prende na borda. Nenhum
+      mecanismo novo: o que havia de errado era um dos dois eixos estar
+      escrito na forma antiga.
+    */
+    const cabeV = (y) => y >= folga && y + altura <= alturaJanela - folga;
     const abaixo = ancora.bottom + afastamento;
-    const espacoAbaixo = alturaJanela - folga - abaixo;
-    const espacoAcima = (ancora.top - afastamento) - folga;
+    const acima = ancora.top - afastamento - altura;
 
     let topo = abaixo;
     if (altura > 0) {
-      if (altura <= espacoAbaixo) {
-        topo = abaixo;                                        // 1: o lugar normal
-      } else if (altura <= espacoAcima) {
-        topo = ancora.top - afastamento - altura;             // 1: vira para cima
-      } else {
-        topo = Math.max(folga, alturaJanela - altura - folga); // 2: encosta na borda
-      }
+      if (cabeV(abaixo)) topo = abaixo;                       // o lugar de sempre
+      else if (cabeV(acima)) topo = acima;                    // 1: vira para cima
+      else topo = Math.max(folga, Math.min(abaixo, alturaJanela - altura - folga)); // 2 e 3
     }
 
     /* ---- horizontal ---------------------------------------------------- */

@@ -17,17 +17,29 @@
  * marcação que a `BarraFiltros` reaproveita em toda faixa de filtro) — com
  * o CSS REAL do sistema.
  *
- * E MONTA CADA UM DUAS VEZES, encostado na borda ESQUERDA e na borda
- * DIREITA da janela. Não é capricho: uma camada que ancora pela direita só
- * vaza quando o botão está à esquerda, e uma que ancora pela esquerda só
- * vaza quando o botão está à direita. Medir num lugar só é como o defeito
- * do cliente passou — o painel estava certo na tela larga com o botão no
- * meio, e cortado na estreita com ele na ponta.
+ * E MONTA CADA UM NOS QUATRO CANTOS DA JANELA, em dois eixos.
+ *
+ * HORIZONTAL (`?eixo=h`, o padrão): botão na borda ESQUERDA e na borda
+ * DIREITA. Uma camada que ancora pela direita só vaza quando o botão está à
+ * esquerda, e uma que ancora pela esquerda só vaza quando o botão está à
+ * direita. Medir num lugar só é como o defeito do cliente passou — o painel
+ * estava certo na tela larga com o botão no meio, e cortado na estreita com
+ * ele na ponta.
+ *
+ * VERTICAL (`?eixo=v`, 06/09 à tarde): botão perto do TOPO e perto do
+ * RODAPÉ. Faltava, e a conta do que faltou está na matriz: 39 telas
+ * reprovando o passo 1b do P4 com a camada vazando pela borda DE BAIXO,
+ * enquanto esta prova passava verde em todas as larguras. Prova que só
+ * cobre um eixo aprova o outro por omissão.
  *
  * `?d=<defeito>` planta um defeito. Hoje só um: `semPosicao`, que devolve o
- * painel de filtros ao arranjo ANTERIOR (`absolute; right: 0`) para provar
- * que a medição REPROVA o estado de antes — check que não reprova o defeito
- * conhecido não está medindo nada.
+ * painel de filtros ao arranjo ANTERIOR (`absolute; top: calc(100% + 6px);
+ * right: 0`) para provar que a medição REPROVA o estado de antes — check que
+ * não reprova o defeito conhecido não está medindo nada. Ele serve aos dois
+ * eixos: preso embaixo do botão, o painel vaza pela ESQUERDA quando o botão
+ * está na borda esquerda (o defeito da captura) e pela BASE quando o botão
+ * está perto do rodapé (o defeito das 39 telas) — que é a camada NÃO
+ * VIRANDO PARA CIMA, escrita em CSS.
  */
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -38,6 +50,23 @@ import ApropriacaoAutocomplete from '../../src/components/ui/ApropriacaoAutocomp
 
 const params = new URLSearchParams(window.location.search);
 const D = params.get('d') || '';
+/*
+  O EIXO (06/09, tarde). `?eixo=v` monta a MESMA linha de camadas numa
+  página alta, com um grupo perto do TOPO e outro perto do RODAPÉ.
+
+  Ela existe porque a fixture só media o eixo horizontal — os dois grupos
+  eram "botão na borda esquerda" e "botão na borda direita", e nenhum deles
+  chega perto da borda de BAIXO. Foi por essa fresta que passaram as 39
+  telas do passo 1b da matriz: camada de 320px ancorada num botão a ~1000px
+  do topo, numa janela de 1080.
+
+  Os dois grupos moram no FLUXO da página, e não presos com `fixed`, de
+  propósito: é assim que a âncora de verdade se comporta, e é o que permite
+  a terceira medida — abrir o painel e ROLAR A PÁGINA, que é o que o
+  harness faz (ele rola até o botão, clica, e a página se acomoda) e o que
+  qualquer pessoa faz com o painel aberto.
+*/
+const EIXO = params.get('eixo') === 'v' ? 'v' : 'h';
 
 /* Os 15 filtros da Consulta de títulos, que é a faixa mais larga do
    sistema e a da captura — inclusive o rótulo comprido do aviso. */
@@ -90,6 +119,20 @@ function useVisibilidade() {
     restaurar: () => setOcultos(new Set())
   };
 }
+
+/*
+  O MENU MAIS ALTO QUE A JANELA — a resposta 3 do cliente ("rola por
+  dentro"), que nenhuma das outras quatro camadas exercita: as três com
+  teto próprio no CSS nunca passam de 320px, e a lista do autocomplete
+  para nos 648px. O `.app-mais-menu` NÃO tem teto de altura nenhum, então
+  40 itens dele passam de 1400px e não cabem em janela nenhuma das três.
+  É o mesmo componente real, com a lista comprida que uma tela de
+  relatório entrega.
+*/
+const ITENS_ALTOS = Array.from({ length: 40 }, (_, i) => ({
+  rotulo: `Ação avançada número ${i + 1}`,
+  onClick: () => {}
+}));
 
 const ITENS_MAIS = [
   { rotulo: 'Exportar para Excel', onClick: () => {} },
@@ -176,6 +219,11 @@ function Linha({ lado }) {
         </span>
       </Ancora>
       <Ancora lado={lado}>
+        <span data-camada="menu-alto">
+          <MenuMais itens={ITENS_ALTOS} rotulo="Ações avançadas" />
+        </span>
+      </Ancora>
+      <Ancora lado={lado}>
         <span data-camada="apropriacao" style={{ width: 260, display: 'block' }}>
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setAbrirApropriacao(true)}>
             Apropriação
@@ -194,8 +242,24 @@ function Linha({ lado }) {
 }
 
 function App() {
+  const classe = `prova-pagina${D === 'semPosicao' ? ' prova-defeito' : ''}`;
+  if (EIXO === 'v') {
+    return (
+      <div className={classe}>
+        <Linha lado="topo" />
+        {/* Uma janela inteira de vão: o grupo de baixo nasce ABAIXO da
+            dobra, e o clique do Playwright rola o mínimo para trazê-lo —
+            deixando o botão encostado na borda DE BAIXO, que é a posição
+            em que as 39 telas reprovaram. */}
+        <div className="prova-vao" />
+        <Linha lado="rodape" />
+        <div className="prova-vazio" />
+        <style>{D === 'semPosicao' ? CSS_DEFEITO : ''}</style>
+      </div>
+    );
+  }
   return (
-    <div className={`prova-pagina${D === 'semPosicao' ? ' prova-defeito' : ''}`}>
+    <div className={classe}>
       <Linha lado="esq" />
       <Linha lado="dir" />
       <div className="prova-vazio" />

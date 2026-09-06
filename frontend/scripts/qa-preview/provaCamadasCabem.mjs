@@ -34,9 +34,40 @@
  * direita só vaza com o botão à esquerda; a ancorada pela esquerda, o
  * contrário. Um lado só é como o defeito passou.
  *
+ * ----------------------------------------------------------------------------
+ * E NOS DOIS EIXOS (06/09, tarde) — a lacuna que custou 39 telas.
+ *
+ * Esta prova nasceu medindo só o eixo HORIZONTAL: os dois grupos de âncora
+ * eram "botão na borda esquerda" e "botão na borda direita", e nenhum dos dois
+ * chega perto da borda DE BAIXO. Ela passou verde nas três larguras enquanto a
+ * matriz reprovava 39 telas no passo 1b do P4, todas com a mesma frase — "VAZA
+ * N px além da borda DE BAIXO".
+ *
+ * A causa estava no `usePosicaoFlutuante` e é a assinatura exata que o eixo
+ * novo reproduz: com a ÂNCORA FORA DA JANELA (é onde o harness a deixa, e onde
+ * qualquer pessoa a deixa rolando a página com o painel aberto), o vertical
+ * perguntava "sobra espaço acima do botão?" em vez de "a caixa posta aqui fica
+ * dentro da janela?" — e com o botão em y=1671 numa janela de 1080 sobram
+ * 1659px acima dele. A camada virava para cima e parava 324px ABAIXO da borda
+ * de baixo. Medido nesta prova, no grupo `rodape`, antes do conserto.
+ *
+ * O eixo vertical mede TRÊS coisas por camada, e a terceira é a que pega isso:
+ *   1. âncora perto do TOPO — o lugar normal, embaixo do botão;
+ *   2. âncora perto do RODAPÉ — tem de virar para cima (o clique do Playwright
+ *      rola o mínimo e deixa o botão encostado na borda de baixo);
+ *   3. A PÁGINA ROLA COM A CAMADA ABERTA — a âncora sai da janela e a camada
+ *      NÃO PODE ir junto.
+ * E a quinta camada da fixture (`menu-alto`, 40 itens do `.app-mais-menu`, que
+ * não tem teto de altura no CSS) é a única MAIS ALTA QUE A JANELA nas três
+ * larguras: é ela que exercita a resposta 3 do cliente, a rolagem por dentro.
+ *
+ * ----------------------------------------------------------------------------
  * A MORDIDA: o caso `semPosicao` devolve o painel ao arranjo ANTERIOR
- * (`absolute; right: 0`) e a prova exige que ele REPROVE. Sem isso, esta
- * medição poderia estar lendo zero e ninguém saberia.
+ * (`absolute; top: calc(100% + 6px); right: 0`) e a prova exige que ele
+ * REPROVE. Sem isso, esta medição poderia estar lendo zero e ninguém saberia.
+ * Ele é medido nos DOIS eixos, e no vertical é literalmente "a camada NÃO vira
+ * para cima": presa embaixo de um botão que está na borda de baixo, ela tem de
+ * ser acusada por vazamento na BASE — se não for, o eixo novo não mede nada.
  *
  * Rode com `npm run provas` ou `node scripts/qa-preview/provaCamadasCabem.mjs`.
  */
@@ -65,6 +96,21 @@ const CAMADAS = [
   {
     nome: 'menu de ações "⋯"',
     marca: 'menu-mais',
+    camada: '.app-mais-menu',
+    opcao: null
+  },
+  {
+    /*
+      A ÚNICA MAIS ALTA QUE A JANELA nas três larguras — 40 itens de um
+      `.app-mais-menu`, que não declara teto de altura nenhum no CSS. Ela
+      existe porque as outras quatro NÃO exercitam a resposta 3 do cliente
+      ("não cabe de jeito nenhum → alinha à borda e rola por dentro"): as
+      três com teto próprio param em 320px e a lista do autocomplete em
+      648px. Sem ela, a única resposta que não estava medida era justamente
+      a que evita conteúdo INALCANÇÁVEL.
+    */
+    nome: 'menu "⋯" mais alto que a janela',
+    marca: 'menu-alto',
     camada: '.app-mais-menu',
     opcao: null
   },
@@ -102,6 +148,12 @@ const LADOS = [
   { id: 'dir', nome: 'botão na borda DIREITA' }
 ];
 
+/* O eixo vertical, na página `?eixo=v`. Mesmos componentes, mesma medida. */
+const ALTURAS = [
+  { id: 'topo', nome: 'botão perto do TOPO' },
+  { id: 'rodape', nome: 'botão perto do RODAPÉ' }
+];
+
 let falhas = 0;
 const registrar = (ok, texto) => {
   if (!ok) falhas += 1;
@@ -119,6 +171,7 @@ const medirCamada = ([marca, lado, seletorCamada, global]) => {
   const el = global ? document.querySelector(seletorCamada) : ancora.querySelector(seletorCamada);
   if (!el) return { erro: 'a camada não entrou no DOM depois do clique' };
   const c = el.getBoundingClientRect();
+  const a = ancora.getBoundingClientRect();
   const estilo = getComputedStyle(el);
   const T = 1;
   const vaza = [];
@@ -131,6 +184,13 @@ const medirCamada = ([marca, lado, seletorCamada, global]) => {
     caixa: `${Math.round(c.width)}×${Math.round(c.height)}px em x ${Math.round(c.left)}..${Math.round(c.right)},`
       + ` y ${Math.round(c.top)}..${Math.round(c.bottom)}`,
     janela: `${window.innerWidth}×${window.innerHeight}`,
+    /* Onde a camada ficou EM RELAÇÃO AO BOTÃO. Não é critério de aprovação
+       — "cabe na janela" é —, mas é o número que denuncia a camada que
+       virou para cima sem precisar: ela cabe, e abre a 300px do botão que
+       a chamou. Vai para o log de propósito, para a próxima leitura ser
+       comparação e não impressão. */
+    daAncora: c.top >= a.bottom ? `${Math.round(c.top - a.bottom)}px ABAIXO do botão`
+      : (c.bottom <= a.top ? `${Math.round(a.top - c.bottom)}px ACIMA do botão` : 'sobre o botão'),
     /* Conteúdo que não coube na caixa TEM de ter rolagem própria — cortar
        sem rolagem é a mesma inalcançabilidade, só que por dentro. */
     corta: el.scrollHeight > el.clientHeight + 2 && estilo.overflowY !== 'auto' && estilo.overflowY !== 'scroll',
@@ -214,6 +274,85 @@ async function main() {
       await contexto.close();
     }
 
+    /* ================================================== o eixo VERTICAL == */
+    for (const largura of LARGURAS) {
+      console.log(`\n— eixo VERTICAL · ${largura.width}×${largura.height} —`);
+      const contexto = await navegador.newContext({ viewport: { width: largura.width, height: largura.height } });
+      const pagina = await contexto.newPage();
+      await pagina.goto(servidor.rota('?eixo=v'), { waitUntil: 'domcontentloaded' });
+      await pagina.waitForSelector('.prova-pagina', { timeout: 10000 });
+
+      for (const camada of CAMADAS) {
+        for (const alto of ALTURAS) {
+          const { medida } = await abrirEMedir(pagina, camada, alto.id);
+          if (medida.erro) {
+            registrar(false, `${camada.nome} · ${alto.nome} :: ${medida.erro}`);
+            continue;
+          }
+          if (!medida.visivel) {
+            registrar(false, `${camada.nome} · ${alto.nome} :: abriu com caixa vazia (${medida.caixa})`);
+            continue;
+          }
+          const ok = medida.vaza.length === 0 && !medida.corta;
+          registrar(ok, `${camada.nome} · ${alto.nome} :: ${medida.caixa}`
+            + ` numa janela de ${medida.janela} (${medida.daAncora})`
+            + (medida.vaza.length ? ` — VAZA ${medida.vaza.join(' e ')}` : '')
+            + (medida.corta ? ' — CORTA o conteúdo por dentro SEM rolagem (o que sobrou é inalcançável)' : '')
+            + (ok ? ' — cabe inteira' : ''));
+
+          /* A SELEÇÃO SOBREVIVE TAMBÉM À CAMADA VIRADA PARA CIMA — o eixo
+             novo mexe em quem fica ONDE, e o `useFecharAoSair` fecha no
+             `mousedown` enquanto a opção escolhe no `mouseup`. */
+          if (camada.opcao) {
+            const opcao = pagina.locator(
+              `.prova-ancora--${alto.id} [data-camada="${camada.marca}"] ${camada.camada} ${camada.opcao}`
+            ).first();
+            const antes = await opcao.isChecked().catch(() => null);
+            await opcao.click({ timeout: 8000 }).catch(() => {});
+            await pagina.waitForTimeout(180);
+            const depois = await opcao.isChecked().catch(() => null);
+            registrar(depois !== null && depois !== antes,
+              `${camada.nome} · ${alto.nome} :: a seleção sobreviveu ao reposicionamento`
+              + ` (marcação ${antes} → ${depois})`
+              + (depois === null ? ' — a opção SAIU DO DOM no clique: a camada fechou no mousedown' : ''));
+          }
+
+          /*
+            A PÁGINA ROLA COM A CAMADA ABERTA — e a camada NÃO vai junto para
+            fora da janela.
+
+            É a medida que faltava, e é o caso REAL: o harness rola até o
+            botão, clica, e a página se acomoda; uma pessoa abre o painel e
+            rola para conferir a tabela atrás. A camada é `fixed` e o hook a
+            reposiciona a cada evento de rolagem — se ele calcular só em
+            relação ao botão, ela acompanha o botão para fora da tela e o
+            conteúdo fica INALCANÇÁVEL, que é o defeito das 39 telas.
+          */
+          await pagina.evaluate(() => window.scrollTo(0, 0));
+          await pagina.waitForTimeout(300);
+          const rolada = await pagina.evaluate(medirCamada, [camada.marca, alto.id, camada.camada, Boolean(camada.global)]);
+          if (rolada.erro || !rolada.visivel) {
+            /* Camada que FECHOU na rolagem não é defeito de geometria: é o
+               que várias fecham de propósito. Só não pode ficar fora. */
+            registrar(true, `${camada.nome} · ${alto.nome} :: a camada fechou quando a página rolou — nada a medir`);
+          } else {
+            const okRolada = rolada.vaza.length === 0 && !rolada.corta;
+            registrar(okRolada, `${camada.nome} · ${alto.nome} :: a página rolou com ela aberta e ela ficou em`
+              + ` ${rolada.caixa} numa janela de ${rolada.janela} (${rolada.daAncora})`
+              + (rolada.vaza.length ? ` — VAZA ${rolada.vaza.join(' e ')}` : '')
+              + (rolada.corta ? ' — CORTA sem rolagem' : '')
+              + (okRolada ? ' — continua inteira dentro da janela' : ''));
+          }
+
+          await pagina.keyboard.press('Escape').catch(() => {});
+          await pagina.locator('.prova-vazio').click({ timeout: 5000, position: { x: 5, y: 5 } }).catch(() => {});
+          await pagina.waitForTimeout(140);
+        }
+      }
+      await pagina.close();
+      await contexto.close();
+    }
+
     /* ------------------------------------------------------- a mordida -- */
     console.log('\n— mordida: o arranjo ANTERIOR do painel tem de REPROVAR —');
     let mordeu = 0;
@@ -235,6 +374,38 @@ async function main() {
       await contexto.close();
     }
     registrar(mordeu > 0, `a medição morde o defeito conhecido em ${mordeu} de ${LARGURAS.length} largura(s)`);
+
+    /*
+      A MORDIDA DO EIXO NOVO — "a camada NÃO vira para cima", escrita em CSS.
+
+      O mesmo defeito plantado, medido no grupo `rodape`: preso embaixo do
+      botão por `top: calc(100% + 6px)`, o painel não tem como virar, e com o
+      botão encostado na borda de baixo ele TEM de ser acusado por vazamento
+      na BASE. A conferência é pela borda NOMEADA, não por "vazou alguma
+      coisa": no eixo horizontal este mesmo defeito já vaza pela esquerda, e
+      aceitar qualquer vazamento faria a mordida do eixo vertical passar sem
+      que o eixo vertical estivesse medindo nada.
+    */
+    console.log('\n— mordida do eixo vertical: sem virar para cima, tem de vazar pela BASE —');
+    let mordeuV = 0;
+    for (const largura of LARGURAS) {
+      const contexto = await navegador.newContext({ viewport: { width: largura.width, height: largura.height } });
+      const pagina = await contexto.newPage();
+      await pagina.goto(servidor.rota('?eixo=v&d=semPosicao'), { waitUntil: 'domcontentloaded' });
+      await pagina.waitForSelector('.prova-pagina', { timeout: 10000 });
+      const camada = CAMADAS[0];
+      const { medida } = await abrirEMedir(pagina, camada, 'rodape');
+      const naBase = !medida.erro && medida.vaza.some((v) => v.includes('BASE'));
+      if (naBase) mordeuV += 1;
+      registrar(naBase, `@${largura.rotulo} o painel preso embaixo do botão do RODAPÉ :: `
+        + (medida.erro || `${medida.caixa} em ${medida.janela}`)
+        + (medida.vaza?.length ? ` — VAZA ${medida.vaza.join(' e ')}` : '')
+        + (naBase ? '' : ' — NÃO foi acusado na BASE, e devia: o eixo vertical desta prova não está medindo'));
+      await pagina.close();
+      await contexto.close();
+    }
+    registrar(mordeuV === LARGURAS.length,
+      `a medição do eixo vertical morde a camada que não vira para cima em ${mordeuV} de ${LARGURAS.length} largura(s)`);
   } finally {
     await navegador.close();
     servidor.fechar();

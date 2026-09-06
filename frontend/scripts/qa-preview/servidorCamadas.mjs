@@ -45,6 +45,12 @@ const CSS_FIXTURE = `
   .prova-ancora { display: flex; }
   .prova-ancora--esq { justify-content: flex-start; padding-left: 0; }
   .prova-ancora--dir { justify-content: flex-end; padding-right: 0; }
+  /* EIXO VERTICAL: os dois grupos ficam à esquerda, e o que separa um do
+     outro é uma janela inteira de vão — o grupo de baixo nasce fora da
+     dobra e o clique do Playwright rola o mínimo para trazê-lo, deixando o
+     botão encostado na borda DE BAIXO. É a posição das 39 telas. */
+  .prova-ancora--topo, .prova-ancora--rodape { justify-content: flex-start; }
+  .prova-vao { height: 100vh; }
   .prova-vazio { height: 900px; }
 `;
 
