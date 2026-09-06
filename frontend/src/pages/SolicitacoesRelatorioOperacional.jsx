@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   CelulaDupla,
   Pagina,
   PageHeader,
@@ -428,781 +429,791 @@ export default function SolicitacoesRelatorioOperacional() {
       </StatGrid>
 
       {/*
-        O funil usava `app-empty-card` — a caixa de ESTADO VAZIO — para
-        mostrar cinco números que existem. A classe diz "não há nada aqui" e
-        o conteúdo dizia o contrário. Ladrilho de dado único é StatTile.
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 11 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      <BlocoConteudo
-        titulo="Funil do período"
-        descricao="Contagem por etapa alcançada, sobre todas as solicitações do recorte."
-      >
-        <StatGrid colunas={5}>
-          <StatTile label="Criadas" valor={formatNumber(resumo.criadas)} />
-          <StatTile label="Assumidas" valor={formatNumber(resumo.assumidas)} />
-          <StatTile label="Enviadas" valor={formatNumber(resumo.enviadas)} />
-          <StatTile label="Aprovadas diretoria" valor={formatNumber(resumo.aprovadas_diretoria)} />
-          <StatTile label="Concluídas" valor={formatNumber(resumo.concluidas)} tom="success" />
-        </StatGrid>
-      </BlocoConteudo>
-
-      <div className="grid gap-4 xl:grid-cols-3">
+      <BlocosPersonalizaveis chave="blocos:solicitacoes-relatorio-operacional" larguraPadrao="total">
+        {/*
+          O funil usava `app-empty-card` — a caixa de ESTADO VAZIO — para
+          mostrar cinco números que existem. A classe diz "não há nada aqui" e
+          o conteúdo dizia o contrário. Ladrilho de dado único é StatTile.
+        */}
         <BlocoConteudo
-          titulo="Ranking por setor atual"
-          contagem={porSetor.length > topSetores.length ? `${topSetores.length} de ${porSetor.length}` : `${porSetor.length} setor(es)`}
-          descricao={`Os ${LINHAS_RANKING} setores de maior volume no período filtrado.`}
+          titulo="Funil do período"
+          descricao="Contagem por etapa alcançada, sobre todas as solicitações do recorte."
         >
-          {loading ? (
-            <div className="app-empty-card">Carregando setores...</div>
-          ) : topSetores.length === 0 ? (
-            <div className="app-empty-card">Sem dados por setor no período.</div>
-          ) : (
-            <div className="grid gap-3">
-              {topSetores.map((item, index) => {
-                const total = Number(item.total || 0);
-                return (
-                  <div key={`setor-grafico-${item.key}`} className="grid gap-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
-                        <strong className="ml-2 text-sm text-[var(--c-text)]">{formatLabel(item.setor || item.key)}</strong>
+          <StatGrid colunas={5}>
+            <StatTile label="Criadas" valor={formatNumber(resumo.criadas)} />
+            <StatTile label="Assumidas" valor={formatNumber(resumo.assumidas)} />
+            <StatTile label="Enviadas" valor={formatNumber(resumo.enviadas)} />
+            <StatTile label="Aprovadas diretoria" valor={formatNumber(resumo.aprovadas_diretoria)} />
+            <StatTile label="Concluídas" valor={formatNumber(resumo.concluidas)} tom="success" />
+          </StatGrid>
+        </BlocoConteudo>
+
+        <div data-bloco-id="ranking-por-setor-atual" data-bloco-rotulo="Ranking por setor atual" className="grid gap-4 xl:grid-cols-3">
+          <BlocoConteudo
+            titulo="Ranking por setor atual"
+            contagem={porSetor.length > topSetores.length ? `${topSetores.length} de ${porSetor.length}` : `${porSetor.length} setor(es)`}
+            descricao={`Os ${LINHAS_RANKING} setores de maior volume no período filtrado.`}
+          >
+            {loading ? (
+              <div className="app-empty-card">Carregando setores...</div>
+            ) : topSetores.length === 0 ? (
+              <div className="app-empty-card">Sem dados por setor no período.</div>
+            ) : (
+              <div className="grid gap-3">
+                {topSetores.map((item, index) => {
+                  const total = Number(item.total || 0);
+                  return (
+                    <div key={`setor-grafico-${item.key}`} className="grid gap-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
+                          <strong className="ml-2 text-sm text-[var(--c-text)]">{formatLabel(item.setor || item.key)}</strong>
+                        </div>
+                        <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatNumber(total)}</strong>
                       </div>
-                      <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatNumber(total)}</strong>
+                      <BarraProporcao valor={total} maior={maiorTotalSetor} />
                     </div>
-                    <BarraProporcao valor={total} maior={maiorTotalSetor} />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </BlocoConteudo>
+                  );
+                })}
+              </div>
+            )}
+          </BlocoConteudo>
 
-        <BlocoConteudo
-          titulo="Distribuição por status"
-          contagem={porStatus.length > topStatus.length ? `${topStatus.length} de ${porStatus.length}` : `${porStatus.length} status`}
-          descricao={`Os ${LINHAS_RANKING} status de maior volume. O percentual é sobre TODAS as solicitações do recorte, não só sobre estes.`}
-        >
-          {loading ? (
-            <div className="app-empty-card">Carregando status...</div>
-          ) : topStatus.length === 0 ? (
-            <div className="app-empty-card">Sem dados por status no período.</div>
-          ) : (
-            <div className="grid gap-3">
-              {topStatus.map((item) => {
-                const total = Number(item.total || 0);
-                const percent = Number(resumo.total_solicitacoes || 0) > 0
-                  ? (total / Number(resumo.total_solicitacoes || 0)) * 100
-                  : 0;
-                return (
-                  <div key={`status-grafico-${item.key}`} className="grid gap-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <strong className="text-sm text-[var(--c-text)]">{formatLabel(item.status || item.key)}</strong>
-                      <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
-                        {formatNumber(total)} | {formatPercent(percent)}
-                      </span>
-                    </div>
-                    <BarraProporcao valor={total} maior={maiorTotalStatus} tom="var(--c-success)" />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Volume por obra/centro"
-          contagem={porObra.length > topObras.length ? `${topObras.length} de ${porObra.length}` : `${porObra.length} obra(s)/centro(s)`}
-          descricao={`As ${LINHAS_RANKING} origens que mais abriram solicitações. Antes disso o servidor já cortou em ${LIMITE_AGRUPAMENTO} obras/centros — nem o "de N" é a lista completa.`}
-        >
-          {loading ? (
-            <div className="app-empty-card">Carregando obras...</div>
-          ) : topObras.length === 0 ? (
-            <div className="app-empty-card">Sem dados por obra/centro no período.</div>
-          ) : (
-            <div className="grid gap-3">
-              {topObras.map((item, index) => {
-                const total = Number(item.total || 0);
-                return (
-                  <div key={`obra-grafico-${item.key}`} className="grid gap-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
-                        <strong className="ml-2 text-sm text-[var(--c-text)]">{item.obra_nome || 'Sem obra/centro'}</strong>
+          <BlocoConteudo
+            titulo="Distribuição por status"
+            contagem={porStatus.length > topStatus.length ? `${topStatus.length} de ${porStatus.length}` : `${porStatus.length} status`}
+            descricao={`Os ${LINHAS_RANKING} status de maior volume. O percentual é sobre TODAS as solicitações do recorte, não só sobre estes.`}
+          >
+            {loading ? (
+              <div className="app-empty-card">Carregando status...</div>
+            ) : topStatus.length === 0 ? (
+              <div className="app-empty-card">Sem dados por status no período.</div>
+            ) : (
+              <div className="grid gap-3">
+                {topStatus.map((item) => {
+                  const total = Number(item.total || 0);
+                  const percent = Number(resumo.total_solicitacoes || 0) > 0
+                    ? (total / Number(resumo.total_solicitacoes || 0)) * 100
+                    : 0;
+                  return (
+                    <div key={`status-grafico-${item.key}`} className="grid gap-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <strong className="text-sm text-[var(--c-text)]">{formatLabel(item.status || item.key)}</strong>
+                        <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
+                          {formatNumber(total)} | {formatPercent(percent)}
+                        </span>
                       </div>
-                      <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatNumber(total)}</strong>
+                      <BarraProporcao valor={total} maior={maiorTotalStatus} tom="var(--c-success)" />
                     </div>
-                    <BarraProporcao valor={total} maior={maiorTotalObra} tom="var(--c-warning)" />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </BlocoConteudo>
-      </div>
+                  );
+                })}
+              </div>
+            )}
+          </BlocoConteudo>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <BlocoConteudo
-          titulo="Evolução mensal"
-          contagem={`${evolucaoMensal.length} mês(es)`}
-          descricao="Solicitações criadas por mês dentro do período filtrado."
-        >
-          {loading ? (
-            <div className="app-empty-card">Carregando evolução...</div>
-          ) : evolucaoMensal.length === 0 ? (
-            <div className="app-empty-card">Sem dados mensais para o filtro selecionado.</div>
-          ) : (
-            <div className="grid gap-3">
-              {evolucaoMensal.map((item) => {
-                const total = Number(item.total || 0);
-                return (
-                  <div key={`evolucao-${item.mes}`} className="grid gap-2">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <strong className="text-sm text-[var(--c-text)]">{item.mes_label || item.mes}</strong>
-                      <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
-                        {formatNumber(total)} criada(s)
-                      </span>
-                    </div>
-                    <BarraProporcao valor={total} maior={maiorTotalEvolucao} />
-                    <div className="text-xs text-[var(--c-muted)]">
-                      {formatNumber(item.concluidas)} concluída(s) | {formatNumber(item.abertas)} aberta(s)
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Aging por status"
-          contagem={agingStatus.length > topAgingStatus.length ? `${topAgingStatus.length} de ${agingStatus.length}` : `${agingStatus.length} status`}
-          descricao={`Tempo médio parado das solicitações abertas em cada status atual — os ${LINHAS_RANKING} de maior volume.`}
-        >
-          {loading ? (
-            <div className="app-empty-card">Carregando aging por status...</div>
-          ) : topAgingStatus.length === 0 ? (
-            <div className="app-empty-card">Sem solicitações abertas para calcular aging por status.</div>
-          ) : (
-            <div className="grid gap-3">
-              {topAgingStatus.map((item) => {
-                const media = Number(item.media_dias_parada || 0);
-                return (
-                  <div key={`aging-status-${item.key}`} className="grid gap-2">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <strong className="text-sm text-[var(--c-text)]">{formatLabel(item.status || item.key)}</strong>
-                      <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
-                        {formatDays(media)} | {formatNumber(item.total)} aberta(s)
-                      </span>
-                    </div>
-                    <BarraProporcao valor={media} maior={maiorAgingStatus} tom="var(--c-danger)" />
-                    <div className="text-xs text-[var(--c-muted)]">
-                      Maior parada: {formatDays(item.maior_dias_parada)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </BlocoConteudo>
-      </div>
-
-      <BlocoConteudo
-        titulo="Mapa setor x status"
-        descricao={`Cruzamento dos ${LINHAS_HEATMAP} setores e dos ${LINHAS_HEATMAP} status de maior volume no período filtrado.`}
-      >
-        {loading ? (
-          <div className="app-empty-card">Carregando matriz...</div>
-        ) : topSetoresHeatmap.length === 0 || topStatusHeatmap.length === 0 ? (
-          <div className="app-empty-card">Sem dados suficientes para montar o mapa setor x status.</div>
-        ) : (
-          /* R18 (onde NÃO vale): rolagem horizontal com `overflow-x-auto`
-             não é `overflow: hidden` e não há nada fixo aqui dentro. A
-             largura mínima em px que existia (`min-w-[720px]`) saiu — quem
-             dita o mínimo agora é o conteúdo (`min-w-max`), sem medida
-             escrita na tela (R10). */
-          <div className="overflow-x-auto">
-            <div
-              className="grid min-w-max gap-2"
-              style={{ gridTemplateColumns: `auto repeat(${topStatusHeatmap.length}, minmax(0, 1fr))` }}
-            >
-              <div className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--c-muted)]">Setor</div>
-              {topStatusHeatmap.map((statusItem) => (
-                <div key={`heatmap-head-${statusItem.key}`} className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--c-muted)] text-center">
-                  {formatLabel(statusItem.status || statusItem.key)}
-                </div>
-              ))}
-              {topSetoresHeatmap.map((setorItem) => (
-                <Fragment key={`heatmap-row-${setorItem.key}`}>
-                  <div className="text-sm font-bold text-[var(--c-text)] py-2">
-                    {formatLabel(setorItem.setor || setorItem.key)}
-                  </div>
-                  {topStatusHeatmap.map((statusItem) => {
-                    const item = heatmapLookup.get(`${setorItem.setor || 'NAO_INFORMADO'}|${statusItem.status || 'NAO_INFORMADO'}`);
-                    const total = Number(item?.total || 0);
-                    /*
-                      A INTENSIDADE é dado (a proporção da célula), como a
-                      largura da barra. O que era cor à mão saiu: antes a
-                      célula pintava `rgba(37, 99, 235, opacidade)` e trocava
-                      o texto para `#fff` acima de 45% — dois valores crus,
-                      sem par no tema escuro e sem passar pelo piso de
-                      contraste (R2/R25).
-                      Agora a mistura sai de token (`--sem-info` sobre a
-                      superfície do bloco) e o teto é 45%, para o texto
-                      continuar em `--c-text` nos dois temas em vez de
-                      inverter para branco. O número está escrito em toda
-                      célula, então a cor reforça — não carrega sozinha.
-                    */
-                    // Zero não ganha piso de tinta: a célula sem cruzamento
-                    // fica na cor da superfície, com o "0" escrito. Piso de
-                    // intensidade é a mesma mentira do piso de largura.
-                    const intensidade = total > 0 && maiorHeatmap > 0
-                      ? Math.min(45, Math.max(1, Math.round((total / maiorHeatmap) * 45)))
-                      : 0;
-                    return (
-                      <div
-                        key={`heatmap-cell-${setorItem.key}-${statusItem.key}`}
-                        className="rounded-lg px-3 py-2 text-center text-sm font-bold text-[var(--c-text)]"
-                        style={{
-                          backgroundColor: `color-mix(in srgb, var(--sem-info) ${intensidade}%, var(--ui-surface))`
-                        }}
-                      >
-                        {formatNumber(total)}
+          <BlocoConteudo
+            titulo="Volume por obra/centro"
+            contagem={porObra.length > topObras.length ? `${topObras.length} de ${porObra.length}` : `${porObra.length} obra(s)/centro(s)`}
+            descricao={`As ${LINHAS_RANKING} origens que mais abriram solicitações. Antes disso o servidor já cortou em ${LIMITE_AGRUPAMENTO} obras/centros — nem o "de N" é a lista completa.`}
+          >
+            {loading ? (
+              <div className="app-empty-card">Carregando obras...</div>
+            ) : topObras.length === 0 ? (
+              <div className="app-empty-card">Sem dados por obra/centro no período.</div>
+            ) : (
+              <div className="grid gap-3">
+                {topObras.map((item, index) => {
+                  const total = Number(item.total || 0);
+                  return (
+                    <div key={`obra-grafico-${item.key}`} className="grid gap-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
+                          <strong className="ml-2 text-sm text-[var(--c-text)]">{item.obra_nome || 'Sem obra/centro'}</strong>
+                        </div>
+                        <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatNumber(total)}</strong>
                       </div>
-                    );
-                  })}
-                </Fragment>
-              ))}
-            </div>
-          </div>
-        )}
-      </BlocoConteudo>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <BlocoConteudo
-          titulo="SLA por setor"
-          contagem={slaSetor.length > topSlaSetor.length ? `${topSlaSetor.length} de ${slaSetor.length}` : `${slaSetor.length} setor(es)`}
-          descricao={`Solicitações abertas vencidas conforme o SLA cadastrado por setor — os ${LINHAS_RANKING} com mais vencidas.`}
-          /* R11 (onde NÃO vale): "Configurar SLA" não é navegação para tela
-             irmã disfarçada de ação — é a ÚNICA saída do estado vazio deste
-             bloco ("nenhum SLA configurado"). Fica. */
-          acoes={<Link to="/solicitacoes-sla-setor" className="btn btn-outline">Configurar SLA</Link>}
-        >
-          {loading ? (
-            <div className="app-empty-card">Carregando SLA...</div>
-          ) : !relatorio?.sla_configurado ? (
-            <div className="app-empty-card">
-              Nenhum SLA por setor configurado. Cadastre os prazos para ativar a leitura de vencimentos.
-            </div>
-          ) : topSlaSetor.length === 0 ? (
-            <div className="app-empty-card">Nenhuma solicitação aberta em setor com SLA configurado.</div>
-          ) : (
-            <div className="grid gap-3">
-              {topSlaSetor.map((item) => {
-                const vencidas = Number(item.vencidas || 0);
-                /*
-                  Aqui o piso de 4% era ainda pior que nos outros gráficos:
-                  o setor com ZERO vencida ganhava barra visível — verde, mas
-                  visível — num gráfico cujo título é "vencidas". Zero é
-                  largura zero; o tom continua distinguindo quem tem vencida
-                  de quem não tem.
-                */
-                return (
-                  <div key={`sla-setor-${item.key}`} className="grid gap-2">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <strong className="text-sm text-[var(--c-text)]">{formatLabel(item.setor_nome || item.setor || item.key)}</strong>
-                      <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
-                        {formatNumber(vencidas)} vencida(s) de {formatNumber(item.total)}
-                      </span>
+                      <BarraProporcao valor={total} maior={maiorTotalObra} tom="var(--c-warning)" />
                     </div>
-                    <BarraProporcao
-                      valor={vencidas}
-                      maior={maiorSlaVencidas}
-                      tom={vencidas > 0 ? 'var(--c-danger)' : 'var(--c-success)'}
-                    />
-                    <div className="text-xs text-[var(--c-muted)]">
-                      SLA: {formatNumber(item.sla_dias, 1)} dia(s) | No prazo: {formatNumber(item.no_prazo)} | Maior parada: {formatDays(item.maior_dias_parada)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Setores sem SLA configurado"
-          contagem={setoresSemSla.length > topSetoresSemSla.length ? `${topSetoresSemSla.length} de ${setoresSemSla.length}` : `${setoresSemSla.length} setor(es)`}
-          descricao={`Solicitações abertas que ainda não podem ser tratadas como vencidas por falta de regra real — os ${LINHAS_SEM_SLA} de maior volume.`}
-        >
-          {loading ? (
-            <div className="app-empty-card">Carregando setores sem SLA...</div>
-          ) : topSetoresSemSla.length === 0 ? (
-            <div className="app-empty-card">Todas as solicitações abertas do filtro estão em setores com SLA ou não há abertas.</div>
-          ) : (
-            <div className="divide-y divide-[var(--ui-border)]">
-              {topSetoresSemSla.map((item) => (
-                <div key={`sem-sla-${item.key}`} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div>
-                    <strong className="block text-sm text-[var(--c-text)]">{formatLabel(item.setor_nome || item.setor || item.key)}</strong>
-                    <span className="text-xs text-[var(--c-muted)]">{formatCurrency(item.valor_aberto)} em aberto</span>
-                  </div>
-                  <span className="fx-badge fx-badge--warning">
-                    {formatNumber(item.total)} aberta(s)
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </BlocoConteudo>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <BlocoConteudo
-          titulo="Tempos por etapa"
-          contagem={`${temposEtapas.length} etapa(s)`}
-          descricao="Médias calculadas apenas quando a etapa possui data real registrada."
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'etapa',
-                titulo: 'Etapa',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.label
-              },
-              { id: 'amostras', titulo: 'Amostras', tipo: 'numero', render: (item) => formatNumber(item.amostras) },
-              { id: 'media', titulo: 'Média', tipo: 'numero', render: (item) => formatDays(item.media_dias) },
-              { id: 'maior', titulo: 'Maior', tipo: 'numero', render: (item) => formatDays(item.maior_dias) }
-            ]}
-            itens={temposEtapas}
-            getId={(item) => item.key}
-            carregando={loading}
-            vazio="Sem etapas com datas suficientes no período."
-            storageKey="tabela:solicitacoes-relatorio-operacional:tempos-etapas"
-            rotuloRolagem="Tempos por etapa"
-          />
-        </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Aging por setor atual"
-          contagem={`${agingSetor.length} setor(es)`}
-          descricao="Solicitações abertas agrupadas pelo setor em que estão paradas agora."
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'setor',
-                titulo: 'Setor',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => formatLabel(item.setor || item.key)
-              },
-              { id: 'abertas', titulo: 'Abertas', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'media', titulo: 'Média parada', tipo: 'numero', render: (item) => formatDays(item.media_dias_parada) },
-              { id: 'maior', titulo: 'Maior parada', tipo: 'numero', render: (item) => formatDays(item.maior_dias_parada) },
-              { id: 'valor', titulo: 'Valor aberto', tipo: 'valor', render: (item) => formatCurrency(item.valor_aberto) }
-            ]}
-            itens={agingSetor}
-            getId={(item) => item.key}
-            carregando={loading}
-            vazio="Sem solicitações abertas nos filtros selecionados."
-            storageKey="tabela:solicitacoes-relatorio-operacional:aging-setor"
-            rotuloRolagem="Aging por setor atual"
-          />
-        </BlocoConteudo>
-      </div>
-
-      <BlocoConteudo
-        titulo="Pendências financeiras por usuário"
-        contagem={`${pendenciasFinanceirasCriador.length} usuário(s)`}
-        descricao="Mede solicitações marcadas por GEO ou Financeiro como fora do prazo, sem nota ou sem boleto até o vencimento."
-      >
-        {/* A "leitura" do bloco é um aviso permanente sobre como o número é
-            calculado — `app-alert` (token semântico) no lugar do trio
-            border-amber-100/bg-amber-50/text-amber-800 escrito à mão (R25). */}
-        <div className="app-alert app-alert--warning">
-          <strong>Leitura:</strong> a pendência fica aberta até ser regularizada no detalhe da solicitação. O tempo médio mede o prazo entre a marcação e a regularização.
+                  );
+                })}
+              </div>
+            )}
+          </BlocoConteudo>
         </div>
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'usuario',
-              titulo: 'Usuário criador',
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => item.usuario_nome || 'Sem criador'
-            },
-            {
-              id: 'marcadas',
-              titulo: 'Marcadas',
-              tipo: 'numero',
-              render: (item) => <strong>{formatNumber(item.total_marcadas)}</strong>
-            },
-            {
-              id: 'abertas',
-              titulo: 'Abertas',
-              tipo: 'numero',
-              render: (item) => (
-                <span className={Number(item.abertas || 0) > 0 ? 'font-bold text-[var(--sem-warning)]' : 'text-[var(--c-muted)]'}>
-                  {formatNumber(item.abertas)}
-                </span>
-              )
-            },
-            {
-              id: 'regularizadas',
-              titulo: 'Regularizadas',
-              tipo: 'numero',
-              render: (item) => <span className="font-bold text-[var(--sem-success)]">{formatNumber(item.regularizadas)}</span>
-            },
-            { id: 'media', titulo: 'Prazo médio', tipo: 'numero', render: (item) => formatDays(item.media_dias_regularizacao) },
-            { id: 'maior', titulo: 'Maior prazo', tipo: 'numero', render: (item) => formatDays(item.maior_dias_regularizacao) },
-            {
-              id: 'tipos',
-              titulo: 'Tipos de pendência',
-              tipo: 'texto',
-              render: (item) => (
-                Array.isArray(item.tipos) && item.tipos.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {item.tipos.map((tipo) => (
-                      <span key={`${item.key}-${tipo.tipo}`} className="fx-badge fx-badge--neutral">
-                        {formatLabel(tipo.tipo)}: {formatNumber(tipo.total)}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-[var(--c-muted)]">Sem tipo informado</span>
-                )
-              )
-            }
-          ]}
-          itens={pendenciasFinanceirasCriador}
-          getId={(item) => item.key}
-          carregando={loading}
-          vazio="Sem pendências financeiras marcadas no período."
-          storageKey="tabela:solicitacoes-relatorio-operacional:pendencias-financeiras"
-          rotuloRolagem="Pendências financeiras por usuário"
-        />
-      </BlocoConteudo>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <BlocoConteudo
-          titulo="Por status"
-          contagem={`${porStatus.length} status`}
-          descricao="Todos os status com solicitação no recorte."
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'status',
-                titulo: 'Status',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => formatLabel(item.status || item.key)
-              },
-              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
-            ]}
-            itens={porStatus}
-            getId={(item) => item.key}
-            carregando={loading}
-            vazio="Sem dados no período."
-            storageKey="tabela:solicitacoes-relatorio-operacional:por-status"
-            rotuloRolagem="Por status"
-          />
-        </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Por setor atual"
-          contagem={`${porSetor.length} setor(es)`}
-          descricao="Todos os setores com solicitação no recorte."
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'setor',
-                titulo: 'Setor',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => formatLabel(item.setor || item.key)
-              },
-              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
-            ]}
-            itens={porSetor}
-            getId={(item) => item.key}
-            carregando={loading}
-            vazio="Sem dados no período."
-            storageKey="tabela:solicitacoes-relatorio-operacional:por-setor"
-            rotuloRolagem="Por setor atual"
-          />
-        </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Por obra/centro"
-          contagem={`${porObra.length} de até ${LIMITE_AGRUPAMENTO}`}
-          descricao={`O servidor devolve as ${LIMITE_AGRUPAMENTO} obras/centros de maior volume — não a lista completa.`}
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'obra',
-                titulo: 'Obra / Centro',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => (
-                  <CelulaDupla
-                    principal={item.obra_nome || 'Sem obra/centro'}
-                    sub={item.obra_codigo || ''}
-                  />
-                )
-              },
-              { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (item) => formatLabel(item.tipo_centro_custo) },
-              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
-            ]}
-            itens={porObra}
-            getId={(item) => item.key}
-            carregando={loading}
-            vazio="Sem dados no período."
-            storageKey="tabela:solicitacoes-relatorio-operacional:por-obra"
-            rotuloRolagem="Por obra/centro"
-          />
-        </BlocoConteudo>
-      </div>
-
-      <BlocoConteudo
-        titulo="Acertividade na criação por usuário"
-        contagem={`${acertividadeCriacaoOrdenada.length} usuário(s)`}
-        descricao="Mede solicitações criadas, quantas voltaram para ajuste e quais setores registraram essas ocorrências."
-      >
-        <div className="app-alert app-alert--warning">
-          <strong>Leitura:</strong> "Com ajuste" conta cada solicitação uma única vez. "Ocorrências por setor" pode ser maior quando a mesma solicitação recebeu ajuste de mais de um setor.
-        </div>
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'usuario',
-              titulo: 'Usuário criador',
-              // R17: o criador NOMEIA a linha desta tabela.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              ordenavel: true,
-              valorOrdenacao: (item) => String(item.usuario_nome || 'Sem criador'),
-              render: (item) => item.usuario_nome || 'Sem criador'
-            },
-            {
-              id: 'criadas',
-              titulo: 'Criadas',
-              tipo: 'numero',
-              ordenavel: true,
-              // Quantidade interessa do MAIOR para o menor no 1o clique.
-              ordemInicial: 'desc',
-              valorOrdenacao: (item) => Number(item.total_criadas || 0),
-              render: (item) => formatNumber(item.total_criadas)
-            },
-            {
-              id: 'ajustes',
-              titulo: 'Com ajuste',
-              tipo: 'numero',
-              ordenavel: true,
-              ordemInicial: 'desc',
-              valorOrdenacao: (item) => Number(item.solicitacoes_com_ajuste || 0),
-              render: (item) => (
-                <>
-                  <strong>{formatNumber(item.solicitacoes_com_ajuste)}</strong>
-                  <div className="text-xs text-[var(--c-muted)]">
-                    {formatPercent(item.taxa_ajuste)} das criadas
-                  </div>
-                </>
-              )
-            },
-            {
-              id: 'ocorrencias',
-              titulo: 'Ocorr. setor',
-              tipo: 'numero',
-              ordenavel: true,
-              ordemInicial: 'desc',
-              valorOrdenacao: (item) => Number(item.ocorrencias_setor_ajuste || 0),
-              render: (item) => (
-                <>
-                  <strong>{formatNumber(item.ocorrencias_setor_ajuste)}</strong>
-                  {Number(item.solicitacoes_com_ajuste_multissetor || 0) > 0 ? (
-                    <div className="text-xs text-[var(--sem-warning)]">
-                      {formatNumber(item.solicitacoes_com_ajuste_multissetor)} multi-setor
+        <div data-bloco-id="evolucao-mensal" data-bloco-rotulo="Evolução mensal" className="grid gap-4 xl:grid-cols-2">
+          <BlocoConteudo
+            titulo="Evolução mensal"
+            contagem={`${evolucaoMensal.length} mês(es)`}
+            descricao="Solicitações criadas por mês dentro do período filtrado."
+          >
+            {loading ? (
+              <div className="app-empty-card">Carregando evolução...</div>
+            ) : evolucaoMensal.length === 0 ? (
+              <div className="app-empty-card">Sem dados mensais para o filtro selecionado.</div>
+            ) : (
+              <div className="grid gap-3">
+                {evolucaoMensal.map((item) => {
+                  const total = Number(item.total || 0);
+                  return (
+                    <div key={`evolucao-${item.mes}`} className="grid gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <strong className="text-sm text-[var(--c-text)]">{item.mes_label || item.mes}</strong>
+                        <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
+                          {formatNumber(total)} criada(s)
+                        </span>
+                      </div>
+                      <BarraProporcao valor={total} maior={maiorTotalEvolucao} />
+                      <div className="text-xs text-[var(--c-muted)]">
+                        {formatNumber(item.concluidas)} concluída(s) | {formatNumber(item.abertas)} aberta(s)
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-xs text-[var(--c-muted)]">sem multi-setor</div>
-                  )}
-                </>
-              )
-            },
-            {
-              id: 'acertividade',
-              titulo: 'Acertividade',
-              tipo: 'numero',
-              ordenavel: true,
-              ordemInicial: 'desc',
-              valorOrdenacao: (item) => Number(item.taxa_acertividade || 0),
-              render: (item) => (
-                <span className="fx-badge fx-badge--success">
-                  {formatPercent(item.taxa_acertividade)}
-                </span>
-              )
-            },
-            {
-              id: 'setores',
-              titulo: 'Setores que pediram ajuste',
-              tipo: 'texto',
-              render: (item) => (Array.isArray(item.ajustes_por_setor) && item.ajustes_por_setor.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {item.ajustes_por_setor.map((setor) => (
-                    <span key={`${item.key}-${setor.setor}`} className="fx-badge fx-badge--neutral">
-                      {formatLabel(setor.setor)}: {formatNumber(setor.total)}
+                  );
+                })}
+              </div>
+            )}
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Aging por status"
+            contagem={agingStatus.length > topAgingStatus.length ? `${topAgingStatus.length} de ${agingStatus.length}` : `${agingStatus.length} status`}
+            descricao={`Tempo médio parado das solicitações abertas em cada status atual — os ${LINHAS_RANKING} de maior volume.`}
+          >
+            {loading ? (
+              <div className="app-empty-card">Carregando aging por status...</div>
+            ) : topAgingStatus.length === 0 ? (
+              <div className="app-empty-card">Sem solicitações abertas para calcular aging por status.</div>
+            ) : (
+              <div className="grid gap-3">
+                {topAgingStatus.map((item) => {
+                  const media = Number(item.media_dias_parada || 0);
+                  return (
+                    <div key={`aging-status-${item.key}`} className="grid gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <strong className="text-sm text-[var(--c-text)]">{formatLabel(item.status || item.key)}</strong>
+                        <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
+                          {formatDays(media)} | {formatNumber(item.total)} aberta(s)
+                        </span>
+                      </div>
+                      <BarraProporcao valor={media} maior={maiorAgingStatus} tom="var(--c-danger)" />
+                      <div className="text-xs text-[var(--c-muted)]">
+                        Maior parada: {formatDays(item.maior_dias_parada)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </BlocoConteudo>
+        </div>
+
+        <BlocoConteudo
+          titulo="Mapa setor x status"
+          descricao={`Cruzamento dos ${LINHAS_HEATMAP} setores e dos ${LINHAS_HEATMAP} status de maior volume no período filtrado.`}
+        >
+          {loading ? (
+            <div className="app-empty-card">Carregando matriz...</div>
+          ) : topSetoresHeatmap.length === 0 || topStatusHeatmap.length === 0 ? (
+            <div className="app-empty-card">Sem dados suficientes para montar o mapa setor x status.</div>
+          ) : (
+            /* R18 (onde NÃO vale): rolagem horizontal com `overflow-x-auto`
+               não é `overflow: hidden` e não há nada fixo aqui dentro. A
+               largura mínima em px que existia (`min-w-[720px]`) saiu — quem
+               dita o mínimo agora é o conteúdo (`min-w-max`), sem medida
+               escrita na tela (R10). */
+            <div className="overflow-x-auto">
+              <div
+                className="grid min-w-max gap-2"
+                style={{ gridTemplateColumns: `auto repeat(${topStatusHeatmap.length}, minmax(0, 1fr))` }}
+              >
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--c-muted)]">Setor</div>
+                {topStatusHeatmap.map((statusItem) => (
+                  <div key={`heatmap-head-${statusItem.key}`} className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--c-muted)] text-center">
+                    {formatLabel(statusItem.status || statusItem.key)}
+                  </div>
+                ))}
+                {topSetoresHeatmap.map((setorItem) => (
+                  <Fragment key={`heatmap-row-${setorItem.key}`}>
+                    <div className="text-sm font-bold text-[var(--c-text)] py-2">
+                      {formatLabel(setorItem.setor || setorItem.key)}
+                    </div>
+                    {topStatusHeatmap.map((statusItem) => {
+                      const item = heatmapLookup.get(`${setorItem.setor || 'NAO_INFORMADO'}|${statusItem.status || 'NAO_INFORMADO'}`);
+                      const total = Number(item?.total || 0);
+                      /*
+                        A INTENSIDADE é dado (a proporção da célula), como a
+                        largura da barra. O que era cor à mão saiu: antes a
+                        célula pintava `rgba(37, 99, 235, opacidade)` e trocava
+                        o texto para `#fff` acima de 45% — dois valores crus,
+                        sem par no tema escuro e sem passar pelo piso de
+                        contraste (R2/R25).
+                        Agora a mistura sai de token (`--sem-info` sobre a
+                        superfície do bloco) e o teto é 45%, para o texto
+                        continuar em `--c-text` nos dois temas em vez de
+                        inverter para branco. O número está escrito em toda
+                        célula, então a cor reforça — não carrega sozinha.
+                      */
+                      // Zero não ganha piso de tinta: a célula sem cruzamento
+                      // fica na cor da superfície, com o "0" escrito. Piso de
+                      // intensidade é a mesma mentira do piso de largura.
+                      const intensidade = total > 0 && maiorHeatmap > 0
+                        ? Math.min(45, Math.max(1, Math.round((total / maiorHeatmap) * 45)))
+                        : 0;
+                      return (
+                        <div
+                          key={`heatmap-cell-${setorItem.key}-${statusItem.key}`}
+                          className="rounded-lg px-3 py-2 text-center text-sm font-bold text-[var(--c-text)]"
+                          style={{
+                            backgroundColor: `color-mix(in srgb, var(--sem-info) ${intensidade}%, var(--ui-surface))`
+                          }}
+                        >
+                          {formatNumber(total)}
+                        </div>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+        </BlocoConteudo>
+
+        <div data-bloco-id="sla-por-setor" data-bloco-rotulo="SLA por setor" className="grid gap-4 xl:grid-cols-2">
+          <BlocoConteudo
+            titulo="SLA por setor"
+            contagem={slaSetor.length > topSlaSetor.length ? `${topSlaSetor.length} de ${slaSetor.length}` : `${slaSetor.length} setor(es)`}
+            descricao={`Solicitações abertas vencidas conforme o SLA cadastrado por setor — os ${LINHAS_RANKING} com mais vencidas.`}
+            /* R11 (onde NÃO vale): "Configurar SLA" não é navegação para tela
+               irmã disfarçada de ação — é a ÚNICA saída do estado vazio deste
+               bloco ("nenhum SLA configurado"). Fica. */
+            acoes={<Link to="/solicitacoes-sla-setor" className="btn btn-outline">Configurar SLA</Link>}
+          >
+            {loading ? (
+              <div className="app-empty-card">Carregando SLA...</div>
+            ) : !relatorio?.sla_configurado ? (
+              <div className="app-empty-card">
+                Nenhum SLA por setor configurado. Cadastre os prazos para ativar a leitura de vencimentos.
+              </div>
+            ) : topSlaSetor.length === 0 ? (
+              <div className="app-empty-card">Nenhuma solicitação aberta em setor com SLA configurado.</div>
+            ) : (
+              <div className="grid gap-3">
+                {topSlaSetor.map((item) => {
+                  const vencidas = Number(item.vencidas || 0);
+                  /*
+                    Aqui o piso de 4% era ainda pior que nos outros gráficos:
+                    o setor com ZERO vencida ganhava barra visível — verde, mas
+                    visível — num gráfico cujo título é "vencidas". Zero é
+                    largura zero; o tom continua distinguindo quem tem vencida
+                    de quem não tem.
+                  */
+                  return (
+                    <div key={`sla-setor-${item.key}`} className="grid gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <strong className="text-sm text-[var(--c-text)]">{formatLabel(item.setor_nome || item.setor || item.key)}</strong>
+                        <span className="text-sm font-bold tabular-nums text-[var(--c-text)]">
+                          {formatNumber(vencidas)} vencida(s) de {formatNumber(item.total)}
+                        </span>
+                      </div>
+                      <BarraProporcao
+                        valor={vencidas}
+                        maior={maiorSlaVencidas}
+                        tom={vencidas > 0 ? 'var(--c-danger)' : 'var(--c-success)'}
+                      />
+                      <div className="text-xs text-[var(--c-muted)]">
+                        SLA: {formatNumber(item.sla_dias, 1)} dia(s) | No prazo: {formatNumber(item.no_prazo)} | Maior parada: {formatDays(item.maior_dias_parada)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Setores sem SLA configurado"
+            contagem={setoresSemSla.length > topSetoresSemSla.length ? `${topSetoresSemSla.length} de ${setoresSemSla.length}` : `${setoresSemSla.length} setor(es)`}
+            descricao={`Solicitações abertas que ainda não podem ser tratadas como vencidas por falta de regra real — os ${LINHAS_SEM_SLA} de maior volume.`}
+          >
+            {loading ? (
+              <div className="app-empty-card">Carregando setores sem SLA...</div>
+            ) : topSetoresSemSla.length === 0 ? (
+              <div className="app-empty-card">Todas as solicitações abertas do filtro estão em setores com SLA ou não há abertas.</div>
+            ) : (
+              <div className="divide-y divide-[var(--ui-border)]">
+                {topSetoresSemSla.map((item) => (
+                  <div key={`sem-sla-${item.key}`} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div>
+                      <strong className="block text-sm text-[var(--c-text)]">{formatLabel(item.setor_nome || item.setor || item.key)}</strong>
+                      <span className="text-xs text-[var(--c-muted)]">{formatCurrency(item.valor_aberto)} em aberto</span>
+                    </div>
+                    <span className="fx-badge fx-badge--warning">
+                      {formatNumber(item.total)} aberta(s)
                     </span>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-[var(--c-muted)]">Sem ajustes</span>
-              ))
-            }
-          ]}
-          itens={acertividadeCriacaoOrdenada}
-          getId={(item) => item.key}
-          carregando={loading}
-          vazio="Sem solicitações criadas no período."
-          storageKey="tabela:solicitacoes-relatorio-operacional:acertividade-criacao"
-          rotuloRolagem="Acertividade na criação por usuário"
-        />
-      </BlocoConteudo>
+                  </div>
+                ))}
+              </div>
+            )}
+          </BlocoConteudo>
+        </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <BlocoConteudo
-          titulo="Por tipo"
-          contagem={`${porTipo.length} de até ${LIMITE_AGRUPAMENTO}`}
-          descricao={`O servidor devolve os ${LIMITE_AGRUPAMENTO} tipos de maior volume — não a lista completa.`}
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'tipo',
-                titulo: 'Tipo',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.tipo_nome || 'Sem tipo'
-              },
-              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
-            ]}
-            itens={porTipo}
-            getId={(item) => item.key}
-            carregando={loading}
-            vazio="Sem dados no período."
-            storageKey="tabela:solicitacoes-relatorio-operacional:por-tipo"
-            rotuloRolagem="Por tipo"
-          />
-        </BlocoConteudo>
+        <div data-bloco-id="tempos-por-etapa" data-bloco-rotulo="Tempos por etapa" className="grid gap-4 xl:grid-cols-2">
+          <BlocoConteudo
+            titulo="Tempos por etapa"
+            contagem={`${temposEtapas.length} etapa(s)`}
+            descricao="Médias calculadas apenas quando a etapa possui data real registrada."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'etapa',
+                  titulo: 'Etapa',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.label
+                },
+                { id: 'amostras', titulo: 'Amostras', tipo: 'numero', render: (item) => formatNumber(item.amostras) },
+                { id: 'media', titulo: 'Média', tipo: 'numero', render: (item) => formatDays(item.media_dias) },
+                { id: 'maior', titulo: 'Maior', tipo: 'numero', render: (item) => formatDays(item.maior_dias) }
+              ]}
+              itens={temposEtapas}
+              getId={(item) => item.key}
+              carregando={loading}
+              vazio="Sem etapas com datas suficientes no período."
+              storageKey="tabela:solicitacoes-relatorio-operacional:tempos-etapas"
+              rotuloRolagem="Tempos por etapa"
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Aging por setor atual"
+            contagem={`${agingSetor.length} setor(es)`}
+            descricao="Solicitações abertas agrupadas pelo setor em que estão paradas agora."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'setor',
+                  titulo: 'Setor',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => formatLabel(item.setor || item.key)
+                },
+                { id: 'abertas', titulo: 'Abertas', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'media', titulo: 'Média parada', tipo: 'numero', render: (item) => formatDays(item.media_dias_parada) },
+                { id: 'maior', titulo: 'Maior parada', tipo: 'numero', render: (item) => formatDays(item.maior_dias_parada) },
+                { id: 'valor', titulo: 'Valor aberto', tipo: 'valor', render: (item) => formatCurrency(item.valor_aberto) }
+              ]}
+              itens={agingSetor}
+              getId={(item) => item.key}
+              carregando={loading}
+              vazio="Sem solicitações abertas nos filtros selecionados."
+              storageKey="tabela:solicitacoes-relatorio-operacional:aging-setor"
+              rotuloRolagem="Aging por setor atual"
+            />
+          </BlocoConteudo>
+        </div>
 
         <BlocoConteudo
-          titulo="Por responsável atual"
-          contagem={`${porResponsavel.length} de até ${LIMITE_AGRUPAMENTO}`}
-          descricao={`O servidor devolve os ${LIMITE_AGRUPAMENTO} responsáveis de maior volume — não a lista completa.`}
+          titulo="Pendências financeiras por usuário"
+          contagem={`${pendenciasFinanceirasCriador.length} usuário(s)`}
+          descricao="Mede solicitações marcadas por GEO ou Financeiro como fora do prazo, sem nota ou sem boleto até o vencimento."
         >
+          {/* A "leitura" do bloco é um aviso permanente sobre como o número é
+              calculado — `app-alert` (token semântico) no lugar do trio
+              border-amber-100/bg-amber-50/text-amber-800 escrito à mão (R25). */}
+          <div className="app-alert app-alert--warning">
+            <strong>Leitura:</strong> a pendência fica aberta até ser regularizada no detalhe da solicitação. O tempo médio mede o prazo entre a marcação e a regularização.
+          </div>
           <TabelaPadrao
             colunas={[
               {
                 id: 'usuario',
-                titulo: 'Responsável',
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.usuario_nome || 'Sem responsável'
-              },
-              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
-            ]}
-            itens={porResponsavel}
-            getId={(item) => item.key}
-            carregando={loading}
-            vazio="Sem dados no período."
-            storageKey="tabela:solicitacoes-relatorio-operacional:por-responsavel"
-            rotuloRolagem="Por responsável atual"
-          />
-        </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Por criador"
-          contagem={`${porCriador.length} de até ${LIMITE_AGRUPAMENTO}`}
-          descricao={`O servidor devolve os ${LIMITE_AGRUPAMENTO} criadores de maior volume — não a lista completa.`}
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'usuario',
-                titulo: 'Criador',
+                titulo: 'Usuário criador',
                 tipo: 'identidade',
                 noCard: 'titulo',
                 render: (item) => item.usuario_nome || 'Sem criador'
               },
-              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+              {
+                id: 'marcadas',
+                titulo: 'Marcadas',
+                tipo: 'numero',
+                render: (item) => <strong>{formatNumber(item.total_marcadas)}</strong>
+              },
+              {
+                id: 'abertas',
+                titulo: 'Abertas',
+                tipo: 'numero',
+                render: (item) => (
+                  <span className={Number(item.abertas || 0) > 0 ? 'font-bold text-[var(--sem-warning)]' : 'text-[var(--c-muted)]'}>
+                    {formatNumber(item.abertas)}
+                  </span>
+                )
+              },
+              {
+                id: 'regularizadas',
+                titulo: 'Regularizadas',
+                tipo: 'numero',
+                render: (item) => <span className="font-bold text-[var(--sem-success)]">{formatNumber(item.regularizadas)}</span>
+              },
+              { id: 'media', titulo: 'Prazo médio', tipo: 'numero', render: (item) => formatDays(item.media_dias_regularizacao) },
+              { id: 'maior', titulo: 'Maior prazo', tipo: 'numero', render: (item) => formatDays(item.maior_dias_regularizacao) },
+              {
+                id: 'tipos',
+                titulo: 'Tipos de pendência',
+                tipo: 'texto',
+                render: (item) => (
+                  Array.isArray(item.tipos) && item.tipos.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {item.tipos.map((tipo) => (
+                        <span key={`${item.key}-${tipo.tipo}`} className="fx-badge fx-badge--neutral">
+                          {formatLabel(tipo.tipo)}: {formatNumber(tipo.total)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-[var(--c-muted)]">Sem tipo informado</span>
+                  )
+                )
+              }
             ]}
-            itens={porCriador}
+            itens={pendenciasFinanceirasCriador}
             getId={(item) => item.key}
             carregando={loading}
-            vazio="Sem dados no período."
-            storageKey="tabela:solicitacoes-relatorio-operacional:por-criador"
-            rotuloRolagem="Por criador"
+            vazio="Sem pendências financeiras marcadas no período."
+            storageKey="tabela:solicitacoes-relatorio-operacional:pendencias-financeiras"
+            rotuloRolagem="Pendências financeiras por usuário"
           />
         </BlocoConteudo>
-      </div>
 
-      <BlocoConteudo
-        titulo="Gargalos operacionais"
-        contagem={`${gargalos.length} de até ${LIMITE_GARGALOS}`}
-        descricao={`Solicitações abertas há pelo menos 3 dias sem nova movimentação registrada. O servidor devolve as ${LIMITE_GARGALOS} mais paradas — se houver mais, elas não estão aqui.`}
-        variante="primario"
-        cor="var(--module-solicitacoes)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'codigo',
-              titulo: 'Solicitação',
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => (
-                <div>
-                  <Link to={`/solicitacoes/${item.id}`} className="font-bold text-[var(--c-primary)] hover:underline">
-                    {item.codigo || `#${item.id}`}
-                  </Link>
-                  <div className="text-xs text-[var(--c-muted)]">Criada em {formatDate(item.criada_em)}</div>
-                </div>
-              )
-            },
-            { id: 'setor', titulo: 'Setor', tipo: 'texto', render: (item) => formatLabel(item.setor) },
-            { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => formatLabel(item.status) },
-            { id: 'responsavel', titulo: 'Responsável', tipo: 'texto', render: (item) => item.responsavel_nome || '-' },
-            { id: 'obra', titulo: 'Obra / Centro', tipo: 'texto', render: (item) => item.obra_nome || '-' },
-            { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (item) => item.tipo_nome || '-' },
-            {
-              id: 'dias',
-              titulo: 'Parada',
-              tipo: 'numero',
-              render: (item) => (
-                <div>
-                  <strong>{formatNumber(item.dias_parada, 1)} dia(s)</strong>
-                  <div className="text-xs text-[var(--c-muted)]">Última: {formatDate(item.ultima_movimentacao_em)}</div>
-                </div>
-              )
-            },
-            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor) }
-          ]}
-          itens={gargalos}
-          carregando={loading}
-          vazio="Nenhum gargalo encontrado nos filtros selecionados."
-          storageKey="tabela:solicitacoes-relatorio-operacional:gargalos"
-          rotuloRolagem="Gargalos operacionais"
-        />
-      </BlocoConteudo>
+        <div data-bloco-id="por-status" data-bloco-rotulo="Por status" className="grid gap-4 xl:grid-cols-3">
+          <BlocoConteudo
+            titulo="Por status"
+            contagem={`${porStatus.length} status`}
+            descricao="Todos os status com solicitação no recorte."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'status',
+                  titulo: 'Status',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => formatLabel(item.status || item.key)
+                },
+                { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+              ]}
+              itens={porStatus}
+              getId={(item) => item.key}
+              carregando={loading}
+              vazio="Sem dados no período."
+              storageKey="tabela:solicitacoes-relatorio-operacional:por-status"
+              rotuloRolagem="Por status"
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Por setor atual"
+            contagem={`${porSetor.length} setor(es)`}
+            descricao="Todos os setores com solicitação no recorte."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'setor',
+                  titulo: 'Setor',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => formatLabel(item.setor || item.key)
+                },
+                { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+              ]}
+              itens={porSetor}
+              getId={(item) => item.key}
+              carregando={loading}
+              vazio="Sem dados no período."
+              storageKey="tabela:solicitacoes-relatorio-operacional:por-setor"
+              rotuloRolagem="Por setor atual"
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Por obra/centro"
+            contagem={`${porObra.length} de até ${LIMITE_AGRUPAMENTO}`}
+            descricao={`O servidor devolve as ${LIMITE_AGRUPAMENTO} obras/centros de maior volume — não a lista completa.`}
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'obra',
+                  titulo: 'Obra / Centro',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => (
+                    <CelulaDupla
+                      principal={item.obra_nome || 'Sem obra/centro'}
+                      sub={item.obra_codigo || ''}
+                    />
+                  )
+                },
+                { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (item) => formatLabel(item.tipo_centro_custo) },
+                { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+              ]}
+              itens={porObra}
+              getId={(item) => item.key}
+              carregando={loading}
+              vazio="Sem dados no período."
+              storageKey="tabela:solicitacoes-relatorio-operacional:por-obra"
+              rotuloRolagem="Por obra/centro"
+            />
+          </BlocoConteudo>
+        </div>
+
+        <BlocoConteudo
+          titulo="Acertividade na criação por usuário"
+          contagem={`${acertividadeCriacaoOrdenada.length} usuário(s)`}
+          descricao="Mede solicitações criadas, quantas voltaram para ajuste e quais setores registraram essas ocorrências."
+        >
+          <div className="app-alert app-alert--warning">
+            <strong>Leitura:</strong> "Com ajuste" conta cada solicitação uma única vez. "Ocorrências por setor" pode ser maior quando a mesma solicitação recebeu ajuste de mais de um setor.
+          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'usuario',
+                titulo: 'Usuário criador',
+                // R17: o criador NOMEIA a linha desta tabela.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                ordenavel: true,
+                valorOrdenacao: (item) => String(item.usuario_nome || 'Sem criador'),
+                render: (item) => item.usuario_nome || 'Sem criador'
+              },
+              {
+                id: 'criadas',
+                titulo: 'Criadas',
+                tipo: 'numero',
+                ordenavel: true,
+                // Quantidade interessa do MAIOR para o menor no 1o clique.
+                ordemInicial: 'desc',
+                valorOrdenacao: (item) => Number(item.total_criadas || 0),
+                render: (item) => formatNumber(item.total_criadas)
+              },
+              {
+                id: 'ajustes',
+                titulo: 'Com ajuste',
+                tipo: 'numero',
+                ordenavel: true,
+                ordemInicial: 'desc',
+                valorOrdenacao: (item) => Number(item.solicitacoes_com_ajuste || 0),
+                render: (item) => (
+                  <>
+                    <strong>{formatNumber(item.solicitacoes_com_ajuste)}</strong>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      {formatPercent(item.taxa_ajuste)} das criadas
+                    </div>
+                  </>
+                )
+              },
+              {
+                id: 'ocorrencias',
+                titulo: 'Ocorr. setor',
+                tipo: 'numero',
+                ordenavel: true,
+                ordemInicial: 'desc',
+                valorOrdenacao: (item) => Number(item.ocorrencias_setor_ajuste || 0),
+                render: (item) => (
+                  <>
+                    <strong>{formatNumber(item.ocorrencias_setor_ajuste)}</strong>
+                    {Number(item.solicitacoes_com_ajuste_multissetor || 0) > 0 ? (
+                      <div className="text-xs text-[var(--sem-warning)]">
+                        {formatNumber(item.solicitacoes_com_ajuste_multissetor)} multi-setor
+                      </div>
+                    ) : (
+                      <div className="text-xs text-[var(--c-muted)]">sem multi-setor</div>
+                    )}
+                  </>
+                )
+              },
+              {
+                id: 'acertividade',
+                titulo: 'Acertividade',
+                tipo: 'numero',
+                ordenavel: true,
+                ordemInicial: 'desc',
+                valorOrdenacao: (item) => Number(item.taxa_acertividade || 0),
+                render: (item) => (
+                  <span className="fx-badge fx-badge--success">
+                    {formatPercent(item.taxa_acertividade)}
+                  </span>
+                )
+              },
+              {
+                id: 'setores',
+                titulo: 'Setores que pediram ajuste',
+                tipo: 'texto',
+                render: (item) => (Array.isArray(item.ajustes_por_setor) && item.ajustes_por_setor.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {item.ajustes_por_setor.map((setor) => (
+                      <span key={`${item.key}-${setor.setor}`} className="fx-badge fx-badge--neutral">
+                        {formatLabel(setor.setor)}: {formatNumber(setor.total)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[var(--c-muted)]">Sem ajustes</span>
+                ))
+              }
+            ]}
+            itens={acertividadeCriacaoOrdenada}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem solicitações criadas no período."
+            storageKey="tabela:solicitacoes-relatorio-operacional:acertividade-criacao"
+            rotuloRolagem="Acertividade na criação por usuário"
+          />
+        </BlocoConteudo>
+
+        <div data-bloco-id="por-tipo" data-bloco-rotulo="Por tipo" className="grid gap-4 xl:grid-cols-3">
+          <BlocoConteudo
+            titulo="Por tipo"
+            contagem={`${porTipo.length} de até ${LIMITE_AGRUPAMENTO}`}
+            descricao={`O servidor devolve os ${LIMITE_AGRUPAMENTO} tipos de maior volume — não a lista completa.`}
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'tipo',
+                  titulo: 'Tipo',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.tipo_nome || 'Sem tipo'
+                },
+                { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+              ]}
+              itens={porTipo}
+              getId={(item) => item.key}
+              carregando={loading}
+              vazio="Sem dados no período."
+              storageKey="tabela:solicitacoes-relatorio-operacional:por-tipo"
+              rotuloRolagem="Por tipo"
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Por responsável atual"
+            contagem={`${porResponsavel.length} de até ${LIMITE_AGRUPAMENTO}`}
+            descricao={`O servidor devolve os ${LIMITE_AGRUPAMENTO} responsáveis de maior volume — não a lista completa.`}
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'usuario',
+                  titulo: 'Responsável',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.usuario_nome || 'Sem responsável'
+                },
+                { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+              ]}
+              itens={porResponsavel}
+              getId={(item) => item.key}
+              carregando={loading}
+              vazio="Sem dados no período."
+              storageKey="tabela:solicitacoes-relatorio-operacional:por-responsavel"
+              rotuloRolagem="Por responsável atual"
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Por criador"
+            contagem={`${porCriador.length} de até ${LIMITE_AGRUPAMENTO}`}
+            descricao={`O servidor devolve os ${LIMITE_AGRUPAMENTO} criadores de maior volume — não a lista completa.`}
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'usuario',
+                  titulo: 'Criador',
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.usuario_nome || 'Sem criador'
+                },
+                { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+              ]}
+              itens={porCriador}
+              getId={(item) => item.key}
+              carregando={loading}
+              vazio="Sem dados no período."
+              storageKey="tabela:solicitacoes-relatorio-operacional:por-criador"
+              rotuloRolagem="Por criador"
+            />
+          </BlocoConteudo>
+        </div>
+
+        <BlocoConteudo
+          titulo="Gargalos operacionais"
+          contagem={`${gargalos.length} de até ${LIMITE_GARGALOS}`}
+          descricao={`Solicitações abertas há pelo menos 3 dias sem nova movimentação registrada. O servidor devolve as ${LIMITE_GARGALOS} mais paradas — se houver mais, elas não estão aqui.`}
+          variante="primario"
+          cor="var(--module-solicitacoes)"
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'codigo',
+                titulo: 'Solicitação',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <div>
+                    <Link to={`/solicitacoes/${item.id}`} className="font-bold text-[var(--c-primary)] hover:underline">
+                      {item.codigo || `#${item.id}`}
+                    </Link>
+                    <div className="text-xs text-[var(--c-muted)]">Criada em {formatDate(item.criada_em)}</div>
+                  </div>
+                )
+              },
+              { id: 'setor', titulo: 'Setor', tipo: 'texto', render: (item) => formatLabel(item.setor) },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => formatLabel(item.status) },
+              { id: 'responsavel', titulo: 'Responsável', tipo: 'texto', render: (item) => item.responsavel_nome || '-' },
+              { id: 'obra', titulo: 'Obra / Centro', tipo: 'texto', render: (item) => item.obra_nome || '-' },
+              { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (item) => item.tipo_nome || '-' },
+              {
+                id: 'dias',
+                titulo: 'Parada',
+                tipo: 'numero',
+                render: (item) => (
+                  <div>
+                    <strong>{formatNumber(item.dias_parada, 1)} dia(s)</strong>
+                    <div className="text-xs text-[var(--c-muted)]">Última: {formatDate(item.ultima_movimentacao_em)}</div>
+                  </div>
+                )
+              },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor) }
+            ]}
+            itens={gargalos}
+            carregando={loading}
+            vazio="Nenhum gargalo encontrado nos filtros selecionados."
+            storageKey="tabela:solicitacoes-relatorio-operacional:gargalos"
+            rotuloRolagem="Gargalos operacionais"
+          />
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

@@ -72,6 +72,32 @@ import {
    `larguras` está de fora de propósito — ver acima. */
 export const TIPO_COLUNAS = 'colunas';
 export const TIPO_VISUAL = 'visual';
+/*
+  `blocos` ENTRA NA MIGRAÇÃO (05/09) — o tipo já existia no conjunto
+  fechado do backend (`listaPreferenciasValidators.js:36`, teto de 16KB) e
+  não tinha nenhum dono no frontend. Passa a ter dois:
+    - o RECOLHIMENTO de um `BlocoConteudo` que recebe chave (o defeito
+      medido: 39 arquivos de tela passam `recolhivel` e NENHUM grava —
+      recolher não sobrevivia ao F5);
+    - o ARRANJO de blocos das telas de relatório/painel
+      (`BlocosPersonalizaveis`), que antes só existia escrito à mão na
+      Home e no detalhe da solicitação.
+*/
+export const TIPO_BLOCOS = 'blocos';
+/*
+  `filtros` ENTRA NA MIGRAÇÃO (05/09, fechamento do N53) — também já
+  existia no conjunto fechado do backend e também não tinha dono no
+  frontend. Passa a ter um: a escolha de QUAIS FILTROS APARECEM nas três
+  telas que a oferecem (Consulta de títulos, Solicitações e
+  Provisionamentos — cinco endereços), unificada no
+  `components/padrao/PainelFiltrosVisiveis.jsx`.
+
+  Este é o tipo em que "banco em vez de navegador" não é conforto: a
+  escolha MUDA O RESULTADO DA CONSULTA (esconder um filtro limpa o valor
+  dele), então guardá-la por máquina fazia o mesmo usuário, com os mesmos
+  campos preenchidos, ler números diferentes em máquinas diferentes.
+*/
+export const TIPO_FILTROS = 'filtros';
 
 /*
   700ms, o MESMO valor que a ListaAvancada já usa
@@ -154,6 +180,60 @@ const ESPELHO = {
     },
     remover(base) {
       removerChave(`${base}:colunas`);
+    }
+  },
+  /*
+    O ESPELHO DE `blocos` NÃO TEM PASSADO — E É POR ISSO QUE ELE É SÓ
+    SEMENTE (05/09).
+
+    Os outros dois tipos espelham CHAVES ANTIGAS do navegador porque o
+    build anterior lê e escreve exatamente ali (rede de rollback). Aqui
+    não existe chave antiga: o recolhimento de bloco nunca foi gravado em
+    lugar nenhum, e o arranjo das duas telas que já tinham personalização
+    mora no balde `geral` da rota legada, que segue intocado. Então
+    `<base>:blocos` nasce hoje e serve a UMA função: a semente síncrona,
+    para o bloco nascer recolhido para quem já usou esta máquina em vez de
+    abrir aberto e fechar sozinho quando a carga única responder. Build
+    revertido simplesmente ignora a chave — e volta ao que fazia antes,
+    que era não guardar nada.
+  */
+  [TIPO_BLOCOS]: {
+    ler(base) {
+      const valor = lerJson(`${base}:blocos`, null);
+      return ehObjeto(valor) ? valor : null;
+    },
+    gravar(base, valor) {
+      gravarJson(`${base}:blocos`, valor);
+    },
+    remover(base) {
+      removerChave(`${base}:blocos`);
+    }
+  },
+  /*
+    O ESPELHO DE `filtros`, como o de `blocos`, é SÓ SEMENTE (05/09).
+
+    As chaves antigas das duas telas que gravavam ("
+    `fluxy.financeiro.titulos.visibleFilters.<carteira>.<usuario>`" e
+    "`solicitacoes:filtros-visiveis:<usuario>`") NÃO são espelhadas aqui de
+    propósito: elas trazem o usuário NO NOME e são lidas pela própria tela,
+    que passa o resultado como `legado` ao `useFiltrosVisiveis` — é lá que
+    a migração para o banco acontece, uma vez, com o portão de "a carga do
+    servidor terminou sem erro". Mapear aqui exigiria que o contexto
+    soubesse o usuário e o formato de cada tela; `<base>:filtros` nasce
+    hoje e serve só à semente síncrona, para a faixa nascer com o recorte
+    certo em vez de piscar do padrão para ele. Build revertido ignora a
+    chave nova e reencontra as antigas, que não são apagadas.
+  */
+  [TIPO_FILTROS]: {
+    ler(base) {
+      const valor = lerJson(`${base}:filtros`, null);
+      return ehObjeto(valor) ? valor : null;
+    },
+    gravar(base, valor) {
+      gravarJson(`${base}:filtros`, valor);
+    },
+    remover(base) {
+      removerChave(`${base}:filtros`);
     }
   },
   [TIPO_VISUAL]: {

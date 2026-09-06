@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   CelulaDupla,
   Pagina,
   PageHeader,
@@ -258,151 +259,161 @@ export default function ComprasRelatorioPrecosInsumos() {
       </StatGrid>
 
       {/*
-        R18: as três tabelas viviam dentro de `card ... overflow-hidden` — o
-        `hidden` cria scrollport e mata o `position: sticky` do cabeçalho e
-        da coluna fixa em silêncio. O BlocoConteudo não recorta.
-
-        R25 + CelulaDupla: cada célula "principal + detalhe" era
-        `text-slate-900` sobre `text-slate-500` escrita à mão, dez vezes —
-        `text-slate-500` é #64748b, 4,34:1, abaixo do mínimo AA de 4,5:1, e
-        sem par no tema escuro. Era a `CelulaDupla` reimplementada célula a
-        célula: agora é o componente, que já traz o par de tons por token.
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      <BlocoConteudo
-        titulo="Insumos por preco medio"
-        descricao="Resumo por item comprado, com menor preco medio observado entre fornecedores."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'item',
-              titulo: 'Item',
-              // R17: o insumo/item NOMEIA a linha do resumo.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => (
-                <CelulaDupla
-                  principal={item.descricao}
-                  sub={`${item.unidade || '-'} - ${item.origem === 'INSUMO' ? 'Insumo cadastrado' : 'Item manual'}`}
-                />
-              )
-            },
-            { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoria_nome || '-' },
-            { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
-            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
-            { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
-            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
-            { id: 'preco_medio', titulo: 'Preco medio', tipo: 'valor', render: (item) => formatMoney(item.preco_medio_geral) },
-            {
-              id: 'melhor',
-              titulo: 'Melhor fornecedor medio',
-              tipo: 'texto',
-              render: (item) => (
-                <CelulaDupla
-                  principal={item.melhor_fornecedor?.nome || '-'}
-                  sub={formatMoney(item.menor_preco_medio)}
-                />
-              )
-            }
-          ]}
-          itens={itens}
-          getId={(item) => item.key}
-          carregando={loading}
-          storageKey="tabela:compras-precos-insumos:itens"
-          rotuloRolagem="Insumos por preco medio"
-          vazio="Sem itens de pedido nos filtros."
-        />
-      </BlocoConteudo>
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-precos-insumos" larguraPadrao="total">
+        {/*
+          R18: as três tabelas viviam dentro de `card ... overflow-hidden` — o
+          `hidden` cria scrollport e mata o `position: sticky` do cabeçalho e
+          da coluna fixa em silêncio. O BlocoConteudo não recorta.
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          R25 + CelulaDupla: cada célula "principal + detalhe" era
+          `text-slate-900` sobre `text-slate-500` escrita à mão, dez vezes —
+          `text-slate-500` é #64748b, 4,34:1, abaixo do mínimo AA de 4,5:1, e
+          sem par no tema escuro. Era a `CelulaDupla` reimplementada célula a
+          célula: agora é o componente, que já traz o par de tons por token.
+        */}
         <BlocoConteudo
-          titulo="Comparativo por fornecedor"
-          descricao="Cada linha compara o preco medio do fornecedor contra o menor preco medio do mesmo item."
+          titulo="Insumos por preco medio"
+          descricao="Resumo por item comprado, com menor preco medio observado entre fornecedores."
+          variante="primario"
+          cor="var(--c-primary)"
         >
           <TabelaPadrao
             colunas={[
               {
                 id: 'item',
                 titulo: 'Item',
-                // R17: o insumo/item NOMEIA a linha do comparativo.
+                // R17: o insumo/item NOMEIA a linha do resumo.
                 tipo: 'identidade',
                 noCard: 'titulo',
                 render: (item) => (
-                  <CelulaDupla principal={item.descricao} sub={item.unidade || '-'} />
-                )
-              },
-              { id: 'fornecedor', titulo: 'Fornecedor', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.fornecedor_nome}</span> },
-              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
-              { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
-              { id: 'preco', titulo: 'Preco medio', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.preco_medio)}</span> },
-              { id: 'menor', titulo: 'Menor medio', tipo: 'valor', render: (item) => formatMoney(item.menor_preco_medio_item) },
-              {
-                id: 'diferenca',
-                titulo: 'Diferenca',
-                tipo: 'valor',
-                /*
-                  R25: `text-amber-700` / `text-emerald-700` viravam a única
-                  fonte do SIGNIFICADO (pagou acima × está no menor preço).
-                  O significado ficou, agora em token semântico: acima do
-                  menor preço é `--c-warning`, no menor preço é `--c-success`.
-                */
-                render: (item) => (
                   <CelulaDupla
-                    principal={(
-                      <span
-                        className="font-semibold"
-                        style={{
-                          color: Number(item.diferenca_menor_preco_medio || 0) > 0
-                            ? 'var(--c-warning)'
-                            : 'var(--c-success)'
-                        }}
-                      >
-                        {formatMoney(item.diferenca_menor_preco_medio)}
-                      </span>
-                    )}
-                    sub={formatPercent(item.diferenca_percentual)}
-                    title={`${formatMoney(item.diferenca_menor_preco_medio)} — ${formatPercent(item.diferenca_percentual)}`}
+                    principal={item.descricao}
+                    sub={`${item.unidade || '-'} - ${item.origem === 'INSUMO' ? 'Insumo cadastrado' : 'Item manual'}`}
                   />
                 )
               },
-              { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
+              { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoria_nome || '-' },
+              { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+              { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+              { id: 'preco_medio', titulo: 'Preco medio', tipo: 'valor', render: (item) => formatMoney(item.preco_medio_geral) },
+              {
+                id: 'melhor',
+                titulo: 'Melhor fornecedor medio',
+                tipo: 'texto',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={item.melhor_fornecedor?.nome || '-'}
+                    sub={formatMoney(item.menor_preco_medio)}
+                  />
+                )
+              }
             ]}
-            itens={comparativo}
-            getId={(item) => `${item.item_key}-${item.fornecedor_id || 'sem'}`}
+            itens={itens}
+            getId={(item) => item.key}
             carregando={loading}
-            storageKey="tabela:compras-precos-insumos:comparativo"
-            rotuloRolagem="Comparativo por fornecedor"
-            vazio="Sem comparativo nos filtros."
+            storageKey="tabela:compras-precos-insumos:itens"
+            rotuloRolagem="Insumos por preco medio"
+            vazio="Sem itens de pedido nos filtros."
           />
         </BlocoConteudo>
 
-        <BlocoConteudo titulo="Categorias" descricao="Valor analisado por categoria dos insumos.">
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'categoria',
-                titulo: 'Categoria',
-                // R17: a categoria NOMEIA a linha deste resumo.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.categoria_nome
-              },
-              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
-              { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> }
-            ]}
-            itens={categorias}
-            getId={(item) => item.key}
-            carregando={loading}
-            storageKey="tabela:compras-precos-insumos:categorias"
-            rotuloRolagem="Categorias"
-            vazio="Sem categorias nos filtros."
-          />
-        </BlocoConteudo>
-      </div>
+        <div data-bloco-id="comparativo-por-fornecedor" data-bloco-rotulo="Comparativo por fornecedor" className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <BlocoConteudo
+            titulo="Comparativo por fornecedor"
+            descricao="Cada linha compara o preco medio do fornecedor contra o menor preco medio do mesmo item."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'item',
+                  titulo: 'Item',
+                  // R17: o insumo/item NOMEIA a linha do comparativo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => (
+                    <CelulaDupla principal={item.descricao} sub={item.unidade || '-'} />
+                  )
+                },
+                { id: 'fornecedor', titulo: 'Fornecedor', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.fornecedor_nome}</span> },
+                { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+                { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
+                { id: 'preco', titulo: 'Preco medio', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.preco_medio)}</span> },
+                { id: 'menor', titulo: 'Menor medio', tipo: 'valor', render: (item) => formatMoney(item.menor_preco_medio_item) },
+                {
+                  id: 'diferenca',
+                  titulo: 'Diferenca',
+                  tipo: 'valor',
+                  /*
+                    R25: `text-amber-700` / `text-emerald-700` viravam a única
+                    fonte do SIGNIFICADO (pagou acima × está no menor preço).
+                    O significado ficou, agora em token semântico: acima do
+                    menor preço é `--c-warning`, no menor preço é `--c-success`.
+                  */
+                  render: (item) => (
+                    <CelulaDupla
+                      principal={(
+                        <span
+                          className="font-semibold"
+                          style={{
+                            color: Number(item.diferenca_menor_preco_medio || 0) > 0
+                              ? 'var(--c-warning)'
+                              : 'var(--c-success)'
+                          }}
+                        >
+                          {formatMoney(item.diferenca_menor_preco_medio)}
+                        </span>
+                      )}
+                      sub={formatPercent(item.diferenca_percentual)}
+                      title={`${formatMoney(item.diferenca_menor_preco_medio)} — ${formatPercent(item.diferenca_percentual)}`}
+                    />
+                  )
+                },
+                { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
+              ]}
+              itens={comparativo}
+              getId={(item) => `${item.item_key}-${item.fornecedor_id || 'sem'}`}
+              carregando={loading}
+              storageKey="tabela:compras-precos-insumos:comparativo"
+              rotuloRolagem="Comparativo por fornecedor"
+              vazio="Sem comparativo nos filtros."
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo titulo="Categorias" descricao="Valor analisado por categoria dos insumos.">
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'categoria',
+                  titulo: 'Categoria',
+                  // R17: a categoria NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.categoria_nome
+                },
+                { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+                { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> }
+              ]}
+              itens={categorias}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-precos-insumos:categorias"
+              rotuloRolagem="Categorias"
+              vazio="Sem categorias nos filtros."
+            />
+          </BlocoConteudo>
+        </div>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

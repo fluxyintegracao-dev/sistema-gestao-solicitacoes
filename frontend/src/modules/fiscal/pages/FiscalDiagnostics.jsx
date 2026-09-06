@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Avisos,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   CamposComVazios,
   CampoForm,
   FormSecao,
@@ -213,262 +214,276 @@ export default function FiscalDiagnostics() {
         <div className="app-empty-card">Carregando diagnostico...</div>
       ) : data ? (
         <>
-          <BlocoConteudo titulo="Módulo" variante="secundario">
-            {/* B4 — campo vazio some com contador; a contagem sai da PRÓPRIA
-                lista de campos, sem espelhar condição à mão. */}
-            <CamposComVazios
-              campos={[
-                { label: 'Fiscal habilitado', valor: <SinalConfigurado ativo={modulo.enabled} /> },
-                { label: 'Ambiente Fiscal', valor: modulo.env },
-                { label: 'NODE_ENV', valor: modulo.node_env }
-              ]}
-            />
-          </BlocoConteudo>
-
-          <BlocoConteudo
-            titulo="Storage S3 fiscal"
-            descricao="Bucket e endpoint aparecem MASCARADOS pelo backend — a tela nunca recebe o valor completo."
-            variante="secundario"
-            acoes={(
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleStorageProbe}
-                disabled={probeLoading || !storage.configured}
-                title="Cria um arquivo pequeno e sem dados fiscais no bucket configurado para validar permissao de escrita do backend."
-              >
-                {probeLoading ? 'Testando...' : 'Testar storage'}
-              </button>
-            )}
+          {/*
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 7 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
+          */}
+          <BlocosPersonalizaveis
+            chave="blocos:fiscal-diagnostics"
+            larguraPadrao="total"
+            dentroDeGrade
           >
-            <CamposComVazios
-              campos={[
-                { label: 'Storage configurado', valor: <SinalConfigurado ativo={storage.configured} /> },
-                { label: 'Bucket', valor: storage.bucket_masked || (storage.bucket_configured ? 'configurado' : 'pendente') },
-                { label: 'Regiao', valor: storage.region || 'pendente' },
-                { label: 'Prefixo', valor: storage.prefix },
-                { label: 'URL expira em', valor: `${storage.presigned_expires_seconds || 300}s` }
-              ]}
-            />
-
-            {probeResult ? (
-              <StatGrid colunas={4}>
-                <StatTile label="Resultado do teste" valor={<SinalConfigurado ativo={probeResult.ok} />} />
-                <StatTile label="Bucket" valor={probeResult.bucket_masked || 'configurado'} />
-                <StatTile label="Chave criada" valor={probeResult.key} />
-                <StatTile label="Hash" valor={probeResult.hash} />
-              </StatGrid>
-            ) : null}
-          </BlocoConteudo>
-
-          <BlocoConteudo
-            titulo="Ensaio local de DFe"
-            descricao="Processa uma fixture local de retorno SEFAZ para validar parser, S3 fiscal, logs e Caixa de Entrada sem consulta externa."
-            variante="secundario"
-          >
-            {/*
-              R12 — seletor de CONTEXTO, não filtro: escolhe sobre QUAL
-              empresa o ensaio e o preflight vão agir. Nenhuma lista desta
-              tela é recortada por ele.
-            */}
-            <FormSecao colunas={2}>
-              <CampoForm label="Empresa fiscal do ensaio">
-                <select
-                  className="input"
-                  value={fixtureCompanyId}
-                  onChange={(event) => setFixtureCompanyId(event.target.value)}
-                  disabled={fixtureLoading || !companies.length}
-                >
-                  <option value="">Selecione a empresa fiscal</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.razao_social || company.nome_fantasia || company.cnpj}
-                    </option>
-                  ))}
-                </select>
-              </CampoForm>
-              <CampoForm label="Executar">
-                <div className="app-actionbar">
-                  <button
-                    type="button"
-                    onClick={handleFixtureSync}
-                    disabled={fixtureLoading || !storage.configured || !fixtureCompanyId}
-                    className="btn btn-primary"
-                  >
-                    {fixtureLoading ? 'Processando...' : 'Processar fixture DFe'}
-                  </button>
-                </div>
-              </CampoForm>
-            </FormSecao>
-
-            {/*
-              Isto é CONDIÇÃO DERIVADA DO CONTEÚDO, não evento: fecha e o
-              problema continua. Por isso segue como faixa no fluxo, ao lado
-              do controle que ela descreve, e NÃO vira `useAvisos` (fronteira
-              declarada no próprio Avisos.jsx).
-            */}
-            {!dados.empresas_monitoradas ? (
-              <p className="text-sm text-[var(--sem-warning)]">
-                A empresa selecionada precisa estar ativa e com o modulo fiscal habilitado. Se nao estiver, o backend retornara a orientacao.
-              </p>
-            ) : null}
-
-            {fixtureResult ? (
-              <>
-                <StatGrid colunas={4}>
-                  <StatTile label="Resultado" valor={fixtureResult.status} />
-                  <StatTile label="Log" valor={fixtureResult.log_id} />
-                  <StatTile label="Empresa" valor={fixtureResult.company_id} />
-                  <StatTile label="Documentos" valor={fixtureResult.processed?.documents_processed ?? 0} />
-                </StatGrid>
-                {fixtureResult.processed?.items?.length ? (
-                  <BlocoConteudo
-                    titulo="Documentos processados"
-                    contagem={`${fixtureResult.processed.items.length} documento(s)`}
-                    variante="secundario"
-                  >
-                    {/*
-                      Link para o REGISTRO RELACIONADO fica NO CORPO, junto do
-                      dado que o origina (decisão de 04/09) — nunca na barra de
-                      ações. Cada documento aqui foi criado por ESTE ensaio.
-                    */}
-                    <div className="app-actionbar">
-                      {fixtureResult.processed.items.map((item) => (
-                        <Link
-                          key={item.document_id}
-                          className="btn btn-outline"
-                          to={`/fiscal/documentos/${item.document_id}`}
-                        >
-                          NF {item.document_id}
-                        </Link>
-                      ))}
-                      <Link className="btn btn-outline" to="/fiscal/documentos">Ver caixa de entrada</Link>
-                    </div>
-                  </BlocoConteudo>
-                ) : null}
-              </>
-            ) : null}
-          </BlocoConteudo>
-
-          <BlocoConteudo titulo="Criptografia e SEFAZ" variante="secundario">
-            <CamposComVazios
-              campos={[
-                { label: 'Crypto configurado', valor: <SinalConfigurado ativo={crypto.configured} /> },
-                { label: 'Crypto producao', valor: <SinalConfigurado ativo={crypto.min_length_ok_for_production} /> },
-                { label: 'SEFAZ habilitada', valor: <SinalConfigurado ativo={sefaz.enabled} /> },
-                { label: 'Ambiente SEFAZ', valor: sefaz.ambiente },
-                { label: 'UF SEFAZ', valor: sefaz.uf || 'pendente' },
-                { label: 'Endpoint distribuição', valor: <SinalConfigurado ativo={sefaz.distribution_url_configured && sefaz.distribution_url_https} /> },
-                { label: 'Endpoint', valor: sefaz.distribution_url_masked || 'pendente' },
-                { label: 'Endpoint sugerido', valor: sefaz.suggested_distribution_url || 'pendente' },
-                { label: 'Timeout SEFAZ', valor: `${sefaz.request_timeout_ms || 30000}ms` },
-                { label: 'Max docs/run', valor: sefaz.max_docs_per_run },
-                { label: 'Lock TTL', valor: `${sefaz.lock_ttl_seconds || 900}s` },
-                { label: 'Espera sem DFe', valor: `${sefaz.empty_result_wait_minutes || 60}min` },
-                { label: 'Espera consumo indevido', valor: `${sefaz.consumo_indevido_wait_minutes || 60}min` },
-                { label: 'Bloqueio consumo indevido', valor: sefaz.block_on_consumo_indevido ? 'Sim' : 'Nao' }
-              ]}
-            />
-          </BlocoConteudo>
-
-          {/* B2 — o bloco principal da tela: é o preflight que responde à
-              pergunta central ("posso ligar a SEFAZ real?"). Ele fica
-              SEMPRE visível, com o botão que o dispara — esconder o botão
-              atrás do resultado deixaria a capacidade sem porta. */}
-          <BlocoConteudo
-            titulo="Preflight SEFAZ"
-            descricao="Valida empresa, certificado, storage, endpoint e SOAP local antes de qualquer chamada real."
-            variante="primario"
-            cor="var(--module-fiscal)"
-            acoes={(
-              <>
-                {preflightResult ? (
-                  <StatusBadge status={preflightResult.ready ? 'Pronto' : 'Com pendencias'} kind={preflightResult.ready ? 'success' : 'warning'} />
-                ) : null}
-                <button
-                  type="button"
-                  onClick={handlePreflight}
-                  disabled={preflightLoading || !fixtureCompanyId}
-                  className="btn btn-primary"
-                  title="Usa a empresa fiscal escolhida no bloco Ensaio local de DFe."
-                >
-                  {preflightLoading ? 'Validando...' : 'Executar preflight'}
-                </button>
-              </>
-            )}
-          >
-            {preflightResult ? (
-              <>
-                <StatGrid colunas={4}>
-                <StatTile label="Resultado" valor={<SinalConfigurado ativo={preflightResult.ready} />} />
-                <StatTile
-                  label="SEFAZ real"
-                  valor={preflightResult.sefaz_enabled ? 'Habilitada' : 'Desabilitada'}
-                  tom={preflightResult.sefaz_enabled ? 'danger' : undefined}
-                />
-                <StatTile label="Tipo" valor={preflightResult.document_type} />
-                <StatTile label="Empresas" valor={preflightResult.companies?.length || 0} />
-              </StatGrid>
-
-              <BlocoConteudo titulo="Checks globais" variante="secundario">
-                <TabelaChecks
-                  checks={preflightResult.global_checks}
-                  storageKey="tabela:diagnostico-fiscal:preflight-checks-globais"
-                  rotulo="Checks globais do preflight"
-                />
-              </BlocoConteudo>
-
-              {(preflightResult.companies || []).map((item) => (
-                <BlocoConteudo
-                  key={item.company.id}
-                  titulo={item.company.razao_social}
-                  variante="secundario"
-                  acoes={<StatusBadge status={item.ready ? 'OK' : 'WARN'} kind={item.ready ? 'success' : 'warning'} />}
-                >
-                  <TabelaChecks
-                    checks={item.checks}
-                    storageKey="tabela:diagnostico-fiscal:preflight-checks-empresa"
-                    rotulo={`Checks do preflight de ${item.company.razao_social}`}
-                  />
-                </BlocoConteudo>
-              ))}
-              </>
-            ) : (
-              <p className="text-sm text-[var(--c-muted)]">
-                Escolha a empresa fiscal no bloco &quot;Ensaio local de DFe&quot; e execute o preflight para ver os checks.
-              </p>
-            )}
-          </BlocoConteudo>
-
-          <BlocoConteudo titulo="Dados fiscais" variante="secundario">
-            <CamposComVazios
-              campos={[
-                { label: 'Empresas cadastradas', valor: dados.empresas_total },
-                { label: 'Empresas monitoradas', valor: dados.empresas_monitoradas },
-                { label: 'Certificados', valor: dados.certificados_total },
-                { label: 'Certificados ativos', valor: dados.certificados_ativos },
-                { label: 'Estados sync', valor: dados.sync_states_total },
-                { label: 'Locks ativos', valor: dados.sync_states_locked }
-              ]}
-            />
-          </BlocoConteudo>
-
-          <BlocoConteudo titulo="Último log" variante="secundario">
-            {ultimoLog ? (
+            <BlocoConteudo titulo="Módulo" variante="secundario">
+              {/* B4 — campo vazio some com contador; a contagem sai da PRÓPRIA
+                  lista de campos, sem espelhar condição à mão. */}
               <CamposComVazios
                 campos={[
-                  { label: 'ID', valor: ultimoLog.id },
-                  { label: 'Inicio', valor: ultimoLog.started_at ? new Date(ultimoLog.started_at).toLocaleString('pt-BR') : '-' },
-                  { label: 'Status', valor: ultimoLog.status },
-                  { label: 'Tipo', valor: ultimoLog.request_type },
-                  { label: 'Codigo', valor: ultimoLog.response_code },
-                  { label: 'Mensagem', valor: ultimoLog.response_message || ultimoLog.error_message || '-' }
+                  { label: 'Fiscal habilitado', valor: <SinalConfigurado ativo={modulo.enabled} /> },
+                  { label: 'Ambiente Fiscal', valor: modulo.env },
+                  { label: 'NODE_ENV', valor: modulo.node_env }
                 ]}
               />
-            ) : (
-              <p className="text-sm text-[var(--c-muted)]">Nenhum log fiscal registrado.</p>
-            )}
-          </BlocoConteudo>
+            </BlocoConteudo>
+
+            <BlocoConteudo
+              titulo="Storage S3 fiscal"
+              descricao="Bucket e endpoint aparecem MASCARADOS pelo backend — a tela nunca recebe o valor completo."
+              variante="secundario"
+              acoes={(
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleStorageProbe}
+                  disabled={probeLoading || !storage.configured}
+                  title="Cria um arquivo pequeno e sem dados fiscais no bucket configurado para validar permissao de escrita do backend."
+                >
+                  {probeLoading ? 'Testando...' : 'Testar storage'}
+                </button>
+              )}
+            >
+              <CamposComVazios
+                campos={[
+                  { label: 'Storage configurado', valor: <SinalConfigurado ativo={storage.configured} /> },
+                  { label: 'Bucket', valor: storage.bucket_masked || (storage.bucket_configured ? 'configurado' : 'pendente') },
+                  { label: 'Regiao', valor: storage.region || 'pendente' },
+                  { label: 'Prefixo', valor: storage.prefix },
+                  { label: 'URL expira em', valor: `${storage.presigned_expires_seconds || 300}s` }
+                ]}
+              />
+
+              {probeResult ? (
+                <StatGrid colunas={4}>
+                  <StatTile label="Resultado do teste" valor={<SinalConfigurado ativo={probeResult.ok} />} />
+                  <StatTile label="Bucket" valor={probeResult.bucket_masked || 'configurado'} />
+                  <StatTile label="Chave criada" valor={probeResult.key} />
+                  <StatTile label="Hash" valor={probeResult.hash} />
+                </StatGrid>
+              ) : null}
+            </BlocoConteudo>
+
+            <BlocoConteudo
+              titulo="Ensaio local de DFe"
+              descricao="Processa uma fixture local de retorno SEFAZ para validar parser, S3 fiscal, logs e Caixa de Entrada sem consulta externa."
+              variante="secundario"
+            >
+              {/*
+                R12 — seletor de CONTEXTO, não filtro: escolhe sobre QUAL
+                empresa o ensaio e o preflight vão agir. Nenhuma lista desta
+                tela é recortada por ele.
+              */}
+              <FormSecao colunas={2}>
+                <CampoForm label="Empresa fiscal do ensaio">
+                  <select
+                    className="input"
+                    value={fixtureCompanyId}
+                    onChange={(event) => setFixtureCompanyId(event.target.value)}
+                    disabled={fixtureLoading || !companies.length}
+                  >
+                    <option value="">Selecione a empresa fiscal</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.razao_social || company.nome_fantasia || company.cnpj}
+                      </option>
+                    ))}
+                  </select>
+                </CampoForm>
+                <CampoForm label="Executar">
+                  <div className="app-actionbar">
+                    <button
+                      type="button"
+                      onClick={handleFixtureSync}
+                      disabled={fixtureLoading || !storage.configured || !fixtureCompanyId}
+                      className="btn btn-primary"
+                    >
+                      {fixtureLoading ? 'Processando...' : 'Processar fixture DFe'}
+                    </button>
+                  </div>
+                </CampoForm>
+              </FormSecao>
+
+              {/*
+                Isto é CONDIÇÃO DERIVADA DO CONTEÚDO, não evento: fecha e o
+                problema continua. Por isso segue como faixa no fluxo, ao lado
+                do controle que ela descreve, e NÃO vira `useAvisos` (fronteira
+                declarada no próprio Avisos.jsx).
+              */}
+              {!dados.empresas_monitoradas ? (
+                <p className="text-sm text-[var(--sem-warning)]">
+                  A empresa selecionada precisa estar ativa e com o modulo fiscal habilitado. Se nao estiver, o backend retornara a orientacao.
+                </p>
+              ) : null}
+
+              {fixtureResult ? (
+                <>
+                  <StatGrid colunas={4}>
+                    <StatTile label="Resultado" valor={fixtureResult.status} />
+                    <StatTile label="Log" valor={fixtureResult.log_id} />
+                    <StatTile label="Empresa" valor={fixtureResult.company_id} />
+                    <StatTile label="Documentos" valor={fixtureResult.processed?.documents_processed ?? 0} />
+                  </StatGrid>
+                  {fixtureResult.processed?.items?.length ? (
+                    <BlocoConteudo
+                      titulo="Documentos processados"
+                      contagem={`${fixtureResult.processed.items.length} documento(s)`}
+                      variante="secundario"
+                    >
+                      {/*
+                        Link para o REGISTRO RELACIONADO fica NO CORPO, junto do
+                        dado que o origina (decisão de 04/09) — nunca na barra de
+                        ações. Cada documento aqui foi criado por ESTE ensaio.
+                      */}
+                      <div className="app-actionbar">
+                        {fixtureResult.processed.items.map((item) => (
+                          <Link
+                            key={item.document_id}
+                            className="btn btn-outline"
+                            to={`/fiscal/documentos/${item.document_id}`}
+                          >
+                            NF {item.document_id}
+                          </Link>
+                        ))}
+                        <Link className="btn btn-outline" to="/fiscal/documentos">Ver caixa de entrada</Link>
+                      </div>
+                    </BlocoConteudo>
+                  ) : null}
+                </>
+              ) : null}
+            </BlocoConteudo>
+
+            <BlocoConteudo titulo="Criptografia e SEFAZ" variante="secundario">
+              <CamposComVazios
+                campos={[
+                  { label: 'Crypto configurado', valor: <SinalConfigurado ativo={crypto.configured} /> },
+                  { label: 'Crypto producao', valor: <SinalConfigurado ativo={crypto.min_length_ok_for_production} /> },
+                  { label: 'SEFAZ habilitada', valor: <SinalConfigurado ativo={sefaz.enabled} /> },
+                  { label: 'Ambiente SEFAZ', valor: sefaz.ambiente },
+                  { label: 'UF SEFAZ', valor: sefaz.uf || 'pendente' },
+                  { label: 'Endpoint distribuição', valor: <SinalConfigurado ativo={sefaz.distribution_url_configured && sefaz.distribution_url_https} /> },
+                  { label: 'Endpoint', valor: sefaz.distribution_url_masked || 'pendente' },
+                  { label: 'Endpoint sugerido', valor: sefaz.suggested_distribution_url || 'pendente' },
+                  { label: 'Timeout SEFAZ', valor: `${sefaz.request_timeout_ms || 30000}ms` },
+                  { label: 'Max docs/run', valor: sefaz.max_docs_per_run },
+                  { label: 'Lock TTL', valor: `${sefaz.lock_ttl_seconds || 900}s` },
+                  { label: 'Espera sem DFe', valor: `${sefaz.empty_result_wait_minutes || 60}min` },
+                  { label: 'Espera consumo indevido', valor: `${sefaz.consumo_indevido_wait_minutes || 60}min` },
+                  { label: 'Bloqueio consumo indevido', valor: sefaz.block_on_consumo_indevido ? 'Sim' : 'Nao' }
+                ]}
+              />
+            </BlocoConteudo>
+
+            {/* B2 — o bloco principal da tela: é o preflight que responde à
+                pergunta central ("posso ligar a SEFAZ real?"). Ele fica
+                SEMPRE visível, com o botão que o dispara — esconder o botão
+                atrás do resultado deixaria a capacidade sem porta. */}
+            <BlocoConteudo
+              titulo="Preflight SEFAZ"
+              descricao="Valida empresa, certificado, storage, endpoint e SOAP local antes de qualquer chamada real."
+              variante="primario"
+              cor="var(--module-fiscal)"
+              acoes={(
+                <>
+                  {preflightResult ? (
+                    <StatusBadge status={preflightResult.ready ? 'Pronto' : 'Com pendencias'} kind={preflightResult.ready ? 'success' : 'warning'} />
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handlePreflight}
+                    disabled={preflightLoading || !fixtureCompanyId}
+                    className="btn btn-primary"
+                    title="Usa a empresa fiscal escolhida no bloco Ensaio local de DFe."
+                  >
+                    {preflightLoading ? 'Validando...' : 'Executar preflight'}
+                  </button>
+                </>
+              )}
+            >
+              {preflightResult ? (
+                <>
+                  <StatGrid colunas={4}>
+                  <StatTile label="Resultado" valor={<SinalConfigurado ativo={preflightResult.ready} />} />
+                  <StatTile
+                    label="SEFAZ real"
+                    valor={preflightResult.sefaz_enabled ? 'Habilitada' : 'Desabilitada'}
+                    tom={preflightResult.sefaz_enabled ? 'danger' : undefined}
+                  />
+                  <StatTile label="Tipo" valor={preflightResult.document_type} />
+                  <StatTile label="Empresas" valor={preflightResult.companies?.length || 0} />
+                </StatGrid>
+
+                <BlocoConteudo titulo="Checks globais" variante="secundario">
+                  <TabelaChecks
+                    checks={preflightResult.global_checks}
+                    storageKey="tabela:diagnostico-fiscal:preflight-checks-globais"
+                    rotulo="Checks globais do preflight"
+                  />
+                </BlocoConteudo>
+
+                {(preflightResult.companies || []).map((item) => (
+                  <BlocoConteudo
+                    key={item.company.id}
+                    titulo={item.company.razao_social}
+                    variante="secundario"
+                    acoes={<StatusBadge status={item.ready ? 'OK' : 'WARN'} kind={item.ready ? 'success' : 'warning'} />}
+                  >
+                    <TabelaChecks
+                      checks={item.checks}
+                      storageKey="tabela:diagnostico-fiscal:preflight-checks-empresa"
+                      rotulo={`Checks do preflight de ${item.company.razao_social}`}
+                    />
+                  </BlocoConteudo>
+                ))}
+                </>
+              ) : (
+                <p className="text-sm text-[var(--c-muted)]">
+                  Escolha a empresa fiscal no bloco &quot;Ensaio local de DFe&quot; e execute o preflight para ver os checks.
+                </p>
+              )}
+            </BlocoConteudo>
+
+            <BlocoConteudo titulo="Dados fiscais" variante="secundario">
+              <CamposComVazios
+                campos={[
+                  { label: 'Empresas cadastradas', valor: dados.empresas_total },
+                  { label: 'Empresas monitoradas', valor: dados.empresas_monitoradas },
+                  { label: 'Certificados', valor: dados.certificados_total },
+                  { label: 'Certificados ativos', valor: dados.certificados_ativos },
+                  { label: 'Estados sync', valor: dados.sync_states_total },
+                  { label: 'Locks ativos', valor: dados.sync_states_locked }
+                ]}
+              />
+            </BlocoConteudo>
+
+            <BlocoConteudo titulo="Último log" variante="secundario">
+              {ultimoLog ? (
+                <CamposComVazios
+                  campos={[
+                    { label: 'ID', valor: ultimoLog.id },
+                    { label: 'Inicio', valor: ultimoLog.started_at ? new Date(ultimoLog.started_at).toLocaleString('pt-BR') : '-' },
+                    { label: 'Status', valor: ultimoLog.status },
+                    { label: 'Tipo', valor: ultimoLog.request_type },
+                    { label: 'Codigo', valor: ultimoLog.response_code },
+                    { label: 'Mensagem', valor: ultimoLog.response_message || ultimoLog.error_message || '-' }
+                  ]}
+                />
+              ) : (
+                <p className="text-sm text-[var(--c-muted)]">Nenhum log fiscal registrado.</p>
+              )}
+            </BlocoConteudo>
+          </BlocosPersonalizaveis>
         </>
       ) : null}
     </Pagina>

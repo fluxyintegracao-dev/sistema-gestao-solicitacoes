@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   CelulaDupla,
   Pagina,
   PageHeader,
@@ -297,136 +298,150 @@ export default function ContratosRelatorioOperacional() {
             <StatTile label="Inativos" valor={number(resumo.inativos)} sub="Contratos marcados como inativos" />
           </StatGrid>
 
-          <BlocoConteudo
-            titulo="Cadastros por mês"
-            contagem={`${number(porMes.length)} mês(es)`}
-            descricao="Evolução baseada na data real de cadastro do contrato."
+          {/*
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 3 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
+          */}
+          <BlocosPersonalizaveis
+            chave="blocos:contratos-relatorio-operacional"
+            larguraPadrao="total"
+            dentroDeGrade
           >
-            <div className="space-y-3">
-              {porMes.length === 0 ? (
-                <div className="app-empty-card">Nenhum contrato no período.</div>
-              ) : porMes.map((item) => {
-                const total = Number(item.total || 0);
-                /*
-                  Largura mínima cravada REMOVIDA: era
-                  `Math.max((total / maxMes) * 100, 4)`, que desenhava uma
-                  barra visível para o mês de ZERO contrato — o gráfico
-                  afirmava volume onde não havia nenhum. Zero agora é
-                  largura zero; o número ao lado continua dizendo quanto é.
-                */
-                const width = maxMes > 0 ? Math.round((total / maxMes) * 100) : 0;
-                return (
-                  <div key={item.label} className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
-                    <span className="text-sm font-semibold text-[var(--c-text)]">{monthLabel(item.label)}</span>
-                    {/* A largura em % é DADO (a proporção da barra), não medida
-                        de layout — por isso continua no style. Trilho e
-                        preenchimento vêm de token (R25). */}
-                    <div className="h-3 overflow-hidden rounded-full bg-[var(--ui-border)]">
-                      <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${width}%` }} />
+            <BlocoConteudo
+              titulo="Cadastros por mês"
+              contagem={`${number(porMes.length)} mês(es)`}
+              descricao="Evolução baseada na data real de cadastro do contrato."
+            >
+              <div className="space-y-3">
+                {porMes.length === 0 ? (
+                  <div className="app-empty-card">Nenhum contrato no período.</div>
+                ) : porMes.map((item) => {
+                  const total = Number(item.total || 0);
+                  /*
+                    Largura mínima cravada REMOVIDA: era
+                    `Math.max((total / maxMes) * 100, 4)`, que desenhava uma
+                    barra visível para o mês de ZERO contrato — o gráfico
+                    afirmava volume onde não havia nenhum. Zero agora é
+                    largura zero; o número ao lado continua dizendo quanto é.
+                  */
+                  const width = maxMes > 0 ? Math.round((total / maxMes) * 100) : 0;
+                  return (
+                    <div key={item.label} className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+                      <span className="text-sm font-semibold text-[var(--c-text)]">{monthLabel(item.label)}</span>
+                      {/* A largura em % é DADO (a proporção da barra), não medida
+                          de layout — por isso continua no style. Trilho e
+                          preenchimento vêm de token (R25). */}
+                      <div className="h-3 overflow-hidden rounded-full bg-[var(--ui-border)]">
+                        <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${width}%` }} />
+                      </div>
+                      <span className="text-right text-sm font-semibold tabular-nums text-[var(--c-text)]">{number(total)}</span>
                     </div>
-                    <span className="text-right text-sm font-semibold tabular-nums text-[var(--c-text)]">{number(total)}</span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </BlocoConteudo>
+
+            <div data-bloco-id="contratos-por-empresa-do-grupo" data-bloco-rotulo="Contratos por empresa do grupo" className="grid gap-4 xl:grid-cols-2">
+              <BlocoGrupo
+                titulo="Contratos por empresa do grupo"
+                descricao="Todas as empresas do recorte."
+                rows={data?.por_empresa || []}
+                storageKey="tabela:contratos-relatorio-operacional:empresas"
+                labelHeader="Empresa"
+              />
+              <BlocoGrupo
+                titulo="Contratos por obra/centro"
+                descricao="Todas as obras/centros do recorte."
+                rows={data?.por_obra || []}
+                storageKey="tabela:contratos-relatorio-operacional:obras"
+                labelHeader="Obra/Centro"
+              />
+              <BlocoGrupo
+                titulo="Contratos por referência"
+                // O servidor devolve no máximo 50 referências, ordenadas por
+                // valor — o rótulo tem de dizer isso (ver LIMITE_REFERENCIAS).
+                descricao={`As ${LIMITE_REFERENCIAS} referências de maior valor no recorte — o servidor não devolve as demais.`}
+                rows={data?.por_referencia || []}
+                storageKey="tabela:contratos-relatorio-operacional:referencias"
+                labelHeader="Referência"
+              />
+              <BlocoGrupo
+                titulo="Contratos por status"
+                descricao="Todos os status do recorte."
+                rows={data?.por_status || []}
+                storageKey="tabela:contratos-relatorio-operacional:status"
+                labelHeader="Status"
+              />
             </div>
-          </BlocoConteudo>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <BlocoGrupo
-              titulo="Contratos por empresa do grupo"
-              descricao="Todas as empresas do recorte."
-              rows={data?.por_empresa || []}
-              storageKey="tabela:contratos-relatorio-operacional:empresas"
-              labelHeader="Empresa"
-            />
-            <BlocoGrupo
-              titulo="Contratos por obra/centro"
-              descricao="Todas as obras/centros do recorte."
-              rows={data?.por_obra || []}
-              storageKey="tabela:contratos-relatorio-operacional:obras"
-              labelHeader="Obra/Centro"
-            />
-            <BlocoGrupo
-              titulo="Contratos por referência"
-              // O servidor devolve no máximo 50 referências, ordenadas por
-              // valor — o rótulo tem de dizer isso (ver LIMITE_REFERENCIAS).
-              descricao={`As ${LIMITE_REFERENCIAS} referências de maior valor no recorte — o servidor não devolve as demais.`}
-              rows={data?.por_referencia || []}
-              storageKey="tabela:contratos-relatorio-operacional:referencias"
-              labelHeader="Referência"
-            />
-            <BlocoGrupo
-              titulo="Contratos por status"
-              descricao="Todos os status do recorte."
-              rows={data?.por_status || []}
-              storageKey="tabela:contratos-relatorio-operacional:status"
-              labelHeader="Status"
-            />
-          </div>
-
-          <BlocoConteudo
-            titulo="Pendências cadastrais"
-            // Antes: "N contrato(s)" ao lado de um título que prometia TODAS
-            // as pendências. Com mais de 80 o contador parava em 80 e ninguém
-            // ficava sabendo. Agora a contagem diz de que lista ela fala.
-            contagem={`${number(pendencias.length)} contrato(s) nesta lista`}
-            descricao={`Apenas pendências explícitas: sem anexo, sem empresa vinculada na obra/centro, sem referência ou valor zerado. O servidor devolve no máximo ${LIMITE_PENDENCIAS} contratos, dos maiores valores para os menores.`}
-            variante="primario"
-            cor="var(--module-contratos)"
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'contrato',
-                  titulo: 'Contrato',
-                  // R17: o codigo do contrato nomeia a pendencia listada.
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  // T6, mesmo motivo dos blocos de agrupamento: a coluna de
-                  // conteúdo desta tabela também nasce no piso de 160px (as
-                  // outras seis somam mais que o contêiner), e o código do
-                  // contrato aqui é texto livre — "CONTRATO DE PRESTAÇÃO DE
-                  // SERVIÇO DE RETROESCAVADEIRA…" é um valor real da base.
-                  render: (item) => <CelulaDupla principal={item.codigo} />
-                },
-                /*
-                  As três colunas de texto livre abaixo levam o MESMO
-                  conteúdo (descrição de contrato, nome de obra, razão
-                  social) com 180px — um degrau só acima do piso onde a de
-                  identidade já corta. Palavra de ~19 caracteres estoura
-                  também aqui, então elas seguem o mesmo caminho: truncam no
-                  span e levam o texto inteiro no `title` da CelulaDupla.
-                */
-                { id: 'referencia', titulo: 'Referência', tipo: 'texto', render: (item) => <CelulaDupla principal={item.referencia || '-'} /> },
-                { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => <CelulaDupla principal={item.obra || '-'} /> },
-                { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => <CelulaDupla principal={item.empresa || '-'} /> },
-                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => money(item.valor_total) },
-                { id: 'saldo', titulo: 'A pagar', tipo: 'valor', render: (item) => money(item.total_a_pagar) },
-                {
-                  id: 'pendencias',
-                  titulo: 'Pendências',
-                  tipo: 'texto',
-                  render: (item) => (
-                    <div className="flex flex-wrap gap-1">
-                      {(item.pendencias || []).map((pendencia) => (
-                        // fx-badge é a pílula do sistema (token + ícone);
-                        // substitui o par bg-amber-50/text-amber-700 escrito
-                        // à mão, que não tem par no tema escuro (R25).
-                        <span key={pendencia} className="fx-badge fx-badge--warning">
-                          {pendencia}
-                        </span>
-                      ))}
-                    </div>
-                  )
-                }
-              ]}
-              itens={pendencias}
-              getId={(item) => item.id}
-              storageKey="tabela:contratos-relatorio-operacional:pendencias"
-              rotuloRolagem="Pendências cadastrais"
-              vazio="Nenhuma pendência cadastral nos filtros atuais."
-            />
-          </BlocoConteudo>
+            <BlocoConteudo
+              titulo="Pendências cadastrais"
+              // Antes: "N contrato(s)" ao lado de um título que prometia TODAS
+              // as pendências. Com mais de 80 o contador parava em 80 e ninguém
+              // ficava sabendo. Agora a contagem diz de que lista ela fala.
+              contagem={`${number(pendencias.length)} contrato(s) nesta lista`}
+              descricao={`Apenas pendências explícitas: sem anexo, sem empresa vinculada na obra/centro, sem referência ou valor zerado. O servidor devolve no máximo ${LIMITE_PENDENCIAS} contratos, dos maiores valores para os menores.`}
+              variante="primario"
+              cor="var(--module-contratos)"
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'contrato',
+                    titulo: 'Contrato',
+                    // R17: o codigo do contrato nomeia a pendencia listada.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    // T6, mesmo motivo dos blocos de agrupamento: a coluna de
+                    // conteúdo desta tabela também nasce no piso de 160px (as
+                    // outras seis somam mais que o contêiner), e o código do
+                    // contrato aqui é texto livre — "CONTRATO DE PRESTAÇÃO DE
+                    // SERVIÇO DE RETROESCAVADEIRA…" é um valor real da base.
+                    render: (item) => <CelulaDupla principal={item.codigo} />
+                  },
+                  /*
+                    As três colunas de texto livre abaixo levam o MESMO
+                    conteúdo (descrição de contrato, nome de obra, razão
+                    social) com 180px — um degrau só acima do piso onde a de
+                    identidade já corta. Palavra de ~19 caracteres estoura
+                    também aqui, então elas seguem o mesmo caminho: truncam no
+                    span e levam o texto inteiro no `title` da CelulaDupla.
+                  */
+                  { id: 'referencia', titulo: 'Referência', tipo: 'texto', render: (item) => <CelulaDupla principal={item.referencia || '-'} /> },
+                  { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => <CelulaDupla principal={item.obra || '-'} /> },
+                  { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => <CelulaDupla principal={item.empresa || '-'} /> },
+                  { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => money(item.valor_total) },
+                  { id: 'saldo', titulo: 'A pagar', tipo: 'valor', render: (item) => money(item.total_a_pagar) },
+                  {
+                    id: 'pendencias',
+                    titulo: 'Pendências',
+                    tipo: 'texto',
+                    render: (item) => (
+                      <div className="flex flex-wrap gap-1">
+                        {(item.pendencias || []).map((pendencia) => (
+                          // fx-badge é a pílula do sistema (token + ícone);
+                          // substitui o par bg-amber-50/text-amber-700 escrito
+                          // à mão, que não tem par no tema escuro (R25).
+                          <span key={pendencia} className="fx-badge fx-badge--warning">
+                            {pendencia}
+                          </span>
+                        ))}
+                      </div>
+                    )
+                  }
+                ]}
+                itens={pendencias}
+                getId={(item) => item.id}
+                storageKey="tabela:contratos-relatorio-operacional:pendencias"
+                rotuloRolagem="Pendências cadastrais"
+                vazio="Nenhuma pendência cadastral nos filtros atuais."
+              />
+            </BlocoConteudo>
+          </BlocosPersonalizaveis>
         </>
       )}
     </Pagina>

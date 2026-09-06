@@ -3,6 +3,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   BarraFiltros,
   StatGrid,
   StatTile,
@@ -170,54 +171,64 @@ export default function SstTimeline() {
         />
       </BlocoConteudo>
 
-      {data ? (
-        <BlocoConteudo titulo="Resumo do colaborador" descricao="Contagem consolidada do periodo carregado.">
-          <StatGrid colunas={3}>
-            <StatTile label="Eventos" valor={data.resumo?.eventos_total || 0} />
-            <StatTile
-              label="Pendencias abertas"
-              valor={data.resumo?.pendencias_abertas || 0}
-              tom={data.resumo?.pendencias_abertas ? 'warning' : 'success'}
-            />
-            <StatTile
-              label="Bloqueios abertos"
-              valor={data.resumo?.bloqueios_abertos || 0}
-              tom={data.resumo?.bloqueios_abertos ? 'danger' : 'success'}
-            />
-          </StatGrid>
-        </BlocoConteudo>
-      ) : null}
-
       {/*
-        Linha do tempo, não tabela: a ordem cronológica é a informação, e
-        cada evento tem título, descrição livre e data — colunas fixas
-        empurrariam a descrição para dentro de 160px. O padrão entra como
-        moldura; cada evento é um bloco secundário com a data ancorada no
-        próprio bloco.
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      <BlocoConteudo
-        titulo="Linha do tempo"
-        variante="primario"
-        cor="var(--module-sst)"
-        contagem={`${timeline.length} evento(s)`}
-        descricao="Do mais recente para o mais antigo, na ordem devolvida pelo backend."
-      >
-        <div className="grid gap-2">
-          {timeline.map((item, index) => (
-            <BlocoConteudo
-              key={`${item.tipo}-${item.origem_id}-${index}`}
-              variante="secundario"
-              titulo={item.titulo}
-              contagem={item.data || '-'}
-              descricao={item.descricao || undefined}
-              acoes={<StatusBadge status={item.tipo} kind={familiaEvento()} />}
-            />
-          ))}
-          {!timeline.length ? (
-            <p className="text-sm text-muted">Selecione um colaborador para visualizar a timeline.</p>
-          ) : null}
-        </div>
-      </BlocoConteudo>
+      <BlocosPersonalizaveis chave="blocos:sst-timeline" larguraPadrao="total">
+        {data ? (
+          <BlocoConteudo titulo="Resumo do colaborador" descricao="Contagem consolidada do periodo carregado.">
+            <StatGrid colunas={3}>
+              <StatTile label="Eventos" valor={data.resumo?.eventos_total || 0} />
+              <StatTile
+                label="Pendencias abertas"
+                valor={data.resumo?.pendencias_abertas || 0}
+                tom={data.resumo?.pendencias_abertas ? 'warning' : 'success'}
+              />
+              <StatTile
+                label="Bloqueios abertos"
+                valor={data.resumo?.bloqueios_abertos || 0}
+                tom={data.resumo?.bloqueios_abertos ? 'danger' : 'success'}
+              />
+            </StatGrid>
+          </BlocoConteudo>
+        ) : null}
+
+        {/*
+          Linha do tempo, não tabela: a ordem cronológica é a informação, e
+          cada evento tem título, descrição livre e data — colunas fixas
+          empurrariam a descrição para dentro de 160px. O padrão entra como
+          moldura; cada evento é um bloco secundário com a data ancorada no
+          próprio bloco.
+        */}
+        <BlocoConteudo
+          titulo="Linha do tempo"
+          variante="primario"
+          cor="var(--module-sst)"
+          contagem={`${timeline.length} evento(s)`}
+          descricao="Do mais recente para o mais antigo, na ordem devolvida pelo backend."
+        >
+          <div className="grid gap-2">
+            {timeline.map((item, index) => (
+              <BlocoConteudo
+                key={`${item.tipo}-${item.origem_id}-${index}`}
+                variante="secundario"
+                titulo={item.titulo}
+                contagem={item.data || '-'}
+                descricao={item.descricao || undefined}
+                acoes={<StatusBadge status={item.tipo} kind={familiaEvento()} />}
+              />
+            ))}
+            {!timeline.length ? (
+              <p className="text-sm text-muted">Selecione um colaborador para visualizar a timeline.</p>
+            ) : null}
+          </div>
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
 
       {elementoConfirmacao}
     </Pagina>

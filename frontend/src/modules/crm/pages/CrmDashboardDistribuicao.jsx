@@ -4,6 +4,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -229,170 +230,185 @@ export default function CrmDashboardDistribuicao() {
             ))}
           </StatGrid>
 
-          {/* B2 — UM primário por tela: a carteira por responsável é o que
-              responde a pergunta central (quem está sobrecarregado). */}
-          <BlocoConteudo
-            titulo="Carteira por responsavel"
-            descricao="Base para identificar sobrecarga, carteira parada e desequilibrio operacional."
-            variante="primario"
-            cor="var(--c-primary)"
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'responsavel',
-                  titulo: 'Responsavel',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (row) => (
-                    <CelulaDupla
-                      principal={row.usuario?.nome || '-'}
-                      sub={row.usuario?.perfil || '-'}
-                    />
-                  )
-                },
-                {
-                  id: 'carteira',
-                  titulo: 'Carteira',
-                  tipo: 'numero',
-                  render: (row) => (
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-semibold text-main">{row.totalCarteira}</span>
-                        <span className="text-xs text-muted">ativos</span>
-                      </div>
-                      <BarraProporcao valor={row.totalCarteira} max={maxCarteira} />
-                    </div>
-                  )
-                },
-                {
-                  id: 'novos',
-                  titulo: 'Novos periodo',
-                  tipo: 'numero',
-                  render: (row) => row.novosPeriodo
-                },
-                {
-                  id: 'sem_atividade',
-                  titulo: 'Sem atividade',
-                  tipo: 'numero',
-                  // R25: `text-amber-600` era paleta crua; o tom é semântico
-                  // (carteira parada = alerta) e vem do token.
-                  render: (row) => (
-                    <span className={row.semAtividade > 0 ? 'font-semibold text-[var(--sem-warning)]' : undefined}>
-                      {row.semAtividade}
-                    </span>
-                  )
-                },
-                {
-                  id: 'convertidos',
-                  titulo: 'Convertidos',
-                  tipo: 'numero',
-                  render: (row) => row.convertidosPeriodo
-                },
-                {
-                  id: 'taxa',
-                  titulo: 'Taxa periodo',
-                  tipo: 'numero',
-                  render: (row) => `${row.taxaConversaoPeriodo}%`
-                },
-                {
-                  id: 'pressao',
-                  titulo: 'Pressao',
-                  tipo: 'numero',
-                  render: (row) => row.pressaoCarteira
-                }
-              ]}
-              itens={data.responsaveis || []}
-              getId={(row) => row.usuario?.id || row.usuario?.nome}
-              vazio="Nenhum responsavel com carteira ativa no periodo."
-              storageKey="tabela:crm-dashboard-distribuicao:responsaveis"
-              rotuloRolagem="Carteira por responsavel"
-            />
-          </BlocoConteudo>
-
-          <BlocoVolume
-            titulo="Redistribuicoes por dia"
-            descricao="Volume diario auditado no periodo selecionado."
-            rows={data.redistribuicoesPorDia}
-            labelKey="dia"
-          />
-
-          <BlocoVolume
-            titulo="Redistribuicoes por usuario"
-            descricao="Quem executou redistribuicoes no periodo."
-            rows={data.redistribuicoesPorAtor}
-            labelKey="usuario"
-          />
-
           {/*
-            R1/R17 — o histórico era um cartão por movimentação, com o dado
-            espalhado em <p> soltos: nada alinhava, nada era coluna e nada
-            podia ser redimensionado. Vira TabelaPadrao com os MESMOS dados
-            (lead, de → para, quem executou, quando, motivo).
-
-            Regra 1 de organização: histórico e registros ficam por último e
-            recolhidos — o bloco continua à vista pelo título, e a pessoa
-            abre quando precisa auditar.
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 4 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
           */}
-          <BlocoConteudo
-            titulo="Redistribuicoes recentes"
-            descricao="Historico auditado das movimentacoes de responsavel."
-            recolhivel
-            recolhidoPadrao
+          <BlocosPersonalizaveis
+            chave="blocos:crm-dashboard-distribuicao"
+            larguraPadrao="total"
+            dentroDeGrade
           >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'lead',
-                  titulo: 'Lead',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (row) => (row.lead?.id ? (
-                    <Link to={`/crm/leads/${row.lead.id}`} className="text-[var(--c-primary)] hover:underline">
-                      {row.lead.nome || `Lead #${row.lead.id}`}
-                    </Link>
-                  ) : 'Lead removido ou indisponivel')
-                },
-                {
-                  id: 'movimentacao',
-                  titulo: 'Movimentacao',
-                  tipo: 'texto',
-                  render: (row) => (
-                    <CelulaDupla
-                      principal={row.oldAssignedUserName || 'Sem responsavel'}
-                      sub={`para ${row.newAssignedUserName || 'Novo responsavel nao informado'}`}
-                    />
-                  )
-                },
-                {
-                  id: 'executor',
-                  titulo: 'Executado por',
-                  tipo: 'texto',
-                  render: (row) => row.usuario?.nome || 'sistema'
-                },
-                {
-                  id: 'motivo',
-                  titulo: 'Motivo',
-                  tipo: 'texto',
-                  // T6: texto longo trunca com o conteúdo completo no tooltip.
-                  render: (row) => (
-                    <span title={row.motivo || undefined}>{row.motivo || '-'}</span>
-                  )
-                },
-                {
-                  id: 'createdAt',
-                  titulo: 'Quando',
-                  tipo: 'data',
-                  render: (row) => fmtDate(row.createdAt)
-                }
-              ]}
-              itens={data.redistribuicoesRecentes || []}
-              getId={(row) => row.id}
-              vazio="Nenhuma redistribuicao registrada no periodo."
-              storageKey="tabela:crm-dashboard-distribuicao:redistribuicoes"
-              rotuloRolagem="Redistribuicoes recentes"
+            {/* B2 — UM primário por tela: a carteira por responsável é o que
+                responde a pergunta central (quem está sobrecarregado). */}
+            <BlocoConteudo
+              titulo="Carteira por responsavel"
+              descricao="Base para identificar sobrecarga, carteira parada e desequilibrio operacional."
+              variante="primario"
+              cor="var(--c-primary)"
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'responsavel',
+                    titulo: 'Responsavel',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (row) => (
+                      <CelulaDupla
+                        principal={row.usuario?.nome || '-'}
+                        sub={row.usuario?.perfil || '-'}
+                      />
+                    )
+                  },
+                  {
+                    id: 'carteira',
+                    titulo: 'Carteira',
+                    tipo: 'numero',
+                    render: (row) => (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold text-main">{row.totalCarteira}</span>
+                          <span className="text-xs text-muted">ativos</span>
+                        </div>
+                        <BarraProporcao valor={row.totalCarteira} max={maxCarteira} />
+                      </div>
+                    )
+                  },
+                  {
+                    id: 'novos',
+                    titulo: 'Novos periodo',
+                    tipo: 'numero',
+                    render: (row) => row.novosPeriodo
+                  },
+                  {
+                    id: 'sem_atividade',
+                    titulo: 'Sem atividade',
+                    tipo: 'numero',
+                    // R25: `text-amber-600` era paleta crua; o tom é semântico
+                    // (carteira parada = alerta) e vem do token.
+                    render: (row) => (
+                      <span className={row.semAtividade > 0 ? 'font-semibold text-[var(--sem-warning)]' : undefined}>
+                        {row.semAtividade}
+                      </span>
+                    )
+                  },
+                  {
+                    id: 'convertidos',
+                    titulo: 'Convertidos',
+                    tipo: 'numero',
+                    render: (row) => row.convertidosPeriodo
+                  },
+                  {
+                    id: 'taxa',
+                    titulo: 'Taxa periodo',
+                    tipo: 'numero',
+                    render: (row) => `${row.taxaConversaoPeriodo}%`
+                  },
+                  {
+                    id: 'pressao',
+                    titulo: 'Pressao',
+                    tipo: 'numero',
+                    render: (row) => row.pressaoCarteira
+                  }
+                ]}
+                itens={data.responsaveis || []}
+                getId={(row) => row.usuario?.id || row.usuario?.nome}
+                vazio="Nenhum responsavel com carteira ativa no periodo."
+                storageKey="tabela:crm-dashboard-distribuicao:responsaveis"
+                rotuloRolagem="Carteira por responsavel"
+              />
+            </BlocoConteudo>
+
+            <BlocoVolume data-bloco-id="redistribuicoes-por-dia" data-bloco-rotulo="Redistribuicoes por dia"
+              titulo="Redistribuicoes por dia"
+              descricao="Volume diario auditado no periodo selecionado."
+              rows={data.redistribuicoesPorDia}
+              labelKey="dia"
             />
-          </BlocoConteudo>
+
+            <BlocoVolume data-bloco-id="redistribuicoes-por-usuario" data-bloco-rotulo="Redistribuicoes por usuario"
+              titulo="Redistribuicoes por usuario"
+              descricao="Quem executou redistribuicoes no periodo."
+              rows={data.redistribuicoesPorAtor}
+              labelKey="usuario"
+            />
+
+            {/*
+              R1/R17 — o histórico era um cartão por movimentação, com o dado
+              espalhado em <p> soltos: nada alinhava, nada era coluna e nada
+              podia ser redimensionado. Vira TabelaPadrao com os MESMOS dados
+              (lead, de → para, quem executou, quando, motivo).
+
+              Regra 1 de organização: histórico e registros ficam por último e
+              recolhidos — o bloco continua à vista pelo título, e a pessoa
+              abre quando precisa auditar.
+            */}
+            <BlocoConteudo
+              titulo="Redistribuicoes recentes"
+              descricao="Historico auditado das movimentacoes de responsavel."
+              recolhivel
+              chavePreferencia="bloco:crm-dashboard-distribuicao:redistribuicoes-recentes"
+              recolhidoPadrao
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'lead',
+                    titulo: 'Lead',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (row) => (row.lead?.id ? (
+                      <Link to={`/crm/leads/${row.lead.id}`} className="text-[var(--c-primary)] hover:underline">
+                        {row.lead.nome || `Lead #${row.lead.id}`}
+                      </Link>
+                    ) : 'Lead removido ou indisponivel')
+                  },
+                  {
+                    id: 'movimentacao',
+                    titulo: 'Movimentacao',
+                    tipo: 'texto',
+                    render: (row) => (
+                      <CelulaDupla
+                        principal={row.oldAssignedUserName || 'Sem responsavel'}
+                        sub={`para ${row.newAssignedUserName || 'Novo responsavel nao informado'}`}
+                      />
+                    )
+                  },
+                  {
+                    id: 'executor',
+                    titulo: 'Executado por',
+                    tipo: 'texto',
+                    render: (row) => row.usuario?.nome || 'sistema'
+                  },
+                  {
+                    id: 'motivo',
+                    titulo: 'Motivo',
+                    tipo: 'texto',
+                    // T6: texto longo trunca com o conteúdo completo no tooltip.
+                    render: (row) => (
+                      <span title={row.motivo || undefined}>{row.motivo || '-'}</span>
+                    )
+                  },
+                  {
+                    id: 'createdAt',
+                    titulo: 'Quando',
+                    tipo: 'data',
+                    render: (row) => fmtDate(row.createdAt)
+                  }
+                ]}
+                itens={data.redistribuicoesRecentes || []}
+                getId={(row) => row.id}
+                vazio="Nenhuma redistribuicao registrada no periodo."
+                storageKey="tabela:crm-dashboard-distribuicao:redistribuicoes"
+                rotuloRolagem="Redistribuicoes recentes"
+              />
+            </BlocoConteudo>
+          </BlocosPersonalizaveis>
         </>
       )}
     </Pagina>

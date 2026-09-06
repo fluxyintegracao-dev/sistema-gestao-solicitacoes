@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -267,160 +268,170 @@ export default function ComprasRelatorioEvolucao() {
         <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com pedido no periodo" />
       </StatGrid>
 
-      {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
-          scrollport e matava o `position: sticky` da coluna fixa e do
-          cabecalho — sem erro e sem falha de build. */}
-      <BlocoConteudo
-        titulo="Curva mensal"
-        descricao="Pedidos agrupados pelo mes real de criacao do pedido de compra."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          // R17: serie puramente temporal (mes x totais) — a linha e um
-          // periodo, nao um registro nomeado; nao ha coluna de identidade.
-          semIdentidade
-          colunas={[
-            { id: 'mes', titulo: 'Mes', tipo: 'texto', noCard: 'titulo', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.label}</span> },
-            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
-            { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
-            { id: 'obras', titulo: 'Obras', tipo: 'numero', render: (item) => formatNumber(item.obras) },
-            { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
-            {
-              id: 'valor',
-              titulo: 'Valor',
-              tipo: 'valor',
-              render: (item) => (
-                <span className="font-semibold">
-                  {formatMoney(item.valor_total)}
-                  <MiniBar value={item.valor_total} max={maxMesValor} />
-                </span>
-              )
-            },
-            { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'texto',
-              render: (item) => (
-                <>
-                  {/* `.badge-soft` NAO EXISTE em CSS nenhum do repositorio —
-                      a pilula saia sem fundo, sem contorno e sem forma.
-                      `badge-muted` existe e e a familia neutra do sistema. */}
-                  {(item.status || []).slice(0, 3).map((status) => (
-                    <span key={status.key} className="badge badge-muted mr-1">
-                      {status.label}: {status.total}
-                    </span>
-                  ))}
-                </>
-              )
-            }
-          ]}
-          itens={meses}
-          getId={(item) => item.key}
-          carregando={loading}
-          storageKey="tabela:compras-evolucao:meses"
-          rotuloRolagem="Curva mensal"
-          vazio="Sem pedidos nos filtros."
-        />
-      </BlocoConteudo>
-
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-evolucao" larguraPadrao="total">
+        {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
+            scrollport e matava o `position: sticky` da coluna fixa e do
+            cabecalho — sem erro e sem falha de build. */}
         <BlocoConteudo
-          titulo="Compras por obra/centro"
-          descricao="Ranking de valor comprado por obra ou centro de custo no periodo."
-          variante="secundario"
+          titulo="Curva mensal"
+          descricao="Pedidos agrupados pelo mes real de criacao do pedido de compra."
+          variante="primario"
+          cor="var(--c-primary)"
         >
           <TabelaPadrao
+            // R17: serie puramente temporal (mes x totais) — a linha e um
+            // periodo, nao um registro nomeado; nao ha coluna de identidade.
+            semIdentidade
             colunas={[
-              {
-                id: 'obra',
-                titulo: 'Obra/Centro',
-                // R17: a obra/centro NOMEIA a linha do ranking.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.obra_nome
-              },
+              { id: 'mes', titulo: 'Mes', tipo: 'texto', noCard: 'titulo', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.label}</span> },
               { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
               { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+              { id: 'obras', titulo: 'Obras', tipo: 'numero', render: (item) => formatNumber(item.obras) },
               { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
-              { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
               {
-                id: 'meses',
-                titulo: 'Meses',
+                id: 'valor',
+                titulo: 'Valor',
                 tipo: 'valor',
-                /*
-                  T7: os tres meses iam juntos num UNICO texto ("mes: valor |
-                  mes: valor | ..."), e esse texto e um SO no de dinheiro:
-                  quando nao cabia, ele nao truncava, QUEBRAVA em ate 3
-                  linhas — o mesmo defeito que a T6 ja tinha aprendido para
-                  palavra partida, só que aqui era o VALOR que virava dois.
-                  Cada mes vira sua PROPRIA linha (nowrap, sem juntar por
-                  "|"): a T7 mede cada um separado, e cada um sozinho e bem
-                  mais curto que a largura da coluna.
-
-                  E a coluna passa a declarar o PAPEL em vez da medida: cada
-                  linha dela é dinheiro, então o papel é `valor` — e quem
-                  sabe a largura de dinheiro é o componente (190px e piso
-                  monetário, contra o pior caso real de 162px). A primeira
-                  versão deste conserto cravou `largura: 200` aqui e o
-                  validador reprovou, com razão: R10, medida na tela é o
-                  defeito que a declaração de papel existe para evitar.
-                */
-                render: (item) => {
-                  const ultimosMeses = (item.meses || []).slice(-3);
-                  if (!ultimosMeses.length) {
-                    return <span className="text-xs text-[var(--c-muted)]">-</span>;
-                  }
-                  return (
-                    <div className="grid gap-1">
-                      {ultimosMeses.map((mes) => (
-                        <span key={mes.label} className="block whitespace-nowrap text-xs text-[var(--c-muted)]">
-                          {mes.label}: {formatMoney(mes.valor_total)}
-                        </span>
-                      ))}
-                    </div>
-                  );
-                }
-              }
-            ]}
-            itens={obrasResumo}
-            getId={(item) => item.key}
-            carregando={loading}
-            storageKey="tabela:compras-evolucao:obras"
-            rotuloRolagem="Compras por obra/centro"
-            vazio="Sem dados por obra/centro."
-          />
-        </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Pedidos por status"
-          descricao="Distribuicao dos pedidos usados na evolucao."
-          variante="secundario"
-        >
-          <TabelaPadrao
-            colunas={[
+                render: (item) => (
+                  <span className="font-semibold">
+                    {formatMoney(item.valor_total)}
+                    <MiniBar value={item.valor_total} max={maxMesValor} />
+                  </span>
+                )
+              },
+              { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
               {
                 id: 'status',
                 titulo: 'Status',
-                // R17: o status NOMEIA a linha deste agrupamento.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.label
-              },
-              { id: 'total', titulo: 'Total', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> }
+                tipo: 'texto',
+                render: (item) => (
+                  <>
+                    {/* `.badge-soft` NAO EXISTE em CSS nenhum do repositorio —
+                        a pilula saia sem fundo, sem contorno e sem forma.
+                        `badge-muted` existe e e a familia neutra do sistema. */}
+                    {(item.status || []).slice(0, 3).map((status) => (
+                      <span key={status.key} className="badge badge-muted mr-1">
+                        {status.label}: {status.total}
+                      </span>
+                    ))}
+                  </>
+                )
+              }
             ]}
-            itens={statusResumo}
+            itens={meses}
             getId={(item) => item.key}
             carregando={loading}
-            storageKey="tabela:compras-evolucao:status"
-            rotuloRolagem="Pedidos por status"
-            vazio="Sem status nos filtros."
+            storageKey="tabela:compras-evolucao:meses"
+            rotuloRolagem="Curva mensal"
+            vazio="Sem pedidos nos filtros."
           />
         </BlocoConteudo>
-      </div>
+
+        <div data-bloco-id="compras-por-obra-centro" data-bloco-rotulo="Compras por obra/centro" className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <BlocoConteudo
+            titulo="Compras por obra/centro"
+            descricao="Ranking de valor comprado por obra ou centro de custo no periodo."
+            variante="secundario"
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'obra',
+                  titulo: 'Obra/Centro',
+                  // R17: a obra/centro NOMEIA a linha do ranking.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.obra_nome
+                },
+                { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+                { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+                { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+                { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
+                {
+                  id: 'meses',
+                  titulo: 'Meses',
+                  tipo: 'valor',
+                  /*
+                    T7: os tres meses iam juntos num UNICO texto ("mes: valor |
+                    mes: valor | ..."), e esse texto e um SO no de dinheiro:
+                    quando nao cabia, ele nao truncava, QUEBRAVA em ate 3
+                    linhas — o mesmo defeito que a T6 ja tinha aprendido para
+                    palavra partida, só que aqui era o VALOR que virava dois.
+                    Cada mes vira sua PROPRIA linha (nowrap, sem juntar por
+                    "|"): a T7 mede cada um separado, e cada um sozinho e bem
+                    mais curto que a largura da coluna.
+
+                    E a coluna passa a declarar o PAPEL em vez da medida: cada
+                    linha dela é dinheiro, então o papel é `valor` — e quem
+                    sabe a largura de dinheiro é o componente (190px e piso
+                    monetário, contra o pior caso real de 162px). A primeira
+                    versão deste conserto cravou `largura: 200` aqui e o
+                    validador reprovou, com razão: R10, medida na tela é o
+                    defeito que a declaração de papel existe para evitar.
+                  */
+                  render: (item) => {
+                    const ultimosMeses = (item.meses || []).slice(-3);
+                    if (!ultimosMeses.length) {
+                      return <span className="text-xs text-[var(--c-muted)]">-</span>;
+                    }
+                    return (
+                      <div className="grid gap-1">
+                        {ultimosMeses.map((mes) => (
+                          <span key={mes.label} className="block whitespace-nowrap text-xs text-[var(--c-muted)]">
+                            {mes.label}: {formatMoney(mes.valor_total)}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  }
+                }
+              ]}
+              itens={obrasResumo}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-evolucao:obras"
+              rotuloRolagem="Compras por obra/centro"
+              vazio="Sem dados por obra/centro."
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Pedidos por status"
+            descricao="Distribuicao dos pedidos usados na evolucao."
+            variante="secundario"
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'status',
+                  titulo: 'Status',
+                  // R17: o status NOMEIA a linha deste agrupamento.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.label
+                },
+                { id: 'total', titulo: 'Total', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> }
+              ]}
+              itens={statusResumo}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-evolucao:status"
+              rotuloRolagem="Pedidos por status"
+              vazio="Sem status nos filtros."
+            />
+          </BlocoConteudo>
+        </div>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

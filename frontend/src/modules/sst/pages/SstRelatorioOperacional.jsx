@@ -3,6 +3,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -215,140 +216,151 @@ export default function SstRelatorioOperacional() {
 
       {loading ? <div className="app-empty-card">Carregando relatorio...</div> : null}
 
-      <BlocoConteudo
-        titulo="Pendencias de conformidade"
-        contagem={`${(conformidade.pendencias || []).length} item(ns)`}
-        variante="primario"
-        cor="var(--sem-danger)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'tipo',
-              titulo: 'Tipo',
-              // R17: a pendência é lida pelo TIPO de conformidade que falhou —
-              // é o que nomeia a linha; origem_tipo/#id é a referência técnica.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (row) => row.tipo
-            },
-            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
-            { id: 'mensagem', titulo: 'Mensagem', tipo: 'texto', render: (row) => row.mensagem },
-            {
-              id: 'origem',
-              titulo: 'Origem',
-              tipo: 'codigo',
-              render: (row) => `${row.origem_tipo || '-'} #${row.origem_id || '-'}`
-            }
-          ]}
-          itens={conformidade.pendencias || []}
-          getId={(row) => `${row.origem_tipo}-${row.origem_id}-${row.tipo}`}
-          vazio="Nenhum registro encontrado."
-          storageKey="tabela:sst-relatorio-operacional:pendencias"
-          rotuloRolagem="Pendencias de conformidade"
-        />
-      </BlocoConteudo>
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 5 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:sst-relatorio-operacional" larguraPadrao="total">
+        <BlocoConteudo
+          titulo="Pendencias de conformidade"
+          contagem={`${(conformidade.pendencias || []).length} item(ns)`}
+          variante="primario"
+          cor="var(--sem-danger)"
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'tipo',
+                titulo: 'Tipo',
+                // R17: a pendência é lida pelo TIPO de conformidade que falhou —
+                // é o que nomeia a linha; origem_tipo/#id é a referência técnica.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (row) => row.tipo
+              },
+              { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
+              { id: 'mensagem', titulo: 'Mensagem', tipo: 'texto', render: (row) => row.mensagem },
+              {
+                id: 'origem',
+                titulo: 'Origem',
+                tipo: 'codigo',
+                render: (row) => `${row.origem_tipo || '-'} #${row.origem_id || '-'}`
+              }
+            ]}
+            itens={conformidade.pendencias || []}
+            getId={(row) => `${row.origem_tipo}-${row.origem_id}-${row.tipo}`}
+            vazio="Nenhum registro encontrado."
+            storageKey="tabela:sst-relatorio-operacional:pendencias"
+            rotuloRolagem="Pendencias de conformidade"
+          />
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Eventos operacionais abertos"
-        contagem={`${(data?.eventos_abertos || []).length} item(ns)`}
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'tipo_evento',
-              titulo: 'Tipo',
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (row) => row.tipo_evento
-            },
-            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
-            { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
-            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) },
-            { id: 'mensagem', titulo: 'Mensagem', tipo: 'texto', render: (row) => row.mensagem }
-          ]}
-          itens={data?.eventos_abertos || []}
-          vazio="Nenhum registro encontrado."
-          storageKey="tabela:sst-relatorio-operacional:eventos-abertos"
-          rotuloRolagem="Eventos operacionais abertos"
-        />
-      </BlocoConteudo>
+        <BlocoConteudo
+          titulo="Eventos operacionais abertos"
+          contagem={`${(data?.eventos_abertos || []).length} item(ns)`}
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'tipo_evento',
+                titulo: 'Tipo',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (row) => row.tipo_evento
+              },
+              { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
+              { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
+              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) },
+              { id: 'mensagem', titulo: 'Mensagem', tipo: 'texto', render: (row) => row.mensagem }
+            ]}
+            itens={data?.eventos_abertos || []}
+            vazio="Nenhum registro encontrado."
+            storageKey="tabela:sst-relatorio-operacional:eventos-abertos"
+            rotuloRolagem="Eventos operacionais abertos"
+          />
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Riscos criticos"
-        contagem={`${(data?.riscos_criticos || []).length} item(ns)`}
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'risco',
-              titulo: 'Risco',
-              // R17: o risco tem nome próprio — é ele que identifica a linha.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (row) => row.nome
-            },
-            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
-            { id: 'probabilidade', titulo: 'Probabilidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.probabilidade} /> },
-            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
-          ]}
-          itens={data?.riscos_criticos || []}
-          vazio="Nenhum registro encontrado."
-          storageKey="tabela:sst-relatorio-operacional:riscos-criticos"
-          rotuloRolagem="Riscos criticos"
-        />
-      </BlocoConteudo>
+        <BlocoConteudo
+          titulo="Riscos criticos"
+          contagem={`${(data?.riscos_criticos || []).length} item(ns)`}
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'risco',
+                titulo: 'Risco',
+                // R17: o risco tem nome próprio — é ele que identifica a linha.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (row) => row.nome
+              },
+              { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.severidade} /> },
+              { id: 'probabilidade', titulo: 'Probabilidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.probabilidade} /> },
+              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
+            ]}
+            itens={data?.riscos_criticos || []}
+            vazio="Nenhum registro encontrado."
+            storageKey="tabela:sst-relatorio-operacional:riscos-criticos"
+            rotuloRolagem="Riscos criticos"
+          />
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Acidentes e incidentes recentes"
-        contagem={`${(data?.acidentes_recentes || []).length} item(ns)`}
-      >
-        <TabelaPadrao
-          colunas={[
-            { id: 'data_ocorrencia', titulo: 'Data', tipo: 'data', render: (row) => row.data_ocorrencia },
-            {
-              id: 'tipo',
-              titulo: 'Tipo',
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (row) => row.tipo
-            },
-            { id: 'gravidade', titulo: 'Gravidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.gravidade} /> },
-            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
-          ]}
-          itens={data?.acidentes_recentes || []}
-          vazio="Nenhum registro encontrado."
-          storageKey="tabela:sst-relatorio-operacional:acidentes-recentes"
-          rotuloRolagem="Acidentes e incidentes recentes"
-        />
-      </BlocoConteudo>
+        <BlocoConteudo
+          titulo="Acidentes e incidentes recentes"
+          contagem={`${(data?.acidentes_recentes || []).length} item(ns)`}
+        >
+          <TabelaPadrao
+            colunas={[
+              { id: 'data_ocorrencia', titulo: 'Data', tipo: 'data', render: (row) => row.data_ocorrencia },
+              {
+                id: 'tipo',
+                titulo: 'Tipo',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (row) => row.tipo
+              },
+              { id: 'gravidade', titulo: 'Gravidade', tipo: 'badge', render: (row) => <CelulaSeveridade valor={row.gravidade} /> },
+              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
+            ]}
+            itens={data?.acidentes_recentes || []}
+            vazio="Nenhum registro encontrado."
+            storageKey="tabela:sst-relatorio-operacional:acidentes-recentes"
+            rotuloRolagem="Acidentes e incidentes recentes"
+          />
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Historico recente SST"
-        contagem={`${(data?.historicos_recentes || []).length} item(ns)`}
-        recolhivel
-        recolhidoPadrao
-      >
-        <TabelaPadrao
-          colunas={[
-            { id: 'data', titulo: 'Data', tipo: 'data', render: (row) => new Date(row.createdAt).toLocaleString('pt-BR') },
-            {
-              id: 'recurso',
-              titulo: 'Recurso',
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (row) => row.recurso
-            },
-            { id: 'acao', titulo: 'Acao', tipo: 'texto', render: (row) => row.acao },
-            { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
-            { id: 'resumo', titulo: 'Resumo', tipo: 'texto', render: (row) => row.resumo }
-          ]}
-          itens={data?.historicos_recentes || []}
-          vazio="Nenhum registro encontrado."
-          storageKey="tabela:sst-relatorio-operacional:historico"
-          rotuloRolagem="Historico recente SST"
-        />
-      </BlocoConteudo>
+        <BlocoConteudo
+          titulo="Historico recente SST"
+          contagem={`${(data?.historicos_recentes || []).length} item(ns)`}
+          recolhivel
+          chavePreferencia="bloco:sst-relatorio-operacional:historico-recente-sst"
+          recolhidoPadrao
+        >
+          <TabelaPadrao
+            colunas={[
+              { id: 'data', titulo: 'Data', tipo: 'data', render: (row) => new Date(row.createdAt).toLocaleString('pt-BR') },
+              {
+                id: 'recurso',
+                titulo: 'Recurso',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (row) => row.recurso
+              },
+              { id: 'acao', titulo: 'Acao', tipo: 'texto', render: (row) => row.acao },
+              { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
+              { id: 'resumo', titulo: 'Resumo', tipo: 'texto', render: (row) => row.resumo }
+            ]}
+            itens={data?.historicos_recentes || []}
+            vazio="Nenhum registro encontrado."
+            storageKey="tabela:sst-relatorio-operacional:historico"
+            rotuloRolagem="Historico recente SST"
+          />
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

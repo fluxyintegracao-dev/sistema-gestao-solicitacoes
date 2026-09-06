@@ -4,6 +4,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   Avisos,
@@ -94,83 +95,93 @@ export default function SstExecutivo() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <BlocoConteudo
-        titulo="Compliance e pendencias"
-        variante="primario"
-        cor="var(--module-sst)"
-        descricao={data?.nivel ? `Nivel atual: ${data.nivel}.` : 'Recorte corporativo do modulo.'}
-      >
-        <StatGrid colunas={3}>
-          <StatTile
-            label="Compliance geral"
-            valor={`${data?.compliance_geral ?? 100}%`}
-            sub={data?.nivel || 'CONTROLADO'}
-            tom={(data?.compliance_geral ?? 100) < 50 ? 'danger' : 'success'}
-          />
-          <StatTile label="Colaboradores avaliados" valor={cards.colaboradores_avaliados || 0} sub="Score SST" tom="info" />
-          <StatTile label="Pendencias" valor={cards.pendencias_total || 0} sub="Abertas ou detectadas" tom={cards.pendencias_total ? 'warning' : 'success'} />
-          <StatTile label="Pendencias criticas" valor={cards.pendencias_criticas || 0} sub="Exigem acao" tom={cards.pendencias_criticas ? 'danger' : 'success'} />
-          <StatTile label="Bloqueios abertos" valor={cards.bloqueios_abertos || 0} sub="Motor operacional" tom={cards.bloqueios_abertos ? 'danger' : 'success'} />
-        </StatGrid>
-      </BlocoConteudo>
-
       {/*
-        Isto NÃO é tabela: é o recorte de risco por obra, lido como mapa.
-        Cada obra é um bloco secundário com a TARJA lateral da sua família
-        (`.tarja--*`, o utilitário que o próprio catálogo declara aplicável
-        a "linha, card, bloco") e a etiqueta de criticidade — cor, ícone e
-        texto juntos, porque cor sozinha não comunica.
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 3 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      {/*
-        C6: o "Heatmap" era a AÇÃO PRINCIPAL desta tela e não é ação nenhuma —
-        é caminho para outra rota. Barra de ações é para o que se faz AQUI; o
-        caminho mora no hub, na trilha e no Ctrl+K, e o atalho fica junto do
-        conteúdo a que ele se refere. É o mesmo arranjo da SstCentroOperacional
-        (linha 211). Nada some: o mapa continua a um clique, do lado das obras
-        críticas que ele desenha.
-      */}
-      <BlocoConteudo
-        titulo="Obras criticas"
-        contagem={`${obras.length} item(ns)`}
-        descricao="Ordenadas pelo indice de risco calculado no backend."
-        acoes={<Link to="/sst/relatorios/heatmap" className="btn btn-outline btn-sm">Abrir mapa</Link>}
-      >
-        <div className="grid gap-3 md:grid-cols-2">
-          {obras.map((item) => (
-            <BlocoConteudo
-              key={`${item.obra_id || 'sem'}-${item.obra}`}
-              variante="secundario"
-              className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
-              titulo={item.obra}
-              descricao={`Indice de risco ${item.indice_risco}`}
-              acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
-            >
-              <StatGrid colunas={1}>
-                <StatTile label="Pendencias" valor={item.pendencias ?? 0} tom={item.pendencias ? 'warning' : undefined} />
-              </StatGrid>
-            </BlocoConteudo>
-          ))}
-          {!obras.length ? <p className="text-sm text-muted">Nenhuma obra critica detectada.</p> : null}
-        </div>
-      </BlocoConteudo>
+      <BlocosPersonalizaveis chave="blocos:sst-executivo" larguraPadrao="total">
+        <BlocoConteudo
+          titulo="Compliance e pendencias"
+          variante="primario"
+          cor="var(--module-sst)"
+          descricao={data?.nivel ? `Nivel atual: ${data.nivel}.` : 'Recorte corporativo do modulo.'}
+        >
+          <StatGrid colunas={3}>
+            <StatTile
+              label="Compliance geral"
+              valor={`${data?.compliance_geral ?? 100}%`}
+              sub={data?.nivel || 'CONTROLADO'}
+              tom={(data?.compliance_geral ?? 100) < 50 ? 'danger' : 'success'}
+            />
+            <StatTile label="Colaboradores avaliados" valor={cards.colaboradores_avaliados || 0} sub="Score SST" tom="info" />
+            <StatTile label="Pendencias" valor={cards.pendencias_total || 0} sub="Abertas ou detectadas" tom={cards.pendencias_total ? 'warning' : 'success'} />
+            <StatTile label="Pendencias criticas" valor={cards.pendencias_criticas || 0} sub="Exigem acao" tom={cards.pendencias_criticas ? 'danger' : 'success'} />
+            <StatTile label="Bloqueios abertos" valor={cards.bloqueios_abertos || 0} sub="Motor operacional" tom={cards.bloqueios_abertos ? 'danger' : 'success'} />
+          </StatGrid>
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Prontidao preditiva e IA documental"
-        descricao="Contratos futuros ja estruturados; nada e transmitido nesta fase."
-      >
-        <StatGrid colunas={2}>
-          <StatTile
-            label="Prontidao preditiva"
-            valor={data?.predicao?.status || 'PREPARADO_ARQUITETURALMENTE'}
-            sub="Motor preditivo preparado, sem IA ativa nesta fase."
-          />
-          <StatTile
-            label="IA documental"
-            valor={data?.ia_documental?.status || 'PIPELINE_DOCUMENTAL_PREPARADO'}
-            sub="OCR e classificacao documental estruturados como contratos futuros."
-          />
-        </StatGrid>
-      </BlocoConteudo>
+        {/*
+          Isto NÃO é tabela: é o recorte de risco por obra, lido como mapa.
+          Cada obra é um bloco secundário com a TARJA lateral da sua família
+          (`.tarja--*`, o utilitário que o próprio catálogo declara aplicável
+          a "linha, card, bloco") e a etiqueta de criticidade — cor, ícone e
+          texto juntos, porque cor sozinha não comunica.
+        */}
+        {/*
+          C6: o "Heatmap" era a AÇÃO PRINCIPAL desta tela e não é ação nenhuma —
+          é caminho para outra rota. Barra de ações é para o que se faz AQUI; o
+          caminho mora no hub, na trilha e no Ctrl+K, e o atalho fica junto do
+          conteúdo a que ele se refere. É o mesmo arranjo da SstCentroOperacional
+          (linha 211). Nada some: o mapa continua a um clique, do lado das obras
+          críticas que ele desenha.
+        */}
+        <BlocoConteudo
+          titulo="Obras criticas"
+          contagem={`${obras.length} item(ns)`}
+          descricao="Ordenadas pelo indice de risco calculado no backend."
+          acoes={<Link to="/sst/relatorios/heatmap" className="btn btn-outline btn-sm">Abrir mapa</Link>}
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            {obras.map((item) => (
+              <BlocoConteudo
+                key={`${item.obra_id || 'sem'}-${item.obra}`}
+                variante="secundario"
+                className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
+                titulo={item.obra}
+                descricao={`Indice de risco ${item.indice_risco}`}
+                acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
+              >
+                <StatGrid colunas={1}>
+                  <StatTile label="Pendencias" valor={item.pendencias ?? 0} tom={item.pendencias ? 'warning' : undefined} />
+                </StatGrid>
+              </BlocoConteudo>
+            ))}
+            {!obras.length ? <p className="text-sm text-muted">Nenhuma obra critica detectada.</p> : null}
+          </div>
+        </BlocoConteudo>
+
+        <BlocoConteudo
+          titulo="Prontidao preditiva e IA documental"
+          descricao="Contratos futuros ja estruturados; nada e transmitido nesta fase."
+        >
+          <StatGrid colunas={2}>
+            <StatTile
+              label="Prontidao preditiva"
+              valor={data?.predicao?.status || 'PREPARADO_ARQUITETURALMENTE'}
+              sub="Motor preditivo preparado, sem IA ativa nesta fase."
+            />
+            <StatTile
+              label="IA documental"
+              valor={data?.ia_documental?.status || 'PIPELINE_DOCUMENTAL_PREPARADO'}
+              sub="OCR e classificacao documental estruturados como contratos futuros."
+            />
+          </StatGrid>
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
 
       {elementoConfirmacao}
     </Pagina>

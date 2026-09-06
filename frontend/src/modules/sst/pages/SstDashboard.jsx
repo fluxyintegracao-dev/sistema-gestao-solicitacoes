@@ -5,6 +5,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   Avisos,
@@ -72,73 +73,83 @@ export default function SstDashboard() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {isVisible('sst.dashboard.metricas_principais') ? (
-        <BlocoConteudo
-          titulo="Indicadores criticos"
-          variante="primario"
-          cor="var(--module-sst)"
-          descricao={data?.periodo_alerta_dias
-            ? `Alertas de validade considerando ${data.periodo_alerta_dias} dia(s).`
-            : 'Compliance, risco e aptidao no recorte atual.'}
-        >
-          <StatGrid>
-            <StatTile
-              label={<><HiOutlineShieldCheck aria-hidden="true" /> Compliance score</>}
-              valor={`${cards.compliance_score ?? 100}%`}
-              tom="success"
-            />
-            <StatTile
-              label={<><HiOutlineExclamationTriangle aria-hidden="true" /> Riscos criticos</>}
-              valor={cards.riscos_criticos ?? 0}
-              tom={tom(cards.riscos_criticos, 'danger', 'info')}
-            />
-            <StatTile
-              label={<><HiOutlineUserGroup aria-hidden="true" /> Colaboradores inaptos</>}
-              valor={cards.colaboradores_inaptos ?? 0}
-              tom={tom(cards.colaboradores_inaptos, 'danger', 'success')}
-            />
-            <StatTile
-              label={<><HiOutlineClipboardDocumentCheck aria-hidden="true" /> Pendencias criticas</>}
-              valor={cards.pendencias_criticas ?? 0}
-              tom={tom(cards.pendencias_criticas, 'danger', undefined)}
-            />
-          </StatGrid>
-        </BlocoConteudo>
-      ) : null}
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 3 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:sst-dashboard" larguraPadrao="total">
+        {isVisible('sst.dashboard.metricas_principais') ? (
+          <BlocoConteudo
+            titulo="Indicadores criticos"
+            variante="primario"
+            cor="var(--module-sst)"
+            descricao={data?.periodo_alerta_dias
+              ? `Alertas de validade considerando ${data.periodo_alerta_dias} dia(s).`
+              : 'Compliance, risco e aptidao no recorte atual.'}
+          >
+            <StatGrid>
+              <StatTile
+                label={<><HiOutlineShieldCheck aria-hidden="true" /> Compliance score</>}
+                valor={`${cards.compliance_score ?? 100}%`}
+                tom="success"
+              />
+              <StatTile
+                label={<><HiOutlineExclamationTriangle aria-hidden="true" /> Riscos criticos</>}
+                valor={cards.riscos_criticos ?? 0}
+                tom={tom(cards.riscos_criticos, 'danger', 'info')}
+              />
+              <StatTile
+                label={<><HiOutlineUserGroup aria-hidden="true" /> Colaboradores inaptos</>}
+                valor={cards.colaboradores_inaptos ?? 0}
+                tom={tom(cards.colaboradores_inaptos, 'danger', 'success')}
+              />
+              <StatTile
+                label={<><HiOutlineClipboardDocumentCheck aria-hidden="true" /> Pendencias criticas</>}
+                valor={cards.pendencias_criticas ?? 0}
+                tom={tom(cards.pendencias_criticas, 'danger', undefined)}
+              />
+            </StatGrid>
+          </BlocoConteudo>
+        ) : null}
 
-      {isVisible('sst.dashboard.vencimentos') ? (
-        <BlocoConteudo
-          titulo="Vencimentos"
-          descricao="Documentos e entregas que ja venceram ou estao no prazo de alerta."
-        >
-          <StatGrid>
-            <StatTile label="Exames vencidos" valor={cards.exames_vencidos ?? 0} tom={tom(cards.exames_vencidos, 'danger', undefined)} />
-            <StatTile label="ASO vencidos" valor={cards.aso_vencidos ?? 0} tom={tom(cards.aso_vencidos, 'danger', undefined)} />
-            <StatTile label="EPI vencendo" valor={cards.epi_vencendo ?? 0} tom={tom(cards.epi_vencendo, 'warning', undefined)} />
-            <StatTile label="Treinamentos vencidos" valor={cards.treinamentos_vencidos ?? 0} tom={tom(cards.treinamentos_vencidos, 'danger', undefined)} />
-          </StatGrid>
-        </BlocoConteudo>
-      ) : null}
+        {isVisible('sst.dashboard.vencimentos') ? (
+          <BlocoConteudo
+            titulo="Vencimentos"
+            descricao="Documentos e entregas que ja venceram ou estao no prazo de alerta."
+          >
+            <StatGrid>
+              <StatTile label="Exames vencidos" valor={cards.exames_vencidos ?? 0} tom={tom(cards.exames_vencidos, 'danger', undefined)} />
+              <StatTile label="ASO vencidos" valor={cards.aso_vencidos ?? 0} tom={tom(cards.aso_vencidos, 'danger', undefined)} />
+              <StatTile label="EPI vencendo" valor={cards.epi_vencendo ?? 0} tom={tom(cards.epi_vencendo, 'warning', undefined)} />
+              <StatTile label="Treinamentos vencidos" valor={cards.treinamentos_vencidos ?? 0} tom={tom(cards.treinamentos_vencidos, 'danger', undefined)} />
+            </StatGrid>
+          </BlocoConteudo>
+        ) : null}
 
-      {isVisible('sst.dashboard.operacao') ? (
-        <BlocoConteudo
-          titulo="Operacao SST"
-          contagem={loading ? 'Carregando' : `${visibleNav.length} area(s)`}
-          descricao="Areas do modulo liberadas para o seu acesso."
-        >
-          {/* R25: os atalhos usavam `hover:border-sky-200 hover:bg-sky-50
+        {isVisible('sst.dashboard.operacao') ? (
+          <BlocoConteudo
+            titulo="Operacao SST"
+            contagem={loading ? 'Carregando' : `${visibleNav.length} area(s)`}
+            descricao="Areas do modulo liberadas para o seu acesso."
+          >
+            {/* R25: os atalhos usavam `hover:border-sky-200 hover:bg-sky-50
               hover:text-sky-900` — paleta crua. Passam a ser botões do
-              sistema (`btn btn-outline`), que já trazem alvo de 32px (R2),
-              foco visível e cor por token. */}
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {visibleNav.map(([key, label]) => (
-              <Link key={key} to={`/sst/${key}`} className="btn btn-outline">
-                {label}
-              </Link>
-            ))}
-          </div>
-        </BlocoConteudo>
-      ) : null}
+                sistema (`btn btn-outline`), que já trazem alvo de 32px (R2),
+                foco visível e cor por token. */}
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {visibleNav.map(([key, label]) => (
+                <Link key={key} to={`/sst/${key}`} className="btn btn-outline">
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </BlocoConteudo>
+        ) : null}
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

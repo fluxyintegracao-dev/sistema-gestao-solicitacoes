@@ -11,6 +11,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -638,177 +639,187 @@ export default function Dashboard() {
         }}
       />
 
-      {dados.visao.financeiro && (
-        <BlocoConteudo
-          titulo="Caixa e pendencias"
-          descricao="Os numeros que decidem o dia. Cada ladrilho abre a tela onde a acao acontece."
-        >
-          <StatGrid colunas={4}>
-            <Ladrilho
-              label="Saldo aberto projetado"
-              valor={formatCurrency(saldoAberto)}
-              sub="Receber em aberto menos pagar em aberto"
-              tom={saldoAberto >= 0 ? 'success' : 'danger'}
-              href={rotaDe('fin-relatorios')}
-            />
-            <Ladrilho
-              label="Resultado do mes"
-              valor={formatCurrency(resultadoMes)}
-              sub="Recebido no mes menos pago no mes"
-              tom={resultadoMes >= 0 ? 'info' : 'warning'}
-              href={rotaDe('fin-relatorios')}
-            />
-            <Ladrilho
-              label="A pagar vencido"
-              valor={formatCurrency(financeiro.pagar_vencido)}
-              sub={`${financeiro.quantidade_pagar_vencido} titulo(s) a pagar vencido(s)`}
-              tom={financeiro.pagar_vencido > 0 ? 'danger' : 'success'}
-              /* `/financeiro/titulos` sem filtro NAO e destino do menu: o
-                 menu oferece "Contas a Pagar" e "a Receber" separados
-                 (decisao registrada em 04/09). Unico destino escrito a mao
-                 aqui, e por isso — abaixo do limite de tres do trinco. */
-              href="/financeiro/titulos"
-            />
-            <Ladrilho
-              label="A receber vencido"
-              valor={formatCurrency(financeiro.receber_vencido)}
-              sub={`${financeiro.quantidade_receber_vencido} titulo(s) a receber vencido(s)`}
-              tom={financeiro.receber_vencido > 0 ? 'warning' : 'success'}
-              href="/financeiro/titulos"
-            />
-            <Ladrilho
-              label="Conciliacao pendente"
-              valor={formatNumber(financeiro.conciliacao_pendente_quantidade)}
-              sub={formatCurrency(financeiro.conciliacao_pendente_valor)}
-              tom={financeiro.conciliacao_pendente_quantidade > 0 ? 'warning' : 'success'}
-              href={rotaDe('fin-conciliacao')}
-            />
-          </StatGrid>
-        </BlocoConteudo>
-      )}
-
-      {dados.visao.solicitacoes && !dados.visao.financeiro && (
-        <BlocoConteudo
-          titulo="Operacao do setor"
-          descricao="Volume visivel para o seu escopo. Cada ladrilho abre a lista de solicitacoes."
-        >
-          <StatGrid colunas={4}>
-            <Ladrilho label="Solicitacoes abertas" valor={formatNumber(dados.total)} sub="Total operacional visivel" tom="info" href={rotaDe('solicitacoes-lista')} />
-            <Ladrilho label="Aguardando acao" valor={formatNumber(solicitacoesPendentes)} sub="Pendentes e em analise" tom={solicitacoesPendentes > 0 ? 'warning' : 'success'} href={rotaDe('solicitacoes-lista')} />
-            <Ladrilho label="Valor em solicitacoes" valor={formatCurrency(totalSolicitacoesValor)} sub="Base informada nos registros" href={rotaDe('solicitacoes-lista')} />
-            <Ladrilho label="Areas com demanda" valor={formatNumber(topAreas.length)} sub="Setores com solicitacoes abertas" />
-          </StatGrid>
-        </BlocoConteudo>
-      )}
-
-      {/* B2: UM bloco principal por tela, e nesta é a fila de decisão — a
-          pergunta central do painel é "por onde começo?". */}
-      <BlocoConteudo
-        titulo="Fila de decisao"
-        variante="primario"
-        cor="var(--sem-danger)"
-        descricao="Lista priorizada por risco financeiro e operacional. Leitura objetiva dos pontos que pedem acao: vencidos, caixa aberto, conciliacao, fila operacional e exposicao por obra. Comece por aqui."
-      >
-        {decisoes.length ? (
-          <TabelaPadrao
-            colunas={colunasDecisoes}
-            itens={decisoes}
-            getId={(item) => item.id}
-            storageKey="tabela:dashboard:decisoes"
-            rotuloRolagem="Fila de decisao"
-            semIdentidade
-            larguraAcoes={140}
-            // A1: linha acionável com caminho por teclado (tabIndex +
-            // Enter/Espaço do componente) E um link focável na linha.
-            aoClicarLinha={(item) => item.href && navigate(item.href)}
-            acoesLinha={(item) => (
-              <Link to={item.href} className="btn btn-outline btn-sm">
-                Abrir
-              </Link>
-            )}
-            vazio={{
-              title: 'Sem acao critica agora',
-              message: 'Nao ha alertas executivos relevantes com os dados atuais.'
-            }}
-          />
-        ) : (
-          <EmptyState title="Sem acao critica agora" message="Nao ha alertas executivos relevantes com os dados atuais." />
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 6 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:dashboard" larguraPadrao="total">
+        {dados.visao.financeiro && (
+          <BlocoConteudo
+            titulo="Caixa e pendencias"
+            descricao="Os numeros que decidem o dia. Cada ladrilho abre a tela onde a acao acontece."
+          >
+            <StatGrid colunas={4}>
+              <Ladrilho
+                label="Saldo aberto projetado"
+                valor={formatCurrency(saldoAberto)}
+                sub="Receber em aberto menos pagar em aberto"
+                tom={saldoAberto >= 0 ? 'success' : 'danger'}
+                href={rotaDe('fin-relatorios')}
+              />
+              <Ladrilho
+                label="Resultado do mes"
+                valor={formatCurrency(resultadoMes)}
+                sub="Recebido no mes menos pago no mes"
+                tom={resultadoMes >= 0 ? 'info' : 'warning'}
+                href={rotaDe('fin-relatorios')}
+              />
+              <Ladrilho
+                label="A pagar vencido"
+                valor={formatCurrency(financeiro.pagar_vencido)}
+                sub={`${financeiro.quantidade_pagar_vencido} titulo(s) a pagar vencido(s)`}
+                tom={financeiro.pagar_vencido > 0 ? 'danger' : 'success'}
+                /* `/financeiro/titulos` sem filtro NAO e destino do menu: o
+                   menu oferece "Contas a Pagar" e "a Receber" separados
+                   (decisao registrada em 04/09). Unico destino escrito a mao
+                   aqui, e por isso — abaixo do limite de tres do trinco. */
+                href="/financeiro/titulos"
+              />
+              <Ladrilho
+                label="A receber vencido"
+                valor={formatCurrency(financeiro.receber_vencido)}
+                sub={`${financeiro.quantidade_receber_vencido} titulo(s) a receber vencido(s)`}
+                tom={financeiro.receber_vencido > 0 ? 'warning' : 'success'}
+                href="/financeiro/titulos"
+              />
+              <Ladrilho
+                label="Conciliacao pendente"
+                valor={formatNumber(financeiro.conciliacao_pendente_quantidade)}
+                sub={formatCurrency(financeiro.conciliacao_pendente_valor)}
+                tom={financeiro.conciliacao_pendente_quantidade > 0 ? 'warning' : 'success'}
+                href={rotaDe('fin-conciliacao')}
+              />
+            </StatGrid>
+          </BlocoConteudo>
         )}
-      </BlocoConteudo>
 
-      {quickActions.length ? (
-        /* "Onde a NAVEGAÇÃO mora" (04/09): caminho para OUTRA tela não vai
-           na barra de ações nem no menu "⋯" — vai no hub. Esta página é o
-           hub de entrada do sistema, então os atalhos moram no corpo. */
-        <BlocoConteudo titulo="Ir direto para" descricao="Atalhos para as telas onde a acao acontece.">
-          <div className="app-actionbar">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Link key={action.to} to={action.to} className="btn btn-outline">
-                  <Icon aria-hidden="true" />
-                  {action.label}
-                </Link>
-              );
-            })}
-          </div>
-        </BlocoConteudo>
-      ) : null}
+        {dados.visao.solicitacoes && !dados.visao.financeiro && (
+          <BlocoConteudo
+            titulo="Operacao do setor"
+            descricao="Volume visivel para o seu escopo. Cada ladrilho abre a lista de solicitacoes."
+          >
+            <StatGrid colunas={4}>
+              <Ladrilho label="Solicitacoes abertas" valor={formatNumber(dados.total)} sub="Total operacional visivel" tom="info" href={rotaDe('solicitacoes-lista')} />
+              <Ladrilho label="Aguardando acao" valor={formatNumber(solicitacoesPendentes)} sub="Pendentes e em analise" tom={solicitacoesPendentes > 0 ? 'warning' : 'success'} href={rotaDe('solicitacoes-lista')} />
+              <Ladrilho label="Valor em solicitacoes" valor={formatCurrency(totalSolicitacoesValor)} sub="Base informada nos registros" href={rotaDe('solicitacoes-lista')} />
+              <Ladrilho label="Areas com demanda" valor={formatNumber(topAreas.length)} sub="Setores com solicitacoes abertas" />
+            </StatGrid>
+          </BlocoConteudo>
+        )}
 
-      {dados.visao.financeiro && (
+        {/* B2: UM bloco principal por tela, e nesta é a fila de decisão — a
+            pergunta central do painel é "por onde começo?". */}
         <BlocoConteudo
-          titulo="Pulso financeiro"
-          descricao="Compara compromissos, recebiveis e movimento liquidado no mes. A receber e sempre verde e a pagar sempre vermelho, aqui e nas tabelas abaixo (R8: a cor e da serie, nao do componente)."
+          titulo="Fila de decisao"
+          variante="primario"
+          cor="var(--sem-danger)"
+          descricao="Lista priorizada por risco financeiro e operacional. Leitura objetiva dos pontos que pedem acao: vencidos, caixa aberto, conciliacao, fila operacional e exposicao por obra. Comece por aqui."
         >
-          <StatGrid colunas={4}>
-            <Ladrilho
-              label="A receber em aberto"
-              valor={formatCurrency(financeiro.total_receber_aberto)}
-              sub={`${financeiro.quantidade_receber_aberto} titulo(s) a receber`}
-              tom="success"
-              href="/financeiro/titulos"
+          {decisoes.length ? (
+            <TabelaPadrao
+              colunas={colunasDecisoes}
+              itens={decisoes}
+              getId={(item) => item.id}
+              storageKey="tabela:dashboard:decisoes"
+              rotuloRolagem="Fila de decisao"
+              semIdentidade
+              larguraAcoes={140}
+              // A1: linha acionável com caminho por teclado (tabIndex +
+              // Enter/Espaço do componente) E um link focável na linha.
+              aoClicarLinha={(item) => item.href && navigate(item.href)}
+              acoesLinha={(item) => (
+                <Link to={item.href} className="btn btn-outline btn-sm">
+                  Abrir
+                </Link>
+              )}
+              vazio={{
+                title: 'Sem acao critica agora',
+                message: 'Nao ha alertas executivos relevantes com os dados atuais.'
+              }}
             />
-            <Ladrilho
-              label="A pagar em aberto"
-              valor={formatCurrency(financeiro.total_pagar_aberto)}
-              sub={`${financeiro.quantidade_pagar_aberto} titulo(s) a pagar`}
-              tom="danger"
-              href="/financeiro/titulos"
-            />
-            <Ladrilho
-              label="Recebido no mes"
-              valor={formatCurrency(financeiro.movimentado_mes_receber)}
-              sub="Entradas baixadas no periodo atual"
-              tom="success"
-            />
-            <Ladrilho
-              label="Pago no mes"
-              valor={formatCurrency(financeiro.movimentado_mes_pagar)}
-              sub="Saidas baixadas no periodo atual"
-              tom="danger"
-            />
+          ) : (
+            <EmptyState title="Sem acao critica agora" message="Nao ha alertas executivos relevantes com os dados atuais." />
+          )}
+        </BlocoConteudo>
+
+        {quickActions.length ? (
+          /* "Onde a NAVEGAÇÃO mora" (04/09): caminho para OUTRA tela não vai
+             na barra de ações nem no menu "⋯" — vai no hub. Esta página é o
+             hub de entrada do sistema, então os atalhos moram no corpo. */
+          <BlocoConteudo titulo="Ir direto para" descricao="Atalhos para as telas onde a acao acontece.">
+            <div className="app-actionbar">
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <Link key={action.to} to={action.to} className="btn btn-outline">
+                    <Icon aria-hidden="true" />
+                    {action.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </BlocoConteudo>
+        ) : null}
+
+        {dados.visao.financeiro && (
+          <BlocoConteudo
+            titulo="Pulso financeiro"
+            descricao="Compara compromissos, recebiveis e movimento liquidado no mes. A receber e sempre verde e a pagar sempre vermelho, aqui e nas tabelas abaixo (R8: a cor e da serie, nao do componente)."
+          >
+            <StatGrid colunas={4}>
+              <Ladrilho
+                label="A receber em aberto"
+                valor={formatCurrency(financeiro.total_receber_aberto)}
+                sub={`${financeiro.quantidade_receber_aberto} titulo(s) a receber`}
+                tom="success"
+                href="/financeiro/titulos"
+              />
+              <Ladrilho
+                label="A pagar em aberto"
+                valor={formatCurrency(financeiro.total_pagar_aberto)}
+                sub={`${financeiro.quantidade_pagar_aberto} titulo(s) a pagar`}
+                tom="danger"
+                href="/financeiro/titulos"
+              />
+              <Ladrilho
+                label="Recebido no mes"
+                valor={formatCurrency(financeiro.movimentado_mes_receber)}
+                sub="Entradas baixadas no periodo atual"
+                tom="success"
+              />
+              <Ladrilho
+                label="Pago no mes"
+                valor={formatCurrency(financeiro.movimentado_mes_pagar)}
+                sub="Saidas baixadas no periodo atual"
+                tom="danger"
+              />
+            </StatGrid>
+          </BlocoConteudo>
+        )}
+
+        <BlocoConteudo
+          titulo="Insights do Fluxy"
+          descricao="Leituras objetivas geradas no frontend a partir dos indicadores ja carregados."
+        >
+          <StatGrid colunas={2}>
+            {insights.map((item) => (
+              <StatTile
+                key={`${item.title}-${item.message}`}
+                label={item.title}
+                valor={item.message}
+                tom={item.tom}
+                icone={item.tom === 'danger'
+                  ? <HiOutlineExclamationTriangle aria-hidden="true" />
+                  : <HiOutlineSparkles aria-hidden="true" />}
+              />
+            ))}
           </StatGrid>
         </BlocoConteudo>
-      )}
-
-      <BlocoConteudo
-        titulo="Insights do Fluxy"
-        descricao="Leituras objetivas geradas no frontend a partir dos indicadores ja carregados."
-      >
-        <StatGrid colunas={2}>
-          {insights.map((item) => (
-            <StatTile
-              key={`${item.title}-${item.message}`}
-              label={item.title}
-              valor={item.message}
-              tom={item.tom}
-              icone={item.tom === 'danger'
-                ? <HiOutlineExclamationTriangle aria-hidden="true" />
-                : <HiOutlineSparkles aria-hidden="true" />}
-            />
-          ))}
-        </StatGrid>
-      </BlocoConteudo>
+      </BlocosPersonalizaveis>
 
       {dados.visao.financeiro && (
         <>

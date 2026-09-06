@@ -13,6 +13,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -272,179 +273,189 @@ export default function GovernancaSistema() {
         </BlocoConteudo>
       ) : null}
 
-      {!loading && activeTab === 'executiva' ? (
-        <BlocoConteudo
-          titulo="Visao executiva"
-          descricao="Volume institucional consolidado do sistema."
-          variante="primario"
-          cor="var(--sem-info)"
-        >
-          <StatGrid>
-            <Metrica label="Usuarios ativos" value={executive.usuarios_ativos} detail={`${formatNumber(executive.usuarios_totais)} usuarios cadastrados`} icon={HiOutlineShieldCheck} />
-            <Metrica label="Processos abertos" value={executive.processos_abertos} detail="Solicitacoes em andamento" icon={HiOutlineDocumentText} />
-            <Metrica label="Processos concluidos" value={executive.processos_concluidos} detail="Historico institucional" icon={HiOutlineCheckCircle} />
-            <Metrica label="Documentos" value={executive.documentos} detail={`${formatNumber(executive.modulos_ativos)} modulos ativos`} icon={HiOutlineChartBar} />
-            <Metrica label="Empresas do grupo" value={executive.empresas_ativas} />
-            <Metrica label="Obras / centros" value={executive.obras_ativas} />
-          </StatGrid>
-        </BlocoConteudo>
-      ) : null}
-
-      {!loading && activeTab === 'adocao' ? (
-        <BlocoConteudo
-          titulo="Adocao do sistema"
-          descricao="Indicadores institucionais sem ranking individual."
-          variante="primario"
-          cor="var(--sem-info)"
-        >
-          <StatGrid colunas={3}>
-            <Metrica label="Taxa de adocao" value={adoption.taxa_adocao_usuarios} detail="% de usuarios ativos em 30 dias" />
-            <Metrica label="Usuarios ativos 30d" value={adoption.usuarios_ativos_30d} />
-            <Metrica label="Acessos governanca 30d" value={adoption.acessos_governanca_30d} />
-          </StatGrid>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {(adoption.modulos_em_uso || []).map((item) => (
-              <span key={item.modulo} className="badge badge-muted">{item.modulo}</span>
-            ))}
-          </div>
-        </BlocoConteudo>
-      ) : null}
-
-      {!loading && activeTab === 'eficiencia' ? (
-        <BlocoConteudo
-          titulo="Eficiencia operacional"
-          descricao="Conclusao de processos e movimento financeiro medido."
-          variante="primario"
-          cor="var(--sem-info)"
-        >
-          <StatGrid colunas={4}>
-            <Metrica label="Indice de conclusao" value={efficiency.indice_conclusao} detail="% dos processos medidos" />
-            <Metrica label="Titulos abertos" value={efficiency.titulos_abertos} />
-            <Metrica label="Titulos baixados" value={efficiency.titulos_baixados} />
-            <Metrica label="Pedidos de compra" value={efficiency.pedidos_compra} />
-          </StatGrid>
-        </BlocoConteudo>
-      ) : null}
-
-      {!loading && activeTab === 'auditoria' ? (
-        <BlocoConteudo
-          titulo="Auditoria e governanca"
-          contagem={`${(audit.logs || []).length} registro(s) recentes`}
-          descricao="Acessos ao modulo e eventos de seguranca agregados."
-          variante="primario"
-          cor="var(--sem-info)"
-        >
-          <StatGrid colunas={2}>
-            <Metrica label="Eventos de seguranca" value={audit.eventos_seguranca} />
-            <Metrica label="Acessos governanca" value={audit.acessos_governanca} />
-          </StatGrid>
-          {/*
-            R18: o wrapper deste bloco era `overflow-hidden` — cria
-            scrollport e MATA o `position: sticky` do cabeçalho da tabela e
-            da coluna fixa, em silêncio. O recorte era só para arredondar o
-            canto, papel que hoje é do BlocoConteudo.
-          */}
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'data',
-                titulo: 'Data',
-                tipo: 'data',
-                render: (log) => (log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR') : '-')
-              },
-              {
-                id: 'acao',
-                titulo: 'Acao',
-                tipo: 'texto',
-                noCard: 'titulo',
-                render: (log) => log.acao
-              },
-              {
-                id: 'usuario',
-                titulo: 'Usuario',
-                tipo: 'codigo',
-                render: (log) => `#${log.usuario_id || '-'}`
-              },
-              {
-                id: 'ip',
-                titulo: 'IP',
-                tipo: 'codigo',
-                render: (log) => log.ip || '-'
-              }
-            ]}
-            itens={audit.logs || []}
-            getId={(log) => log.id}
-            /*
-              R17 — `semIdentidade` DECLARADO, com o motivo.
-
-              A linha aqui é um EVENTO (data + ator + ação), não um registro
-              com nome próprio. A versão anterior marcava a coluna "Acao"
-              como `tipo: 'identidade'`, o que a exibia em MAIÚSCULAS: a
-              caixa alta da identidade existe para nome legível de pessoa,
-              obra ou empresa, e aplicada a um verbo de log ("EXPORTOU
-              DASHBOARD") sugere um nome onde não há nenhum. O ator é
-              `usuario_id`, uma chave técnica — por isso `tipo: 'codigo'`.
-            */
-            semIdentidade
-            storageKey="tabela:governanca-sistema:auditoria"
-            rotuloRolagem="Logs de governanca"
-            vazio="Nenhum log de governanca registrado ainda."
-          />
-        </BlocoConteudo>
-      ) : null}
-
-      {!loading && activeTab === 'saude' ? (
-        <BlocoConteudo
-          titulo="Saude tecnica"
-          descricao={`Latencia medida: ${health.latency_ms || 0}ms. Uptime: ${formatNumber(health.uptime_seconds)}s.`}
-          variante="primario"
-          cor="var(--sem-info)"
-        >
-          <StatGrid colunas={4}>
-            <StatTile label="API" valor={<EtiquetaSaude value={health.api} />} />
-            <StatTile label="Database" valor={<EtiquetaSaude value={health.database} />} />
-            <StatTile label="Storage" valor={<EtiquetaSaude value={health.storage} />} />
-            <StatTile label="Config" valor={<HiOutlineCog6Tooth aria-hidden="true" />} />
-          </StatGrid>
-          <div className="mt-4">
-            <StatGrid colunas={2}>
-              {Object.entries(health.integrations || {}).map(([key, value]) => (
-                <StatTile key={key} label={key.replace(/_/g, ' ')} valor={<EtiquetaSaude value={value} />} />
-              ))}
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 6 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:governanca-sistema" larguraPadrao="total">
+        {!loading && activeTab === 'executiva' ? (
+          <BlocoConteudo
+            titulo="Visao executiva"
+            descricao="Volume institucional consolidado do sistema."
+            variante="primario"
+            cor="var(--sem-info)"
+          >
+            <StatGrid>
+              <Metrica label="Usuarios ativos" value={executive.usuarios_ativos} detail={`${formatNumber(executive.usuarios_totais)} usuarios cadastrados`} icon={HiOutlineShieldCheck} />
+              <Metrica label="Processos abertos" value={executive.processos_abertos} detail="Solicitacoes em andamento" icon={HiOutlineDocumentText} />
+              <Metrica label="Processos concluidos" value={executive.processos_concluidos} detail="Historico institucional" icon={HiOutlineCheckCircle} />
+              <Metrica label="Documentos" value={executive.documentos} detail={`${formatNumber(executive.modulos_ativos)} modulos ativos`} icon={HiOutlineChartBar} />
+              <Metrica label="Empresas do grupo" value={executive.empresas_ativas} />
+              <Metrica label="Obras / centros" value={executive.obras_ativas} />
             </StatGrid>
-          </div>
-        </BlocoConteudo>
-      ) : null}
+          </BlocoConteudo>
+        ) : null}
 
-      {!loading && activeTab === 'produto' ? (
-        <BlocoConteudo
-          titulo="Evolucao do produto"
-          descricao="Leitura executiva do roadmap e dos snapshots consolidados."
-          variante="primario"
-          cor="var(--sem-info)"
-        >
-          <StatGrid colunas={2}>
-            <Metrica label="Modulos consolidados" value={product.modulos_consolidados} />
-            <Metrica label="Snapshots historicos" value={(product.snapshots || []).length} />
-          </StatGrid>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div>
-              <p className="text-xs text-muted mb-3">Modulos ativos</p>
-              <div className="flex flex-wrap gap-2">
-                {(product.modulos || []).map((module) => (
-                  <span key={module} className="badge badge-muted">{module}</span>
+        {!loading && activeTab === 'adocao' ? (
+          <BlocoConteudo
+            titulo="Adocao do sistema"
+            descricao="Indicadores institucionais sem ranking individual."
+            variante="primario"
+            cor="var(--sem-info)"
+          >
+            <StatGrid colunas={3}>
+              <Metrica label="Taxa de adocao" value={adoption.taxa_adocao_usuarios} detail="% de usuarios ativos em 30 dias" />
+              <Metrica label="Usuarios ativos 30d" value={adoption.usuarios_ativos_30d} />
+              <Metrica label="Acessos governanca 30d" value={adoption.acessos_governanca_30d} />
+            </StatGrid>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(adoption.modulos_em_uso || []).map((item) => (
+                <span key={item.modulo} className="badge badge-muted">{item.modulo}</span>
+              ))}
+            </div>
+          </BlocoConteudo>
+        ) : null}
+
+        {!loading && activeTab === 'eficiencia' ? (
+          <BlocoConteudo
+            titulo="Eficiencia operacional"
+            descricao="Conclusao de processos e movimento financeiro medido."
+            variante="primario"
+            cor="var(--sem-info)"
+          >
+            <StatGrid colunas={4}>
+              <Metrica label="Indice de conclusao" value={efficiency.indice_conclusao} detail="% dos processos medidos" />
+              <Metrica label="Titulos abertos" value={efficiency.titulos_abertos} />
+              <Metrica label="Titulos baixados" value={efficiency.titulos_baixados} />
+              <Metrica label="Pedidos de compra" value={efficiency.pedidos_compra} />
+            </StatGrid>
+          </BlocoConteudo>
+        ) : null}
+
+        {!loading && activeTab === 'auditoria' ? (
+          <BlocoConteudo
+            titulo="Auditoria e governanca"
+            contagem={`${(audit.logs || []).length} registro(s) recentes`}
+            descricao="Acessos ao modulo e eventos de seguranca agregados."
+            variante="primario"
+            cor="var(--sem-info)"
+          >
+            <StatGrid colunas={2}>
+              <Metrica label="Eventos de seguranca" value={audit.eventos_seguranca} />
+              <Metrica label="Acessos governanca" value={audit.acessos_governanca} />
+            </StatGrid>
+            {/*
+              R18: o wrapper deste bloco era `overflow-hidden` — cria
+              scrollport e MATA o `position: sticky` do cabeçalho da tabela e
+              da coluna fixa, em silêncio. O recorte era só para arredondar o
+              canto, papel que hoje é do BlocoConteudo.
+            */}
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'data',
+                  titulo: 'Data',
+                  tipo: 'data',
+                  render: (log) => (log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR') : '-')
+                },
+                {
+                  id: 'acao',
+                  titulo: 'Acao',
+                  tipo: 'texto',
+                  noCard: 'titulo',
+                  render: (log) => log.acao
+                },
+                {
+                  id: 'usuario',
+                  titulo: 'Usuario',
+                  tipo: 'codigo',
+                  render: (log) => `#${log.usuario_id || '-'}`
+                },
+                {
+                  id: 'ip',
+                  titulo: 'IP',
+                  tipo: 'codigo',
+                  render: (log) => log.ip || '-'
+                }
+              ]}
+              itens={audit.logs || []}
+              getId={(log) => log.id}
+              /*
+                R17 — `semIdentidade` DECLARADO, com o motivo.
+
+                A linha aqui é um EVENTO (data + ator + ação), não um registro
+                com nome próprio. A versão anterior marcava a coluna "Acao"
+                como `tipo: 'identidade'`, o que a exibia em MAIÚSCULAS: a
+                caixa alta da identidade existe para nome legível de pessoa,
+                obra ou empresa, e aplicada a um verbo de log ("EXPORTOU
+                DASHBOARD") sugere um nome onde não há nenhum. O ator é
+                `usuario_id`, uma chave técnica — por isso `tipo: 'codigo'`.
+              */
+              semIdentidade
+              storageKey="tabela:governanca-sistema:auditoria"
+              rotuloRolagem="Logs de governanca"
+              vazio="Nenhum log de governanca registrado ainda."
+            />
+          </BlocoConteudo>
+        ) : null}
+
+        {!loading && activeTab === 'saude' ? (
+          <BlocoConteudo
+            titulo="Saude tecnica"
+            descricao={`Latencia medida: ${health.latency_ms || 0}ms. Uptime: ${formatNumber(health.uptime_seconds)}s.`}
+            variante="primario"
+            cor="var(--sem-info)"
+          >
+            <StatGrid colunas={4}>
+              <StatTile label="API" valor={<EtiquetaSaude value={health.api} />} />
+              <StatTile label="Database" valor={<EtiquetaSaude value={health.database} />} />
+              <StatTile label="Storage" valor={<EtiquetaSaude value={health.storage} />} />
+              <StatTile label="Config" valor={<HiOutlineCog6Tooth aria-hidden="true" />} />
+            </StatGrid>
+            <div className="mt-4">
+              <StatGrid colunas={2}>
+                {Object.entries(health.integrations || {}).map(([key, value]) => (
+                  <StatTile key={key} label={key.replace(/_/g, ' ')} valor={<EtiquetaSaude value={value} />} />
                 ))}
+              </StatGrid>
+            </div>
+          </BlocoConteudo>
+        ) : null}
+
+        {!loading && activeTab === 'produto' ? (
+          <BlocoConteudo
+            titulo="Evolucao do produto"
+            descricao="Leitura executiva do roadmap e dos snapshots consolidados."
+            variante="primario"
+            cor="var(--sem-info)"
+          >
+            <StatGrid colunas={2}>
+              <Metrica label="Modulos consolidados" value={product.modulos_consolidados} />
+              <Metrica label="Snapshots historicos" value={(product.snapshots || []).length} />
+            </StatGrid>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div>
+                <p className="text-xs text-muted mb-3">Modulos ativos</p>
+                <div className="flex flex-wrap gap-2">
+                  {(product.modulos || []).map((module) => (
+                    <span key={module} className="badge badge-muted">{module}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted mb-3">Proximas frentes</p>
+                <ul className="text-sm">
+                  {(product.proximas_frentes || []).map((item) => <li key={item}>- {item}</li>)}
+                </ul>
               </div>
             </div>
-            <div>
-              <p className="text-xs text-muted mb-3">Proximas frentes</p>
-              <ul className="text-sm">
-                {(product.proximas_frentes || []).map((item) => <li key={item}>- {item}</li>)}
-              </ul>
-            </div>
-          </div>
-        </BlocoConteudo>
-      ) : null}
+          </BlocoConteudo>
+        ) : null}
+      </BlocosPersonalizaveis>
 
       {elementoConfirmacao}
     </Pagina>

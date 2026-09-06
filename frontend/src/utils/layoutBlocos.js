@@ -73,3 +73,120 @@ export function resolverLayoutBlocos(ordemPadrao, { configSetor = null, prefsUsu
 
   return { ordem, ocultos, recolhidos, larguras };
 }
+
+// =====================================================================
+// ARRANJO PERSONALIZÁVEL GENÉRICO (05/09)
+// ---------------------------------------------------------------------
+// O motor acima resolve as CAMADAS. O que vem abaixo é o que faltava
+// para as duas telas que já tinham personalização (Home e detalhe da
+// solicitação) pararem de manter, cada uma, a sua cópia das seis funções
+// de mutação — e para as telas de relatório ganharem o mesmo mecanismo
+// sem escrever nenhuma delas. Ele é usado pelo componente padrão
+// `components/padrao/BlocosPersonalizaveis.jsx`.
+//
+// A SOMA DAS DUAS TELAS, NÃO A ESCOLHA DE UMA:
+//   - `adicionados` (só a Home tinha): bloco que nasce DESLIGADO
+//     (`padraoOculto`) e volta pelo "Adicionar bloco";
+//   - `recolhidos` (só o detalhe tinha): bloco recolhido pelo arranjo;
+//   - `larguras` com PADRÃO POR BLOCO: o detalhe tem padrão 'normal' e a
+//     Home 'total' — em vez de escolher um dos dois, o padrão viaja no
+//     catálogo (`larguraPadrao` por bloco) e o que se guarda é o desvio.
+// =====================================================================
+
+// Largura efetiva de um bloco quando o usuário não escolheu nada.
+export function larguraPadraoDoBloco(bloco, larguraPadraoDaTela = 'normal') {
+  const declarada = bloco?.larguraPadrao;
+  if (declarada === 'normal' || declarada === 'total') return declarada;
+  return larguraPadraoDaTela === 'total' ? 'total' : 'normal';
+}
+
+/*
+  Resolve o arranjo de uma tela a partir do catálogo (a ordem do CÓDIGO) e
+  da preferência do usuário. Devolve, além do arranjo, o que NÃO foi
+  reconhecido — e isso não é detalhe: a preferência guarda o desvio, e um
+  id que sumiu do catálogo (bloco escondido por permissão hoje, bloco
+  renomeado ontem) é IGNORADO NA LEITURA e PRESERVADO NA GRAVAÇÃO. Filtrar
+  é reversível; apagar não é. É a mesma regra da linha 23-24 deste arquivo.
+*/
+export function resolverArranjoBlocos(catalogo, prefsUsuario = null, opcoes = {}) {
+  const { configSetor = null, larguraPadrao: larguraPadraoDaTela = 'normal' } = opcoes;
+  const blocos = Array.isArray(catalogo) ? catalogo.filter((bloco) => bloco && bloco.id) : [];
+  const ordemPadrao = blocos.map((bloco) => bloco.id);
+  const idsValidos = new Set(ordemPadrao);
+  const porId = new Map(blocos.map((bloco) => [bloco.id, bloco]));
+
+  const base = resolverLayoutBlocos(ordemPadrao, { configSetor, prefsUsuario });
+
+  // Camada `adicionados`: quem nasce desligado só aparece quando o usuário
+  // pediu (ou quando o admin do setor ligou no layout do setor).
+  const ligadosPeloSetor = new Set(
+    (Array.isArray(configSetor) ? configSetor : [])
+      .filter((item) => item?.visivel !== false)
+      .map((item) => item?.bloco)
+  );
+  const adicionados = new Set(
+    (Array.isArray(prefsUsuario?.adicionados) ? prefsUsuario.adicionados : [])
+      .filter((id) => idsValidos.has(id))
+  );
+  const ocultos = new Set(base.ocultos);
+  for (const bloco of blocos) {
+    if (!bloco.padraoOculto) continue;
+    if (adicionados.has(bloco.id) || ligadosPeloSetor.has(bloco.id)) continue;
+    ocultos.add(bloco.id);
+  }
+
+  // Largura FINAL por bloco: escolha do usuário > padrão do bloco >
+  // padrão da tela.
+  const larguras = {};
+  for (const bloco of blocos) {
+    const escolhida = base.larguras[bloco.id];
+    larguras[bloco.id] = (escolhida === 'normal' || escolhida === 'total')
+      ? escolhida
+      : larguraPadraoDoBloco(bloco, larguraPadraoDaTela);
+  }
+
+  const fora = (lista) => (Array.isArray(lista) ? lista.filter((id) => !idsValidos.has(id)) : []);
+  const largurasDesconhecidas = {};
+  for (const [id, largura] of Object.entries(prefsUsuario?.larguras || {})) {
+    if (!idsValidos.has(id)) largurasDesconhecidas[id] = largura;
+  }
+
+  return {
+    ordem: base.ordem,
+    ocultos,
+    recolhidos: base.recolhidos,
+    larguras,
+    adicionados,
+    porId,
+    idsValidos,
+    // O que a leitura ignorou e a gravação tem de devolver intacto.
+    desconhecidos: {
+      ordem: Array.isArray(prefsUsuario?.ordem) ? prefsUsuario.ordem : [],
+      removidos: fora(prefsUsuario?.removidos),
+      adicionados: fora(prefsUsuario?.adicionados),
+      recolhidos: fora(prefsUsuario?.recolhidos),
+      larguras: largurasDesconhecidas
+    }
+  };
+}
+
+/*
+  Mescla a ordem NOVA (só ids do catálogo) de volta na ordem ARMAZENADA,
+  mantendo cada id desconhecido no lugar em que estava. Sem isto, mover um
+  bloco jogaria para o fim (ou para fora) o bloco que a permissão do dia
+  escondeu — e a pessoa que abrisse a mesma tela com outro perfil veria o
+  arranjo dela desfeito por um arrasto que não era sobre aquele bloco.
+*/
+export function mesclarOrdemBlocos(ordemArmazenada, novaOrdem, idsValidos) {
+  const armazenada = Array.isArray(ordemArmazenada) ? ordemArmazenada : [];
+  const fila = Array.isArray(novaOrdem) ? novaOrdem.slice() : [];
+  const resultado = [];
+  for (const id of armazenada) {
+    if (idsValidos.has(id)) {
+      if (fila.length > 0) resultado.push(fila.shift());
+    } else {
+      resultado.push(id);
+    }
+  }
+  return [...resultado, ...fila];
+}

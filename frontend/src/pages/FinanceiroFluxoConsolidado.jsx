@@ -4,6 +4,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -211,299 +212,309 @@ export default function FinanceiroFluxoConsolidado() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <BlocoConteudo
-        titulo="Recorte do fluxo"
-        descricao="A tela so muda ao atualizar o fluxo."
-        variante="secundario"
-      >
-      <form onSubmit={aplicarFiltros}>
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <label className="app-filter-field">
-            <span className="app-filter-label">Periodo</span>
-            <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
-              <option value="MES_ATUAL">Mes atual</option>
-              <option value="PROXIMO_MES">Proximo mes</option>
-              <option value="HOJE">Hoje</option>
-              <option value="7_DIAS">7 dias</option>
-              <option value="30_DIAS">30 dias</option>
-              <option value="90_DIAS">90 dias</option>
-              <option value="PERSONALIZADO">Personalizado</option>
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Data inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Data final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Holding</span>
-            <select className="input w-full input-sm" value={filters.holding_id} disabled={loadingRefs} onChange={(event) => updateFilter('holding_id', event.target.value)}>
-              <option value="">Todas</option>
-              {holdings.map((holding) => (
-                <option key={holding.id} value={holding.id}>{holding.nome}</option>
-              ))}
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Empresa</span>
-            <select className="input w-full input-sm" value={filters.empresa_id} disabled={loadingRefs} onChange={(event) => updateFilter('empresa_id', event.target.value)}>
-              <option value="">Todas</option>
-              {empresasOperacionais
-                .filter((empresa) => !filters.holding_id || Number(empresa.holding_id) === Number(filters.holding_id))
-                .map((empresa) => (
-                  <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
-                ))}
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Obra/Centro</span>
-            <select className="input w-full input-sm" value={filters.obra_id} disabled={loadingRefs} onChange={(event) => updateFilter('obra_id', event.target.value)}>
-              <option value="">Todos</option>
-              {obras.map((obra) => (
-                <option key={obra.id} value={obra.id}>{obra.nome}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
-            <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
-            Eliminar entre empresas no consolidado
-          </label>
-          {rascunho ? (
-            <span className="text-xs text-[var(--c-muted)]">
-              Recorte em rascunho — clique em Atualizar fluxo para valer.
-            </span>
-          ) : null}
-        </div>
-        {/* R15 — atalho de teclado COM caminho visivel equivalente: sem um
-            submit dentro do formulario o navegador para de aplicar com
-            Enter. O botao visivel e o "Atualizar fluxo" da faixa fixa; este
-            so preserva o Enter (R16: um dono por responsabilidade). */}
-        <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar fluxo</button>
-      </form>
-      </BlocoConteudo>
-
       {/*
-        B2 — UM bloco primario, e ele responde a pergunta da tela: o caixa do
-        grupo fecha no periodo? A resposta e o par previsto x realizado, e e
-        por isso que ele carrega a barra de cor.
-
-        B3 — o periodo ja esta na contagem da faixa fixa e nao se repete
-        aqui.
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 3 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      <BlocoConteudo
-        titulo="Consolidado do periodo"
-        descricao="Azul e o previsto; vermelho e o realizado. A mesma dupla vale nas tabelas abaixo."
-        variante="primario"
-        cor="var(--module-financeiro)"
-      >
-        <StatGrid colunas={4}>
-          <StatTile
-            label="Entradas previstas"
-            valor={<Previsto>{formatCurrency(resumo.entradas_previstas)}</Previsto>}
-            sub={`${resumo.titulos_previstos || 0} titulo(s)`}
-          />
-          <StatTile
-            label="Saidas previstas"
-            valor={<Previsto>{formatCurrency(resumo.saidas_previstas)}</Previsto>}
-            sub="Pagamentos em aberto"
-          />
-          <StatTile
-            label="Saldo previsto"
-            valor={<Previsto>{formatCurrency(resumo.saldo_previsto)}</Previsto>}
-            sub="Receber menos pagar"
-          />
-          <StatTile
-            label="Saldo realizado"
-            valor={<Realizado>{formatCurrency(resumo.saldo_realizado)}</Realizado>}
-            sub={`${resumo.movimentos_realizados || 0} baixa(s)`}
-          />
-          <StatTile
-            label="Necessidade futura"
-            valor={formatCurrency(resumo.necessidade_futura_caixa)}
-            sub={resumo.pior_periodo_previsto?.label
-              ? `Pior periodo: ${resumo.pior_periodo_previsto.label}`
-              : 'Menor saldo previsto acumulado'}
-            tom={Number(resumo.necessidade_futura_caixa || 0) > 0 ? 'warning' : 'success'}
-          />
-          <StatTile
-            label="Entre Empresas previsto eliminado"
-            valor={formatCurrency(resumo.intercompany_previsto_eliminado)}
-            sub={`${resumo.intercompany_titulos_eliminados || 0} titulo(s)`}
-          />
-          <StatTile
-            label="Entre Empresas realizado eliminado"
-            valor={formatCurrency(resumo.intercompany_realizado_eliminado)}
-            sub={`${resumo.intercompany_movimentos_eliminados || 0} baixa(s)`}
-          />
-        </StatGrid>
-      </BlocoConteudo>
-
-      {loading ? (
-        <div className="app-empty-card">Carregando fluxo consolidado...</div>
-      ) : (
-        <>
-          <BlocoConteudo
-            titulo="Alertas do fluxo"
-            contagem={`${alertas.length} alerta(s)`}
-            descricao="Calculados sobre o fluxo previsto e realizado do periodo filtrado."
-            variante="secundario"
-          >
-            {alertas.length === 0 ? (
-              <div className="app-empty-card">Nenhum alerta critico encontrado para os filtros atuais.</div>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {alertas.map((alerta) => (
-                  <div
-                    key={alerta.codigo}
-                    className="rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface-2)] px-4 py-3"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-[var(--c-text)]">{alerta.titulo}</h3>
-                      <StatusBadge status={alerta.severidade} kind={familiaDaSeveridade(alerta.severidade)} />
-                    </div>
-                    {alerta.valor != null ? (
-                      <strong className="mt-2 block text-sm tabular-nums text-[var(--c-text)]">
-                        {formatCurrency(alerta.valor)}
-                      </strong>
-                    ) : null}
-                    <p className="mt-2 text-sm text-[var(--c-text)]">{alerta.descricao}</p>
-                    <p className="mt-2 text-xs font-semibold text-[var(--c-muted)]">{alerta.acao}</p>
-                  </div>
+      <BlocosPersonalizaveis chave="blocos:financeiro-fluxo-consolidado" larguraPadrao="total">
+        <BlocoConteudo
+          titulo="Recorte do fluxo"
+          descricao="A tela so muda ao atualizar o fluxo."
+          variante="secundario"
+        >
+        <form onSubmit={aplicarFiltros}>
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <label className="app-filter-field">
+              <span className="app-filter-label">Periodo</span>
+              <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
+                <option value="MES_ATUAL">Mes atual</option>
+                <option value="PROXIMO_MES">Proximo mes</option>
+                <option value="HOJE">Hoje</option>
+                <option value="7_DIAS">7 dias</option>
+                <option value="30_DIAS">30 dias</option>
+                <option value="90_DIAS">90 dias</option>
+                <option value="PERSONALIZADO">Personalizado</option>
+              </select>
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Data inicial</span>
+              <input className="input w-full input-sm" type="date" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Data final</span>
+              <input className="input w-full input-sm" type="date" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Holding</span>
+              <select className="input w-full input-sm" value={filters.holding_id} disabled={loadingRefs} onChange={(event) => updateFilter('holding_id', event.target.value)}>
+                <option value="">Todas</option>
+                {holdings.map((holding) => (
+                  <option key={holding.id} value={holding.id}>{holding.nome}</option>
                 ))}
-              </div>
-            )}
-          </BlocoConteudo>
+              </select>
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Empresa</span>
+              <select className="input w-full input-sm" value={filters.empresa_id} disabled={loadingRefs} onChange={(event) => updateFilter('empresa_id', event.target.value)}>
+                <option value="">Todas</option>
+                {empresasOperacionais
+                  .filter((empresa) => !filters.holding_id || Number(empresa.holding_id) === Number(filters.holding_id))
+                  .map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
+                  ))}
+              </select>
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Obra/Centro</span>
+              <select className="input w-full input-sm" value={filters.obra_id} disabled={loadingRefs} onChange={(event) => updateFilter('obra_id', event.target.value)}>
+                <option value="">Todos</option>
+                {obras.map((obra) => (
+                  <option key={obra.id} value={obra.id}>{obra.nome}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
+              <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
+              Eliminar entre empresas no consolidado
+            </label>
+            {rascunho ? (
+              <span className="text-xs text-[var(--c-muted)]">
+                Recorte em rascunho — clique em Atualizar fluxo para valer.
+              </span>
+            ) : null}
+          </div>
+          {/* R15 — atalho de teclado COM caminho visivel equivalente: sem um
+              submit dentro do formulario o navegador para de aplicar com
+              Enter. O botao visivel e o "Atualizar fluxo" da faixa fixa; este
+              so preserva o Enter (R16: um dono por responsabilidade). */}
+          <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar fluxo</button>
+        </form>
+        </BlocoConteudo>
 
-          <BlocoConteudo
-            titulo="Resumo por empresa"
-            contagem={`${empresasResumo.length} empresa(s)`}
-            descricao="Previsto usa a empresa do titulo. Realizado usa a empresa informada na baixa."
-            variante="secundario"
-            className="app-table-shell"
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'empresa',
-                  titulo: 'Empresa',
-                  // R17: a empresa NOMEIA a linha do resumo.
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (empresa) => empresa.empresa_nome
-                },
-                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.entradas_previstas)}</Previsto> },
-                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.saidas_previstas)}</Previsto> },
-                {
-                  id: 'saldo_previsto',
-                  titulo: 'Saldo previsto',
-                  tipo: 'valor',
-                  render: (empresa) => (
-                    <strong className="texto-previsto">{formatCurrency(empresa.saldo_previsto)}</strong>
-                  )
-                },
-                { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.entradas_realizadas)}</Realizado> },
-                { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
-                {
-                  id: 'saldo_realizado',
-                  titulo: 'Saldo realizado',
-                  tipo: 'valor',
-                  render: (empresa) => (
-                    <strong className="texto-realizado">{formatCurrency(empresa.saldo_realizado)}</strong>
-                  )
-                }
-              ]}
-              itens={empresasResumo}
-              getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
-              storageKey="tabela:financeiro-fluxo-consolidado:empresas"
-              rotuloRolagem="Resumo por empresa"
-              vazio="Nenhum movimento encontrado para os filtros atuais."
+        {/*
+          B2 — UM bloco primario, e ele responde a pergunta da tela: o caixa do
+          grupo fecha no periodo? A resposta e o par previsto x realizado, e e
+          por isso que ele carrega a barra de cor.
+
+          B3 — o periodo ja esta na contagem da faixa fixa e nao se repete
+          aqui.
+        */}
+        <BlocoConteudo
+          titulo="Consolidado do periodo"
+          descricao="Azul e o previsto; vermelho e o realizado. A mesma dupla vale nas tabelas abaixo."
+          variante="primario"
+          cor="var(--module-financeiro)"
+        >
+          <StatGrid colunas={4}>
+            <StatTile
+              label="Entradas previstas"
+              valor={<Previsto>{formatCurrency(resumo.entradas_previstas)}</Previsto>}
+              sub={`${resumo.titulos_previstos || 0} titulo(s)`}
             />
-          </BlocoConteudo>
+            <StatTile
+              label="Saidas previstas"
+              valor={<Previsto>{formatCurrency(resumo.saidas_previstas)}</Previsto>}
+              sub="Pagamentos em aberto"
+            />
+            <StatTile
+              label="Saldo previsto"
+              valor={<Previsto>{formatCurrency(resumo.saldo_previsto)}</Previsto>}
+              sub="Receber menos pagar"
+            />
+            <StatTile
+              label="Saldo realizado"
+              valor={<Realizado>{formatCurrency(resumo.saldo_realizado)}</Realizado>}
+              sub={`${resumo.movimentos_realizados || 0} baixa(s)`}
+            />
+            <StatTile
+              label="Necessidade futura"
+              valor={formatCurrency(resumo.necessidade_futura_caixa)}
+              sub={resumo.pior_periodo_previsto?.label
+                ? `Pior periodo: ${resumo.pior_periodo_previsto.label}`
+                : 'Menor saldo previsto acumulado'}
+              tom={Number(resumo.necessidade_futura_caixa || 0) > 0 ? 'warning' : 'success'}
+            />
+            <StatTile
+              label="Entre Empresas previsto eliminado"
+              valor={formatCurrency(resumo.intercompany_previsto_eliminado)}
+              sub={`${resumo.intercompany_titulos_eliminados || 0} titulo(s)`}
+            />
+            <StatTile
+              label="Entre Empresas realizado eliminado"
+              valor={formatCurrency(resumo.intercompany_realizado_eliminado)}
+              sub={`${resumo.intercompany_movimentos_eliminados || 0} baixa(s)`}
+            />
+          </StatGrid>
+        </BlocoConteudo>
 
-          <BlocoConteudo
-            titulo="Resumo por obra/centro de custo"
-            contagem={`${obrasResumo.length} obra(s)/centro(s)`}
-            descricao="Identifica obras e centros que consomem ou geram caixa previsto no periodo."
-            variante="secundario"
-            className="app-table-shell"
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'obra',
-                  titulo: 'Obra/Centro',
-                  // R17: a obra/centro NOMEIA a linha do resumo.
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (obra) => (
-                    <div>
-                      <div className="font-semibold text-[var(--c-text)]">{obra.obra_nome}</div>
-                      {obra.obra_codigo ? <div className="text-xs text-[var(--c-muted)]">{obra.obra_codigo}</div> : null}
+        {loading ? (
+          <div data-bloco-id="alertas-do-fluxo" data-bloco-rotulo="Alertas do fluxo" className="app-empty-card">Carregando fluxo consolidado...</div>
+        ) : (
+          <>
+            <BlocoConteudo
+              titulo="Alertas do fluxo"
+              contagem={`${alertas.length} alerta(s)`}
+              descricao="Calculados sobre o fluxo previsto e realizado do periodo filtrado."
+              variante="secundario"
+            >
+              {alertas.length === 0 ? (
+                <div className="app-empty-card">Nenhum alerta critico encontrado para os filtros atuais.</div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {alertas.map((alerta) => (
+                    <div
+                      key={alerta.codigo}
+                      className="rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface-2)] px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <h3 className="text-sm font-semibold text-[var(--c-text)]">{alerta.titulo}</h3>
+                        <StatusBadge status={alerta.severidade} kind={familiaDaSeveridade(alerta.severidade)} />
+                      </div>
+                      {alerta.valor != null ? (
+                        <strong className="mt-2 block text-sm tabular-nums text-[var(--c-text)]">
+                          {formatCurrency(alerta.valor)}
+                        </strong>
+                      ) : null}
+                      <p className="mt-2 text-sm text-[var(--c-text)]">{alerta.descricao}</p>
+                      <p className="mt-2 text-xs font-semibold text-[var(--c-muted)]">{alerta.acao}</p>
                     </div>
-                  )
-                },
-                { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (obra) => obra.tipo_centro_custo || '-' },
-                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.entradas_previstas)}</Previsto> },
-                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.saidas_previstas)}</Previsto> },
-                {
-                  id: 'saldo_previsto',
-                  titulo: 'Saldo previsto',
-                  tipo: 'valor',
-                  render: (obra) => (
-                    <strong className="texto-previsto">{formatCurrency(obra.saldo_previsto)}</strong>
-                  )
-                },
-                {
-                  id: 'saldo_realizado',
-                  titulo: 'Saldo realizado',
-                  tipo: 'valor',
-                  render: (obra) => (
-                    <strong className="texto-realizado">{formatCurrency(obra.saldo_realizado)}</strong>
-                  )
-                }
-              ]}
-              itens={obrasResumo}
-              getId={(obra) => obra.obra_id || obra.obra_nome}
-              storageKey="tabela:financeiro-fluxo-consolidado:obras"
-              rotuloRolagem="Resumo por obra ou centro de custo"
-              vazio="Nenhuma obra ou centro de custo encontrado para os filtros atuais."
-            />
-          </BlocoConteudo>
+                  ))}
+                </div>
+              )}
+            </BlocoConteudo>
 
-          <BlocoConteudo
-            titulo="Serie consolidada"
-            contagem={`${serie.length} periodo(s)`}
-            descricao="Acompanha entradas, saidas e saldos por periodo."
-            variante="secundario"
-            className="app-table-shell"
-          >
-            <TabelaPadrao
-              colunas={[
-                { id: 'periodo', titulo: 'Periodo', tipo: 'data', noCard: 'titulo', render: (item) => item.label },
-                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.entradas_previstas)}</Previsto> },
-                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.saidas_previstas)}</Previsto> },
-                { id: 'saldo_previsto', titulo: 'Saldo previsto', tipo: 'valor', render: (item) => <strong className="texto-previsto">{formatCurrency(item.saldo_previsto)}</strong> },
-                { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.entradas_realizadas)}</Realizado> },
-                { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.saidas_realizadas)}</Realizado> },
-                { id: 'saldo_realizado', titulo: 'Saldo realizado', tipo: 'valor', render: (item) => <strong className="texto-realizado">{formatCurrency(item.saldo_realizado)}</strong> }
-              ]}
-              itens={serie}
-              getId={(item) => item.referencia}
-              storageKey="tabela:financeiro-fluxo-consolidado:serie"
-              rotuloRolagem="Serie consolidada"
-              vazio="Nenhum periodo encontrado."
-              // R17: linha e periodo x totais de fluxo — nao ha registro nomeado
-              // para virar identidade; o unico rotulo e a competencia temporal.
-              semIdentidade
-            />
-          </BlocoConteudo>
-        </>
-      )}
+            <BlocoConteudo
+              titulo="Resumo por empresa"
+              contagem={`${empresasResumo.length} empresa(s)`}
+              descricao="Previsto usa a empresa do titulo. Realizado usa a empresa informada na baixa."
+              variante="secundario"
+              className="app-table-shell"
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'empresa',
+                    titulo: 'Empresa',
+                    // R17: a empresa NOMEIA a linha do resumo.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (empresa) => empresa.empresa_nome
+                  },
+                  { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.entradas_previstas)}</Previsto> },
+                  { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.saidas_previstas)}</Previsto> },
+                  {
+                    id: 'saldo_previsto',
+                    titulo: 'Saldo previsto',
+                    tipo: 'valor',
+                    render: (empresa) => (
+                      <strong className="texto-previsto">{formatCurrency(empresa.saldo_previsto)}</strong>
+                    )
+                  },
+                  { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.entradas_realizadas)}</Realizado> },
+                  { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
+                  {
+                    id: 'saldo_realizado',
+                    titulo: 'Saldo realizado',
+                    tipo: 'valor',
+                    render: (empresa) => (
+                      <strong className="texto-realizado">{formatCurrency(empresa.saldo_realizado)}</strong>
+                    )
+                  }
+                ]}
+                itens={empresasResumo}
+                getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
+                storageKey="tabela:financeiro-fluxo-consolidado:empresas"
+                rotuloRolagem="Resumo por empresa"
+                vazio="Nenhum movimento encontrado para os filtros atuais."
+              />
+            </BlocoConteudo>
+
+            <BlocoConteudo
+              titulo="Resumo por obra/centro de custo"
+              contagem={`${obrasResumo.length} obra(s)/centro(s)`}
+              descricao="Identifica obras e centros que consomem ou geram caixa previsto no periodo."
+              variante="secundario"
+              className="app-table-shell"
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'obra',
+                    titulo: 'Obra/Centro',
+                    // R17: a obra/centro NOMEIA a linha do resumo.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (obra) => (
+                      <div>
+                        <div className="font-semibold text-[var(--c-text)]">{obra.obra_nome}</div>
+                        {obra.obra_codigo ? <div className="text-xs text-[var(--c-muted)]">{obra.obra_codigo}</div> : null}
+                      </div>
+                    )
+                  },
+                  { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (obra) => obra.tipo_centro_custo || '-' },
+                  { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.entradas_previstas)}</Previsto> },
+                  { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.saidas_previstas)}</Previsto> },
+                  {
+                    id: 'saldo_previsto',
+                    titulo: 'Saldo previsto',
+                    tipo: 'valor',
+                    render: (obra) => (
+                      <strong className="texto-previsto">{formatCurrency(obra.saldo_previsto)}</strong>
+                    )
+                  },
+                  {
+                    id: 'saldo_realizado',
+                    titulo: 'Saldo realizado',
+                    tipo: 'valor',
+                    render: (obra) => (
+                      <strong className="texto-realizado">{formatCurrency(obra.saldo_realizado)}</strong>
+                    )
+                  }
+                ]}
+                itens={obrasResumo}
+                getId={(obra) => obra.obra_id || obra.obra_nome}
+                storageKey="tabela:financeiro-fluxo-consolidado:obras"
+                rotuloRolagem="Resumo por obra ou centro de custo"
+                vazio="Nenhuma obra ou centro de custo encontrado para os filtros atuais."
+              />
+            </BlocoConteudo>
+
+            <BlocoConteudo
+              titulo="Serie consolidada"
+              contagem={`${serie.length} periodo(s)`}
+              descricao="Acompanha entradas, saidas e saldos por periodo."
+              variante="secundario"
+              className="app-table-shell"
+            >
+              <TabelaPadrao
+                colunas={[
+                  { id: 'periodo', titulo: 'Periodo', tipo: 'data', noCard: 'titulo', render: (item) => item.label },
+                  { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.entradas_previstas)}</Previsto> },
+                  { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.saidas_previstas)}</Previsto> },
+                  { id: 'saldo_previsto', titulo: 'Saldo previsto', tipo: 'valor', render: (item) => <strong className="texto-previsto">{formatCurrency(item.saldo_previsto)}</strong> },
+                  { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.entradas_realizadas)}</Realizado> },
+                  { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.saidas_realizadas)}</Realizado> },
+                  { id: 'saldo_realizado', titulo: 'Saldo realizado', tipo: 'valor', render: (item) => <strong className="texto-realizado">{formatCurrency(item.saldo_realizado)}</strong> }
+                ]}
+                itens={serie}
+                getId={(item) => item.referencia}
+                storageKey="tabela:financeiro-fluxo-consolidado:serie"
+                rotuloRolagem="Serie consolidada"
+                vazio="Nenhum periodo encontrado."
+                // R17: linha e periodo x totais de fluxo — nao ha registro nomeado
+                // para virar identidade; o unico rotulo e a competencia temporal.
+                semIdentidade
+              />
+            </BlocoConteudo>
+          </>
+        )}
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

@@ -9,6 +9,7 @@ import {
 import {
   Avisos,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -232,76 +233,86 @@ export default function SstObservabilidadeAvancada() {
         <StatTile label="Readiness" valor={readiness.nivel || 'SEM_DADOS'} sub={producao?.readiness?.nivel} />
       </StatGrid>
 
-      <BlocoConteudo
-        titulo="Operacao controlada"
-        descricao="Acoes administrativas para manter a camada enterprise saudavel — os botoes ficam na faixa do cabecalho, sempre a um clique."
-        variante="primario"
-        cor="var(--sem-info)"
-        acoes={<EtiquetaStatus valor={readiness.nivel} />}
-      >
-        <StatGrid colunas={3}>
-          <StatTile label="Worker" valor={filas.workers?.worker_id || 'sem worker'} sub={`BullMQ ready: ${filas.workers?.bullmq_ready ? 'sim' : 'nao'}`} />
-          <StatTile label="Fila" valor={filas.queue_name || 'sst-default'} sub={`Media ${fmt(snapshot.avg_duration_ms)} ms`} />
-          <StatTile label="eSocial" valor="Transmissao bloqueada" sub="Apenas dominio operacional SST." />
-        </StatGrid>
-      </BlocoConteudo>
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 6 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:sst-observabilidade-avancada" larguraPadrao="total">
+        <BlocoConteudo
+          titulo="Operacao controlada"
+          descricao="Acoes administrativas para manter a camada enterprise saudavel — os botoes ficam na faixa do cabecalho, sempre a um clique."
+          variante="primario"
+          cor="var(--sem-info)"
+          acoes={<EtiquetaStatus valor={readiness.nivel} />}
+        >
+          <StatGrid colunas={3}>
+            <StatTile label="Worker" valor={filas.workers?.worker_id || 'sem worker'} sub={`BullMQ ready: ${filas.workers?.bullmq_ready ? 'sim' : 'nao'}`} />
+            <StatTile label="Fila" valor={filas.queue_name || 'sst-default'} sub={`Media ${fmt(snapshot.avg_duration_ms)} ms`} />
+            <StatTile label="eSocial" valor="Transmissao bloqueada" sub="Apenas dominio operacional SST." />
+          </StatGrid>
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Status dos jobs">
-        <GradeContadores itens={filas.status} />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Status dos jobs">
+          <GradeContadores itens={filas.status} />
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Qualidade operacional">
-        <GradeContadores itens={qualidade.ABERTA || qualidade} />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Qualidade operacional">
+          <GradeContadores itens={qualidade.ABERTA || qualidade} />
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Governanca por acao" recolhivel recolhidoPadrao>
-        <GradeContadores itens={governanca.acoes} />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Governanca por acao" recolhivel chavePreferencia="bloco:sst-observabilidade-avancada:governanca-por-acao" recolhidoPadrao>
+          <GradeContadores itens={governanca.acoes} />
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Governanca por criticidade" recolhivel recolhidoPadrao>
-        <GradeContadores itens={governanca.criticidades} />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Governanca por criticidade" recolhivel chavePreferencia="bloco:sst-observabilidade-avancada:governanca-por-criticidade" recolhidoPadrao>
+          <GradeContadores itens={governanca.criticidades} />
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Performance recente"
-        contagem={`${(data?.performance?.recentes || []).length} metrica(s)`}
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'metrica',
-              titulo: 'Metrica',
-              // R17: a métrica é cadastrada com nome próprio (metric_name) —
-              // é ele que nomeia a linha.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => item.metric_name
-            },
-            {
-              id: 'grupo',
-              titulo: 'Grupo',
-              tipo: 'texto',
-              render: (item) => item.metric_group || item.scope_type || 'SISTEMA'
-            },
-            {
-              id: 'valor',
-              titulo: 'Valor',
-              tipo: 'numero',
-              render: (item) => `${fmt(item.value)} ${item.unit || ''}`.trim()
-            },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (item) => <EtiquetaStatus valor={item.status || 'REGISTRADO'} />
-            }
-          ]}
-          itens={data?.performance?.recentes || []}
-          vazio="Nenhuma metrica recente registrada."
-          storageKey="tabela:sst-observabilidade-avancada:performance"
-          rotuloRolagem="Performance recente"
-        />
-      </BlocoConteudo>
+        <BlocoConteudo
+          titulo="Performance recente"
+          contagem={`${(data?.performance?.recentes || []).length} metrica(s)`}
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'metrica',
+                titulo: 'Metrica',
+                // R17: a métrica é cadastrada com nome próprio (metric_name) —
+                // é ele que nomeia a linha.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.metric_name
+              },
+              {
+                id: 'grupo',
+                titulo: 'Grupo',
+                tipo: 'texto',
+                render: (item) => item.metric_group || item.scope_type || 'SISTEMA'
+              },
+              {
+                id: 'valor',
+                titulo: 'Valor',
+                tipo: 'numero',
+                render: (item) => `${fmt(item.value)} ${item.unit || ''}`.trim()
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => <EtiquetaStatus valor={item.status || 'REGISTRADO'} />
+              }
+            ]}
+            itens={data?.performance?.recentes || []}
+            vazio="Nenhuma metrica recente registrada."
+            storageKey="tabela:sst-observabilidade-avancada:performance"
+            rotuloRolagem="Performance recente"
+          />
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
 
       {elementoConfirmacao}
     </Pagina>

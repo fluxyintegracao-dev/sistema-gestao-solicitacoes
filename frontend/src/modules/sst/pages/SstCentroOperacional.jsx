@@ -4,6 +4,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   Avisos,
@@ -167,104 +168,114 @@ export default function SstCentroOperacional() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <BlocoConteudo
-        titulo="Resumo corporativo"
-        variante="primario"
-        cor="var(--module-sst)"
-        descricao={resumo.nivel ? `Nivel atual: ${resumo.nivel}.` : 'Base consolidada do grupo.'}
-      >
-        <StatGrid colunas={3}>
-          <StatTile label="Compliance" valor={`${resumo.compliance_geral ?? 100}%`} sub={resumo.nivel || 'CONTROLADO'} />
-          <StatTile label="Empresas" valor={fmt(resumo.empresas_mapeadas)} sub="Base do grupo" />
-          <StatTile label="Obras" valor={fmt(resumo.obras_mapeadas)} sub="Obras e centros" />
-          <StatTile
-            label="Pendencias"
-            valor={fmt(resumo.pendencias_abertas)}
-            sub="Abertas"
-            tom={resumo.pendencias_abertas ? 'warning' : undefined}
-          />
-          <StatTile
-            label="Bloqueios"
-            valor={fmt(resumo.bloqueios_abertos)}
-            sub="Ativos"
-            tom={resumo.bloqueios_abertos ? 'danger' : undefined}
-          />
-          <StatTile
-            label="Riscos"
-            valor={fmt(resumo.riscos_criticos)}
-            sub="Altos ou criticos"
-            tom={resumo.riscos_criticos ? 'danger' : undefined}
-          />
-        </StatGrid>
-      </BlocoConteudo>
-
       {/*
-        Os três blocos abaixo estavam em duas colunas com fração à mão
-        (`xl:grid-cols-[1.2fr_0.8fr]` — medida escrita na tela, R10). Agora
-        empilham em largura total: apoio não fica lado a lado com o
-        principal, e o mapa por obra deixa de disputar meia tela.
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 4 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      <BlocoConteudo
-        titulo="Heatmap corporativo"
-        contagem={`${topHeatmap.length} de ${(data?.heatmap_corporativo || []).length} obra(s)`}
-        descricao="As obras de maior indice de risco; o mapa completo fica na tela de heatmap."
-        acoes={<Link to="/sst/relatorios/heatmap" className="btn btn-outline btn-sm">Abrir mapa</Link>}
-      >
-        <div className="grid gap-3 md:grid-cols-2">
-          {topHeatmap.map((item) => (
-            <BlocoConteudo
-              key={`${item.obra_id || 'sem'}-${item.obra}`}
-              variante="secundario"
-              className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
-              titulo={item.obra}
-              descricao={`Indice ${item.indice_risco} com ${item.pendencias} pendencia(s)`}
-              acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
+      <BlocosPersonalizaveis chave="blocos:sst-centro-operacional" larguraPadrao="total">
+        <BlocoConteudo
+          titulo="Resumo corporativo"
+          variante="primario"
+          cor="var(--module-sst)"
+          descricao={resumo.nivel ? `Nivel atual: ${resumo.nivel}.` : 'Base consolidada do grupo.'}
+        >
+          <StatGrid colunas={3}>
+            <StatTile label="Compliance" valor={`${resumo.compliance_geral ?? 100}%`} sub={resumo.nivel || 'CONTROLADO'} />
+            <StatTile label="Empresas" valor={fmt(resumo.empresas_mapeadas)} sub="Base do grupo" />
+            <StatTile label="Obras" valor={fmt(resumo.obras_mapeadas)} sub="Obras e centros" />
+            <StatTile
+              label="Pendencias"
+              valor={fmt(resumo.pendencias_abertas)}
+              sub="Abertas"
+              tom={resumo.pendencias_abertas ? 'warning' : undefined}
             />
-          ))}
-          {!topHeatmap.length ? <p className="text-sm text-muted">Nenhum ponto critico no heatmap.</p> : null}
-        </div>
-      </BlocoConteudo>
+            <StatTile
+              label="Bloqueios"
+              valor={fmt(resumo.bloqueios_abertos)}
+              sub="Ativos"
+              tom={resumo.bloqueios_abertos ? 'danger' : undefined}
+            />
+            <StatTile
+              label="Riscos"
+              valor={fmt(resumo.riscos_criticos)}
+              sub="Altos ou criticos"
+              tom={resumo.riscos_criticos ? 'danger' : undefined}
+            />
+          </StatGrid>
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Sinais operacionais"
-        contagem={`${sinais.length} sinal(is)`}
-        descricao="Gerados pelo motor de inteligencia a partir do estado atual."
-      >
-        <div className="grid gap-3 md:grid-cols-2">
-          {sinais.map((item, index) => (
-            <BlocoConteudo
-              key={`${item.tipo}-${index}`}
-              variante="secundario"
-              className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
-              titulo={item.tipo}
-              descricao={item.mensagem}
-              acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
-            />
-          ))}
-          {!sinais.length ? <p className="text-sm text-muted">Nenhum sinal critico gerado pelo motor.</p> : null}
-        </div>
-      </BlocoConteudo>
+        {/*
+          Os três blocos abaixo estavam em duas colunas com fração à mão
+          (`xl:grid-cols-[1.2fr_0.8fr]` — medida escrita na tela, R10). Agora
+          empilham em largura total: apoio não fica lado a lado com o
+          principal, e o mapa por obra deixa de disputar meia tela.
+        */}
+        <BlocoConteudo
+          titulo="Heatmap corporativo"
+          contagem={`${topHeatmap.length} de ${(data?.heatmap_corporativo || []).length} obra(s)`}
+          descricao="As obras de maior indice de risco; o mapa completo fica na tela de heatmap."
+          acoes={<Link to="/sst/relatorios/heatmap" className="btn btn-outline btn-sm">Abrir mapa</Link>}
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            {topHeatmap.map((item) => (
+              <BlocoConteudo
+                key={`${item.obra_id || 'sem'}-${item.obra}`}
+                variante="secundario"
+                className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
+                titulo={item.obra}
+                descricao={`Indice ${item.indice_risco} com ${item.pendencias} pendencia(s)`}
+                acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
+              />
+            ))}
+            {!topHeatmap.length ? <p className="text-sm text-muted">Nenhum ponto critico no heatmap.</p> : null}
+          </div>
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Recomendacoes operacionais"
-        contagem={`${topRecomendacoes.length} de ${recomendacoes.length} recomendacao(oes)`}
-        descricao="Acao sugerida pelo backend para os sinais de maior criticidade."
-        acoes={<Link to="/sst/recomendacoes" className="btn btn-outline btn-sm">Ver lista</Link>}
-      >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {topRecomendacoes.map((item) => (
-            <BlocoConteudo
-              key={item.id || `${item.tipo_recomendacao}-${item.titulo}`}
-              variante="secundario"
-              className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
-              titulo={item.titulo}
-              descricao={item.acao_sugerida || item.descricao}
-              acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
-            />
-          ))}
-          {!recomendacoes.length ? <p className="text-sm text-muted">Nenhuma recomendacao gerada.</p> : null}
-        </div>
-      </BlocoConteudo>
+        <BlocoConteudo
+          titulo="Sinais operacionais"
+          contagem={`${sinais.length} sinal(is)`}
+          descricao="Gerados pelo motor de inteligencia a partir do estado atual."
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            {sinais.map((item, index) => (
+              <BlocoConteudo
+                key={`${item.tipo}-${index}`}
+                variante="secundario"
+                className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
+                titulo={item.tipo}
+                descricao={item.mensagem}
+                acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
+              />
+            ))}
+            {!sinais.length ? <p className="text-sm text-muted">Nenhum sinal critico gerado pelo motor.</p> : null}
+          </div>
+        </BlocoConteudo>
+
+        <BlocoConteudo
+          titulo="Recomendacoes operacionais"
+          contagem={`${topRecomendacoes.length} de ${recomendacoes.length} recomendacao(oes)`}
+          descricao="Acao sugerida pelo backend para os sinais de maior criticidade."
+          acoes={<Link to="/sst/recomendacoes" className="btn btn-outline btn-sm">Ver lista</Link>}
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {topRecomendacoes.map((item) => (
+              <BlocoConteudo
+                key={item.id || `${item.tipo_recomendacao}-${item.titulo}`}
+                variante="secundario"
+                className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
+                titulo={item.titulo}
+                descricao={item.acao_sugerida || item.descricao}
+                acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
+              />
+            ))}
+            {!recomendacoes.length ? <p className="text-sm text-muted">Nenhuma recomendacao gerada.</p> : null}
+          </div>
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
 
       {elementoConfirmacao}
     </Pagina>

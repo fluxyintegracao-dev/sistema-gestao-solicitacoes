@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -264,128 +265,146 @@ export default function RhDpRelatorioOperacional() {
           </StatGrid>
           ) : null}
 
-          {isVisible('rhdp.relatorio_operacional.distribuicoes') ? (
-          <div className="grid gap-4 xl:grid-cols-3">
-            <DistributionList title="Headcount por empresa" rows={colaboradores.por_empresa || []} />
-            <DistributionList title="Headcount por obra/centro" rows={colaboradores.por_obra || []} />
-            <DistributionList title="Base cadastrada por empresa" rows={colaboradores.base_cadastrada_por_empresa || []} valueKey="valor" formatter={formatCurrency} />
-          </div>
-          ) : null}
-
-          {isVisible('rhdp.relatorio_operacional.colaboradores') ? (
-          <BlocoConteudo
-            titulo="Colaboradores"
-            descricao="Amostra operacional com a empresa, obra/centro e base cadastrada."
-            variante="primario"
-            cor="var(--c-primary)"
+          {/*
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 3 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
+          */}
+          <BlocosPersonalizaveis
+            chave="blocos:rh-dp-relatorio-operacional"
+            larguraPadrao="total"
+            dentroDeGrade
           >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'nome',
-                  titulo: 'Colaborador',
-                  // R17: o NOME do colaborador é o que identifica a linha.
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (item) => item.nome
-                },
-                {
-                  id: 'empresa',
-                  titulo: 'Empresa',
-                  tipo: 'texto',
-                  render: (item) => item.empresa_nome || '-'
-                },
-                {
-                  id: 'obra',
-                  titulo: 'Obra/Centro',
-                  tipo: 'texto',
-                  render: (item) => item.obra_nome || '-'
-                },
-                {
-                  id: 'setor',
-                  titulo: 'Setor',
-                  tipo: 'texto',
-                  render: (item) => item.setor_nome || '-'
-                },
-                {
-                  id: 'tipo',
-                  titulo: 'Vínculo',
-                  tipo: 'badge',
-                  render: (item) => item.tipo_vinculo || '-'
-                },
-                {
-                  id: 'status',
-                  titulo: 'Status',
-                  tipo: 'status',
-                  render: (item) => (
-                    <StatusBadge status={item.status || '-'} kind={familiaStatus(item.status)} />
-                  )
-                },
-                {
-                  id: 'base',
-                  titulo: 'Base',
-                  tipo: 'valor',
-                  render: (item) => formatCurrency(item.salario_base || item.valor_contratual)
-                }
-              ]}
-              itens={colaboradores.analitico || []}
-              storageKey="tabela:rh-dp-relatorio-operacional:colaboradores"
-              rotuloRolagem="Colaboradores"
-              vazio="Nenhum colaborador encontrado."
-            />
-          </BlocoConteudo>
-          ) : null}
+            {isVisible('rhdp.relatorio_operacional.distribuicoes') ? (
+            <div
+                className="grid gap-4 xl:grid-cols-3"
+                data-bloco-id="distribuicoes-de-headcount"
+                data-bloco-rotulo="Distribuições de headcount"
+              >
+              <DistributionList title="Headcount por empresa" rows={colaboradores.por_empresa || []} />
+              <DistributionList title="Headcount por obra/centro" rows={colaboradores.por_obra || []} />
+              <DistributionList title="Base cadastrada por empresa" rows={colaboradores.base_cadastrada_por_empresa || []} valueKey="valor" formatter={formatCurrency} />
+            </div>
+            ) : null}
 
-          {isVisible('rhdp.relatorio_operacional.documentos') ? (
-          <BlocoConteudo
-            titulo="Documentos críticos"
-            descricao="Documentos vencidos, a vencer ou rejeitados."
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'colaborador',
-                  titulo: 'Colaborador',
-                  // R17: o documento crítico é lido pelo colaborador a que pertence.
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (item) => item.colaborador_nome || '-'
-                },
-                {
-                  id: 'documento',
-                  titulo: 'Documento',
-                  tipo: 'texto',
-                  render: (item) => item.tipo_documento || item.nome_original || '-'
-                },
-                {
-                  id: 'empresa',
-                  titulo: 'Empresa',
-                  tipo: 'texto',
-                  render: (item) => item.empresa_nome || '-'
-                },
-                {
-                  id: 'validade',
-                  titulo: 'Validade',
-                  tipo: 'data',
-                  render: (item) => formatDate(item.validade)
-                },
-                {
-                  id: 'status',
-                  titulo: 'Status',
-                  tipo: 'status',
-                  render: (item) => {
-                    const status = item.validade_status || item.status;
-                    return <StatusBadge status={status || '-'} kind={familiaStatus(status)} />;
+            {isVisible('rhdp.relatorio_operacional.colaboradores') ? (
+            <BlocoConteudo
+              titulo="Colaboradores"
+              descricao="Amostra operacional com a empresa, obra/centro e base cadastrada."
+              variante="primario"
+              cor="var(--c-primary)"
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'nome',
+                    titulo: 'Colaborador',
+                    // R17: o NOME do colaborador é o que identifica a linha.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => item.nome
+                  },
+                  {
+                    id: 'empresa',
+                    titulo: 'Empresa',
+                    tipo: 'texto',
+                    render: (item) => item.empresa_nome || '-'
+                  },
+                  {
+                    id: 'obra',
+                    titulo: 'Obra/Centro',
+                    tipo: 'texto',
+                    render: (item) => item.obra_nome || '-'
+                  },
+                  {
+                    id: 'setor',
+                    titulo: 'Setor',
+                    tipo: 'texto',
+                    render: (item) => item.setor_nome || '-'
+                  },
+                  {
+                    id: 'tipo',
+                    titulo: 'Vínculo',
+                    tipo: 'badge',
+                    render: (item) => item.tipo_vinculo || '-'
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'status',
+                    render: (item) => (
+                      <StatusBadge status={item.status || '-'} kind={familiaStatus(item.status)} />
+                    )
+                  },
+                  {
+                    id: 'base',
+                    titulo: 'Base',
+                    tipo: 'valor',
+                    render: (item) => formatCurrency(item.salario_base || item.valor_contratual)
                   }
-                }
-              ]}
-              itens={docCriticos}
-              storageKey="tabela:rh-dp-relatorio-operacional:documentos"
-              rotuloRolagem="Documentos críticos"
-              vazio="Nenhum documento crítico no recorte."
-            />
-          </BlocoConteudo>
-          ) : null}
+                ]}
+                itens={colaboradores.analitico || []}
+                storageKey="tabela:rh-dp-relatorio-operacional:colaboradores"
+                rotuloRolagem="Colaboradores"
+                vazio="Nenhum colaborador encontrado."
+              />
+            </BlocoConteudo>
+            ) : null}
+
+            {isVisible('rhdp.relatorio_operacional.documentos') ? (
+            <BlocoConteudo
+              titulo="Documentos críticos"
+              descricao="Documentos vencidos, a vencer ou rejeitados."
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'colaborador',
+                    titulo: 'Colaborador',
+                    // R17: o documento crítico é lido pelo colaborador a que pertence.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => item.colaborador_nome || '-'
+                  },
+                  {
+                    id: 'documento',
+                    titulo: 'Documento',
+                    tipo: 'texto',
+                    render: (item) => item.tipo_documento || item.nome_original || '-'
+                  },
+                  {
+                    id: 'empresa',
+                    titulo: 'Empresa',
+                    tipo: 'texto',
+                    render: (item) => item.empresa_nome || '-'
+                  },
+                  {
+                    id: 'validade',
+                    titulo: 'Validade',
+                    tipo: 'data',
+                    render: (item) => formatDate(item.validade)
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'status',
+                    render: (item) => {
+                      const status = item.validade_status || item.status;
+                      return <StatusBadge status={status || '-'} kind={familiaStatus(status)} />;
+                    }
+                  }
+                ]}
+                itens={docCriticos}
+                storageKey="tabela:rh-dp-relatorio-operacional:documentos"
+                rotuloRolagem="Documentos críticos"
+                vazio="Nenhum documento crítico no recorte."
+              />
+            </BlocoConteudo>
+            ) : null}
+          </BlocosPersonalizaveis>
         </>
       )}
     </Pagina>

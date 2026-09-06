@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TIPO_BLOCOS, usePreferenciaDeLista } from '../../contexts/PreferenciasContext';
 
 function Seta() {
   return (
@@ -16,6 +17,10 @@ function Seta() {
  * variante="secundario": branco rebaixado (--ui-surface-2), recua sozinho.
  * recolhivel: histórico/auditoria/raros nascem recolhidos (recolhidoPadrao),
  *   mas o usuário sabe que existem — o título fica sempre à vista.
+ * chavePreferencia: liga o recolhimento à preferência do usuário no banco
+ *   (tipo `blocos`). UMA prop, e o bloco passa a sobreviver ao F5 e a trocar
+ *   de máquina; sem ela o comportamento é o de sempre. Ver o bloco datado
+ *   dentro do componente.
  * contagem/descricao: o texto de apoio vive AQUI, ancorado ao título do
  *   bloco a que se refere — nunca solto na faixa entre a topbar e o
  *   primeiro bloco (regra do cliente, 02/09).
@@ -42,12 +47,13 @@ export default function BlocoConteudo({
   recolhidoPadrao = false,
   recolhido,
   aoAlternarRecolhido,
+  chavePreferencia,
   className = '',
   children,
   ...props
 }) {
   /*
-    RECOLHIMENTO CONTROLÁVEL DE FORA — PREPARO, AINDA NÃO A PERSISTÊNCIA (05/09).
+    RECOLHIMENTO CONTROLÁVEL DE FORA — E AGORA A PERSISTÊNCIA (05/09).
 
     Medido: este `useState` era a única memória do recolhimento e NENHUMA linha
     o gravava. O usuário recolhia, dava F5 e voltava tudo aberto — em
@@ -62,22 +68,63 @@ export default function BlocoConteudo({
     CONTROLADO DE FORA. Quem não passa nada continua exatamente como antes —
     estado interno, `recolhidoPadrao` na montagem, nada gravado.
 
-    O QUE FALTA, E QUEM LIGA: a persistência em si NÃO entra aqui. O mecanismo
-    de preferências está sendo migrado para o banco nesta mesma rodada; ligar os
-    dois agora criaria conflito. Quem ligar deve, na TELA (ou num hook de
-    preferências), ler o estado salvo e passar `recolhido` +
-    `aoAlternarRecolhido` — o componente já está pronto para receber.
+    A PERSISTÊNCIA ENTROU, E ELA É DE UMA PROP SÓ: `chavePreferencia`.
+
+    Por que aqui e não na tela: são 39 arquivos de tela passando `recolhivel`
+    (60 pontos medidos em 05/09). Se cada um tivesse de ler o contexto,
+    guardar estado e passar DUAS props (`recolhido` + `aoAlternarRecolhido`),
+    a fiação seria copiada 60 vezes e metade sairia errada ou nem sairia — o
+    mecanismo existia desde a manhã e nenhuma tela o tinha ligado. Com a chave,
+    a tela declara IDENTIDADE (o que este bloco é) e o componente resolve o
+    resto: lê em render (`usePreferenciaDeLista`, síncrono, sem rede e sem
+    piscar), grava com os mesmos 700ms de atraso e viaja para as outras
+    máquinas do usuário.
+
+    O QUE É GRAVADO É O DESVIO, NUNCA O ESTADO. `{ desvio: true }` significa
+    "o oposto do que o código diz hoje" — e só existe registro quando o
+    usuário de fato discorda do padrão. Duas consequências, as duas
+    intencionais:
+      - o dia em que `recolhidoPadrao` mudar no código, quem nunca mexeu
+        acompanha a mudança (é a mesma regra do arranjo de blocos:
+        `utils/layoutBlocos.js:23-24` — bloco novo entra visível, config
+        antiga não manda no que ela não conhece);
+      - voltar ao padrão APAGA o registro em vez de gravar o padrão, porque
+        aí não há mais desvio nenhum a guardar. Apagar aqui é ato explícito
+        do usuário, não limpeza automática.
+
+    SEM CHAVE, NADA MUDA. `usePreferenciaDeLista('')` devolve `null` e não
+    grava (o `identificar` do contexto recusa chave vazia): quem não passa
+    chave continua com `useState` interno e `recolhidoPadrao` na montagem —
+    byte a byte o que era antes. O hook é chamado SEMPRE, com chave ou sem
+    ela, porque hook não pode ficar atrás de condição (R29).
+
+    PRECEDÊNCIA: controle externo (`recolhido`) > preferência salva >
+    `recolhidoPadrao`. Quem controla de fora não perde o controle por ter
+    passado uma chave — e é o caso do `BlocosPersonalizaveis`, que arranja
+    blocos com a preferência da TELA inteira.
   */
   const [recolhidoInterno, setRecolhidoInterno] = useState(recolhivel && recolhidoPadrao);
   const controlado = typeof recolhido === 'boolean';
-  const estaRecolhido = recolhivel && (controlado ? recolhido : recolhidoInterno);
+  // Chave só tem sentido com `recolhivel`: bloco que não recolhe não tem
+  // estado nenhum a guardar, e registrar a entrada criaria linha morta.
+  const [preferencia, gravarPreferencia] = usePreferenciaDeLista(
+    recolhivel && chavePreferencia ? chavePreferencia : '',
+    TIPO_BLOCOS
+  );
+  const persistente = Boolean(recolhivel && chavePreferencia && !controlado);
+  const padraoRecolhido = Boolean(recolhidoPadrao);
+  const salvoRecolhido = preferencia?.desvio === true ? !padraoRecolhido : padraoRecolhido;
+  const estaRecolhido = recolhivel && (
+    controlado ? recolhido : (persistente ? salvoRecolhido : recolhidoInterno)
+  );
 
   const alternarRecolhido = () => {
     const proximo = !estaRecolhido;
     // Sem controle externo o estado interno segue mandando (comportamento de
     // hoje). Com controle externo quem decide é quem controla — não guardamos
     // uma cópia local que possa divergir.
-    if (!controlado) setRecolhidoInterno(proximo);
+    if (persistente) gravarPreferencia(proximo === padraoRecolhido ? null : { desvio: true });
+    else if (!controlado) setRecolhidoInterno(proximo);
     if (aoAlternarRecolhido) aoAlternarRecolhido(proximo);
   };
 

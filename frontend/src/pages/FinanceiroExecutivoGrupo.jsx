@@ -5,6 +5,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -297,332 +298,342 @@ export default function FinanceiroExecutivoGrupo() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <BlocoConteudo
-        titulo="Recorte do painel"
-        descricao="Porta de entrada executiva: o detalhe fica nos relatorios vinculados. O painel so muda ao atualizar."
-        variante="secundario"
-      >
-        <form onSubmit={aplicarFiltros}>
-          <div className="grid gap-3 md:grid-cols-3">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Periodo</span>
-              <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
-                <option value="MES_ATUAL">Mes atual</option>
-                <option value="PROXIMO_MES">Proximo mes</option>
-                <option value="HOJE">Hoje</option>
-                <option value="30_DIAS">30 dias</option>
-                <option value="90_DIAS">90 dias</option>
-              </select>
-            </label>
-            <label className="app-filter-field">
-              <span className="app-filter-label">Holding</span>
-              <select className="input w-full input-sm" value={filters.holding_id} disabled={loadingEmpresas} onChange={(event) => updateFilter('holding_id', event.target.value)}>
-                <option value="">Todas</option>
-                {holdings.map((holding) => (
-                  <option key={holding.id} value={holding.id}>{holding.nome}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] px-3 py-2 text-sm text-[var(--c-text)]">
-              <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
-              Eliminar entre empresas no consolidado
-            </label>
-          </div>
-          {rascunho ? (
-            <p className="mt-4 text-xs text-[var(--c-muted)]">
-              Recorte em rascunho — clique em Atualizar painel para valer.
-            </p>
-          ) : null}
-          {/* R15 — atalho de teclado COM caminho visivel equivalente: sem um
-              submit dentro do formulario o navegador para de aplicar com
-              Enter. O botao visivel e o da faixa fixa; este so preserva o
-              Enter (R16: um dono por responsabilidade). */}
-          <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar painel</button>
-        </form>
-      </BlocoConteudo>
-
       {/*
-        B2 — UM bloco primario, e ele responde a pergunta da tela: o grupo
-        esta ganhando dinheiro e tem caixa para o que vem?
-
-        B3 — o periodo vive na contagem da faixa fixa e nao se repete aqui.
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 3 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      {isVisible('financeiro.grupo_consolidado.metricas') ? (
+      <BlocosPersonalizaveis chave="blocos:financeiro-executivo-grupo" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Leitura executiva do grupo"
-          descricao={(dividaNoTeto || entreEmpresasNoTeto)
-            ? `Atencao: as fontes de divida e/ou de movimento entre empresas voltaram no teto de ${TETO_LEITURA_HERDADO} registros. Os cartoes marcados abaixo somam apenas o que foi lido, nao o grupo inteiro.`
-            : 'Azul e o caixa previsto; vermelho e o caixa realizado. Os demais indicadores nao pertencem a essa dupla e ficam neutros.'}
-          variante={blocoPrimario === 'metricas' ? 'primario' : 'secundario'}
-          cor="var(--module-financeiro)"
+          titulo="Recorte do painel"
+          descricao="Porta de entrada executiva: o detalhe fica nos relatorios vinculados. O painel so muda ao atualizar."
+          variante="secundario"
         >
-          <StatGrid colunas={3}>
-            <StatTile
-              label="Saldo previsto"
-              valor={<Previsto>{formatCurrency(executivoResumo.saldo_previsto)}</Previsto>}
-              sub="Entradas previstas menos saidas previstas"
-            />
-            <StatTile
-              label="Caixa consolidado realizado"
-              valor={<Realizado>{formatCurrency(executivoResumo.caixa_realizado)}</Realizado>}
-              sub={`${fluxo?.resumo?.movimentos_realizados || 0} baixa(s) no periodo`}
-            />
-            <StatTile
-              label="Necessidade futura de caixa"
-              valor={formatCurrency(necessidadeCaixa)}
-              sub={`Piso previsto ${formatCurrency(pisoCaixaPrevisto)}`}
-              tom={Number(necessidadeCaixa || 0) > 0 ? 'warning' : 'success'}
-            />
-            <StatTile
-              label="EBITDA"
-              valor={formatCurrency(executivoResumo.ebitda)}
-              sub={`Margem ${formatPercent(executivoResumo.margem_ebitda)}`}
-            />
-            <StatTile
-              label="Lucro/Prejuizo liquido"
-              valor={formatCurrency(lucroLiquido)}
-              sub={Number(lucroLiquido || 0) >= 0 ? 'Geracao patrimonial' : 'Consumo patrimonial'}
-            />
-            <StatTile
-              label="Pendencias de consistencia"
-              valor={String(executivoResumo.pendencias_dados || 0)}
-              sub={`${executivoResumo.pendencias_criticas || 0} critica(s), ${executivoResumo.pendencias_altas || 0} alta(s)`}
-              tom={Number(executivoResumo.pendencias_criticas || 0) > 0
-                ? 'danger'
-                : Number(executivoResumo.pendencias_altas || 0) > 0
-                  ? 'warning'
-                  : 'success'}
-            />
-            <StatTile
-              label={dividaNoTeto ? 'Endividamento aberto (lido)' : 'Endividamento aberto'}
-              valor={formatCurrency(executivoResumo.endividamento_aberto)}
-              sub={dividaNoTeto
-                ? `Soma dos ${TETO_LEITURA_HERDADO} titulos lidos, nao do grupo`
-                : `${endividamento?.resumo?.titulos || 0} titulo(s) classificados`}
-              tom={Number(executivoResumo.endividamento_aberto || 0) > 0 ? 'warning' : 'success'}
-            />
-            <StatTile
-              label={dividaNoTeto ? 'Endividamento vencido (lido)' : 'Endividamento vencido'}
-              valor={formatCurrency(executivoResumo.endividamento_vencido)}
-              sub="Vencimento anterior a hoje"
-              tom={Number(executivoResumo.endividamento_vencido || 0) > 0 ? 'danger' : 'success'}
-            />
-            <StatTile
-              label={entreEmpresasNoTeto ? 'Entre Empresas eliminado (lido)' : 'Entre Empresas eliminado'}
-              valor={formatCurrency(executivoResumo.intercompany_eliminado)}
-              sub={entreEmpresasNoTeto
-                ? `Soma dos ${TETO_LEITURA_HERDADO} registros lidos, nao do grupo`
-                : `${intercompany?.resumo?.relacoes_empresas || 0} relacao(oes) entre empresas`}
-            />
-          </StatGrid>
+          <form onSubmit={aplicarFiltros}>
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="app-filter-field">
+                <span className="app-filter-label">Periodo</span>
+                <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
+                  <option value="MES_ATUAL">Mes atual</option>
+                  <option value="PROXIMO_MES">Proximo mes</option>
+                  <option value="HOJE">Hoje</option>
+                  <option value="30_DIAS">30 dias</option>
+                  <option value="90_DIAS">90 dias</option>
+                </select>
+              </label>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Holding</span>
+                <select className="input w-full input-sm" value={filters.holding_id} disabled={loadingEmpresas} onChange={(event) => updateFilter('holding_id', event.target.value)}>
+                  <option value="">Todas</option>
+                  {holdings.map((holding) => (
+                    <option key={holding.id} value={holding.id}>{holding.nome}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] px-3 py-2 text-sm text-[var(--c-text)]">
+                <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
+                Eliminar entre empresas no consolidado
+              </label>
+            </div>
+            {rascunho ? (
+              <p className="mt-4 text-xs text-[var(--c-muted)]">
+                Recorte em rascunho — clique em Atualizar painel para valer.
+              </p>
+            ) : null}
+            {/* R15 — atalho de teclado COM caminho visivel equivalente: sem um
+                submit dentro do formulario o navegador para de aplicar com
+                Enter. O botao visivel e o da faixa fixa; este so preserva o
+                Enter (R16: um dono por responsabilidade). */}
+            <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar painel</button>
+          </form>
         </BlocoConteudo>
-      ) : null}
 
-      {loading ? (
-        <div className="app-empty-card">Carregando painel executivo...</div>
-      ) : (
-        <>
-          <section className="grid gap-4 xl:grid-cols-3">
-            {isVisible('financeiro.grupo_consolidado.caixa_empresas') ? (
-              <BlocoConteudo
-                titulo="Empresas por caixa realizado"
-                contagem={`${topEmpresasCaixa.length} de ${empresasFluxo.length}`}
-                descricao="Usa a empresa informada na baixa financeira. Maiores caixas realizados do periodo, em modulo."
-                variante={blocoPrimario === 'caixa_empresas' ? 'primario' : 'secundario'}
-                cor="var(--module-financeiro)"
-                className="app-table-shell xl:col-span-2"
-              >
-                <TabelaPadrao
-                  colunas={[
-                    {
-                      id: 'empresa',
-                      titulo: 'Empresa',
-                      // R17: a empresa NOMEIA a linha do caixa realizado.
-                      tipo: 'identidade',
-                      noCard: 'titulo',
-                      render: (empresa) => empresa.empresa_nome
-                    },
-                    { id: 'entradas', titulo: 'Entradas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.entradas_realizadas)}</Realizado> },
-                    { id: 'saidas', titulo: 'Saidas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
-                    {
-                      id: 'saldo',
-                      titulo: 'Saldo',
-                      tipo: 'valor',
-                      render: (empresa) => (
-                        <strong className="texto-realizado">{formatCurrency(empresa.saldo_realizado)}</strong>
-                      )
-                    }
-                  ]}
-                  itens={topEmpresasCaixa}
-                  getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
-                  storageKey="tabela:financeiro-executivo-grupo:empresas-caixa"
-                  rotuloRolagem="Empresas por caixa realizado"
-                  vazio="Nenhuma empresa com movimento realizado no periodo."
-                />
-              </BlocoConteudo>
-            ) : null}
+        {/*
+          B2 — UM bloco primario, e ele responde a pergunta da tela: o grupo
+          esta ganhando dinheiro e tem caixa para o que vem?
 
-            {isVisible('financeiro.grupo_consolidado.riscos') ? (
-              <BlocoConteudo
-                titulo="Riscos do periodo"
-                contagem={`${riscos.length} risco(s)`}
-                descricao="Calculados pelo backend sobre os dados reais cadastrados."
-                variante={blocoPrimario === 'riscos' ? 'primario' : 'secundario'}
-                cor="var(--module-financeiro)"
-              >
-                <div className="grid gap-3">
-                  {riscos.length === 0 ? (
-                    <div className="app-empty-card">
-                      Nenhum risco executivo automatico encontrado para os filtros atuais. Ainda assim,
-                      valide a DRE e o diagnostico antes de fechamento oficial.
-                    </div>
-                  ) : (
-                    riscos.slice(0, 5).map((risco) => (
-                      <div key={risco.codigo} className="rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface-2)] p-3">
-                        <div className="mb-2 flex items-start justify-between gap-2">
-                          <strong className="text-sm text-[var(--c-text)]">{risco.titulo}</strong>
-                          <StatusBadge status={risco.severidade} kind={familiaDaSeveridade(risco.severidade)} />
-                        </div>
-                        <p className="text-sm text-[var(--c-muted)]">{risco.descricao}</p>
-                        {risco.valor !== null && risco.valor !== undefined ? (
-                          <p className="mt-2 text-sm font-semibold tabular-nums text-[var(--c-text)]">
-                            {typeof risco.valor === 'number' ? formatCurrency(risco.valor) : risco.valor}
-                          </p>
-                        ) : null}
-                        <p className="mt-2 text-xs text-[var(--c-muted)]">{risco.acao_recomendada}</p>
-                        {risco.rota ? (
-                          <Link to={risco.rota} className="mt-3 inline-flex text-xs font-semibold text-[var(--c-primary)]">
-                            Abrir detalhe
-                          </Link>
-                        ) : null}
+          B3 — o periodo vive na contagem da faixa fixa e nao se repete aqui.
+        */}
+        {isVisible('financeiro.grupo_consolidado.metricas') ? (
+          <BlocoConteudo
+            titulo="Leitura executiva do grupo"
+            descricao={(dividaNoTeto || entreEmpresasNoTeto)
+              ? `Atencao: as fontes de divida e/ou de movimento entre empresas voltaram no teto de ${TETO_LEITURA_HERDADO} registros. Os cartoes marcados abaixo somam apenas o que foi lido, nao o grupo inteiro.`
+              : 'Azul e o caixa previsto; vermelho e o caixa realizado. Os demais indicadores nao pertencem a essa dupla e ficam neutros.'}
+            variante={blocoPrimario === 'metricas' ? 'primario' : 'secundario'}
+            cor="var(--module-financeiro)"
+          >
+            <StatGrid colunas={3}>
+              <StatTile
+                label="Saldo previsto"
+                valor={<Previsto>{formatCurrency(executivoResumo.saldo_previsto)}</Previsto>}
+                sub="Entradas previstas menos saidas previstas"
+              />
+              <StatTile
+                label="Caixa consolidado realizado"
+                valor={<Realizado>{formatCurrency(executivoResumo.caixa_realizado)}</Realizado>}
+                sub={`${fluxo?.resumo?.movimentos_realizados || 0} baixa(s) no periodo`}
+              />
+              <StatTile
+                label="Necessidade futura de caixa"
+                valor={formatCurrency(necessidadeCaixa)}
+                sub={`Piso previsto ${formatCurrency(pisoCaixaPrevisto)}`}
+                tom={Number(necessidadeCaixa || 0) > 0 ? 'warning' : 'success'}
+              />
+              <StatTile
+                label="EBITDA"
+                valor={formatCurrency(executivoResumo.ebitda)}
+                sub={`Margem ${formatPercent(executivoResumo.margem_ebitda)}`}
+              />
+              <StatTile
+                label="Lucro/Prejuizo liquido"
+                valor={formatCurrency(lucroLiquido)}
+                sub={Number(lucroLiquido || 0) >= 0 ? 'Geracao patrimonial' : 'Consumo patrimonial'}
+              />
+              <StatTile
+                label="Pendencias de consistencia"
+                valor={String(executivoResumo.pendencias_dados || 0)}
+                sub={`${executivoResumo.pendencias_criticas || 0} critica(s), ${executivoResumo.pendencias_altas || 0} alta(s)`}
+                tom={Number(executivoResumo.pendencias_criticas || 0) > 0
+                  ? 'danger'
+                  : Number(executivoResumo.pendencias_altas || 0) > 0
+                    ? 'warning'
+                    : 'success'}
+              />
+              <StatTile
+                label={dividaNoTeto ? 'Endividamento aberto (lido)' : 'Endividamento aberto'}
+                valor={formatCurrency(executivoResumo.endividamento_aberto)}
+                sub={dividaNoTeto
+                  ? `Soma dos ${TETO_LEITURA_HERDADO} titulos lidos, nao do grupo`
+                  : `${endividamento?.resumo?.titulos || 0} titulo(s) classificados`}
+                tom={Number(executivoResumo.endividamento_aberto || 0) > 0 ? 'warning' : 'success'}
+              />
+              <StatTile
+                label={dividaNoTeto ? 'Endividamento vencido (lido)' : 'Endividamento vencido'}
+                valor={formatCurrency(executivoResumo.endividamento_vencido)}
+                sub="Vencimento anterior a hoje"
+                tom={Number(executivoResumo.endividamento_vencido || 0) > 0 ? 'danger' : 'success'}
+              />
+              <StatTile
+                label={entreEmpresasNoTeto ? 'Entre Empresas eliminado (lido)' : 'Entre Empresas eliminado'}
+                valor={formatCurrency(executivoResumo.intercompany_eliminado)}
+                sub={entreEmpresasNoTeto
+                  ? `Soma dos ${TETO_LEITURA_HERDADO} registros lidos, nao do grupo`
+                  : `${intercompany?.resumo?.relacoes_empresas || 0} relacao(oes) entre empresas`}
+              />
+            </StatGrid>
+          </BlocoConteudo>
+        ) : null}
+
+        {loading ? (
+          <div data-bloco-id="empresas-por-caixa-realizado" data-bloco-rotulo="Empresas por caixa realizado" className="app-empty-card">Carregando painel executivo...</div>
+        ) : (
+          <>
+            <section className="grid gap-4 xl:grid-cols-3">
+              {isVisible('financeiro.grupo_consolidado.caixa_empresas') ? (
+                <BlocoConteudo
+                  titulo="Empresas por caixa realizado"
+                  contagem={`${topEmpresasCaixa.length} de ${empresasFluxo.length}`}
+                  descricao="Usa a empresa informada na baixa financeira. Maiores caixas realizados do periodo, em modulo."
+                  variante={blocoPrimario === 'caixa_empresas' ? 'primario' : 'secundario'}
+                  cor="var(--module-financeiro)"
+                  className="app-table-shell xl:col-span-2"
+                >
+                  <TabelaPadrao
+                    colunas={[
+                      {
+                        id: 'empresa',
+                        titulo: 'Empresa',
+                        // R17: a empresa NOMEIA a linha do caixa realizado.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (empresa) => empresa.empresa_nome
+                      },
+                      { id: 'entradas', titulo: 'Entradas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.entradas_realizadas)}</Realizado> },
+                      { id: 'saidas', titulo: 'Saidas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
+                      {
+                        id: 'saldo',
+                        titulo: 'Saldo',
+                        tipo: 'valor',
+                        render: (empresa) => (
+                          <strong className="texto-realizado">{formatCurrency(empresa.saldo_realizado)}</strong>
+                        )
+                      }
+                    ]}
+                    itens={topEmpresasCaixa}
+                    getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
+                    storageKey="tabela:financeiro-executivo-grupo:empresas-caixa"
+                    rotuloRolagem="Empresas por caixa realizado"
+                    vazio="Nenhuma empresa com movimento realizado no periodo."
+                  />
+                </BlocoConteudo>
+              ) : null}
+
+              {isVisible('financeiro.grupo_consolidado.riscos') ? (
+                <BlocoConteudo
+                  titulo="Riscos do periodo"
+                  contagem={`${riscos.length} risco(s)`}
+                  descricao="Calculados pelo backend sobre os dados reais cadastrados."
+                  variante={blocoPrimario === 'riscos' ? 'primario' : 'secundario'}
+                  cor="var(--module-financeiro)"
+                >
+                  <div className="grid gap-3">
+                    {riscos.length === 0 ? (
+                      <div className="app-empty-card">
+                        Nenhum risco executivo automatico encontrado para os filtros atuais. Ainda assim,
+                        valide a DRE e o diagnostico antes de fechamento oficial.
                       </div>
-                    ))
-                  )}
-                </div>
-              </BlocoConteudo>
-            ) : null}
-          </section>
+                    ) : (
+                      riscos.slice(0, 5).map((risco) => (
+                        <div key={risco.codigo} className="rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface-2)] p-3">
+                          <div className="mb-2 flex items-start justify-between gap-2">
+                            <strong className="text-sm text-[var(--c-text)]">{risco.titulo}</strong>
+                            <StatusBadge status={risco.severidade} kind={familiaDaSeveridade(risco.severidade)} />
+                          </div>
+                          <p className="text-sm text-[var(--c-muted)]">{risco.descricao}</p>
+                          {risco.valor !== null && risco.valor !== undefined ? (
+                            <p className="mt-2 text-sm font-semibold tabular-nums text-[var(--c-text)]">
+                              {typeof risco.valor === 'number' ? formatCurrency(risco.valor) : risco.valor}
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-xs text-[var(--c-muted)]">{risco.acao_recomendada}</p>
+                          {risco.rota ? (
+                            <Link to={risco.rota} className="mt-3 inline-flex text-xs font-semibold text-[var(--c-primary)]">
+                              Abrir detalhe
+                            </Link>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </BlocoConteudo>
+              ) : null}
+            </section>
 
-          <section className="grid gap-4 xl:grid-cols-3">
-            {isVisible('financeiro.grupo_consolidado.resultado_empresas') ? (
-              <BlocoConteudo
-                titulo="Resultado por empresa"
-                contagem={`${topEmpresasResultado.length} de ${empresasDre.length}`}
-                descricao="Ordenado pelas empresas com MENOR resultado liquido — as que mais pesam contra o grupo."
-                variante="secundario"
-                className="app-table-shell"
-              >
-                <TabelaPadrao
-                  colunas={[
-                    {
-                      id: 'nome',
-                      titulo: 'Empresa',
-                      // R17: a empresa NOMEIA a linha do resultado.
-                      tipo: 'identidade',
-                      noCard: 'titulo',
-                      render: (empresa) => empresa.empresa_nome
-                    },
-                    {
-                      id: 'resultado',
-                      titulo: 'Resultado',
-                      tipo: 'valor',
-                      render: (empresa) => <strong>{formatCurrency(empresa.resultado)}</strong>
-                    }
-                  ]}
-                  itens={topEmpresasResultado}
-                  getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
-                  storageKey="tabela:financeiro-executivo-grupo:resultado-empresas"
-                  rotuloRolagem="Resultado por empresa"
-                  vazio="Nenhuma empresa na DRE do periodo."
-                />
-              </BlocoConteudo>
-            ) : null}
+            <section className="grid gap-4 xl:grid-cols-3">
+              {isVisible('financeiro.grupo_consolidado.resultado_empresas') ? (
+                <BlocoConteudo
+                  titulo="Resultado por empresa"
+                  contagem={`${topEmpresasResultado.length} de ${empresasDre.length}`}
+                  descricao="Ordenado pelas empresas com MENOR resultado liquido — as que mais pesam contra o grupo."
+                  variante="secundario"
+                  className="app-table-shell"
+                >
+                  <TabelaPadrao
+                    colunas={[
+                      {
+                        id: 'nome',
+                        titulo: 'Empresa',
+                        // R17: a empresa NOMEIA a linha do resultado.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (empresa) => empresa.empresa_nome
+                      },
+                      {
+                        id: 'resultado',
+                        titulo: 'Resultado',
+                        tipo: 'valor',
+                        render: (empresa) => <strong>{formatCurrency(empresa.resultado)}</strong>
+                      }
+                    ]}
+                    itens={topEmpresasResultado}
+                    getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
+                    storageKey="tabela:financeiro-executivo-grupo:resultado-empresas"
+                    rotuloRolagem="Resultado por empresa"
+                    vazio="Nenhuma empresa na DRE do periodo."
+                  />
+                </BlocoConteudo>
+              ) : null}
 
-            {isVisible('financeiro.grupo_consolidado.resultado_obras') ? (
-              <BlocoConteudo
-                titulo="Obras por caixa"
-                contagem={`${topObras.length} de ${obras.length}`}
-                /* HONESTIDADE DE RECORTE: `getResultadoObras()` e chamado SEM
-                   filtro nenhum — nao recebe o periodo nem a holding da faixa
-                   acima. Ler estes numeros como "no periodo filtrado" e a
-                   leitura natural e esta errada, entao a tela avisa. */
-                descricao="Recebido menos executado na base ATUAL de obras, ordenado do pior para o melhor. Esta lista nao respeita o periodo nem a holding do recorte acima."
-                variante="secundario"
-                className="app-table-shell"
-              >
-                <TabelaPadrao
-                  colunas={[
-                    {
-                      id: 'nome',
-                      titulo: 'Obra',
-                      // R17: a obra NOMEIA a linha do resultado por caixa.
-                      tipo: 'identidade',
-                      noCard: 'titulo',
-                      render: (obra) => obra.nome
-                    },
-                    {
-                      id: 'resultado',
-                      titulo: 'Resultado',
-                      tipo: 'valor',
-                      render: (obra) => <strong>{formatCurrency(obra.resultado_caixa)}</strong>
-                    }
-                  ]}
-                  itens={topObras}
-                  storageKey="tabela:financeiro-executivo-grupo:resultado-obras"
-                  rotuloRolagem="Obras por caixa"
-                  vazio="Nenhuma obra encontrada."
-                />
-              </BlocoConteudo>
-            ) : null}
+              {isVisible('financeiro.grupo_consolidado.resultado_obras') ? (
+                <BlocoConteudo
+                  titulo="Obras por caixa"
+                  contagem={`${topObras.length} de ${obras.length}`}
+                  /* HONESTIDADE DE RECORTE: `getResultadoObras()` e chamado SEM
+                     filtro nenhum — nao recebe o periodo nem a holding da faixa
+                     acima. Ler estes numeros como "no periodo filtrado" e a
+                     leitura natural e esta errada, entao a tela avisa. */
+                  descricao="Recebido menos executado na base ATUAL de obras, ordenado do pior para o melhor. Esta lista nao respeita o periodo nem a holding do recorte acima."
+                  variante="secundario"
+                  className="app-table-shell"
+                >
+                  <TabelaPadrao
+                    colunas={[
+                      {
+                        id: 'nome',
+                        titulo: 'Obra',
+                        // R17: a obra NOMEIA a linha do resultado por caixa.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (obra) => obra.nome
+                      },
+                      {
+                        id: 'resultado',
+                        titulo: 'Resultado',
+                        tipo: 'valor',
+                        render: (obra) => <strong>{formatCurrency(obra.resultado_caixa)}</strong>
+                      }
+                    ]}
+                    itens={topObras}
+                    storageKey="tabela:financeiro-executivo-grupo:resultado-obras"
+                    rotuloRolagem="Obras por caixa"
+                    vazio="Nenhuma obra encontrada."
+                  />
+                </BlocoConteudo>
+              ) : null}
 
-            {isVisible('financeiro.grupo_consolidado.intercompany') ? (
-              <BlocoConteudo
-                titulo="Maiores relacoes internas"
-                contagem={`${Math.min(relacoesIntercompany.length, 6)} de ${relacoesIntercompany.length}`}
-                /* ORDENACAO x ROTULO: o backend ordena as relacoes pelo maior
-                   valor PREVISTO, e a coluna unica mostrava o realizado com
-                   fallback no previsto — "maiores" por um criterio, numero de
-                   outro. As duas colunas resolvem sem mexer na ordenacao. */
-                descricao={entreEmpresasNoTeto
-                  ? `Ordenado pelo maior valor previsto. Atencao: a fonte voltou no teto de ${TETO_LEITURA_HERDADO} registros lidos.`
-                  : 'Origem e destino de movimentos entre empresas, ordenado pelo maior valor previsto.'}
-                variante="secundario"
-                className="app-table-shell"
-              >
-                <TabelaPadrao
-                  colunas={[
-                    {
-                      id: 'relacao',
-                      titulo: 'Relacao',
-                      // R17: o par origem -> destino NOMEIA a relacao interna.
-                      tipo: 'identidade',
-                      noCard: 'titulo',
-                      render: (relacao) => `${relacao.empresa_origem_nome} -> ${relacao.empresa_destino_nome}`
-                    },
-                    {
-                      id: 'previsto',
-                      titulo: 'Previsto',
-                      tipo: 'valor',
-                      render: (relacao) => <Previsto>{formatCurrency(relacao.valor_previsto)}</Previsto>
-                    },
-                    {
-                      id: 'realizado',
-                      titulo: 'Realizado',
-                      tipo: 'valor',
-                      render: (relacao) => <Realizado>{formatCurrency(relacao.valor_realizado)}</Realizado>
-                    }
-                  ]}
-                  itens={relacoesIntercompany.slice(0, 6)}
-                  getId={(relacao) => `${relacao.empresa_origem_id || 'origem'}-${relacao.empresa_destino_id || 'destino'}`}
-                  storageKey="tabela:financeiro-executivo-grupo:intercompany"
-                  rotuloRolagem="Maiores relacoes internas"
-                  vazio="Nenhuma relacao entre empresas no periodo."
-                />
-              </BlocoConteudo>
-            ) : null}
-          </section>
-        </>
-      )}
+              {isVisible('financeiro.grupo_consolidado.intercompany') ? (
+                <BlocoConteudo
+                  titulo="Maiores relacoes internas"
+                  contagem={`${Math.min(relacoesIntercompany.length, 6)} de ${relacoesIntercompany.length}`}
+                  /* ORDENACAO x ROTULO: o backend ordena as relacoes pelo maior
+                     valor PREVISTO, e a coluna unica mostrava o realizado com
+                     fallback no previsto — "maiores" por um criterio, numero de
+                     outro. As duas colunas resolvem sem mexer na ordenacao. */
+                  descricao={entreEmpresasNoTeto
+                    ? `Ordenado pelo maior valor previsto. Atencao: a fonte voltou no teto de ${TETO_LEITURA_HERDADO} registros lidos.`
+                    : 'Origem e destino de movimentos entre empresas, ordenado pelo maior valor previsto.'}
+                  variante="secundario"
+                  className="app-table-shell"
+                >
+                  <TabelaPadrao
+                    colunas={[
+                      {
+                        id: 'relacao',
+                        titulo: 'Relacao',
+                        // R17: o par origem -> destino NOMEIA a relacao interna.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (relacao) => `${relacao.empresa_origem_nome} -> ${relacao.empresa_destino_nome}`
+                      },
+                      {
+                        id: 'previsto',
+                        titulo: 'Previsto',
+                        tipo: 'valor',
+                        render: (relacao) => <Previsto>{formatCurrency(relacao.valor_previsto)}</Previsto>
+                      },
+                      {
+                        id: 'realizado',
+                        titulo: 'Realizado',
+                        tipo: 'valor',
+                        render: (relacao) => <Realizado>{formatCurrency(relacao.valor_realizado)}</Realizado>
+                      }
+                    ]}
+                    itens={relacoesIntercompany.slice(0, 6)}
+                    getId={(relacao) => `${relacao.empresa_origem_id || 'origem'}-${relacao.empresa_destino_id || 'destino'}`}
+                    storageKey="tabela:financeiro-executivo-grupo:intercompany"
+                    rotuloRolagem="Maiores relacoes internas"
+                    vazio="Nenhuma relacao entre empresas no periodo."
+                  />
+                </BlocoConteudo>
+              ) : null}
+            </section>
+          </>
+        )}
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

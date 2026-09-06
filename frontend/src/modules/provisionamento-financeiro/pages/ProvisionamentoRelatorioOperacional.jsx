@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -402,143 +403,153 @@ export default function ProvisionamentoRelatorioOperacional() {
         />
       </StatGrid>
 
-      <BlocoConteudo
-        titulo="Curva mensal prevista"
-        descricao="Valores por data prevista de desembolso, sem provisoes canceladas."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        {porMes.length === 0 ? (
-          <p className="text-sm text-[var(--c-muted)]">Sem dados no recorte atual.</p>
-        ) : (
-          <div className="space-y-3">
-            {porMes.map((item) => {
-              const valor = Number(item.total_valor || 0);
-              const largura = Math.max((valor / maiorMes) * 100, 4);
-              return (
-                <div key={item.mes} className="space-y-1">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-semibold text-[var(--c-text)]">{formatarMes(item.mes)}</span>
-                    {/* Valor em barra também é dinheiro: tabular, para os
-                        meses alinharem coluna a coluna. */}
-                    <span className="font-semibold tabular-nums text-[var(--c-text)]">{formatarMoedaBRL(valor)}</span>
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 6 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:provisionamento-relatorio-operacional" larguraPadrao="total">
+        <BlocoConteudo
+          titulo="Curva mensal prevista"
+          descricao="Valores por data prevista de desembolso, sem provisoes canceladas."
+          variante="primario"
+          cor="var(--c-primary)"
+        >
+          {porMes.length === 0 ? (
+            <p className="text-sm text-[var(--c-muted)]">Sem dados no recorte atual.</p>
+          ) : (
+            <div className="space-y-3">
+              {porMes.map((item) => {
+                const valor = Number(item.total_valor || 0);
+                const largura = Math.max((valor / maiorMes) * 100, 4);
+                return (
+                  <div key={item.mes} className="space-y-1">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-semibold text-[var(--c-text)]">{formatarMes(item.mes)}</span>
+                      {/* Valor em barra também é dinheiro: tabular, para os
+                          meses alinharem coluna a coluna. */}
+                      <span className="font-semibold tabular-nums text-[var(--c-text)]">{formatarMoedaBRL(valor)}</span>
+                    </div>
+                    {/* A largura em % é DADO (a proporção da barra), não medida
+                        de layout — por isso continua no style; a altura é o
+                        degrau de 8px da escala e as cores são token.
+                        R8: previsto = azul (--c-primary). Não há série
+                        realizada nesta tela, então não há vermelho.
+                        R18 (onde NÃO vale, 2): o overflow aqui só recorta a
+                        FORMA da barra e não é ancestral de nada fixo. */}
+                    <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
+                      <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${largura}%` }} />
+                    </div>
                   </div>
-                  {/* A largura em % é DADO (a proporção da barra), não medida
-                      de layout — por isso continua no style; a altura é o
-                      degrau de 8px da escala e as cores são token.
-                      R8: previsto = azul (--c-primary). Não há série
-                      realizada nesta tela, então não há vermelho.
-                      R18 (onde NÃO vale, 2): o overflow aqui só recorta a
-                      FORMA da barra e não é ancestral de nada fixo. */}
-                  <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
-                    <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${largura}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </BlocoConteudo>
+                );
+              })}
+            </div>
+          )}
+        </BlocoConteudo>
 
-      <BlocoAgrupado
-        titulo="Por obra/centro"
-        descricao="Onde a previsao esta concentrada."
-        linhas={dashboard?.graficos?.por_obra || []}
-        total={totalPeriodo}
-        storageKey="tabela:provisionamento-relatorio-operacional:por-obra"
-        rotulo={(linha) => formatarObra(linha.obra)}
-      />
-
-      <BlocoAgrupado
-        titulo="Por categoria macro"
-        descricao="Composicao da previsao por natureza de gasto."
-        linhas={dashboard?.graficos?.por_categoria || []}
-        total={totalPeriodo}
-        storageKey="tabela:provisionamento-relatorio-operacional:por-categoria"
-        rotulo={(linha) => linha.categoria?.nome || 'Sem categoria'}
-      />
-
-      <BlocoAgrupado
-        titulo="Pipeline por status"
-        descricao="Quanto ja passou por analise e aprovacao."
-        linhas={dashboard?.graficos?.pipeline_status || []}
-        total={totalPeriodo}
-        storageKey="tabela:provisionamento-relatorio-operacional:pipeline-status"
-        rotulo={(linha) => formatarStatus(linha.status)}
-      />
-
-      <BlocoAgrupado
-        titulo="Curva semanal"
-        descricao="Distribuicao da previsao nas proximas semanas do recorte."
-        linhas={dashboard?.graficos?.curva_semanal || []}
-        total={totalPeriodo}
-        storageKey="tabela:provisionamento-relatorio-operacional:curva-semanal"
-        rotulo={(linha) => linha.semana_label || linha.semana_inicio}
-      />
-
-      <BlocoConteudo
-        titulo="Analitico do recorte"
-        contagem={`${lista.length} item(ns)`}
-        descricao={`Primeiros ${LIMITE_ANALITICO} provisionamentos ordenados pela data prevista mais proxima.`}
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'codigo',
-              titulo: 'Codigo',
-              // R17: o código NOMEIA o provisionamento da linha.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              /* "Onde a navegação mora" (04/09): o link para o REGISTRO
-                 relacionado fica no corpo, junto do dado que o origina —
-                 nunca na barra de ações. A cor vem de token (R25). */
-              render: (item) => (
-                <Link className="font-semibold text-[var(--c-primary)]" to={`/provisoes-financeiras/${item.id}`}>
-                  {item.codigo}
-                </Link>
-              )
-            },
-            {
-              id: 'data',
-              titulo: 'Data prevista',
-              tipo: 'data',
-              render: (item) => formatarData(item.data_prevista_desembolso)
-            },
-            { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => formatarObra(item.obra) },
-            { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoriaMacro?.nome || '-' },
-            {
-              id: 'descricao',
-              titulo: 'Descricao',
-              tipo: 'texto',
-              // T6: texto longo trunca com o conteúdo completo no tooltip.
-              render: (item) => <span title={item.descricao || undefined}>{item.descricao || '-'}</span>
-            },
-            { id: 'credor', titulo: 'Credor', tipo: 'texto', render: (item) => item.fornecedor_texto || '-' },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (item) => <StatusBadge status={formatarStatus(item.status)} kind={familiaStatus(item.status)} />
-            },
-            { id: 'prioridade', titulo: 'Prioridade', tipo: 'badge', render: (item) => formatarPrioridade(item.prioridade) },
-            {
-              id: 'valor',
-              titulo: 'Valor',
-              // R1/R17/T7 — dinheiro: 190px, à direita, tabular-nums, e
-              // NUNCA trunca.
-              tipo: 'valor',
-              render: (item) => formatarMoedaBRL(item.valor_previsto)
-            }
-          ]}
-          itens={lista}
-          getId={(item) => item.id}
-          carregando={loading}
-          storageKey="tabela:provisionamento-relatorio-operacional:analitico"
-          rotuloRolagem="Analitico do recorte"
-          colunasConfiguraveis
-          vazio="Nenhum provisionamento encontrado."
+        <BlocoAgrupado data-bloco-id="por-obra-centro" data-bloco-rotulo="Por obra/centro"
+          titulo="Por obra/centro"
+          descricao="Onde a previsao esta concentrada."
+          linhas={dashboard?.graficos?.por_obra || []}
+          total={totalPeriodo}
+          storageKey="tabela:provisionamento-relatorio-operacional:por-obra"
+          rotulo={(linha) => formatarObra(linha.obra)}
         />
-      </BlocoConteudo>
+
+        <BlocoAgrupado data-bloco-id="por-categoria-macro" data-bloco-rotulo="Por categoria macro"
+          titulo="Por categoria macro"
+          descricao="Composicao da previsao por natureza de gasto."
+          linhas={dashboard?.graficos?.por_categoria || []}
+          total={totalPeriodo}
+          storageKey="tabela:provisionamento-relatorio-operacional:por-categoria"
+          rotulo={(linha) => linha.categoria?.nome || 'Sem categoria'}
+        />
+
+        <BlocoAgrupado data-bloco-id="pipeline-por-status" data-bloco-rotulo="Pipeline por status"
+          titulo="Pipeline por status"
+          descricao="Quanto ja passou por analise e aprovacao."
+          linhas={dashboard?.graficos?.pipeline_status || []}
+          total={totalPeriodo}
+          storageKey="tabela:provisionamento-relatorio-operacional:pipeline-status"
+          rotulo={(linha) => formatarStatus(linha.status)}
+        />
+
+        <BlocoAgrupado data-bloco-id="curva-semanal" data-bloco-rotulo="Curva semanal"
+          titulo="Curva semanal"
+          descricao="Distribuicao da previsao nas proximas semanas do recorte."
+          linhas={dashboard?.graficos?.curva_semanal || []}
+          total={totalPeriodo}
+          storageKey="tabela:provisionamento-relatorio-operacional:curva-semanal"
+          rotulo={(linha) => linha.semana_label || linha.semana_inicio}
+        />
+
+        <BlocoConteudo
+          titulo="Analitico do recorte"
+          contagem={`${lista.length} item(ns)`}
+          descricao={`Primeiros ${LIMITE_ANALITICO} provisionamentos ordenados pela data prevista mais proxima.`}
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'codigo',
+                titulo: 'Codigo',
+                // R17: o código NOMEIA o provisionamento da linha.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                /* "Onde a navegação mora" (04/09): o link para o REGISTRO
+                   relacionado fica no corpo, junto do dado que o origina —
+                   nunca na barra de ações. A cor vem de token (R25). */
+                render: (item) => (
+                  <Link className="font-semibold text-[var(--c-primary)]" to={`/provisoes-financeiras/${item.id}`}>
+                    {item.codigo}
+                  </Link>
+                )
+              },
+              {
+                id: 'data',
+                titulo: 'Data prevista',
+                tipo: 'data',
+                render: (item) => formatarData(item.data_prevista_desembolso)
+              },
+              { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => formatarObra(item.obra) },
+              { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoriaMacro?.nome || '-' },
+              {
+                id: 'descricao',
+                titulo: 'Descricao',
+                tipo: 'texto',
+                // T6: texto longo trunca com o conteúdo completo no tooltip.
+                render: (item) => <span title={item.descricao || undefined}>{item.descricao || '-'}</span>
+              },
+              { id: 'credor', titulo: 'Credor', tipo: 'texto', render: (item) => item.fornecedor_texto || '-' },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => <StatusBadge status={formatarStatus(item.status)} kind={familiaStatus(item.status)} />
+              },
+              { id: 'prioridade', titulo: 'Prioridade', tipo: 'badge', render: (item) => formatarPrioridade(item.prioridade) },
+              {
+                id: 'valor',
+                titulo: 'Valor',
+                // R1/R17/T7 — dinheiro: 190px, à direita, tabular-nums, e
+                // NUNCA trunca.
+                tipo: 'valor',
+                render: (item) => formatarMoedaBRL(item.valor_previsto)
+              }
+            ]}
+            itens={lista}
+            getId={(item) => item.id}
+            carregando={loading}
+            storageKey="tabela:provisionamento-relatorio-operacional:analitico"
+            rotuloRolagem="Analitico do recorte"
+            colunasConfiguraveis
+            vazio="Nenhum provisionamento encontrado."
+          />
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

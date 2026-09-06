@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -316,123 +317,133 @@ export default function ComprasRelatorioFornecedores() {
         />
       </StatGrid>
 
-      {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
-          scrollport e matava o `position: sticky` da coluna fixa e do
-          cabecalho — sem erro e sem falha de build. O BlocoConteudo nao
-          recorta nada. */}
-      <BlocoConteudo
-        titulo="Fornecedores com menor taxa de resposta"
-        descricao="Ranking gerado apenas por cotacoes enviadas e respostas registradas. Fornecedores com menos de 2 participacoes ficam fora desta lista."
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'fornecedor',
-              titulo: 'Fornecedor',
-              // R17: o fornecedor NOMEIA a linha do ranking.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => (
-                <div>
-                  <strong>{item.fornecedor.nome}</strong>
-                  <div className="text-xs text-[var(--c-muted)]">
-                    {[item.fornecedor.cnpj, item.fornecedor.cidade, item.fornecedor.estado]
-                      .filter(Boolean)
-                      .join(' - ') || 'Sem dados complementares'}
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-fornecedores" larguraPadrao="total">
+        {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
+            scrollport e matava o `position: sticky` da coluna fixa e do
+            cabecalho — sem erro e sem falha de build. O BlocoConteudo nao
+            recorta nada. */}
+        <BlocoConteudo
+          titulo="Fornecedores com menor taxa de resposta"
+          descricao="Ranking gerado apenas por cotacoes enviadas e respostas registradas. Fornecedores com menos de 2 participacoes ficam fora desta lista."
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'fornecedor',
+                titulo: 'Fornecedor',
+                // R17: o fornecedor NOMEIA a linha do ranking.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <div>
+                    <strong>{item.fornecedor.nome}</strong>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      {[item.fornecedor.cnpj, item.fornecedor.cidade, item.fornecedor.estado]
+                        .filter(Boolean)
+                        .join(' - ') || 'Sem dados complementares'}
+                    </div>
                   </div>
-                </div>
-              )
-            },
-            { id: 'taxa_resposta', titulo: 'Taxa resposta', tipo: 'numero', render: (item) => <strong>{formatPercent(item.taxa_resposta)}</strong> },
-            { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_sem_resposta) },
-            { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
-            { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
-            { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
-            {
-              id: 'sinal',
-              titulo: 'Sinal',
-              tipo: 'badge',
-              render: (item) => {
-                const badge = respostaBadge(item);
-                return <span className={badge.className}>{badge.label}</span>;
+                )
+              },
+              { id: 'taxa_resposta', titulo: 'Taxa resposta', tipo: 'numero', render: (item) => <strong>{formatPercent(item.taxa_resposta)}</strong> },
+              { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_sem_resposta) },
+              { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
+              { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
+              { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
+              {
+                id: 'sinal',
+                titulo: 'Sinal',
+                tipo: 'badge',
+                render: (item) => {
+                  const badge = respostaBadge(item);
+                  return <span className={badge.className}>{badge.label}</span>;
+                }
               }
-            }
-          ]}
-          itens={fornecedoresBaixaResposta}
-          getId={(item) => `risco-${item.fornecedor.id || item.fornecedor.nome}`}
-          carregando={loading}
-          storageKey="tabela:compras-fornecedores:baixa-resposta"
-          rotuloRolagem="Fornecedores com menor taxa de resposta"
-          vazio="Nenhum fornecedor com baixa resposta para os filtros selecionados."
-        />
-      </BlocoConteudo>
+            ]}
+            itens={fornecedoresBaixaResposta}
+            getId={(item) => `risco-${item.fornecedor.id || item.fornecedor.nome}`}
+            carregando={loading}
+            storageKey="tabela:compras-fornecedores:baixa-resposta"
+            rotuloRolagem="Fornecedores com menor taxa de resposta"
+            vazio="Nenhum fornecedor com baixa resposta para os filtros selecionados."
+          />
+        </BlocoConteudo>
 
-      <BlocoConteudo
-        titulo="Base analitica de fornecedores"
-        descricao="Participacao completa em cotacoes, respostas, itens e valores por fornecedor."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'fornecedor',
-              titulo: 'Fornecedor',
-              // R17: o fornecedor NOMEIA o registro desta base analitica.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => (
-                <div>
-                  <strong>{item.fornecedor.nome}</strong>
-                  <div className="text-xs text-[var(--c-muted)]">
-                    {[item.fornecedor.cnpj, item.fornecedor.cidade, item.fornecedor.estado]
-                      .filter(Boolean)
-                      .join(' - ') || 'Sem dados complementares'}
+        <BlocoConteudo
+          titulo="Base analitica de fornecedores"
+          descricao="Participacao completa em cotacoes, respostas, itens e valores por fornecedor."
+          variante="primario"
+          cor="var(--c-primary)"
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'fornecedor',
+                titulo: 'Fornecedor',
+                // R17: o fornecedor NOMEIA o registro desta base analitica.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <div>
+                    <strong>{item.fornecedor.nome}</strong>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      {[item.fornecedor.cnpj, item.fornecedor.cidade, item.fornecedor.estado]
+                        .filter(Boolean)
+                        .join(' - ') || 'Sem dados complementares'}
+                    </div>
                   </div>
-                </div>
-              )
-            },
-            { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
-            {
-              id: 'resposta',
-              titulo: 'Resposta',
-              tipo: 'numero',
-              render: (item) => (
-                <div>
-                  <strong>{formatPercent(item.taxa_resposta)}</strong>
-                  <div className="text-xs text-[var(--c-muted)]">
-                    {formatNumber(item.cotacoes_respondidas)} de{' '}
-                    {formatNumber(item.cotacoes_enviadas)}
+                )
+              },
+              { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
+              {
+                id: 'resposta',
+                titulo: 'Resposta',
+                tipo: 'numero',
+                render: (item) => (
+                  <div>
+                    <strong>{formatPercent(item.taxa_resposta)}</strong>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      {formatNumber(item.cotacoes_respondidas)} de{' '}
+                      {formatNumber(item.cotacoes_enviadas)}
+                    </div>
                   </div>
-                </div>
-              )
-            },
-            { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_sem_resposta) },
-            { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
-            { id: 'prazo', titulo: 'Prazo medio', tipo: 'numero', render: (item) => formatHours(item.prazo_medio_resposta_horas) },
-            { id: 'itens_respondidos', titulo: 'Itens respondidos', tipo: 'numero', render: (item) => formatNumber(item.itens_respondidos) },
-            { id: 'itens_vencedores', titulo: 'Itens vencedores', tipo: 'numero', render: (item) => formatNumber(item.itens_vencedores) },
-            { id: 'valor_cotado', titulo: 'Valor cotado', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_cotado)}</span> },
-            { id: 'valor_vencedor', titulo: 'Valor vencedor', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_vencedor)}</span> },
-            { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
-            {
-              id: 'sinal',
-              titulo: 'Sinal',
-              tipo: 'badge',
-              render: (item) => {
-                const badge = respostaBadge(item);
-                return <span className={badge.className}>{badge.label}</span>;
+                )
+              },
+              { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_sem_resposta) },
+              { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
+              { id: 'prazo', titulo: 'Prazo medio', tipo: 'numero', render: (item) => formatHours(item.prazo_medio_resposta_horas) },
+              { id: 'itens_respondidos', titulo: 'Itens respondidos', tipo: 'numero', render: (item) => formatNumber(item.itens_respondidos) },
+              { id: 'itens_vencedores', titulo: 'Itens vencedores', tipo: 'numero', render: (item) => formatNumber(item.itens_vencedores) },
+              { id: 'valor_cotado', titulo: 'Valor cotado', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_cotado)}</span> },
+              { id: 'valor_vencedor', titulo: 'Valor vencedor', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_vencedor)}</span> },
+              { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
+              {
+                id: 'sinal',
+                titulo: 'Sinal',
+                tipo: 'badge',
+                render: (item) => {
+                  const badge = respostaBadge(item);
+                  return <span className={badge.className}>{badge.label}</span>;
+                }
               }
-            }
-          ]}
-          itens={fornecedores}
-          getId={(item) => item.fornecedor.id || item.fornecedor.nome}
-          carregando={loading}
-          storageKey="tabela:compras-fornecedores:base-analitica"
-          rotuloRolagem="Base analitica de fornecedores"
-          vazio="Nenhum fornecedor encontrado para os filtros selecionados."
-        />
-      </BlocoConteudo>
+            ]}
+            itens={fornecedores}
+            getId={(item) => item.fornecedor.id || item.fornecedor.nome}
+            carregando={loading}
+            storageKey="tabela:compras-fornecedores:base-analitica"
+            rotuloRolagem="Base analitica de fornecedores"
+            vazio="Nenhum fornecedor encontrado para os filtros selecionados."
+          />
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

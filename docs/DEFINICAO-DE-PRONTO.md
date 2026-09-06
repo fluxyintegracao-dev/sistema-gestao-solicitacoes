@@ -429,6 +429,109 @@ apontava.
   Enter/Espaço, ou um link/botão focável dentro da linha que faça a mesma
   ação. N/A só em tela sem linha acionável.
 
+## PREFERÊNCIAS DO USUÁRIO (06/09)
+
+Quatro itens novos, e eles existem por um motivo que vale mais que a lista:
+a leva de preferências construiu **quatro capacidades novas** e a matriz dos
+35 itens anteriores prova apenas que **o que existia antes não quebrou**.
+Nenhuma célula dela olha para o que foi construído agora. Fechar a leva sem
+estes quatro é fechar com "eu acho que funciona".
+
+**Todos medem EFEITO, nunca presença.** É a lição do T2, que passou verde em
+189 telas medindo a existência de um ícone enquanto o menu que ele abria
+estava recortado e ninguém no sistema conseguia alinhar coluna nenhuma — foi
+o cliente que achou, na tela, o que 189 células verdes diziam estar certo.
+Aqui: nenhum item pergunta se o painel existe, se o botão está lá, se a
+classe foi aplicada. Cada um exercita a capacidade e mede o que acontece
+depois.
+
+- **P1** **Escolher colunas funciona e a escolha viaja.** Abrir o painel
+  "Colunas"; esconder uma coluna que **não seja a de identidade** (a caixa
+  habilitada é o critério — a de identidade é travada pelo componente);
+  conferir que a coluna sumiu do **cabeçalho E das células** (`th` fora e
+  contagem de `td` da linha caindo exatamente um — cabeçalho e corpo
+  desalinhados é pior que a coluna visível); recarregar; conferir que
+  continua escondida. E o passo que separa esta leva de um localStorage a
+  mais: conferir que a preferência **foi para o BANCO** — a chamada
+  `PUT /listas/:lista/preferencias/colunas` sai ao esconder, **ou** a leitura
+  seguinte vem de `GET /me/preferencias` trazendo a coluna oculta. Sem
+  nenhuma das duas, **FALHOU**, mesmo com a coluna escondida e persistida:
+  no DOM, banco e navegador são indistinguíveis, e era o navegador que fazia
+  a mesma pessoa ver listas diferentes conforme a máquina.
+  Ao final, **restaurar o padrão** ("Restaurar padrão" do painel, que emite
+  o DELETE). O ambiente é compartilhado e a preferência agora é por usuário
+  no servidor: coluna deixada escondida não morre com o navegador
+  descartável do harness — espera a próxima corrida e estraga a medição
+  dela. Restauração que não restaura **reprova o item**, porque é defeito da
+  capacidade, não detalhe de limpeza.
+  Tabela com menos de 3 colunas de conteúdo → N/A (abaixo do limiar do
+  painel). Tabela com **3 ou mais** colunas de conteúdo e **sem** painel →
+  **FALHOU**: com 3 declaradas e só a de identidade travada o componente
+  deveria oferecê-lo, e recusa deliberada se declara no manifesto
+  (`naoAplica.P1`), não se deduz do silêncio.
+
+- **P2** **Esconder filtro limpa o valor e refaz a consulta** — é o achado
+  crítico **N53**. Nas telas que têm o seletor "Filtros visíveis": aplicar um
+  filtro, medir o resultado, esconder aquele filtro pelo seletor, e conferir
+  que **o resultado MUDOU** (porque o valor foi limpo e a consulta refeita) e
+  que o campo **não ficou no DOM recortando escondido** com o valor dentro.
+  O defeito não tem sintoma visual: a tela fica idêntica à tela certa. A
+  pessoa lê "12 registros", não vê filtro nenhum em campo, conclui que são
+  todos — e leva o número para uma decisão.
+  "O resultado mudou" é medido por três leituras somadas, e qualquer uma que
+  mude basta: linhas à vista, total declarado (faixa ou paginação) e texto
+  da primeira linha. Contar só as linhas reprovaria toda listagem paginada
+  no servidor, onde um filtro corta de 4000 para 300 sem mexer nas 25 da
+  página — defeito do verificador vestido de defeito da tela.
+  Nas telas **sem** o seletor, o item é **N/A declarado**, não falha: hoje
+  três telas o oferecem (Consulta de títulos, Solicitações e
+  Provisionamentos, em cinco endereços) e 88 telas com filtro ainda não o
+  receberam. Reprová-las seria a matriz acusando a tela de uma etapa que o
+  plano ainda não executou.
+
+- **P3** **Recolher bloco sobrevive à recarga.** Recolher um bloco
+  recolhível, recarregar, conferir que continua recolhido. Só nas telas onde
+  o recolhimento foi ligado à preferência.
+  **O portão é comportamental, e essa é a parte que importa.** Saber se uma
+  tela ligou a persistência não se lê no DOM — o bloco é idêntico com e sem
+  `chavePreferencia`. Então cruzam-se duas leituras, e cada cruzamento tem
+  veredito próprio: recolher **gravou** (saiu `PUT .../preferencias/blocos`)
+  → a recarga TEM de trazer o bloco recolhido, e não trazer é **FALHOU**;
+  não gravou e o arquivo da tela **não** declara `chavePreferencia` → **N/A**
+  com o motivo escrito; não gravou e o arquivo **declara** → **FALHOU**, a
+  tela diz que ligou e o recolhimento não guarda nada. É o terceiro caso que
+  impede o item de virar decoração: sem ele, a ausência de gravação — que é
+  o defeito, e atinge 40 arquivos — sairia como cinza.
+
+- **P4** **Camada flutuante fecha ao clicar fora, com Esc, e a seleção
+  acontece.** Abrir um menu ou lista suspensa; clicar em `document.body`
+  bem longe dela (a 200px da caixa, num ponto que não seja acionável —
+  clicar às cegas violaria "somente navegação e leitura"); conferir que
+  **saiu do DOM ou ficou invisível**. Reabrir, apertar **Esc**, mesma
+  conferência. E a terceira, **que é a que ninguém lembra**: reabrir e
+  clicar numa **OPÇÃO**, conferindo que a seleção **ACONTECEU** (a marcação
+  mudou de estado).
+  A terceira não é zelo: o levantamento mediu 12 camadas que fecham por
+  perda de foco com um atraso deliberado de 120–150ms, e o atraso existe
+  para o clique na opção ganhar a corrida contra o fechamento. O hook novo
+  fecha no `mousedown` e o `onClick` da opção dispara no `mouseup` — trocar
+  sem auditar **mata a seleção**. Ou seja: o jeito mais barato de fazer as
+  duas primeiras partes ficarem verdes é quebrar a terceira, e um item sem
+  ela ficaria verde exatamente na tela que piorou.
+  Só **opção de marcação** é clicada (caixa/rádio), nunca item de ação:
+  item de menu costuma ser "Excluir", "Duplicar", "Enviar", e clicar num
+  deles para provar que a camada seleciona criaria ou apagaria registro de
+  verdade no ambiente compartilhado. Camada que fecha nas duas primeiras e
+  não tem opção segura para a terceira é **SEM DADO**, não aprovação.
+
+**Regras de medição que valem para os quatro** (e não se negociam):
+somente navegação e leitura — nenhum registro criado, alterado ou apagado;
+preferência de exibição pode ser mexida **desde que restaurada** no fim, em
+`finally`; capacidade que existe mas a base do preview não deu registro para
+exercitar é **SEM DADO** (não é aprovação e não vira aprovação por
+equivalência com outra tela); capacidade que a tela não tem por natureza é
+**N/A com motivo registrado**.
+
 ## TELAS FORA DO SHELL — DoD própria (03/09)
 
 Quatro telas renderizam **sem o `Layout`**: sem topbar, sem menu lateral,

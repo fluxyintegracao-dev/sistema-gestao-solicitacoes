@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -268,128 +269,138 @@ export default function ComprasRelatorioCategoriasInsumos() {
         <StatTile label="Ticket medio item" valor={formatMoney(resumo.ticket_medio_item)} sub="Valor medio por item" />
       </StatGrid>
 
-      <BlocoConteudo
-        titulo="Compras por categoria"
-        descricao="Top 10 categorias por valor efetivamente pedido no periodo filtrado."
-      >
-        {loading ? (
-          <div className="app-empty-card">Carregando categorias...</div>
-        ) : topCategorias.length === 0 ? (
-          <div className="app-empty-card">Sem itens de pedido para montar o grafico.</div>
-        ) : (
-          <div className="grid gap-3">
-            {topCategorias.map((item, index) => (
-              <div key={`categoria-grafico-${item.key}`} className="grid gap-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
-                    <strong className="ml-2 text-sm text-[var(--c-text)]">{item.categoria_nome}</strong>
-                    <span className="ml-2 text-xs text-[var(--c-muted)]">
-                      {formatNumber(item.itens)} item(ns)
-                    </span>
-                  </div>
-                  <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatMoney(item.valor_total)}</strong>
-                </div>
-                <BarraProporcao valor={item.valor_total} maximo={maiorValorCategoria} />
-              </div>
-            ))}
-          </div>
-        )}
-      </BlocoConteudo>
-
-      {/* R18: os `overflow-hidden` que embrulhavam estas tabelas criavam
-          scrollport e matavam o `position: sticky` da coluna fixa e do
-          cabecalho — sem erro e sem falha de build. */}
-      <div className="grid gap-4 xl:grid-cols-2">
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 3 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-categorias-insumos" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Por categoria"
-          descricao="Categorias do cadastro de insumos e itens manuais sem categoria."
-          variante="secundario"
+          titulo="Compras por categoria"
+          descricao="Top 10 categorias por valor efetivamente pedido no periodo filtrado."
+        >
+          {loading ? (
+            <div className="app-empty-card">Carregando categorias...</div>
+          ) : topCategorias.length === 0 ? (
+            <div className="app-empty-card">Sem itens de pedido para montar o grafico.</div>
+          ) : (
+            <div className="grid gap-3">
+              {topCategorias.map((item, index) => (
+                <div key={`categoria-grafico-${item.key}`} className="grid gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
+                      <strong className="ml-2 text-sm text-[var(--c-text)]">{item.categoria_nome}</strong>
+                      <span className="ml-2 text-xs text-[var(--c-muted)]">
+                        {formatNumber(item.itens)} item(ns)
+                      </span>
+                    </div>
+                    <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatMoney(item.valor_total)}</strong>
+                  </div>
+                  <BarraProporcao valor={item.valor_total} maximo={maiorValorCategoria} />
+                </div>
+              ))}
+            </div>
+          )}
+        </BlocoConteudo>
+
+        {/* R18: os `overflow-hidden` que embrulhavam estas tabelas criavam
+            scrollport e matavam o `position: sticky` da coluna fixa e do
+            cabecalho — sem erro e sem falha de build. */}
+        <div data-bloco-id="por-categoria" data-bloco-rotulo="Por categoria" className="grid gap-4 xl:grid-cols-2">
+          <BlocoConteudo
+            titulo="Por categoria"
+            descricao="Categorias do cadastro de insumos e itens manuais sem categoria."
+            variante="secundario"
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'categoria',
+                  titulo: 'Categoria',
+                  // R17: a categoria NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.categoria_nome
+                },
+                { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+                { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+                { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+              ]}
+              itens={categorias}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-categorias-insumos:categorias"
+              rotuloRolagem="Compras por categoria"
+              vazio="Sem itens de pedido no periodo."
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Por obra/centro"
+            descricao="Concentracao de valor pedido por origem operacional."
+            variante="secundario"
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'obra',
+                  titulo: 'Obra/Centro',
+                  // R17: a obra/centro NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.obra_nome
+                },
+                { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+                { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+              ]}
+              itens={obrasResumo}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-categorias-insumos:obras"
+              rotuloRolagem="Compras por obra/centro"
+              vazio="Sem itens de pedido no periodo."
+            />
+          </BlocoConteudo>
+        </div>
+
+        <BlocoConteudo
+          titulo="Por insumo/item"
+          descricao="Top 100 itens por valor total pedido."
+          variante="primario"
+          cor="var(--c-primary)"
         >
           <TabelaPadrao
             colunas={[
               {
-                id: 'categoria',
-                titulo: 'Categoria',
-                // R17: a categoria NOMEIA a linha deste resumo.
+                id: 'descricao',
+                titulo: 'Insumo/Item',
+                // R17: a descricao do insumo NOMEIA o registro.
                 tipo: 'identidade',
                 noCard: 'titulo',
-                render: (item) => item.categoria_nome
+                render: (item) => item.descricao
               },
+              { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoria_nome },
+              { id: 'unidade', titulo: 'Unidade', tipo: 'texto', render: (item) => item.unidade || '-' },
               { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
               { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
               { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
               { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
             ]}
-            itens={categorias}
+            itens={insumos}
             getId={(item) => item.key}
             carregando={loading}
-            storageKey="tabela:compras-categorias-insumos:categorias"
-            rotuloRolagem="Compras por categoria"
+            storageKey="tabela:compras-categorias-insumos:insumos"
+            rotuloRolagem="Compras por insumo/item"
             vazio="Sem itens de pedido no periodo."
           />
         </BlocoConteudo>
-
-        <BlocoConteudo
-          titulo="Por obra/centro"
-          descricao="Concentracao de valor pedido por origem operacional."
-          variante="secundario"
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'obra',
-                titulo: 'Obra/Centro',
-                // R17: a obra/centro NOMEIA a linha deste resumo.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.obra_nome
-              },
-              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
-              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
-            ]}
-            itens={obrasResumo}
-            getId={(item) => item.key}
-            carregando={loading}
-            storageKey="tabela:compras-categorias-insumos:obras"
-            rotuloRolagem="Compras por obra/centro"
-            vazio="Sem itens de pedido no periodo."
-          />
-        </BlocoConteudo>
-      </div>
-
-      <BlocoConteudo
-        titulo="Por insumo/item"
-        descricao="Top 100 itens por valor total pedido."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'descricao',
-              titulo: 'Insumo/Item',
-              // R17: a descricao do insumo NOMEIA o registro.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => item.descricao
-            },
-            { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoria_nome },
-            { id: 'unidade', titulo: 'Unidade', tipo: 'texto', render: (item) => item.unidade || '-' },
-            { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
-            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
-            { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
-            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
-          ]}
-          itens={insumos}
-          getId={(item) => item.key}
-          carregando={loading}
-          storageKey="tabela:compras-categorias-insumos:insumos"
-          rotuloRolagem="Compras por insumo/item"
-          vazio="Sem itens de pedido no periodo."
-        />
-      </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

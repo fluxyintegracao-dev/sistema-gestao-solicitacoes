@@ -12463,19 +12463,22 @@ body {
   columns: 1;
 }
 
-.sol-detail-blocos-toolbar {
+.sol-detail-blocos-toolbar,
+.app-blocos-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.sol-detail-personalizando {
+.sol-detail-personalizando,
+.app-blocos-ligado {
   border-color: var(--c-primary);
   color: var(--c-primary);
 }
 
-.sol-detail-bloco-toolbar {
+.sol-detail-bloco-toolbar,
+.app-blocos-barra {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -12487,13 +12490,15 @@ body {
   cursor: grab;
 }
 
-.sol-detail-bloco-arrastar {
+.sol-detail-bloco-arrastar,
+.app-blocos-arrastar {
   font-size: var(--fonte-detalhe);
   letter-spacing: -2px;
   color: var(--c-muted);
 }
 
-.sol-detail-bloco-nome {
+.sol-detail-bloco-nome,
+.app-blocos-nome {
   flex: 1;
   font-size: var(--fonte-detalhe);
   font-weight: 700;
@@ -12502,7 +12507,8 @@ body {
   color: var(--c-muted);
 }
 
-.sol-detail-bloco-recolhido {
+.sol-detail-bloco-recolhido,
+.app-blocos-recolhido {
   display: block;
   width: 100%;
   padding: 10px 14px;
@@ -12516,7 +12522,8 @@ body {
   cursor: pointer;
 }
 
-.sol-detail-bloco-recolhido:hover {
+.sol-detail-bloco-recolhido:hover,
+.app-blocos-recolhido:hover {
   color: var(--c-primary);
   border-color: var(--c-primary);
 }
@@ -12679,6 +12686,7 @@ body {
 }
 
 .sol-detail-bloco-largura select,
+.app-blocos-largura select,
 .sol-detail-historico-ordem select {
   border: 1px solid var(--c-border);
   border-radius: 7px;
@@ -12699,7 +12707,8 @@ body {
   white-space: nowrap;
 }
 
-.sol-detail-bloco-remover {
+.sol-detail-bloco-remover,
+.app-blocos-remover {
   border: none;
   background: none;
   padding: 0 4px;
@@ -12710,15 +12719,18 @@ body {
   cursor: pointer;
 }
 
-.sol-detail-bloco-remover:hover {
+.sol-detail-bloco-remover:hover,
+.app-blocos-remover:hover {
   color: var(--sem-danger);
 }
 
-.sol-detail-adicionar-wrap {
+.sol-detail-adicionar-wrap,
+.app-blocos-adicionar {
   position: relative;
 }
 
-.sol-detail-adicionar-pop {
+.sol-detail-adicionar-pop,
+.app-blocos-adicionar-pop {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -12731,7 +12743,8 @@ body {
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
 }
 
-.sol-detail-adicionar-pop button {
+.sol-detail-adicionar-pop button,
+.app-blocos-adicionar-pop button {
   display: block;
   width: 100%;
   padding: 8px 10px;
@@ -12745,6 +12758,112 @@ body {
   cursor: pointer;
 }
 
-.sol-detail-adicionar-pop button:hover {
+.sol-detail-adicionar-pop button:hover,
+.app-blocos-adicionar-pop button:hover {
   background: color-mix(in srgb, var(--c-primary) 8%, transparent);
+}
+
+/* =====================================================================
+   BLOCOS PERSONALIZÁVEIS — O PREFIXO NEUTRO (05/09)
+   ---------------------------------------------------------------------
+   O mecanismo saiu de duas telas e virou `components/padrao/
+   BlocosPersonalizaveis.jsx`. As regras de desenho dele já existiam
+   acima, escritas com o prefixo `sol-detail-*`, e a Home as usava assim
+   mesmo — uma tela vestindo o CSS da outra. Em vez de duplicar as
+   declarações, os seletores neutros entraram AO LADO dos antigos, na
+   mesma regra: um desenho só, dois nomes, e o `sol-detail-*` continua
+   valendo para o que ainda é do detalhe (a barra de ordem do histórico,
+   por exemplo).
+
+   O que precisa nascer aqui é só a GRADE, porque as duas telas a
+   escreviam de formas diferentes: o detalhe com `columns: 2` (fluxo
+   sequencial, cada bloco inteiro numa coluna) e a Home com `grid` de
+   duas colunas. A grade neutra é a da Home — bloco de relatório tem
+   altura própria e alinhar o topo é o que deixa a leitura em pares —, e
+   o detalhe segue com a dele passando `classes` ao componente.
+   ===================================================================== */
+.app-blocos-arranjo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-4);
+}
+
+.app-blocos-entrada {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.app-blocos-colunas {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--esp-4);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .app-blocos-colunas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.app-blocos-item {
+  min-width: 0;
+}
+
+/* Botão de texto da barra por bloco ("Recolher"/"Mostrar"): o mesmo
+   desenho do `la-link` do ListaAvancada, escrito aqui porque aquela
+   folha só é carregada nas telas que usam a lista avançada — e este
+   componente vale para as 40 telas de relatório. */
+.app-blocos-acao {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: var(--fonte-detalhe);
+  font-weight: 600;
+  color: var(--c-primary);
+  cursor: pointer;
+}
+
+.app-blocos-acao:hover {
+  text-decoration: underline;
+}
+
+/* Blocos que já moram numa grade escrita pela tela: os invólucros do
+   componente somem do layout e a grade de fora continua posicionando. */
+.app-blocos-transparente {
+  display: contents;
+}
+
+.app-blocos-total > .app-blocos-item,
+.app-blocos-faixa-grade {
+  grid-column: 1 / -1;
+}
+
+/* Catálogo agrupado do "Adicionar bloco" (o da Home tem 17 blocos em cinco
+   grupos): o painel ganha teto de altura e rolagem própria, e cada grupo
+   se anuncia. Mesmas regras que viviam com o prefixo `hub-*` — o desenho
+   é do componente, não da tela. */
+.app-blocos-adicionar-pop {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.app-blocos-adicionar-grupo {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-blocos-adicionar-grupo + .app-blocos-adicionar-grupo {
+  margin-top: var(--esp-2);
+  border-top: 1px solid var(--ui-border);
+  padding-top: var(--esp-2);
+}
+
+.app-blocos-adicionar-grupo-titulo {
+  padding: var(--esp-1) var(--esp-3) 0;
+  font-size: var(--fonte-detalhe);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-muted);
 }

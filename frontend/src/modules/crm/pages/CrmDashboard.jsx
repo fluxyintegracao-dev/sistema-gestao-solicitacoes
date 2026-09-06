@@ -3,6 +3,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -95,102 +96,116 @@ export default function CrmDashboard() {
           </StatGrid>
 
           {/*
-            B2 — UM primário por tela: é a fila que exige ação hoje, e por
-            isso ela carrega a barra de cor. Os dois blocos de leitura abaixo
-            ficam neutros.
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 3 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
           */}
-          <BlocoConteudo
-            titulo="Fila e atrasos"
-            variante="primario"
-            cor="var(--sem-warning)"
-            descricao="O que precisa de tratamento antes de novas entradas."
+          <BlocosPersonalizaveis
+            chave="blocos:crm-dashboard"
+            larguraPadrao="total"
+            dentroDeGrade
           >
-            <StatGrid colunas={3}>
-              <StatTile
-                label="Sem primeiro contato (SLA)"
-                valor={texto(sla.semPrimeiroContato)}
-                sub="Leads novos sem contato ha mais de 60 min"
-                tom={sla.semPrimeiroContato > 0 ? 'warning' : undefined}
-              />
-              <StatTile
-                label="Tarefas pendentes"
-                valor={texto(tarefas.pendentes)}
-                tom="info"
-              />
-              <StatTile
-                label="Tarefas vencidas"
-                valor={texto(tarefas.vencidas)}
-                sub="Prazo expirado, ainda pendentes"
-                tom={tarefas.vencidas > 0 ? 'danger' : undefined}
-              />
-            </StatGrid>
-          </BlocoConteudo>
+            {/*
+              B2 — UM primário por tela: é a fila que exige ação hoje, e por
+              isso ela carrega a barra de cor. Os dois blocos de leitura abaixo
+              ficam neutros.
+            */}
+            <BlocoConteudo
+              titulo="Fila e atrasos"
+              variante="primario"
+              cor="var(--sem-warning)"
+              descricao="O que precisa de tratamento antes de novas entradas."
+            >
+              <StatGrid colunas={3}>
+                <StatTile
+                  label="Sem primeiro contato (SLA)"
+                  valor={texto(sla.semPrimeiroContato)}
+                  sub="Leads novos sem contato ha mais de 60 min"
+                  tom={sla.semPrimeiroContato > 0 ? 'warning' : undefined}
+                />
+                <StatTile
+                  label="Tarefas pendentes"
+                  valor={texto(tarefas.pendentes)}
+                  tom="info"
+                />
+                <StatTile
+                  label="Tarefas vencidas"
+                  valor={texto(tarefas.vencidas)}
+                  sub="Prazo expirado, ainda pendentes"
+                  tom={tarefas.vencidas > 0 ? 'danger' : undefined}
+                />
+              </StatGrid>
+            </BlocoConteudo>
 
-          {/*
-            R1/R17 — as duas listas eram pares rótulo/valor em <div> soltos:
-            sem coluna declarada, sem alinhamento por tipo, sem
-            redimensionamento e sem largura salva por usuário. Viram
-            TabelaPadrao com o papel de cada coluna declarado.
-          */}
-          <BlocoConteudo
-            titulo="Distribuicao por status"
-            descricao="Onde a carteira esta parada no ciclo de vida do lead."
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'status',
-                  titulo: 'Status',
-                  // R17: `semIdentidade` abaixo — status é classificação, não
-                  // o nome de um registro; forçar 'identidade' aqui poria
-                  // maiúsculas num rótulo que já tem caixa própria.
-                  tipo: 'texto',
-                  noCard: 'titulo',
-                  render: (item) => LIFECYCLE_LABEL[item.lifecycle_status] || item.lifecycle_status
-                },
-                {
-                  id: 'total',
-                  titulo: 'Leads',
-                  tipo: 'numero',
-                  render: (item) => item.total
-                }
-              ]}
-              itens={distribuicaoLifecycle}
-              semIdentidade
-              getId={(item) => item.lifecycle_status}
-              vazio="Nenhum dado disponivel."
-              storageKey="tabela:crm-dashboard:distribuicao-status"
-              rotuloRolagem="Distribuicao por status"
-            />
-          </BlocoConteudo>
+            {/*
+              R1/R17 — as duas listas eram pares rótulo/valor em <div> soltos:
+              sem coluna declarada, sem alinhamento por tipo, sem
+              redimensionamento e sem largura salva por usuário. Viram
+              TabelaPadrao com o papel de cada coluna declarado.
+            */}
+            <BlocoConteudo
+              titulo="Distribuicao por status"
+              descricao="Onde a carteira esta parada no ciclo de vida do lead."
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    // R17: `semIdentidade` abaixo — status é classificação, não
+                    // o nome de um registro; forçar 'identidade' aqui poria
+                    // maiúsculas num rótulo que já tem caixa própria.
+                    tipo: 'texto',
+                    noCard: 'titulo',
+                    render: (item) => LIFECYCLE_LABEL[item.lifecycle_status] || item.lifecycle_status
+                  },
+                  {
+                    id: 'total',
+                    titulo: 'Leads',
+                    tipo: 'numero',
+                    render: (item) => item.total
+                  }
+                ]}
+                itens={distribuicaoLifecycle}
+                semIdentidade
+                getId={(item) => item.lifecycle_status}
+                vazio="Nenhum dado disponivel."
+                storageKey="tabela:crm-dashboard:distribuicao-status"
+                rotuloRolagem="Distribuicao por status"
+              />
+            </BlocoConteudo>
 
-          <BlocoConteudo
-            titulo="Backlog por responsavel"
-            descricao="Carteira ativa atribuida a cada usuario."
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'responsavel',
-                  titulo: 'Responsavel',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (item) => item.usuario?.nome || '—'
-                },
-                {
-                  id: 'total',
-                  titulo: 'Leads',
-                  tipo: 'numero',
-                  render: (item) => item.total
-                }
-              ]}
-              itens={backlogPorResponsavel}
-              getId={(item) => item.usuario?.id || item.usuario?.nome}
-              vazio="Nenhum responsavel atribuido."
-              storageKey="tabela:crm-dashboard:backlog-responsavel"
-              rotuloRolagem="Backlog por responsavel"
-            />
-          </BlocoConteudo>
+            <BlocoConteudo
+              titulo="Backlog por responsavel"
+              descricao="Carteira ativa atribuida a cada usuario."
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'responsavel',
+                    titulo: 'Responsavel',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => item.usuario?.nome || '—'
+                  },
+                  {
+                    id: 'total',
+                    titulo: 'Leads',
+                    tipo: 'numero',
+                    render: (item) => item.total
+                  }
+                ]}
+                itens={backlogPorResponsavel}
+                getId={(item) => item.usuario?.id || item.usuario?.nome}
+                vazio="Nenhum responsavel atribuido."
+                storageKey="tabela:crm-dashboard:backlog-responsavel"
+                rotuloRolagem="Backlog por responsavel"
+              />
+            </BlocoConteudo>
+          </BlocosPersonalizaveis>
         </>
       )}
     </Pagina>

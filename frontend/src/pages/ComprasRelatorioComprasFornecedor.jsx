@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   CelulaDupla,
   Pagina,
   PageHeader,
@@ -264,195 +265,205 @@ export default function ComprasRelatorioComprasFornecedor() {
         />
       </StatGrid>
 
-      <BlocoConteudo
-        titulo="Ranking visual de fornecedores"
-        contagem="Top 10"
-        descricao="Por valor efetivamente pedido no periodo filtrado."
-        variante="secundario"
-      >
-        {loading ? (
-          <div className="app-empty-card">Carregando ranking...</div>
-        ) : topFornecedores.length === 0 ? (
-          <div className="app-empty-card">Sem pedidos emitidos para montar o ranking.</div>
-        ) : (
-          <div className="grid gap-3">
-            {topFornecedores.map((item, index) => {
-              const valor = Number(item.valor_total || 0);
-              /*
-                BARRA QUE MENTIA SOBRE O ZERO (corrigido). O cálculo era
-                `Math.max(4, (valor / maior) * 100)`: um fornecedor com valor
-                pedido ZERO desenhava 4% de barra — o olho lê barra como
-                "houve compra", e não houve nenhuma. O piso existia para que
-                valores minúsculos aparecessem, e cobrava esse preço no caso
-                em que a leitura mais importa.
-                Agora zero tem largura zero e o resto fica na proporção real;
-                o número ao lado da barra continua sendo a fonte exata.
-              */
-              const percentual = maiorValorFornecedor > 0 ? (valor / maiorValorFornecedor) * 100 : 0;
-              return (
-                <div key={`ranking-${item.key}`} className="grid gap-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
-                      <strong className="ml-2 text-sm text-[var(--c-text)]">{item.fornecedor_nome}</strong>
-                      <span className="ml-2 text-xs text-[var(--c-muted)]">
-                        {formatNumber(item.pedidos)} pedido(s)
-                      </span>
-                    </div>
-                    <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatMoney(valor)}</strong>
-                  </div>
-                  {/* R25: o trilho era `bg-slate-100` (paleta crua, sem par
-                      no tema escuro) — agora é o token de contorno.
-                      R18 (onde NÃO vale, 2): este `overflow-hidden` só
-                      recorta a FORMA da barra e não é ancestral de nada
-                      fixo. */}
-                  <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
-                    <div
-                      className="h-full rounded-full bg-[var(--c-primary)]"
-                      style={{ width: `${percentual}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </BlocoConteudo>
-
       {/*
-        R18: as três tabelas viviam em `card ... overflow-hidden` — scrollport
-        criado sem querer, `position: sticky` morto sem erro nenhum.
-        R25 + CelulaDupla: os pares `text-slate-900` / `text-slate-500` eram
-        a CelulaDupla escrita à mão; agora é o componente, com os tons por
-        token (`text-slate-500` é 4,34:1, abaixo do AA de 4,5:1).
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 3 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      <BlocoConteudo
-        titulo="Fornecedores por valor pedido"
-        descricao="Ranking de fornecedores usando somente pedidos de compra emitidos."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'fornecedor',
-              titulo: 'Fornecedor',
-              // R17: o fornecedor NOMEIA a linha do ranking.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => (
-                <CelulaDupla
-                  principal={item.fornecedor_nome}
-                  sub={`${item.cnpj || 'Sem CNPJ'}${item.estado ? ` - ${item.estado}` : ''}`}
-                />
-              )
-            },
-            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
-            { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
-            {
-              id: 'obras',
-              titulo: 'Obras/centros',
-              tipo: 'texto',
-              render: (item) => (
-                <CelulaDupla
-                  principal={formatNumber(item.obras)}
-                  sub={(item.obras_nomes || []).join(', ') || '-'}
-                />
-              )
-            },
-            { id: 'valor', titulo: 'Valor pedido', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
-            { id: 'ticket', titulo: 'Ticket medio', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
-            { id: 'minimo', titulo: 'Minimo nao atingido', tipo: 'numero', render: (item) => formatNumber(item.pedidos_minimo_nao_atingido) },
-            { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
-          ]}
-          itens={fornecedores}
-          getId={(item) => item.key}
-          carregando={loading}
-          storageKey="tabela:compras-fornecedor:fornecedores"
-          rotuloRolagem="Fornecedores por valor pedido"
-          vazio="Sem pedidos emitidos nos filtros."
-        />
-      </BlocoConteudo>
-
-      <div className="grid gap-4 lg:grid-cols-2">
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-compras-fornecedor" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Compras por obra/centro"
-          descricao="Onde o valor comprado por fornecedor esta concentrado."
+          titulo="Ranking visual de fornecedores"
+          contagem="Top 10"
+          descricao="Por valor efetivamente pedido no periodo filtrado."
+          variante="secundario"
         >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'obra',
-                titulo: 'Obra/Centro',
-                // R17: a obra/centro NOMEIA a linha deste resumo.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.obra_nome
-              },
-              { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
-              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
-              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
-              { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) }
-            ]}
-            itens={obrasResumo}
-            getId={(item) => item.key}
-            carregando={loading}
-            storageKey="tabela:compras-fornecedor:obras"
-            rotuloRolagem="Compras por obra/centro"
-            vazio="Sem pedidos por obra/centro nos filtros."
-          />
+          {loading ? (
+            <div className="app-empty-card">Carregando ranking...</div>
+          ) : topFornecedores.length === 0 ? (
+            <div className="app-empty-card">Sem pedidos emitidos para montar o ranking.</div>
+          ) : (
+            <div className="grid gap-3">
+              {topFornecedores.map((item, index) => {
+                const valor = Number(item.valor_total || 0);
+                /*
+                  BARRA QUE MENTIA SOBRE O ZERO (corrigido). O cálculo era
+                  `Math.max(4, (valor / maior) * 100)`: um fornecedor com valor
+                  pedido ZERO desenhava 4% de barra — o olho lê barra como
+                  "houve compra", e não houve nenhuma. O piso existia para que
+                  valores minúsculos aparecessem, e cobrava esse preço no caso
+                  em que a leitura mais importa.
+                  Agora zero tem largura zero e o resto fica na proporção real;
+                  o número ao lado da barra continua sendo a fonte exata.
+                */
+                const percentual = maiorValorFornecedor > 0 ? (valor / maiorValorFornecedor) * 100 : 0;
+                return (
+                  <div key={`ranking-${item.key}`} className="grid gap-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-[var(--c-muted)]">#{index + 1}</span>
+                        <strong className="ml-2 text-sm text-[var(--c-text)]">{item.fornecedor_nome}</strong>
+                        <span className="ml-2 text-xs text-[var(--c-muted)]">
+                          {formatNumber(item.pedidos)} pedido(s)
+                        </span>
+                      </div>
+                      <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatMoney(valor)}</strong>
+                    </div>
+                    {/* R25: o trilho era `bg-slate-100` (paleta crua, sem par
+                        no tema escuro) — agora é o token de contorno.
+                        R18 (onde NÃO vale, 2): este `overflow-hidden` só
+                        recorta a FORMA da barra e não é ancestral de nada
+                        fixo. */}
+                    <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
+                      <div
+                        className="h-full rounded-full bg-[var(--c-primary)]"
+                        style={{ width: `${percentual}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </BlocoConteudo>
 
+        {/*
+          R18: as três tabelas viviam em `card ... overflow-hidden` — scrollport
+          criado sem querer, `position: sticky` morto sem erro nenhum.
+          R25 + CelulaDupla: os pares `text-slate-900` / `text-slate-500` eram
+          a CelulaDupla escrita à mão; agora é o componente, com os tons por
+          token (`text-slate-500` é 4,34:1, abaixo do AA de 4,5:1).
+        */}
         <BlocoConteudo
-          titulo="Pedidos recentes"
-          contagem="Ultimos 100"
-          descricao="Pedidos usados no relatorio."
+          titulo="Fornecedores por valor pedido"
+          descricao="Ranking de fornecedores usando somente pedidos de compra emitidos."
+          variante="primario"
+          cor="var(--c-primary)"
         >
           <TabelaPadrao
             colunas={[
               {
-                id: 'pedido',
-                titulo: 'Pedido',
-                // R17: o pedido de compra NOMEIA o registro.
+                id: 'fornecedor',
+                titulo: 'Fornecedor',
+                // R17: o fornecedor NOMEIA a linha do ranking.
                 tipo: 'identidade',
                 noCard: 'titulo',
                 render: (item) => (
-                  <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/pedidos-compra/${item.id}`}>
-                    PC #{item.id}
-                  </Link>
+                  <CelulaDupla
+                    principal={item.fornecedor_nome}
+                    sub={`${item.cnpj || 'Sem CNPJ'}${item.estado ? ` - ${item.estado}` : ''}`}
+                  />
                 )
               },
-              { id: 'fornecedor', titulo: 'Fornecedor', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.fornecedor?.nome || 'Sem fornecedor'}</span> },
-              {
-                id: 'status',
-                titulo: 'Status',
-                tipo: 'status',
-                render: (item) => <StatusBadge status={item.status_label || '-'} />
-              },
-              { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
-              {
-                id: 'solicitacao',
-                titulo: 'Solicitacao',
-                tipo: 'codigo',
-                render: (item) => (item.solicitacao?.id ? (
-                  <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.solicitacao.id}`}>
-                    SC #{item.solicitacao.id}
-                  </Link>
-                ) : '-')
-              },
+              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
               { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
-              { id: 'criado', titulo: 'Criado em', tipo: 'data', render: (item) => formatDate(item.criado_em) }
+              {
+                id: 'obras',
+                titulo: 'Obras/centros',
+                tipo: 'texto',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={formatNumber(item.obras)}
+                    sub={(item.obras_nomes || []).join(', ') || '-'}
+                  />
+                )
+              },
+              { id: 'valor', titulo: 'Valor pedido', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+              { id: 'ticket', titulo: 'Ticket medio', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
+              { id: 'minimo', titulo: 'Minimo nao atingido', tipo: 'numero', render: (item) => formatNumber(item.pedidos_minimo_nao_atingido) },
+              { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
             ]}
-            itens={pedidos}
+            itens={fornecedores}
+            getId={(item) => item.key}
             carregando={loading}
-            storageKey="tabela:compras-fornecedor:pedidos"
-            rotuloRolagem="Pedidos recentes"
-            vazio="Sem pedidos nos filtros."
+            storageKey="tabela:compras-fornecedor:fornecedores"
+            rotuloRolagem="Fornecedores por valor pedido"
+            vazio="Sem pedidos emitidos nos filtros."
           />
         </BlocoConteudo>
-      </div>
+
+        <div data-bloco-id="compras-por-obra-centro" data-bloco-rotulo="Compras por obra/centro" className="grid gap-4 lg:grid-cols-2">
+          <BlocoConteudo
+            titulo="Compras por obra/centro"
+            descricao="Onde o valor comprado por fornecedor esta concentrado."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'obra',
+                  titulo: 'Obra/Centro',
+                  // R17: a obra/centro NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.obra_nome
+                },
+                { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+                { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+                { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+                { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) }
+              ]}
+              itens={obrasResumo}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-fornecedor:obras"
+              rotuloRolagem="Compras por obra/centro"
+              vazio="Sem pedidos por obra/centro nos filtros."
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Pedidos recentes"
+            contagem="Ultimos 100"
+            descricao="Pedidos usados no relatorio."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'pedido',
+                  titulo: 'Pedido',
+                  // R17: o pedido de compra NOMEIA o registro.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => (
+                    <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/pedidos-compra/${item.id}`}>
+                      PC #{item.id}
+                    </Link>
+                  )
+                },
+                { id: 'fornecedor', titulo: 'Fornecedor', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.fornecedor?.nome || 'Sem fornecedor'}</span> },
+                {
+                  id: 'status',
+                  titulo: 'Status',
+                  tipo: 'status',
+                  render: (item) => <StatusBadge status={item.status_label || '-'} />
+                },
+                { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
+                {
+                  id: 'solicitacao',
+                  titulo: 'Solicitacao',
+                  tipo: 'codigo',
+                  render: (item) => (item.solicitacao?.id ? (
+                    <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.solicitacao.id}`}>
+                      SC #{item.solicitacao.id}
+                    </Link>
+                  ) : '-')
+                },
+                { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+                { id: 'criado', titulo: 'Criado em', tipo: 'data', render: (item) => formatDate(item.criado_em) }
+              ]}
+              itens={pedidos}
+              carregando={loading}
+              storageKey="tabela:compras-fornecedor:pedidos"
+              rotuloRolagem="Pedidos recentes"
+              vazio="Sem pedidos nos filtros."
+            />
+          </BlocoConteudo>
+        </div>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

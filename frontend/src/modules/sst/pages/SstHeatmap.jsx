@@ -3,6 +3,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   Avisos,
@@ -73,51 +74,61 @@ export default function SstHeatmap() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <BlocoConteudo titulo="Totais do recorte" descricao="Soma do que o mapa distribui por obra.">
-        <StatGrid>
-          {totais.map(([chave, valor]) => (
-            <StatTile key={chave} label={rotuloTotal(chave)} valor={valor} />
-          ))}
-          {!totais.length ? <StatTile label="Totais" valor={0} vazio /> : null}
-        </StatGrid>
-      </BlocoConteudo>
-
       {/*
-        Mapa de calor, não tabela: a leitura aqui é espacial — a pessoa
-        varre o grid procurando as manchas vermelhas, não compara colunas.
-        Por isso o padrão entra como MOLDURA (Pagina + PageHeader +
-        BlocoConteudo) e o miolo continua sendo um grid de células, cada
-        uma com a tarja da sua família e a etiqueta de criticidade (cor +
-        ícone + texto — cor sozinha não comunica para daltônicos).
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      <BlocoConteudo
-        titulo="Risco por obra"
-        variante="primario"
-        cor="var(--module-sst)"
-        contagem={`${pontos.length} ponto(s)`}
-        descricao="Cada celula soma pendencias, bloqueios, acidentes e riscos da obra."
-      >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {pontos.map((item) => (
-            <BlocoConteudo
-              key={`${item.obra_id || 'sem'}-${item.obra}`}
-              variante="secundario"
-              className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
-              titulo={item.obra}
-              descricao={`Indice de risco ${item.indice_risco}`}
-              acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
-            >
-              <StatGrid colunas={2}>
-                <StatTile label="Pendencias" valor={item.pendencias ?? 0} tom={item.pendencias ? 'warning' : undefined} />
-                <StatTile label="Bloqueios" valor={item.bloqueios ?? 0} tom={item.bloqueios ? 'danger' : undefined} />
-                <StatTile label="Acidentes" valor={item.acidentes ?? 0} tom={item.acidentes ? 'danger' : undefined} />
-                <StatTile label="Riscos" valor={item.riscos ?? 0} tom={item.riscos ? 'warning' : undefined} />
-              </StatGrid>
-            </BlocoConteudo>
-          ))}
-          {!pontos.length ? <p className="text-sm text-muted">Nenhum ponto critico detectado.</p> : null}
-        </div>
-      </BlocoConteudo>
+      <BlocosPersonalizaveis chave="blocos:sst-heatmap" larguraPadrao="total">
+        <BlocoConteudo titulo="Totais do recorte" descricao="Soma do que o mapa distribui por obra.">
+          <StatGrid>
+            {totais.map(([chave, valor]) => (
+              <StatTile key={chave} label={rotuloTotal(chave)} valor={valor} />
+            ))}
+            {!totais.length ? <StatTile label="Totais" valor={0} vazio /> : null}
+          </StatGrid>
+        </BlocoConteudo>
+
+        {/*
+          Mapa de calor, não tabela: a leitura aqui é espacial — a pessoa
+          varre o grid procurando as manchas vermelhas, não compara colunas.
+          Por isso o padrão entra como MOLDURA (Pagina + PageHeader +
+          BlocoConteudo) e o miolo continua sendo um grid de células, cada
+          uma com a tarja da sua família e a etiqueta de criticidade (cor +
+          ícone + texto — cor sozinha não comunica para daltônicos).
+        */}
+        <BlocoConteudo
+          titulo="Risco por obra"
+          variante="primario"
+          cor="var(--module-sst)"
+          contagem={`${pontos.length} ponto(s)`}
+          descricao="Cada celula soma pendencias, bloqueios, acidentes e riscos da obra."
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {pontos.map((item) => (
+              <BlocoConteudo
+                key={`${item.obra_id || 'sem'}-${item.obra}`}
+                variante="secundario"
+                className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
+                titulo={item.obra}
+                descricao={`Indice de risco ${item.indice_risco}`}
+                acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
+              >
+                <StatGrid colunas={2}>
+                  <StatTile label="Pendencias" valor={item.pendencias ?? 0} tom={item.pendencias ? 'warning' : undefined} />
+                  <StatTile label="Bloqueios" valor={item.bloqueios ?? 0} tom={item.bloqueios ? 'danger' : undefined} />
+                  <StatTile label="Acidentes" valor={item.acidentes ?? 0} tom={item.acidentes ? 'danger' : undefined} />
+                  <StatTile label="Riscos" valor={item.riscos ?? 0} tom={item.riscos ? 'warning' : undefined} />
+                </StatGrid>
+              </BlocoConteudo>
+            ))}
+            {!pontos.length ? <p className="text-sm text-muted">Nenhum ponto critico detectado.</p> : null}
+          </div>
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

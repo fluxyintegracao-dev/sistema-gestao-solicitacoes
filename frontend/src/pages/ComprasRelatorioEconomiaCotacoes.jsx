@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   CelulaDupla,
   Pagina,
   PageHeader,
@@ -367,200 +368,210 @@ export default function ComprasRelatorioEconomiaCotacoes() {
         />
       </StatGrid>
 
-      <BlocoConteudo
-        /*
-          O título diz o que a ORDEM faz (ver a nota no `sort` acima): a lista
-          desce por sobrepreço, então ela é a lista dos maiores sobrepreços —
-          não a dos maiores impactos financeiros, que traria as economias
-          junto.
-        */
-        titulo="Maiores sobreprecos por cotacao"
-        contagem={`Top ${LIMITE_COTACOES_IMPACTO}`}
-        descricao="Ordenado pelo sobrepreco somado dos itens vencidos no periodo; a economia da mesma cotacao aparece ao lado, para comparacao."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        {loading ? (
-          <div className="app-empty-card">Carregando cotacoes...</div>
-        ) : cotacoesResumo.length === 0 ? (
-          <div className="app-empty-card">Sem cotacoes encerradas com vencedor para montar o grafico.</div>
-        ) : (
-          <div className="grid gap-4">
-            {cotacoesResumo.map((cotacao) => {
-              const economia = Number(cotacao.economia || 0);
-              const sobrepreco = Number(cotacao.sobrepreco || 0);
-              /*
-                BARRA QUE MENTIA SOBRE O ZERO (corrigido). O cálculo era
-                `Math.max(3, (valor / maior) * 100)`: economia ZERO e
-                sobrepreço ZERO desenhavam 3% de barra cada um. Numa tela cuja
-                pergunta é exatamente "houve economia? houve sobrepreço?", o
-                piso respondia "houve um pouco" para "não houve nada" — e o
-                caso mais comum é justamente o sobrepreço zerado, ou seja, a
-                compra CERTA aparecia manchada de vermelho.
-                Zero agora tem largura zero; o resto fica na proporção real
-                sobre o maior impacto da lista, e o valor em dinheiro ao lado
-                continua sendo a fonte exata.
-              */
-              const economiaWidth = maiorImpactoCotacao > 0 ? (economia / maiorImpactoCotacao) * 100 : 0;
-              const sobreprecoWidth = maiorImpactoCotacao > 0 ? (sobrepreco / maiorImpactoCotacao) * 100 : 0;
-              return (
-                <div key={`cotacao-impacto-${cotacao.solicitacao.id}`} className="grid gap-2">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <strong className="text-sm text-[var(--c-text)]">SC #{cotacao.solicitacao.id}</strong>
-                      <span className="ml-2 text-xs text-[var(--c-muted)]">
-                        {cotacao.itens} item(ns) | {formatPercent(cotacao.percentual_menor_preco)} no menor preco
-                      </span>
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-economia-cotacoes" larguraPadrao="total">
+        <BlocoConteudo
+          /*
+            O título diz o que a ORDEM faz (ver a nota no `sort` acima): a lista
+            desce por sobrepreço, então ela é a lista dos maiores sobrepreços —
+            não a dos maiores impactos financeiros, que traria as economias
+            junto.
+          */
+          titulo="Maiores sobreprecos por cotacao"
+          contagem={`Top ${LIMITE_COTACOES_IMPACTO}`}
+          descricao="Ordenado pelo sobrepreco somado dos itens vencidos no periodo; a economia da mesma cotacao aparece ao lado, para comparacao."
+          variante="primario"
+          cor="var(--c-primary)"
+        >
+          {loading ? (
+            <div className="app-empty-card">Carregando cotacoes...</div>
+          ) : cotacoesResumo.length === 0 ? (
+            <div className="app-empty-card">Sem cotacoes encerradas com vencedor para montar o grafico.</div>
+          ) : (
+            <div className="grid gap-4">
+              {cotacoesResumo.map((cotacao) => {
+                const economia = Number(cotacao.economia || 0);
+                const sobrepreco = Number(cotacao.sobrepreco || 0);
+                /*
+                  BARRA QUE MENTIA SOBRE O ZERO (corrigido). O cálculo era
+                  `Math.max(3, (valor / maior) * 100)`: economia ZERO e
+                  sobrepreço ZERO desenhavam 3% de barra cada um. Numa tela cuja
+                  pergunta é exatamente "houve economia? houve sobrepreço?", o
+                  piso respondia "houve um pouco" para "não houve nada" — e o
+                  caso mais comum é justamente o sobrepreço zerado, ou seja, a
+                  compra CERTA aparecia manchada de vermelho.
+                  Zero agora tem largura zero; o resto fica na proporção real
+                  sobre o maior impacto da lista, e o valor em dinheiro ao lado
+                  continua sendo a fonte exata.
+                */
+                const economiaWidth = maiorImpactoCotacao > 0 ? (economia / maiorImpactoCotacao) * 100 : 0;
+                const sobreprecoWidth = maiorImpactoCotacao > 0 ? (sobrepreco / maiorImpactoCotacao) * 100 : 0;
+                return (
+                  <div key={`cotacao-impacto-${cotacao.solicitacao.id}`} className="grid gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <strong className="text-sm text-[var(--c-text)]">SC #{cotacao.solicitacao.id}</strong>
+                        <span className="ml-2 text-xs text-[var(--c-muted)]">
+                          {cotacao.itens} item(ns) | {formatPercent(cotacao.percentual_menor_preco)} no menor preco
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
+                        <span style={{ color: economia > 0 ? 'var(--c-success)' : 'var(--c-muted)' }}>
+                          Economia {formatMoney(economia)}
+                        </span>
+                        <span style={{ color: sobrepreco > 0 ? 'var(--c-danger)' : 'var(--c-muted)' }}>
+                          Sobrepreco {formatMoney(sobrepreco)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
-                      <span style={{ color: economia > 0 ? 'var(--c-success)' : 'var(--c-muted)' }}>
-                        Economia {formatMoney(economia)}
-                      </span>
-                      <span style={{ color: sobrepreco > 0 ? 'var(--c-danger)' : 'var(--c-muted)' }}>
-                        Sobrepreco {formatMoney(sobrepreco)}
-                      </span>
+                    <div className="grid gap-1">
+                      {/* R25: o trilho era `bg-slate-100` — paleta crua sem par
+                          no tema escuro; agora é o token de contorno.
+                          R18 (onde NÃO vale, 2): o recorte aqui só arredonda a
+                          FORMA da barra e não é ancestral de nada fixo. */}
+                      <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--c-success)]"
+                          style={{ width: `${economiaWidth}%` }}
+                        />
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--c-danger)]"
+                          style={{ width: `${sobreprecoWidth}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="grid gap-1">
-                    {/* R25: o trilho era `bg-slate-100` — paleta crua sem par
-                        no tema escuro; agora é o token de contorno.
-                        R18 (onde NÃO vale, 2): o recorte aqui só arredonda a
-                        FORMA da barra e não é ancestral de nada fixo. */}
-                    <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
-                      <div
-                        className="h-full rounded-full bg-[var(--c-success)]"
-                        style={{ width: `${economiaWidth}%` }}
-                      />
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
-                      <div
-                        className="h-full rounded-full bg-[var(--c-danger)]"
-                        style={{ width: `${sobreprecoWidth}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </BlocoConteudo>
+                );
+              })}
+            </div>
+          )}
+        </BlocoConteudo>
 
-      {/* R18: a tabela vivia em `card ... overflow-hidden`, que cria
-          scrollport e mata o `position: sticky` sem erro nenhum. */}
-      <BlocoConteudo
-        titulo="Economia por item cotado"
-        descricao="Menor preco disponivel contra o fornecedor vencedor, item a item."
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'cotacao',
-              titulo: 'Cotacao',
-              tipo: 'codigo',
-              render: (linha) => (
-                <CelulaDupla
-                  principal={`SC #${linha.solicitacao.id}`}
-                  sub={`Encerrada em ${formatDate(linha.solicitacao.encerrado_em)}`}
-                />
-              )
-            },
-            {
-              id: 'item',
-              titulo: 'Item',
-              // R17: o item cotado NOMEIA a linha do comparativo.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (linha) => (
-                <CelulaDupla principal={linha.item.descricao} sub={linha.item.unidade} />
-              )
-            },
-            { id: 'quantidade', titulo: 'Qtd.', tipo: 'numero', render: (linha) => Number(linha.item.quantidade || 0).toLocaleString('pt-BR') },
-            /*
-              T7: fornecedor e preco unitario iam juntos na MESMA linha do
-              `sub` (" · "), num texto so — e o nome do fornecedor sozinho ja
-              passa da largura da coluna de valor (190px, pior caso e
-              dinheiro, nao identidade). O preco ficava truncado JUNTO com o
-              nome. Aqui cada dado vira sua PROPRIA linha: o nome do
-              fornecedor (sem "R$") pode truncar com reticencias — T6 aceita
-              texto truncado com o title completo cobrindo, que e o que o
-              `title` do proprio `.app-celula-dupla` ja faz; o preco
-              unitario, sozinho, e curto ("R$ 5,00") e sempre cabe inteiro —
-              T7 nao aceita truncar nem quebrar dinheiro, e sozinho ele nunca
-              precisa.
-            */
-            {
-              id: 'menor_preco',
-              titulo: 'Menor preco',
-              tipo: 'valor',
-              render: (linha) => (
-                <div
-                  className="app-celula-dupla"
-                  title={`${formatMoney(linha.menor_preco.valor_total)} — ${linha.menor_preco.fornecedor_nome} · ${formatMoney(linha.menor_preco.preco_unitario)}`}
-                >
-                  <span className="app-celula-dupla-principal">{formatMoney(linha.menor_preco.valor_total)}</span>
-                  <span className="app-celula-dupla-sub">{linha.menor_preco.fornecedor_nome}</span>
-                  <span className="app-celula-dupla-sub">{formatMoney(linha.menor_preco.preco_unitario)}</span>
-                </div>
-              )
-            },
-            {
-              id: 'vencedor',
-              titulo: 'Vencedor',
-              tipo: 'valor',
-              render: (linha) => (
-                <div
-                  className="app-celula-dupla"
-                  title={`${formatMoney(linha.vencedor.valor_total)} — ${linha.vencedor.fornecedor_nome} · ${formatMoney(linha.vencedor.preco_unitario)}`}
-                >
-                  <span className="app-celula-dupla-principal">{formatMoney(linha.vencedor.valor_total)}</span>
-                  <span className="app-celula-dupla-sub">{linha.vencedor.fornecedor_nome}</span>
-                  <span className="app-celula-dupla-sub">{formatMoney(linha.vencedor.preco_unitario)}</span>
-                </div>
-              )
-            },
-            {
-              id: 'economia',
-              titulo: 'Economia',
-              tipo: 'valor',
-              render: (linha) => (
-                <span className="font-semibold" style={{ color: metricColor(linha.economia) }}>
-                  {formatMoney(linha.economia)}
-                </span>
-              )
-            },
-            {
-              id: 'sobrepreco',
-              titulo: 'Sobrepreco',
-              tipo: 'valor',
-              render: (linha) => (
-                <span
-                  className="font-semibold"
-                  style={{ color: Number(linha.sobrepreco || 0) > 0 ? 'var(--c-danger)' : 'var(--c-muted)' }}
-                >
-                  {formatMoney(linha.sobrepreco)}
-                </span>
-              )
-            },
-            {
-              id: 'sinal',
-              titulo: 'Sinal',
-              tipo: 'badge',
-              render: (linha) => (linha.selecionou_menor_preco ? (
-                <span className="badge badge-success">Menor preco</span>
-              ) : (
-                <span className="badge badge-warning">Acima do menor</span>
-              ))
-            }
-          ]}
-          itens={itens}
-          getId={(linha) => `${linha.solicitacao.id}-${linha.item.item_tipo}-${linha.item.item_referencia_id}`}
-          carregando={loading}
-          storageKey="tabela:compras-economia-cotacoes:itens"
-          rotuloRolagem="Economia por item cotado"
-          vazio="Nenhum item com vencedor encontrado para os filtros selecionados."
-        />
-      </BlocoConteudo>
+        {/* R18: a tabela vivia em `card ... overflow-hidden`, que cria
+            scrollport e mata o `position: sticky` sem erro nenhum. */}
+        <BlocoConteudo
+          titulo="Economia por item cotado"
+          descricao="Menor preco disponivel contra o fornecedor vencedor, item a item."
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'cotacao',
+                titulo: 'Cotacao',
+                tipo: 'codigo',
+                render: (linha) => (
+                  <CelulaDupla
+                    principal={`SC #${linha.solicitacao.id}`}
+                    sub={`Encerrada em ${formatDate(linha.solicitacao.encerrado_em)}`}
+                  />
+                )
+              },
+              {
+                id: 'item',
+                titulo: 'Item',
+                // R17: o item cotado NOMEIA a linha do comparativo.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (linha) => (
+                  <CelulaDupla principal={linha.item.descricao} sub={linha.item.unidade} />
+                )
+              },
+              { id: 'quantidade', titulo: 'Qtd.', tipo: 'numero', render: (linha) => Number(linha.item.quantidade || 0).toLocaleString('pt-BR') },
+              /*
+                T7: fornecedor e preco unitario iam juntos na MESMA linha do
+                `sub` (" · "), num texto so — e o nome do fornecedor sozinho ja
+                passa da largura da coluna de valor (190px, pior caso e
+                dinheiro, nao identidade). O preco ficava truncado JUNTO com o
+                nome. Aqui cada dado vira sua PROPRIA linha: o nome do
+                fornecedor (sem "R$") pode truncar com reticencias — T6 aceita
+                texto truncado com o title completo cobrindo, que e o que o
+                `title` do proprio `.app-celula-dupla` ja faz; o preco
+                unitario, sozinho, e curto ("R$ 5,00") e sempre cabe inteiro —
+                T7 nao aceita truncar nem quebrar dinheiro, e sozinho ele nunca
+                precisa.
+              */
+              {
+                id: 'menor_preco',
+                titulo: 'Menor preco',
+                tipo: 'valor',
+                render: (linha) => (
+                  <div
+                    className="app-celula-dupla"
+                    title={`${formatMoney(linha.menor_preco.valor_total)} — ${linha.menor_preco.fornecedor_nome} · ${formatMoney(linha.menor_preco.preco_unitario)}`}
+                  >
+                    <span className="app-celula-dupla-principal">{formatMoney(linha.menor_preco.valor_total)}</span>
+                    <span className="app-celula-dupla-sub">{linha.menor_preco.fornecedor_nome}</span>
+                    <span className="app-celula-dupla-sub">{formatMoney(linha.menor_preco.preco_unitario)}</span>
+                  </div>
+                )
+              },
+              {
+                id: 'vencedor',
+                titulo: 'Vencedor',
+                tipo: 'valor',
+                render: (linha) => (
+                  <div
+                    className="app-celula-dupla"
+                    title={`${formatMoney(linha.vencedor.valor_total)} — ${linha.vencedor.fornecedor_nome} · ${formatMoney(linha.vencedor.preco_unitario)}`}
+                  >
+                    <span className="app-celula-dupla-principal">{formatMoney(linha.vencedor.valor_total)}</span>
+                    <span className="app-celula-dupla-sub">{linha.vencedor.fornecedor_nome}</span>
+                    <span className="app-celula-dupla-sub">{formatMoney(linha.vencedor.preco_unitario)}</span>
+                  </div>
+                )
+              },
+              {
+                id: 'economia',
+                titulo: 'Economia',
+                tipo: 'valor',
+                render: (linha) => (
+                  <span className="font-semibold" style={{ color: metricColor(linha.economia) }}>
+                    {formatMoney(linha.economia)}
+                  </span>
+                )
+              },
+              {
+                id: 'sobrepreco',
+                titulo: 'Sobrepreco',
+                tipo: 'valor',
+                render: (linha) => (
+                  <span
+                    className="font-semibold"
+                    style={{ color: Number(linha.sobrepreco || 0) > 0 ? 'var(--c-danger)' : 'var(--c-muted)' }}
+                  >
+                    {formatMoney(linha.sobrepreco)}
+                  </span>
+                )
+              },
+              {
+                id: 'sinal',
+                titulo: 'Sinal',
+                tipo: 'badge',
+                render: (linha) => (linha.selecionou_menor_preco ? (
+                  <span className="badge badge-success">Menor preco</span>
+                ) : (
+                  <span className="badge badge-warning">Acima do menor</span>
+                ))
+              }
+            ]}
+            itens={itens}
+            getId={(linha) => `${linha.solicitacao.id}-${linha.item.item_tipo}-${linha.item.item_referencia_id}`}
+            carregando={loading}
+            storageKey="tabela:compras-economia-cotacoes:itens"
+            rotuloRolagem="Economia por item cotado"
+            vazio="Nenhum item com vencedor encontrado para os filtros selecionados."
+          />
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

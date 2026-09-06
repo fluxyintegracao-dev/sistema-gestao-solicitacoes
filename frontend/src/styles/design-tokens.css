@@ -199,9 +199,13 @@
   min-width: 0;
 }
 
-.hub-personalizar-toolbar {
-  margin: 0;
-}
+/* O que MORREU aqui em 05/09, e por quê: `.hub-personalizar-toolbar`,
+   `.hub-adicionar-pop` e `.hub-adicionar-grupo*` desenhavam a barra de
+   personalização e o catálogo "Adicionar bloco" da Home. Esse desenho não é
+   mais da tela — é do `components/padrao/BlocosPersonalizaveis.jsx`, com o
+   prefixo neutro `app-blocos-*` (em index.css), o mesmo que o detalhe da
+   solicitação usa. Regra morta que fica vira armadilha: parece que a Home
+   tem estilo próprio de personalização, e ela não tem mais. */
 
 /* Largura "Normal" = meia largura em telas largas; abaixo disso a
    coluna única volta (largura não se aplica no mobile). */
@@ -2019,33 +2023,6 @@
 
 .hub-modulo-remover:hover::before {
   border-color: var(--sem-danger);
-}
-
-/* Catálogo "Adicionar bloco" agrupado */
-.hub-adicionar-pop {
-  min-width: 300px;
-  max-height: 420px;
-  overflow-y: auto;
-}
-
-.hub-adicionar-grupo {
-  display: flex;
-  flex-direction: column;
-}
-
-.hub-adicionar-grupo + .hub-adicionar-grupo {
-  margin-top: 6px;
-  border-top: 1px solid var(--ui-border);
-  padding-top: 6px;
-}
-
-.hub-adicionar-grupo-titulo {
-  padding: 4px 10px 2px;
-  font-size: var(--fonte-detalhe);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--app-muted-color);
 }
 
 /* Toast único do "módulo continua no Ctrl+K" */

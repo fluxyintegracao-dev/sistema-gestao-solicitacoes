@@ -12,6 +12,7 @@ import {
   TabelaPadrao,
   useAvisos
 } from '../../../components/padrao';
+import { useFiltrosVisiveis } from '../../../components/padrao/PainelFiltrosVisiveis';
 import StatusBadge from '../../../components/StatusBadge';
 import {
   getProvisionamentoFinanceiroContexto,
@@ -48,16 +49,42 @@ const DEFAULT_FILTERS = {
   criterio que nao estava em lugar nenhum da tela. Nao e capricho: sem isso a
   etiqueta some junto com o campo (ela nasce de `filtros`), e o filtro
   invisivel volta exatamente como era.
+
+  ------------------------------------------------------------------------
+  UNIFICAÇÃO E PERSISTÊNCIA (05/09, fechamento do N53).
+
+  Este painel era o TERCEIRO desenho da mesma ideia no sistema — bloco
+  recolhível com caixas soltas, ao lado de um modal (Consulta de títulos) e
+  de um menu de marcação (Solicitações), nas 3 telas medidas que oferecem a
+  escolha. Passa a usar a superfície única
+  (`components/padrao/PainelFiltrosVisiveis.jsx`), no molde do painel
+  "Colunas" da TabelaPadrao.
+
+  E, principalmente, PASSA A GRAVAR. Ele era o único dos três que não
+  guardava nada: a escolha morria no F5, e a capacidade que o cliente
+  mandou repor durava uma sessão. Agora vai para o banco (tipo `filtros`,
+  por usuário) — a mesma escolha vale no desktop da obra e no notebook.
+
+  O CONJUNTO INICIAL abaixo (`padrao: false` = nasce escondido) é o
+  recorte aprovado pelo cliente para esta tela: busca, período e os dois
+  recortes que a operação usa todo dia (obra e status). Credor, item macro,
+  prioridade e criador continuam a um clique de distância, e quem JÁ tinha
+  configurado não é afetado — o padrão só vale para quem nunca configurou.
+
+  `busca` é OBRIGATÓRIO: é o único caminho para achar uma provisão pelo que
+  a pessoa lembra dela (código, descrição ou credor). Mesma família da
+  coluna de identidade travada da TabelaPadrao.
 */
-const FILTROS_ESCONDIVEIS = [
-  { id: 'obra_id', rotulo: 'Obra' },
-  { id: 'categoria_macro_id', rotulo: 'Item macro' },
-  { id: 'status', rotulo: 'Status' },
-  { id: 'prioridade', rotulo: 'Prioridade' },
-  { id: 'fornecedor', rotulo: 'Credor' },
-  { id: 'usuario_criacao_id', rotulo: 'Criador' },
+const FILTROS_DA_TELA = [
+  { id: 'busca', rotulo: 'Busca', obrigatorio: true },
   { id: 'data_inicial', rotulo: 'Data inicial' },
-  { id: 'data_final', rotulo: 'Data final' }
+  { id: 'data_final', rotulo: 'Data final' },
+  { id: 'obra_id', rotulo: 'Obra' },
+  { id: 'status', rotulo: 'Status' },
+  { id: 'fornecedor', rotulo: 'Credor', padrao: false },
+  { id: 'categoria_macro_id', rotulo: 'Item macro', padrao: false },
+  { id: 'prioridade', rotulo: 'Prioridade', padrao: false },
+  { id: 'usuario_criacao_id', rotulo: 'Criador', padrao: false }
 ];
 
 const STATUS_OPCOES = [
@@ -164,20 +191,37 @@ export default function ProvisionamentosFinanceiros() {
   const [loadingBase, setLoadingBase] = useState(true);
   const [loadingLista, setLoadingLista] = useState(false);
   const [filtros, setFiltros] = useState(DEFAULT_FILTERS);
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => FILTROS_ESCONDIVEIS.map((f) => f.id));
+  const [ordenacao, setOrdenacao] = useState(ORDENACAO_PADRAO);
 
   /*
-    Esconder LIMPA. Se o valor ficasse, ele continuaria recortando a lista
-    sem campo e sem etiqueta — o defeito que a propria migracao apontou.
+    Filtro com valor é filtro VISÍVEL — o outro lado de "esconder limpa".
+    Um valor pode chegar antes da preferência (link, voltar do detalhe), e
+    escondê-lo deixaria a lista recortada por um critério fora da tela.
   */
-  function alternarVisibilidadeFiltro(id) {
-    setFiltrosVisiveis((atuais) => {
-      const escondendo = atuais.includes(id);
-      if (escondendo) atualizarFiltro(id, DEFAULT_FILTERS[id] ?? '');
-      return escondendo ? atuais.filter((x) => x !== id) : [...atuais, id];
-    });
-  }
-  const [ordenacao, setOrdenacao] = useState(ORDENACAO_PADRAO);
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA
+      .filter((filtro) => String(filtros?.[filtro.id] ?? '').trim() !== '')
+      .map((filtro) => filtro.id),
+    [filtros]
+  );
+
+  /*
+    A escolha mora na MESMA chave de lista que a TabelaPadrao desta tela já
+    usa: é a mesma lista respondendo a duas perguntas (quais colunas, quais
+    filtros), e o contexto separa as duas pelo TIPO.
+
+    Sem `legado`: esta tela nunca gravou a escolha em lugar nenhum, então
+    não há chave antiga de onde migrar — não existe usuário desta tela com
+    configuração para preservar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis(STORAGE_KEY, FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    // Esconder LIMPA. Se o valor ficasse, ele continuaria recortando a
+    // lista sem campo e sem etiqueta — o defeito que a propria migracao
+    // apontou. Limpar dispara a consulta de novo (o efeito de busca depende
+    // de `filtros`): a lista alarga junto com a faixa.
+    aoEsconder: (id) => atualizarFiltro(id, DEFAULT_FILTERS[id] ?? '')
+  });
 
   useEffect(() => {
     async function carregarBase() {
@@ -396,11 +440,11 @@ export default function ProvisionamentosFinanceiros() {
           contínuas), então vão em `campos`, na mesma faixa.
         */}
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: filtros.busca,
             aoMudar: (valor) => atualizarFiltro('busca', valor),
             placeholder: 'Buscar codigo, descricao ou credor'
-          }}
+          } : null}
           campos={[
             {
               id: 'fornecedor',
@@ -422,38 +466,20 @@ export default function ProvisionamentosFinanceiros() {
               valor: filtros.data_final,
               aoMudar: (valor) => atualizarFiltro('data_final', valor)
             }
-          ].filter((campo) => filtrosVisiveis.includes(campo.id))}
-          filtros={dimensoes.filter((dim) => filtrosVisiveis.includes(dim.id))}
+          ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
+          filtros={dimensoes.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
+          /*
+            O painel de "quais filtros aparecem" desce para DENTRO da faixa
+            (05/09). Ele era um bloco recolhível separado, e a distância era
+            o problema: a pessoa via a faixa encolher sem ver o que a
+            encolheu. Junto do que governa, e no mesmo lugar das outras duas
+            telas, ele é aprendido uma vez só.
+          */
+          visibilidade={visibilidadeFiltros}
           aoAlternar={alternarFiltro}
           aoLimpar={limparFiltros}
         />
-
-        {/*
-          O painel volta como bloco proprio, recolhido: e configuracao de
-          quem opera a tela, nao recorte — misturado a faixa de filtros ele
-          competiria com o que a pessoa veio fazer.
-        */}
-        <BlocoConteudo
-          titulo="Quais filtros aparecem"
-          descricao="Esconder um filtro tambem LIMPA o valor dele — filtro escondido nao continua recortando a lista."
-          variante="secundario"
-          recolhivel
-          recolhidoPadrao
-        >
-          <div className="app-filtros-campos">
-            {FILTROS_ESCONDIVEIS.map((item) => (
-              <label key={item.id} className="app-filtros-campo-rotulo" style={{ display: 'flex', alignItems: 'center', gap: 'var(--esp-2)' }}>
-                <input
-                  type="checkbox"
-                  checked={filtrosVisiveis.includes(item.id)}
-                  onChange={() => alternarVisibilidadeFiltro(item.id)}
-                />
-                <span>{item.rotulo}</span>
-              </label>
-            ))}
-          </div>
-        </BlocoConteudo>
 
         <TabelaPadrao
           colunas={[

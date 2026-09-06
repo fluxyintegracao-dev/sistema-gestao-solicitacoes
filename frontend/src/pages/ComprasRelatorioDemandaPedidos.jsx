@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -310,132 +311,142 @@ export default function ComprasRelatorioDemandaPedidos() {
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <BlocoConteudo titulo="Solicitacoes por obra/centro" descricao="Origem das demandas no periodo filtrado.">
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 3 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-demanda-pedidos" larguraPadrao="total">
+        <div data-bloco-id="solicitacoes-por-obra-centro" data-bloco-rotulo="Solicitacoes por obra/centro" className="grid gap-4 xl:grid-cols-2">
+          <BlocoConteudo titulo="Solicitacoes por obra/centro" descricao="Origem das demandas no periodo filtrado.">
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'obra',
+                  titulo: 'Obra/Centro',
+                  // R17: a obra/centro NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.label
+                },
+                { id: 'total', titulo: 'Total', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor pedidos', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+              ]}
+              itens={solicitacoesPorObra}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-demanda-pedidos:obras-solicitacoes"
+              rotuloRolagem="Solicitacoes por obra/centro"
+              vazio="Sem solicitacoes no periodo."
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo titulo="Pedidos por obra/centro" descricao="Valor efetivamente pedido por origem operacional.">
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'obra',
+                  titulo: 'Obra/Centro',
+                  // R17: a obra/centro NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.label
+                },
+                { id: 'total', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.total) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+              ]}
+              itens={pedidosPorObra}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-demanda-pedidos:obras-pedidos"
+              rotuloRolagem="Pedidos por obra/centro"
+              vazio="Sem pedidos no periodo."
+            />
+          </BlocoConteudo>
+        </div>
+
+        <BlocoConteudo
+          titulo="Analitico de solicitacoes"
+          contagem="Ultimas 100"
+          descricao="Solicitacoes conforme os filtros aplicados."
+          variante="primario"
+          cor="var(--c-primary)"
+        >
           <TabelaPadrao
             colunas={[
               {
-                id: 'obra',
-                titulo: 'Obra/Centro',
-                // R17: a obra/centro NOMEIA a linha deste resumo.
+                id: 'codigo',
+                titulo: 'Codigo',
+                // R17: o codigo da solicitacao NOMEIA o registro.
                 tipo: 'identidade',
                 noCard: 'titulo',
-                render: (item) => item.label
+                render: (item) => (
+                  <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.id}`}>
+                    SC #{item.id}
+                  </Link>
+                )
               },
-              { id: 'total', titulo: 'Total', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor pedidos', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+              { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => <StatusBadge status={item.status_label || '-'} />
+              },
+              { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
+              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+              { id: 'valor', titulo: 'Valor pedidos', tipo: 'valor', render: (item) => formatMoney(item.valor_pedidos) },
+              { id: 'criado', titulo: 'Criada em', tipo: 'data', render: (item) => formatDate(item.criado_em) }
             ]}
-            itens={solicitacoesPorObra}
-            getId={(item) => item.key}
+            itens={solicitacoes}
             carregando={loading}
-            storageKey="tabela:compras-demanda-pedidos:obras-solicitacoes"
-            rotuloRolagem="Solicitacoes por obra/centro"
+            storageKey="tabela:compras-demanda-pedidos:solicitacoes"
+            rotuloRolagem="Analitico de solicitacoes"
             vazio="Sem solicitacoes no periodo."
           />
         </BlocoConteudo>
 
-        <BlocoConteudo titulo="Pedidos por obra/centro" descricao="Valor efetivamente pedido por origem operacional.">
+        <BlocoConteudo
+          titulo="Analitico de pedidos"
+          contagem="Ultimos 100"
+          descricao="Pedidos conforme os filtros aplicados."
+        >
           <TabelaPadrao
             colunas={[
               {
-                id: 'obra',
-                titulo: 'Obra/Centro',
-                // R17: a obra/centro NOMEIA a linha deste resumo.
+                id: 'codigo',
+                titulo: 'Pedido',
+                // R17: o codigo do pedido NOMEIA o registro.
                 tipo: 'identidade',
                 noCard: 'titulo',
-                render: (item) => item.label
+                render: (item) => (
+                  <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/pedidos-compra/${item.id}`}>
+                    PC #{item.id}
+                  </Link>
+                )
               },
-              { id: 'total', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.total) },
-              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => <StatusBadge status={item.status_label || '-'} />
+              },
+              { id: 'solicitacao', titulo: 'Solicitacao', tipo: 'codigo', render: (item) => (item.solicitacao ? `SC #${item.solicitacao.id}` : '-') },
+              { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
+              { id: 'criado', titulo: 'Criado em', tipo: 'data', render: (item) => formatDate(item.criado_em) }
             ]}
-            itens={pedidosPorObra}
-            getId={(item) => item.key}
+            itens={pedidos}
             carregando={loading}
-            storageKey="tabela:compras-demanda-pedidos:obras-pedidos"
-            rotuloRolagem="Pedidos por obra/centro"
+            storageKey="tabela:compras-demanda-pedidos:pedidos"
+            rotuloRolagem="Analitico de pedidos"
             vazio="Sem pedidos no periodo."
           />
         </BlocoConteudo>
-      </div>
-
-      <BlocoConteudo
-        titulo="Analitico de solicitacoes"
-        contagem="Ultimas 100"
-        descricao="Solicitacoes conforme os filtros aplicados."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'codigo',
-              titulo: 'Codigo',
-              // R17: o codigo da solicitacao NOMEIA o registro.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => (
-                <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.id}`}>
-                  SC #{item.id}
-                </Link>
-              )
-            },
-            { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (item) => <StatusBadge status={item.status_label || '-'} />
-            },
-            { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
-            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
-            { id: 'valor', titulo: 'Valor pedidos', tipo: 'valor', render: (item) => formatMoney(item.valor_pedidos) },
-            { id: 'criado', titulo: 'Criada em', tipo: 'data', render: (item) => formatDate(item.criado_em) }
-          ]}
-          itens={solicitacoes}
-          carregando={loading}
-          storageKey="tabela:compras-demanda-pedidos:solicitacoes"
-          rotuloRolagem="Analitico de solicitacoes"
-          vazio="Sem solicitacoes no periodo."
-        />
-      </BlocoConteudo>
-
-      <BlocoConteudo
-        titulo="Analitico de pedidos"
-        contagem="Ultimos 100"
-        descricao="Pedidos conforme os filtros aplicados."
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'codigo',
-              titulo: 'Pedido',
-              // R17: o codigo do pedido NOMEIA o registro.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => (
-                <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/pedidos-compra/${item.id}`}>
-                  PC #{item.id}
-                </Link>
-              )
-            },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (item) => <StatusBadge status={item.status_label || '-'} />
-            },
-            { id: 'solicitacao', titulo: 'Solicitacao', tipo: 'codigo', render: (item) => (item.solicitacao ? `SC #${item.solicitacao.id}` : '-') },
-            { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
-            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
-            { id: 'criado', titulo: 'Criado em', tipo: 'data', render: (item) => formatDate(item.criado_em) }
-          ]}
-          itens={pedidos}
-          carregando={loading}
-          storageKey="tabela:compras-demanda-pedidos:pedidos"
-          rotuloRolagem="Analitico de pedidos"
-          vazio="Sem pedidos no periodo."
-        />
-      </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

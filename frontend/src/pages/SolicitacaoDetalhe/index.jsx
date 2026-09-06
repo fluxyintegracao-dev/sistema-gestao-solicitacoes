@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import { useLiveUpdateSubscription } from '../../contexts/LiveUpdatesContext';
 
 import Header, { apoioDoRegistro, formatarValorSolicitacao } from './Header';
@@ -16,7 +15,7 @@ import RecargaCartaoDetalhe from './RecargaCartaoDetalhe';
 import { getContratoParcelas } from '../../services/contratos';
 import ModalAlterarStatus from './ModalAlterarStatus';
 import { getAcoesPrincipais, resolverAcaoPrincipal } from '../../services/acoesPrincipais';
-import { resolverLayoutDetalhe, rotuloBloco } from './blocosDetalhe';
+import { BLOCOS_DETALHE, resolverLayoutDetalhe } from './blocosDetalhe';
 import { getDetalheLayouts } from '../../services/detalheLayout';
 import { getListaPreferencias, salvarListaPreferencias } from '../../services/listasPreferencias';
 import { tokenSetorDe } from '../../services/atalhos';
@@ -29,6 +28,7 @@ import OverlayModal from '../../components/ui/OverlayModal';
 import {
   Avisos,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   CampoForm,
   FormSecao,
   Pagina,
@@ -278,26 +278,17 @@ export default function SolicitacaoDetalhe() {
   const [layoutSetor, setLayoutSetor] = useState(null);
   const [prefsLayoutUsuario, setPrefsLayoutUsuario] = useState(null);
   const [personalizando, setPersonalizando] = useState(false);
-  const [adicionarBlocoAberto, setAdicionarBlocoAberto] = useState(false);
   /*
-    "ADICIONAR BLOCO" SÓ FECHAVA CLICANDO DE NOVO NO PRÓPRIO BOTÃO (05/09).
+    O "ADICIONAR BLOCO" ERA CÓPIA LITERAL DO DA HOME — E A CÓPIA TROUXE O
+    DESENHO SEM TRAZER O FECHAMENTO (medido e corrigido em 05/09: aqui o
+    `useFecharAoSair` nunca tinha sido ligado, e o painel só fechava
+    clicando de novo no próprio botão; `Esc` não fazia nada).
 
-    Este painel é cópia literal do "Adicionar bloco" do HomeHub — mesma
-    classe, mesmo `role="menu"`, mesmo markup — e a cópia trouxe o desenho
-    sem trazer o fechamento: lá o `useFecharAoSair` está ligado desde o
-    início, aqui ele nunca foi. Resultado: aberto o menu, ele ficava por
-    cima da barra de personalização até a pessoa adivinhar que era para
-    clicar no botão de novo, e `Esc` não fazia nada.
-
-    O ref vai no `.sol-detail-adicionar-wrap`, que envolve o botão E o
-    painel — clicar numa opção é clique DENTRO, o hook não fecha no
-    `mousedown` e o `readicionarBloco` do `onClick` continua rodando (é
-    o mesmo arranjo do HomeHub, e é por isso que lá nunca precisou de
-    `preventDefault`).
+    A correção não mora mais nesta tela: o painel, o ref e o hook foram
+    junto com o resto do mecanismo para o `BlocosPersonalizaveis`. É a
+    razão de a extração valer a pena — o defeito da cópia existia porque
+    havia cópia, e agora só há um lugar onde ele pode voltar a existir.
   */
-  const adicionarBlocoRef = useRef(null);
-  useFecharAoSair(adicionarBlocoRef, adicionarBlocoAberto, () => setAdicionarBlocoAberto(false));
-  const dragBlocoRef = useRef(null);
   // Abaixo de 768px o detalhe vira ABAS, com a ação principal fixa no topo.
   const [isMobileDetalhe, setIsMobileDetalhe] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
@@ -1053,6 +1044,7 @@ export default function SolicitacaoDetalhe() {
   const temCamadaUsuario = (novo) => Boolean(
     novo && (
       novo.ordem?.length || novo.recolhidos?.length || novo.removidos?.length
+      || novo.adicionados?.length
       || Object.keys(novo.larguras || {}).length || novo.historico_ordem === 'desc'
     )
   );
@@ -1068,36 +1060,18 @@ export default function SolicitacaoDetalhe() {
     larguras: { ...largurasBlocos },
     historico_ordem: historicoOrdem
   });
-  const moverBloco = (origemId, alvoId) => {
-    if (!origemId || !alvoId || origemId === alvoId) return;
-    const ordem = ordemBlocos.slice();
-    const de = ordem.indexOf(origemId);
-    const para = ordem.indexOf(alvoId);
-    if (de < 0 || para < 0) return;
-    ordem.splice(para, 0, ordem.splice(de, 1)[0]);
-    persistirLayoutUsuario({ ...camadaAtual(), ordem });
-  };
-  const alternarBlocoRecolhido = (blocoId) => {
-    const recolhidos = new Set(blocosRecolhidos);
-    if (recolhidos.has(blocoId)) recolhidos.delete(blocoId);
-    else recolhidos.add(blocoId);
-    persistirLayoutUsuario({ ...camadaAtual(), recolhidos: Array.from(recolhidos) });
-  };
-  const removerBloco = (blocoId) => {
-    const removidos = new Set(blocosOcultos);
-    removidos.add(blocoId);
-    persistirLayoutUsuario({ ...camadaAtual(), removidos: Array.from(removidos) });
-  };
-  const readicionarBloco = (blocoId) => {
-    const removidos = new Set(blocosOcultos);
-    removidos.delete(blocoId);
-    persistirLayoutUsuario({ ...camadaAtual(), removidos: Array.from(removidos) });
-  };
-  const definirLarguraBloco = (blocoId, largura) => {
-    const larguras = { ...largurasBlocos };
-    if (largura === 'total') larguras[blocoId] = 'total';
-    else delete larguras[blocoId];
-    persistirLayoutUsuario({ ...camadaAtual(), larguras });
+  /*
+    AS SEIS FUNÇÕES DE MUTAÇÃO SAÍRAM DAQUI (05/09).
+
+    `moverBloco`, `alternarBlocoRecolhido`, `removerBloco`,
+    `readicionarBloco`, `definirLarguraBloco` e o `restaurarPadraoSetor`
+    existiam palavra por palavra na Home também. Elas agora vivem UMA vez,
+    no `BlocosPersonalizaveis`, que devolve a camada de BLOCOS inteira; o
+    que sobrou aqui é o que é DO DETALHE e não é bloco — a ordem do
+    histórico, que continua a viajar na mesma preferência.
+  */
+  const persistirArranjoBlocos = (camada) => {
+    persistirLayoutUsuario(camada ? { ...camada, historico_ordem: historicoOrdem } : null);
   };
   const definirOrdemHistorico = (ordem) => {
     persistirLayoutUsuario({ ...camadaAtual(), historico_ordem: ordem === 'desc' ? 'desc' : 'asc' });
@@ -1338,94 +1312,25 @@ export default function SolicitacaoDetalhe() {
     { id: 'historico', rotulo: 'Histórico' }
   ];
 
-  const renderizarBloco = (bloco) => {
-    const recolhido = blocosRecolhidos.has(bloco.id);
-    return (
-      <section
-        key={bloco.id}
-        className="sol-detail-bloco"
-        draggable={personalizando && !isMobileDetalhe}
-        onDragStart={() => { dragBlocoRef.current = bloco.id; }}
-        onDragOver={(event) => { if (personalizando) event.preventDefault(); }}
-        onDrop={() => {
-          if (!personalizando) return;
-          moverBloco(dragBlocoRef.current, bloco.id);
-          dragBlocoRef.current = null;
-        }}
-      >
-        {personalizando && (
-          <div className="sol-detail-bloco-toolbar">
-            <span className="sol-detail-bloco-arrastar" aria-hidden="true">⋮⋮</span>
-            <span className="sol-detail-bloco-nome">{rotuloBloco(bloco.id)}</span>
-            {!isMobileDetalhe && (
-              <label className="sol-detail-bloco-largura">
-                {/* Seletor de CONTEXTO do arranjo (não é filtro de lista) — R12. */}
-                <select
-                  value={largurasBlocos[bloco.id] === 'total' ? 'total' : 'normal'}
-                  onChange={(event) => definirLarguraBloco(bloco.id, event.target.value)}
-                  aria-label={`Largura do bloco ${rotuloBloco(bloco.id)}`}
-                >
-                  <option value="normal">Normal</option>
-                  <option value="total">Largura total</option>
-                </select>
-              </label>
-            )}
-            <button type="button" className="la-link" onClick={() => alternarBlocoRecolhido(bloco.id)}>
-              {recolhido ? 'Mostrar' : 'Recolher'}
-            </button>
-            <button
-              type="button"
-              className="sol-detail-bloco-remover"
-              onClick={() => removerBloco(bloco.id)}
-              title={`Remover ${rotuloBloco(bloco.id)} do seu layout`}
-              aria-label={`Remover ${rotuloBloco(bloco.id)} do seu layout`}
-            >
-              ×
-            </button>
-          </div>
-        )}
-        {recolhido ? (
-          !personalizando && (
-            <button
-              type="button"
-              className="sol-detail-bloco-recolhido"
-              onClick={() => alternarBlocoRecolhido(bloco.id)}
-            >
-              {rotuloBloco(bloco.id)} — mostrar
-            </button>
-          )
-        ) : bloco.conteudo}
-      </section>
-    );
+  /*
+    O DESENHO DO ARRANJO TAMBÉM SAIU (05/09): a barra por bloco, o
+    popover "Adicionar bloco", os segmentos de largura e o bloco recolhido
+    virando uma linha "— mostrar" eram markup copiado entre esta tela e a
+    Home. Agora é o `BlocosPersonalizaveis` quem desenha, com as classes
+    DESTA tela (`classes` abaixo) para o `columns: 2` do detalhe continuar
+    o que sempre foi — a grade neutra do componente é a da Home.
+  */
+  const catalogoBlocos = BLOCOS_DETALHE.map((bloco) => ({
+    id: bloco.id,
+    rotulo: bloco.rotulo,
+    conteudo: conteudoBlocos[bloco.id]
+  }));
+  const arranjoBlocos = {
+    ordem: ordemBlocos,
+    ocultos: blocosOcultos,
+    recolhidos: blocosRecolhidos,
+    larguras: largurasBlocos
   };
-
-  // Blocos removíveis/readicionáveis: o catálogo do "Adicionar bloco" só
-  // oferece o que a permissão e o tipo JÁ permitem nesta solicitação —
-  // adicionar/remover nunca muda o que o usuário PODE ver.
-  const blocosDisponiveisParaAdicionar = ordemBlocos
-    .filter((blocoId) => blocosOcultos.has(blocoId))
-    .map((blocoId) => ({ id: blocoId, conteudo: conteudoBlocos[blocoId] }))
-    .filter((bloco) => bloco.conteudo);
-
-  // Segmentos para a grade: bloco de LARGURA TOTAL quebra a linha e
-  // ocupa tudo; os demais fluem em 2 colunas dentro do segmento.
-  const segmentosBlocos = (() => {
-    const segmentos = [];
-    let corrente = null;
-    for (const bloco of blocosVisiveis) {
-      if (largurasBlocos[bloco.id] === 'total') {
-        segmentos.push({ tipo: 'total', blocos: [bloco] });
-        corrente = null;
-      } else {
-        if (!corrente) {
-          corrente = { tipo: 'colunas', blocos: [] };
-          segmentos.push(corrente);
-        }
-        corrente.blocos.push(bloco);
-      }
-    }
-    return segmentos;
-  })();
 
   const resumoRateio = resumoRateioApropriacao();
 
@@ -1452,10 +1357,7 @@ export default function SolicitacaoDetalhe() {
           // Ações SOBRE ESTA TELA — nenhuma navegação (R11/C6).
           !isMobileDetalhe ? {
             rotulo: personalizando ? 'Concluir personalização' : 'Personalizar layout',
-            onClick: () => {
-              setPersonalizando((atual) => !atual);
-              setAdicionarBlocoAberto(false);
-            }
+            onClick: () => setPersonalizando((atual) => !atual)
           } : null
         ].filter(Boolean)}
       />
@@ -1516,75 +1418,6 @@ export default function SolicitacaoDetalhe() {
         </div>
       )}
 
-      {/* Personalização do layout (desktop): arrastar blocos, recolher,
-          restaurar o padrão do setor. O botão que liga o modo mora no
-          menu "⋯" da faixa; a barra abaixo só existe com o modo ligado. */}
-      {!isMobileDetalhe && personalizando && (
-        <BlocoConteudo
-          titulo="Personalizar layout"
-          variante="secundario"
-          descricao={'Arraste para reordenar; largura, recolher e "×" em cada bloco. Salvo automaticamente. '
-            + 'No celular valem a ordem e os blocos mantidos — largura é só do desktop.'}
-        >
-          <div className="sol-detail-blocos-toolbar">
-            <div className="sol-detail-adicionar-wrap" ref={adicionarBlocoRef}>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setAdicionarBlocoAberto((aberto) => !aberto)}
-                aria-expanded={adicionarBlocoAberto}
-                disabled={blocosDisponiveisParaAdicionar.length === 0}
-              >
-                Adicionar bloco{blocosDisponiveisParaAdicionar.length > 0 ? ` (${blocosDisponiveisParaAdicionar.length})` : ''}
-              </button>
-              {adicionarBlocoAberto && blocosDisponiveisParaAdicionar.length > 0 && (
-                <div className="sol-detail-adicionar-pop" role="menu" aria-label="Blocos disponíveis">
-                  {blocosDisponiveisParaAdicionar.map((bloco) => (
-                    <button
-                      key={bloco.id}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        readicionarBloco(bloco.id);
-                        setAdicionarBlocoAberto(false);
-                      }}
-                    >
-                      {rotuloBloco(bloco.id)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <label className="sol-detail-historico-ordem">
-              Histórico:
-              {/* Seletor de CONTEXTO da apresentação, não filtro de lista — R12. */}
-              <select
-                value={historicoOrdem}
-                onChange={(event) => definirOrdemHistorico(event.target.value)}
-                aria-label="Ordem do histórico"
-              >
-                <option value="asc">mais antigos primeiro</option>
-                <option value="desc">mais recentes primeiro</option>
-              </select>
-            </label>
-            <button type="button" className="btn btn-outline btn-sm" onClick={restaurarPadraoSetor}>
-              Restaurar padrão do setor
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm sol-detail-personalizando"
-              onClick={() => {
-                setPersonalizando(false);
-                setAdicionarBlocoAberto(false);
-              }}
-              aria-pressed
-            >
-              Concluir personalização
-            </button>
-          </div>
-        </BlocoConteudo>
-      )}
-
       {isMobileDetalhe ? (
         <>
           <div className="sol-detail-abas" role="tablist" aria-label="Seções do detalhe">
@@ -1601,31 +1434,66 @@ export default function SolicitacaoDetalhe() {
               </button>
             ))}
           </div>
-          <div className="sol-detail-blocos sol-detail-blocos--mobile">
-            {blocosVisiveis
-              .filter((bloco) => ABA_DO_BLOCO[bloco.id] === abaMobile)
-              .map(renderizarBloco)}
-            {blocosVisiveis.filter((bloco) => ABA_DO_BLOCO[bloco.id] === abaMobile).length === 0 && (
-              <BlocoConteudo variante="secundario">
-                Nada nesta aba para esta solicitação.
-              </BlocoConteudo>
-            )}
-          </div>
+          {/* No celular o catálogo entregue ao componente é só o da ABA: o
+              arranjo continua sendo o mesmo (a ordem e os blocos mantidos
+              valem aqui), mas quem não é desta aba não entra no desenho. */}
+          <BlocosPersonalizaveis
+            blocos={catalogoBlocos.filter((bloco) => ABA_DO_BLOCO[bloco.id] === abaMobile)}
+            arranjo={arranjoBlocos}
+            preferenciasBrutas={prefsLayoutUsuario}
+            aoMudarArranjo={persistirArranjoBlocos}
+            aoRestaurar={restaurarPadraoSetor}
+            personalizando={false}
+            classes={{
+              arranjo: 'sol-detail-arranjo',
+              colunas: 'sol-detail-blocos sol-detail-blocos--mobile',
+              segmentoTotal: 'sol-detail-segmento-total',
+              bloco: 'sol-detail-bloco'
+            }}
+          />
+          {blocosVisiveis.filter((bloco) => ABA_DO_BLOCO[bloco.id] === abaMobile).length === 0 && (
+            <BlocoConteudo variante="secundario">
+              Nada nesta aba para esta solicitação.
+            </BlocoConteudo>
+          )}
         </>
       ) : (
-        <div className="sol-detail-arranjo">
-          {segmentosBlocos.map((segmento, indice) => (
-            segmento.tipo === 'total' ? (
-              <div key={`seg-${indice}`} className="sol-detail-segmento-total">
-                {segmento.blocos.map(renderizarBloco)}
-              </div>
-            ) : (
-              <div key={`seg-${indice}`} className="sol-detail-blocos">
-                {segmento.blocos.map(renderizarBloco)}
-              </div>
-            )
-          ))}
-        </div>
+        <BlocosPersonalizaveis
+          blocos={catalogoBlocos}
+          arranjo={arranjoBlocos}
+          preferenciasBrutas={prefsLayoutUsuario}
+          aoMudarArranjo={persistirArranjoBlocos}
+          aoRestaurar={restaurarPadraoSetor}
+          rotuloRestaurar="Restaurar padrão do setor"
+          /* O modo é ligado pelo "⋯" da faixa (ação SOBRE ESTA TELA —
+             R11/C6), então ele é controlado daqui e a entrada própria do
+             componente não aparece: dois botões para a mesma coisa
+             seriam dois donos. */
+          personalizando={personalizando}
+          aoAlternarPersonalizando={(ligado) => setPersonalizando(ligado)}
+          /* A ordem do histórico é preferência DESTA tela e não é bloco —
+             continua na mesma barra, ao lado do que é do arranjo. */
+          toolbarExtra={(
+            <label className="sol-detail-historico-ordem">
+              Histórico:
+              {/* Seletor de CONTEXTO da apresentação, não filtro de lista — R12. */}
+              <select
+                value={historicoOrdem}
+                onChange={(event) => definirOrdemHistorico(event.target.value)}
+                aria-label="Ordem do histórico"
+              >
+                <option value="asc">mais antigos primeiro</option>
+                <option value="desc">mais recentes primeiro</option>
+              </select>
+            </label>
+          )}
+          classes={{
+            arranjo: 'sol-detail-arranjo',
+            colunas: 'sol-detail-blocos',
+            segmentoTotal: 'sol-detail-segmento-total',
+            bloco: 'sol-detail-bloco'
+          }}
+        />
       )}
 
       <ModalAlterarStatus

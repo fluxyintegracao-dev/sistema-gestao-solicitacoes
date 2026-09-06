@@ -8,6 +8,7 @@ import {
 import {
   Avisos,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -63,7 +64,17 @@ function GradeContadores({ itens, vazio = 'Sem registros.' }) {
 
 function TabelaLogs({ titulo, logs, chaveTabela }) {
   return (
-    <BlocoConteudo titulo={titulo} contagem={`${(logs || []).length} registro(s)`} recolhivel recolhidoPadrao={!(logs || []).length}>
+    /* A chave vem do `chaveTabela`, que já é o identificador estável deste
+       painel (é ele que nomeia a preferência da tabela lá dentro): título
+       é texto de tela e muda; identificador não. Sem ele o recolhimento
+       continuaria como sempre foi — aberto de novo a cada F5. */
+    <BlocoConteudo
+      titulo={titulo}
+      contagem={`${(logs || []).length} registro(s)`}
+      recolhivel
+      chavePreferencia={`bloco:sst-observabilidade:${chaveTabela}`}
+      recolhidoPadrao={!(logs || []).length}
+    >
       <TabelaPadrao
         // R17: a linha é um EVENTO de log (ação/automação/integração +
         // mensagem + status), não um registro com nome próprio — e o nome da
@@ -193,95 +204,105 @@ export default function SstObservabilidade() {
         <StatTile label="Checks" valor={checklist?.status_geral || '...'} sub={`${fmt(checklist?.pendencias)} pendencias`} />
       </StatGrid>
 
-      <BlocoConteudo
-        titulo="Checklist de homologacao"
-        contagem={`${checks.length} check(s)`}
-        variante="primario"
-        cor="var(--sem-info)"
-        acoes={<EtiquetaStatus valor={checklist?.status_geral} />}
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'check',
-              titulo: 'Check',
-              // R17: o check de homologação tem nome próprio — é ele que
-              // identifica a linha na matriz.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => item.name
-            },
-            {
-              id: 'detalhes',
-              titulo: 'Detalhes',
-              tipo: 'texto',
-              render: (item) => (
-                item.details
-                  ? (typeof item.details === 'string' ? item.details : JSON.stringify(item.details))
-                  : '-'
-              )
-            },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (item) => <EtiquetaStatus valor={item.status} />
-            }
-          ]}
-          itens={checks}
-          getId={(item) => item.name}
-          vazio="Nenhum check publicado."
-          storageKey="tabela:sst-observabilidade:checklist"
-          rotuloRolagem="Checklist de homologacao"
-        />
-      </BlocoConteudo>
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 10 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:sst-observabilidade" larguraPadrao="total">
+        <BlocoConteudo
+          titulo="Checklist de homologacao"
+          contagem={`${checks.length} check(s)`}
+          variante="primario"
+          cor="var(--sem-info)"
+          acoes={<EtiquetaStatus valor={checklist?.status_geral} />}
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'check',
+                titulo: 'Check',
+                // R17: o check de homologação tem nome próprio — é ele que
+                // identifica a linha na matriz.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.name
+              },
+              {
+                id: 'detalhes',
+                titulo: 'Detalhes',
+                tipo: 'texto',
+                render: (item) => (
+                  item.details
+                    ? (typeof item.details === 'string' ? item.details : JSON.stringify(item.details))
+                    : '-'
+                )
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => <EtiquetaStatus valor={item.status} />
+              }
+            ]}
+            itens={checks}
+            getId={(item) => item.name}
+            vazio="Nenhum check publicado."
+            storageKey="tabela:sst-observabilidade:checklist"
+            rotuloRolagem="Checklist de homologacao"
+          />
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Feature flags" contagem={`${flags.length} flag(s)`}>
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'flag',
-              titulo: 'Flag',
-              // R17: a flag TEM nome próprio — é ele que identifica a linha.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => item.nome
-            },
-            {
-              id: 'estado',
-              titulo: 'Estado',
-              tipo: 'status',
-              render: (item) => <EtiquetaStatus valor={item.ativa ? 'ATIVA' : 'DESATIVADA'} />
-            }
-          ]}
-          itens={flags}
-          getId={(item) => item.nome}
-          vazio="Nenhuma feature flag publicada."
-          storageKey="tabela:sst-observabilidade:flags"
-          rotuloRolagem="Feature flags"
-        />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Feature flags" contagem={`${flags.length} flag(s)`}>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'flag',
+                titulo: 'Flag',
+                // R17: a flag TEM nome próprio — é ele que identifica a linha.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.nome
+              },
+              {
+                id: 'estado',
+                titulo: 'Estado',
+                tipo: 'status',
+                render: (item) => <EtiquetaStatus valor={item.ativa ? 'ATIVA' : 'DESATIVADA'} />
+              }
+            ]}
+            itens={flags}
+            getId={(item) => item.nome}
+            vazio="Nenhuma feature flag publicada."
+            storageKey="tabela:sst-observabilidade:flags"
+            rotuloRolagem="Feature flags"
+          />
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Workflows por status">
-        <GradeContadores itens={data?.status?.workflows} />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Workflows por status">
+          <GradeContadores itens={data?.status?.workflows} />
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Logs de workflow por status">
-        <GradeContadores itens={data?.status?.workflow_logs} />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Logs de workflow por status">
+          <GradeContadores itens={data?.status?.workflow_logs} />
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Logs de automacao por status">
-        <GradeContadores itens={data?.status?.automation_logs} />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Logs de automacao por status">
+          <GradeContadores itens={data?.status?.automation_logs} />
+        </BlocoConteudo>
 
-      <BlocoConteudo titulo="Logs de integracao por status">
-        <GradeContadores itens={data?.status?.integration_logs} />
-      </BlocoConteudo>
+        <BlocoConteudo titulo="Logs de integracao por status">
+          <GradeContadores itens={data?.status?.integration_logs} />
+        </BlocoConteudo>
 
-      <TabelaLogs titulo="Workflows recentes" logs={data?.ultimos_logs?.workflows} chaveTabela="logs-workflows" />
-      <TabelaLogs titulo="Automacoes recentes" logs={data?.ultimos_logs?.automacoes} chaveTabela="logs-automacoes" />
-      <TabelaLogs titulo="Integracoes recentes" logs={data?.ultimos_logs?.integracoes} chaveTabela="logs-integracoes" />
-      <TabelaLogs titulo="Bloqueios recentes" logs={data?.ultimos_logs?.bloqueios} chaveTabela="logs-bloqueios" />
+        <TabelaLogs data-bloco-id="workflows-recentes" data-bloco-rotulo="Workflows recentes" titulo="Workflows recentes" logs={data?.ultimos_logs?.workflows} chaveTabela="logs-workflows" />
+        <TabelaLogs data-bloco-id="automacoes-recentes" data-bloco-rotulo="Automacoes recentes" titulo="Automacoes recentes" logs={data?.ultimos_logs?.automacoes} chaveTabela="logs-automacoes" />
+        <TabelaLogs data-bloco-id="integracoes-recentes" data-bloco-rotulo="Integracoes recentes" titulo="Integracoes recentes" logs={data?.ultimos_logs?.integracoes} chaveTabela="logs-integracoes" />
+        <TabelaLogs data-bloco-id="bloqueios-recentes" data-bloco-rotulo="Bloqueios recentes" titulo="Bloqueios recentes" logs={data?.ultimos_logs?.bloqueios} chaveTabela="logs-bloqueios" />
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

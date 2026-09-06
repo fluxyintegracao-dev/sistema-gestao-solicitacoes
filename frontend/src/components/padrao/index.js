@@ -2,6 +2,7 @@ export { default as Pagina } from './Pagina';
 export { default as PageHeader } from './PageHeader';
 export { default as MenuMais } from './MenuMais';
 export { default as BlocoConteudo } from './BlocoConteudo';
+export { default as BlocosPersonalizaveis } from './BlocosPersonalizaveis';
 export { default as StatGrid, StatTile } from './StatGrid';
 export { default as CamposComVazios } from './CamposComVazios';
 export { default as TabelaPadrao, CelulaDupla } from './TabelaPadrao';

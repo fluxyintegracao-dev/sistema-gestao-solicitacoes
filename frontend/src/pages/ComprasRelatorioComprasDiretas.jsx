@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -342,145 +343,155 @@ export default function ComprasRelatorioComprasDiretas() {
         <StatTile label="Credores" valor={formatNumber(resumo.credores)} sub="Fornecedores/credores usados" />
       </StatGrid>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <RankingTable
-          title="Solicitantes"
-          subtitle="Usuarios que mais abriram compras diretas."
-          rows={relatorio?.solicitantes}
-          metaKey="email"
-          storageKey="tabela:compras-diretas:solicitantes"
-        />
-        <RankingTable
-          title="Credores"
-          subtitle="Fornecedores/credores mais usados em compra direta."
-          rows={relatorio?.credores}
-          metaKey="documento"
-          storageKey="tabela:compras-diretas:credores"
-        />
-        <RankingTable
-          title="Itens comprados"
-          subtitle="Itens com maior valor acumulado."
-          rows={relatorio?.itens_ranking}
-          metaKey="unidade"
-          storageKey="tabela:compras-diretas:itens-ranking"
-        />
-        <RankingTable
-          title="Obras / centros"
-          subtitle="Centros de custo com maior uso de compra direta."
-          rows={relatorio?.obras}
-          metaKey="obra_codigo"
-          storageKey="tabela:compras-diretas:obras"
-        />
-      </div>
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-compras-diretas" larguraPadrao="total">
+        <div data-bloco-id="solicitantes" data-bloco-rotulo="Solicitantes" className="grid gap-4 lg:grid-cols-2">
+          <RankingTable
+            title="Solicitantes"
+            subtitle="Usuarios que mais abriram compras diretas."
+            rows={relatorio?.solicitantes}
+            metaKey="email"
+            storageKey="tabela:compras-diretas:solicitantes"
+          />
+          <RankingTable
+            title="Credores"
+            subtitle="Fornecedores/credores mais usados em compra direta."
+            rows={relatorio?.credores}
+            metaKey="documento"
+            storageKey="tabela:compras-diretas:credores"
+          />
+          <RankingTable
+            title="Itens comprados"
+            subtitle="Itens com maior valor acumulado."
+            rows={relatorio?.itens_ranking}
+            metaKey="unidade"
+            storageKey="tabela:compras-diretas:itens-ranking"
+          />
+          <RankingTable
+            title="Obras / centros"
+            subtitle="Centros de custo com maior uso de compra direta."
+            rows={relatorio?.obras}
+            metaKey="obra_codigo"
+            storageKey="tabela:compras-diretas:obras"
+          />
+        </div>
 
-      <BlocoConteudo
-        titulo="Detalhamento por item"
-        contagem={loading ? 'Carregando...' : `${formatNumber(itens.length)} item(ns)`}
-        descricao="Cada item comprado com solicitante, obra, credor e valor."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          colunas={[
-            { id: 'data', titulo: 'Data', tipo: 'data', render: (row) => formatDate(row.criado_em) },
-            {
-              id: 'compra',
-              titulo: 'SC',
-              tipo: 'codigo',
-              render: (row) => (
-                <Link to={`/solicitacoes-compra/${row.compra_id}`} className={CLASSE_LINK}>
-                  {row.compra_codigo}
-                </Link>
-              )
-            },
-            {
-              id: 'solicitacao',
-              titulo: 'SOL',
-              tipo: 'codigo',
-              render: (row) => (row.solicitacao_id ? (
-                <Link to={`/solicitacoes/${row.solicitacao_id}`} className={CLASSE_LINK}>
-                  {row.solicitacao_codigo || `#${row.solicitacao_id}`}
-                </Link>
-              ) : '-')
-            },
-            {
-              id: 'solicitante',
-              titulo: 'Solicitante',
-              tipo: 'texto',
-              render: (row) => (
-                <div>
-                  <strong>{row.solicitante?.nome || '-'}</strong>
-                  {row.solicitante?.email ? (
-                    <small className="block text-xs text-[var(--c-muted)]">{row.solicitante.email}</small>
-                  ) : null}
-                </div>
-              )
-            },
-            {
-              id: 'obra',
-              titulo: 'Obra',
-              tipo: 'texto',
-              render: (row) => (
-                <div>
-                  <strong>{row.obra?.nome || '-'}</strong>
-                  {row.obra?.codigo ? (
-                    <small className="block text-xs text-[var(--c-muted)]">{row.obra.codigo}</small>
-                  ) : null}
-                </div>
-              )
-            },
-            {
-              id: 'credor',
-              titulo: 'Credor',
-              tipo: 'texto',
-              render: (row) => (
-                <div>
-                  <strong>{row.credor?.nome || 'Sem credor'}</strong>
-                  {row.credor?.documento ? (
-                    <small className="block text-xs text-[var(--c-muted)]">{row.credor.documento}</small>
-                  ) : null}
-                </div>
-              )
-            },
-            {
-              id: 'item',
-              titulo: 'Item',
-              // R17: o item comprado NOMEIA a linha do detalhamento.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (row) => (
-                <div>
-                  <strong>{row.item?.descricao || '-'}</strong>
-                  {row.item?.apropriacao?.codigo ? (
-                    <small className="block text-xs text-[var(--c-muted)]">
-                      {row.item.apropriacao.codigo} {row.item.apropriacao.descricao || ''}
-                    </small>
-                  ) : null}
-                </div>
-              )
-            },
-            { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: (row) => row.item?.unidade || '-' },
-            { id: 'quantidade', titulo: 'Qtd.', tipo: 'numero', render: (row) => formatNumber(row.quantidade, 2) },
-            { id: 'unitario', titulo: 'Unitario', tipo: 'valor', render: (row) => formatMoney(row.valor_unitario) },
-            { id: 'total', titulo: 'Total', tipo: 'valor', render: (row) => formatMoney(row.valor_total) },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              // `.badge-soft` NAO EXISTE em CSS nenhum do repositorio — a
-              // pilula saia sem fundo, sem contorno e sem forma. `badge-muted`
-              // existe e e a familia neutra do sistema.
-              render: (row) => <span className="badge badge-muted">{row.status_label || row.status}</span>
-            }
-          ]}
-          itens={itens}
-          getId={(row) => `${row.compra_id}-${row.item?.tipo}-${row.item?.id}`}
-          carregando={loading}
-          storageKey="tabela:compras-diretas:detalhe"
-          rotuloRolagem="Detalhamento por item"
-          vazio="Nenhuma compra direta encontrada para os filtros informados."
-        />
-      </BlocoConteudo>
+        <BlocoConteudo
+          titulo="Detalhamento por item"
+          contagem={loading ? 'Carregando...' : `${formatNumber(itens.length)} item(ns)`}
+          descricao="Cada item comprado com solicitante, obra, credor e valor."
+          variante="primario"
+          cor="var(--c-primary)"
+        >
+          <TabelaPadrao
+            colunas={[
+              { id: 'data', titulo: 'Data', tipo: 'data', render: (row) => formatDate(row.criado_em) },
+              {
+                id: 'compra',
+                titulo: 'SC',
+                tipo: 'codigo',
+                render: (row) => (
+                  <Link to={`/solicitacoes-compra/${row.compra_id}`} className={CLASSE_LINK}>
+                    {row.compra_codigo}
+                  </Link>
+                )
+              },
+              {
+                id: 'solicitacao',
+                titulo: 'SOL',
+                tipo: 'codigo',
+                render: (row) => (row.solicitacao_id ? (
+                  <Link to={`/solicitacoes/${row.solicitacao_id}`} className={CLASSE_LINK}>
+                    {row.solicitacao_codigo || `#${row.solicitacao_id}`}
+                  </Link>
+                ) : '-')
+              },
+              {
+                id: 'solicitante',
+                titulo: 'Solicitante',
+                tipo: 'texto',
+                render: (row) => (
+                  <div>
+                    <strong>{row.solicitante?.nome || '-'}</strong>
+                    {row.solicitante?.email ? (
+                      <small className="block text-xs text-[var(--c-muted)]">{row.solicitante.email}</small>
+                    ) : null}
+                  </div>
+                )
+              },
+              {
+                id: 'obra',
+                titulo: 'Obra',
+                tipo: 'texto',
+                render: (row) => (
+                  <div>
+                    <strong>{row.obra?.nome || '-'}</strong>
+                    {row.obra?.codigo ? (
+                      <small className="block text-xs text-[var(--c-muted)]">{row.obra.codigo}</small>
+                    ) : null}
+                  </div>
+                )
+              },
+              {
+                id: 'credor',
+                titulo: 'Credor',
+                tipo: 'texto',
+                render: (row) => (
+                  <div>
+                    <strong>{row.credor?.nome || 'Sem credor'}</strong>
+                    {row.credor?.documento ? (
+                      <small className="block text-xs text-[var(--c-muted)]">{row.credor.documento}</small>
+                    ) : null}
+                  </div>
+                )
+              },
+              {
+                id: 'item',
+                titulo: 'Item',
+                // R17: o item comprado NOMEIA a linha do detalhamento.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (row) => (
+                  <div>
+                    <strong>{row.item?.descricao || '-'}</strong>
+                    {row.item?.apropriacao?.codigo ? (
+                      <small className="block text-xs text-[var(--c-muted)]">
+                        {row.item.apropriacao.codigo} {row.item.apropriacao.descricao || ''}
+                      </small>
+                    ) : null}
+                  </div>
+                )
+              },
+              { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: (row) => row.item?.unidade || '-' },
+              { id: 'quantidade', titulo: 'Qtd.', tipo: 'numero', render: (row) => formatNumber(row.quantidade, 2) },
+              { id: 'unitario', titulo: 'Unitario', tipo: 'valor', render: (row) => formatMoney(row.valor_unitario) },
+              { id: 'total', titulo: 'Total', tipo: 'valor', render: (row) => formatMoney(row.valor_total) },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                // `.badge-soft` NAO EXISTE em CSS nenhum do repositorio — a
+                // pilula saia sem fundo, sem contorno e sem forma. `badge-muted`
+                // existe e e a familia neutra do sistema.
+                render: (row) => <span className="badge badge-muted">{row.status_label || row.status}</span>
+              }
+            ]}
+            itens={itens}
+            getId={(row) => `${row.compra_id}-${row.item?.tipo}-${row.item?.id}`}
+            carregando={loading}
+            storageKey="tabela:compras-diretas:detalhe"
+            rotuloRolagem="Detalhamento por item"
+            vazio="Nenhuma compra direta encontrada para os filtros informados."
+          />
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

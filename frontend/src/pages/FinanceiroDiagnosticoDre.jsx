@@ -4,6 +4,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   Avisos,
@@ -221,65 +222,76 @@ export default function FinanceiroDiagnosticoDre() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       {/*
-        B2 — UM bloco primario, e ele responde a pergunta da tela: a DRE
-        pode ser usada como esta? A resposta e a severidade das pendencias,
-        nao a lista delas.
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
       */}
-      <BlocoConteudo
-        titulo="Situacao dos dados da DRE"
-        descricao="Corrija na ordem: primeiro as criticas, depois as altas."
-        variante="primario"
-        cor="var(--module-financeiro)"
-        acoes={<StatusBadge status={resumo.status} kind={familiaDoStatus(resumo.status)} />}
-      >
-        <StatGrid colunas={5}>
-          <StatTile
-            label="Criticas"
-            valor={String(resumo.pendencias_criticas)}
-            sub="Bloqueiam a leitura da DRE"
-            tom={Number(resumo.pendencias_criticas) > 0 ? 'danger' : 'success'}
-          />
-          <StatTile
-            label="Altas"
-            valor={String(resumo.pendencias_altas)}
-            sub="Distorcem o resultado"
-            tom={Number(resumo.pendencias_altas) > 0 ? 'warning' : 'success'}
-          />
-          <StatTile
-            label="Medias"
-            valor={String(resumo.pendencias_medias)}
-            sub="Revisar antes do fechamento"
-          />
-          <StatTile
-            label="Titulos na DRE"
-            valor={String(resumo.total_titulos_dre)}
-            sub="Marcados para considerar na DRE"
-          />
-          <StatTile
-            label="Empresas"
-            valor={String(resumo.total_empresas)}
-            sub={`${resumo.total_holdings} holding(s) cadastrada(s)`}
-          />
-        </StatGrid>
-      </BlocoConteudo>
+      <BlocosPersonalizaveis chave="blocos:financeiro-diagnostico-dre" larguraPadrao="total">
+        {/*
+          B2 — UM bloco primario, e ele responde a pergunta da tela: a DRE
+          pode ser usada como esta? A resposta e a severidade das pendencias,
+          nao a lista delas.
+        */}
+        <BlocoConteudo
+          titulo="Situacao dos dados da DRE"
+          descricao="Corrija na ordem: primeiro as criticas, depois as altas."
+          variante="primario"
+          cor="var(--module-financeiro)"
+          acoes={<StatusBadge status={resumo.status} kind={familiaDoStatus(resumo.status)} />}
+        >
+          <StatGrid colunas={5}>
+            <StatTile
+              label="Criticas"
+              valor={String(resumo.pendencias_criticas)}
+              sub="Bloqueiam a leitura da DRE"
+              tom={Number(resumo.pendencias_criticas) > 0 ? 'danger' : 'success'}
+            />
+            <StatTile
+              label="Altas"
+              valor={String(resumo.pendencias_altas)}
+              sub="Distorcem o resultado"
+              tom={Number(resumo.pendencias_altas) > 0 ? 'warning' : 'success'}
+            />
+            <StatTile
+              label="Medias"
+              valor={String(resumo.pendencias_medias)}
+              sub="Revisar antes do fechamento"
+            />
+            <StatTile
+              label="Titulos na DRE"
+              valor={String(resumo.total_titulos_dre)}
+              sub="Marcados para considerar na DRE"
+            />
+            <StatTile
+              label="Empresas"
+              valor={String(resumo.total_empresas)}
+              sub={`${resumo.total_holdings} holding(s) cadastrada(s)`}
+            />
+          </StatGrid>
+        </BlocoConteudo>
 
-      {/* D4 — leitura vence densidade: o texto de metodo fica a mao, mas
-          nasce recolhido para nao empurrar as pendencias para baixo da
-          dobra. Recolher e livre; remover exigiria o cliente. */}
-      <BlocoConteudo
-        titulo="Como usar este diagnostico"
-        variante="secundario"
-        recolhivel
-        recolhidoPadrao
-      >
-        <p className="text-sm text-[var(--c-text)]">
-          Antes de confiar na DRE da Holding, corrija primeiro pendencias criticas, depois pendencias altas.
-          A regra operacional recomendada e: toda obra/centro de custo pertence a uma empresa operacional,
-          todo titulo financeiro herda ou informa essa empresa, toda categoria financeira tem grupo DRE,
-          toda competencia representa o mes economico real do custo ou receita, e toda baixa ou transferencia
-          entre empresas possui classificacao completa quando representar relacao interna do grupo.
-        </p>
-      </BlocoConteudo>
+        {/* D4 — leitura vence densidade: o texto de metodo fica a mao, mas
+            nasce recolhido para nao empurrar as pendencias para baixo da
+            dobra. Recolher e livre; remover exigiria o cliente. */}
+        <BlocoConteudo
+          titulo="Como usar este diagnostico"
+          variante="secundario"
+          recolhivel
+          chavePreferencia="bloco:financeiro-diagnostico-dre:como-usar-este-diagnostico"
+          recolhidoPadrao
+        >
+          <p className="text-sm text-[var(--c-text)]">
+            Antes de confiar na DRE da Holding, corrija primeiro pendencias criticas, depois pendencias altas.
+            A regra operacional recomendada e: toda obra/centro de custo pertence a uma empresa operacional,
+            todo titulo financeiro herda ou informa essa empresa, toda categoria financeira tem grupo DRE,
+            toda competencia representa o mes economico real do custo ou receita, e toda baixa ou transferencia
+            entre empresas possui classificacao completa quando representar relacao interna do grupo.
+          </p>
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
 
       {loading ? (
         <div className="app-empty-card">Carregando diagnostico...</div>

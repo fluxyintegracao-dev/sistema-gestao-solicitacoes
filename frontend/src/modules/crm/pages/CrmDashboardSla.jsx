@@ -4,6 +4,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -237,309 +238,323 @@ export default function CrmDashboardSla() {
             ))}
           </StatGrid>
 
-          {/* B2 — UM primário por tela: o backlog por responsável é o que
-              gera ação (cobrar, redistribuir), então é ele que leva a barra
-              de cor; faixas e listas de apoio ficam neutras. */}
-          <BlocoConteudo
-            titulo="Backlog por responsavel"
-            descricao="Fila combinada de leads sem contato, tarefas vencidas e conversas pendentes."
-            variante="primario"
-            cor="var(--sem-danger)"
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'responsavel',
-                  titulo: 'Responsavel',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (row) => row.usuario?.nome || '-'
-                },
-                {
-                  id: 'sem_contato',
-                  titulo: 'Sem contato',
-                  tipo: 'numero',
-                  render: (row) => row.leadsSemPrimeiroContato
-                },
-                {
-                  id: 'tarefas_vencidas',
-                  titulo: 'Tarefas vencidas',
-                  tipo: 'numero',
-                  render: (row) => row.tarefasVencidas
-                },
-                {
-                  id: 'conversas',
-                  titulo: 'Conversas',
-                  tipo: 'numero',
-                  render: (row) => row.conversasPendentes
-                },
-                {
-                  id: 'nao_lidas',
-                  titulo: 'Nao lidas',
-                  tipo: 'numero',
-                  render: (row) => row.mensagensNaoLidas
-                },
-                {
-                  id: 'score',
-                  titulo: 'Score',
-                  tipo: 'numero',
-                  render: (row) => row.score
-                }
-              ]}
-              itens={data.backlogResponsaveis || []}
-              getId={(row) => row.usuario?.id || row.usuario?.nome}
-              vazio="Nenhum backlog por responsavel neste recorte."
-              storageKey="tabela:crm-dashboard-sla:backlog"
-              rotuloRolagem="Backlog por responsavel"
-            />
-          </BlocoConteudo>
-
-          {/* A regra em vigor ("Regra atual: N min") era o rodapé do cartão
-              que repetia o total da faixa; ela não se perdeu — ancora no
-              bloco da LISTA que ela define, que é onde a informação tem
-              função (por que estes leads estão aqui). */}
-          <BlocoConteudo
-            titulo="Leads sem primeiro contato"
-            descricao={`Mais antigos e com maior urgencia de abordagem. Regra atual: ${data.thresholds?.firstContactMinutes || filters.first_contact_minutes} min.`}
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'lead',
-                  titulo: 'Lead',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (row) => (
-                    <CelulaDupla
-                      principal={(
-                        <Link to={`/crm/leads/${row.id}`} className="text-[var(--c-primary)] hover:underline">
-                          {row.nome}
-                        </Link>
-                      )}
-                      sub={row.telefone || '-'}
-                      title={`${row.nome || ''} — ${row.telefone || 'sem telefone'}`}
-                    />
-                  )
-                },
-                {
-                  id: 'responsavel',
-                  titulo: 'Responsavel',
-                  tipo: 'texto',
-                  render: (row) => row.responsavel?.nome || '-'
-                },
-                {
-                  id: 'etapa',
-                  titulo: 'Etapa',
-                  tipo: 'texto',
-                  render: (row) => row.etapa?.nome || '-'
-                },
-                {
-                  id: 'atraso',
-                  titulo: 'Atraso',
-                  tipo: 'numero',
-                  render: (row) => fmtMinutes(row.atrasoMinutos)
-                },
-                {
-                  id: 'createdAt',
-                  titulo: 'Entrada',
-                  tipo: 'data',
-                  render: (row) => fmtDate(row.createdAt)
-                }
-              ]}
-              itens={data.leadsPrimeiroContato || []}
-              vazio="Nenhum lead com atraso de primeiro contato."
-              storageKey="tabela:crm-dashboard-sla:leads-primeiro-contato"
-              rotuloRolagem="Leads sem primeiro contato"
-            />
-          </BlocoConteudo>
-
-          <BlocoConteudo
-            titulo="Leads sem atividade"
-            descricao="Carteira que exige retomada, redistribuicao ou encerramento."
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'lead',
-                  titulo: 'Lead',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (row) => (
-                    <CelulaDupla
-                      principal={(
-                        <Link to={`/crm/leads/${row.id}`} className="text-[var(--c-primary)] hover:underline">
-                          {row.nome}
-                        </Link>
-                      )}
-                      sub={row.telefone || '-'}
-                      title={`${row.nome || ''} — ${row.telefone || 'sem telefone'}`}
-                    />
-                  )
-                },
-                {
-                  id: 'responsavel',
-                  titulo: 'Responsavel',
-                  tipo: 'texto',
-                  render: (row) => row.responsavel?.nome || '-'
-                },
-                {
-                  id: 'etapa',
-                  titulo: 'Etapa',
-                  tipo: 'texto',
-                  render: (row) => row.etapa?.nome || '-'
-                },
-                {
-                  id: 'atraso',
-                  titulo: 'Atraso',
-                  tipo: 'numero',
-                  render: (row) => fmtHours(row.atrasoHoras)
-                },
-                {
-                  id: 'ultima',
-                  titulo: 'Ultima interacao',
-                  tipo: 'data',
-                  render: (row) => fmtDate(row.ultimaInteracaoAt)
-                }
-              ]}
-              itens={data.leadsSemAtividade || []}
-              vazio="Nenhum lead sem atividade acima do limite configurado."
-              storageKey="tabela:crm-dashboard-sla:leads-sem-atividade"
-              rotuloRolagem="Leads sem atividade"
-            />
-          </BlocoConteudo>
-
-          <BlocoConteudo
-            titulo="Tarefas vencidas"
-            descricao="Fila operacional que ja passou do prazo."
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'titulo',
-                  titulo: 'Tarefa',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (row) => (
-                    <CelulaDupla
-                      principal={row.title}
-                      sub={row.lead?.nome || '-'}
-                      title={`${row.title || ''} — ${row.lead?.nome || 'sem lead'}`}
-                    />
-                  )
-                },
-                {
-                  id: 'responsavel',
-                  titulo: 'Responsavel',
-                  tipo: 'texto',
-                  render: (row) => row.responsavel?.nome || '-'
-                },
-                {
-                  id: 'priority',
-                  titulo: 'Prioridade',
-                  tipo: 'badge',
-                  render: (row) => row.priority
-                },
-                {
-                  id: 'atraso',
-                  titulo: 'Atraso',
-                  tipo: 'numero',
-                  render: (row) => fmtHours(row.atrasoHoras)
-                },
-                {
-                  id: 'dueAt',
-                  titulo: 'Vencimento',
-                  tipo: 'data',
-                  render: (row) => fmtDate(row.dueAt)
-                }
-              ]}
-              itens={data.tarefas || []}
-              vazio="Nenhuma tarefa vencida no momento."
-              storageKey="tabela:crm-dashboard-sla:tarefas-vencidas"
-              rotuloRolagem="Tarefas vencidas"
-            />
-          </BlocoConteudo>
-
-          <BlocoConteudo
-            titulo="Conversas pendentes"
-            descricao="Inbox que ainda exige resposta ou tratamento comercial."
-          >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'lead',
-                  titulo: 'Lead',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (row) => (
-                    <CelulaDupla
-                      principal={row.lead?.id ? (
-                        <Link to={`/crm/leads/${row.lead.id}`} className="text-[var(--c-primary)] hover:underline">
-                          {row.lead?.nome || `Lead #${row.lead?.id}`}
-                        </Link>
-                      ) : (row.lead?.nome || '-')}
-                      sub={`Conversa #${row.id}`}
-                      title={`${row.lead?.nome || 'Sem lead'} — conversa #${row.id}`}
-                    />
-                  )
-                },
-                {
-                  id: 'responsavel',
-                  titulo: 'Responsavel',
-                  tipo: 'texto',
-                  render: (row) => row.responsavel?.nome || '-'
-                },
-                {
-                  id: 'status',
-                  titulo: 'Status',
-                  tipo: 'badge',
-                  render: (row) => `${row.status} / ${row.priority}`
-                },
-                {
-                  id: 'unreadCount',
-                  titulo: 'Nao lidas',
-                  tipo: 'numero',
-                  render: (row) => row.unreadCount
-                },
-                {
-                  id: 'lastMessageAt',
-                  titulo: 'Ultima mensagem',
-                  tipo: 'data',
-                  render: (row) => fmtDate(row.lastMessageAt)
-                }
-              ]}
-              itens={data.conversas || []}
-              vazio="Nenhuma conversa aberta ou pendente no inbox."
-              storageKey="tabela:crm-dashboard-sla:conversas-pendentes"
-              rotuloRolagem="Conversas pendentes"
-            />
-          </BlocoConteudo>
-
           {/*
-            As três faixas ficam DEPOIS das listas: elas são leitura de
-            contexto (como o atraso se distribui), enquanto as listas acima
-            são o que gera ação. Regra 1 de organização — dado que gera ação
-            primeiro, contexto depois.
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 8 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
           */}
-          <BlocoFaixas
-            titulo="Faixas sem primeiro contato"
-            descricao="Leads novos ou em contato que ja estouraram o SLA inicial."
-            rows={data.buckets?.primeiroContato}
-            storageKey="tabela:crm-dashboard-sla:faixas-primeiro-contato"
-          />
+          <BlocosPersonalizaveis
+            chave="blocos:crm-dashboard-sla"
+            larguraPadrao="total"
+            dentroDeGrade
+          >
+            {/* B2 — UM primário por tela: o backlog por responsável é o que
+                gera ação (cobrar, redistribuir), então é ele que leva a barra
+                de cor; faixas e listas de apoio ficam neutras. */}
+            <BlocoConteudo
+              titulo="Backlog por responsavel"
+              descricao="Fila combinada de leads sem contato, tarefas vencidas e conversas pendentes."
+              variante="primario"
+              cor="var(--sem-danger)"
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'responsavel',
+                    titulo: 'Responsavel',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (row) => row.usuario?.nome || '-'
+                  },
+                  {
+                    id: 'sem_contato',
+                    titulo: 'Sem contato',
+                    tipo: 'numero',
+                    render: (row) => row.leadsSemPrimeiroContato
+                  },
+                  {
+                    id: 'tarefas_vencidas',
+                    titulo: 'Tarefas vencidas',
+                    tipo: 'numero',
+                    render: (row) => row.tarefasVencidas
+                  },
+                  {
+                    id: 'conversas',
+                    titulo: 'Conversas',
+                    tipo: 'numero',
+                    render: (row) => row.conversasPendentes
+                  },
+                  {
+                    id: 'nao_lidas',
+                    titulo: 'Nao lidas',
+                    tipo: 'numero',
+                    render: (row) => row.mensagensNaoLidas
+                  },
+                  {
+                    id: 'score',
+                    titulo: 'Score',
+                    tipo: 'numero',
+                    render: (row) => row.score
+                  }
+                ]}
+                itens={data.backlogResponsaveis || []}
+                getId={(row) => row.usuario?.id || row.usuario?.nome}
+                vazio="Nenhum backlog por responsavel neste recorte."
+                storageKey="tabela:crm-dashboard-sla:backlog"
+                rotuloRolagem="Backlog por responsavel"
+              />
+            </BlocoConteudo>
 
-          <BlocoFaixas
-            titulo="Faixas sem atividade"
-            descricao="Leads sem interacao recente conforme a regra configurada."
-            rows={data.buckets?.semAtividade}
-            storageKey="tabela:crm-dashboard-sla:faixas-sem-atividade"
-          />
+            {/* A regra em vigor ("Regra atual: N min") era o rodapé do cartão
+                que repetia o total da faixa; ela não se perdeu — ancora no
+                bloco da LISTA que ela define, que é onde a informação tem
+                função (por que estes leads estão aqui). */}
+            <BlocoConteudo
+              titulo="Leads sem primeiro contato"
+              descricao={`Mais antigos e com maior urgencia de abordagem. Regra atual: ${data.thresholds?.firstContactMinutes || filters.first_contact_minutes} min.`}
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'lead',
+                    titulo: 'Lead',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (row) => (
+                      <CelulaDupla
+                        principal={(
+                          <Link to={`/crm/leads/${row.id}`} className="text-[var(--c-primary)] hover:underline">
+                            {row.nome}
+                          </Link>
+                        )}
+                        sub={row.telefone || '-'}
+                        title={`${row.nome || ''} — ${row.telefone || 'sem telefone'}`}
+                      />
+                    )
+                  },
+                  {
+                    id: 'responsavel',
+                    titulo: 'Responsavel',
+                    tipo: 'texto',
+                    render: (row) => row.responsavel?.nome || '-'
+                  },
+                  {
+                    id: 'etapa',
+                    titulo: 'Etapa',
+                    tipo: 'texto',
+                    render: (row) => row.etapa?.nome || '-'
+                  },
+                  {
+                    id: 'atraso',
+                    titulo: 'Atraso',
+                    tipo: 'numero',
+                    render: (row) => fmtMinutes(row.atrasoMinutos)
+                  },
+                  {
+                    id: 'createdAt',
+                    titulo: 'Entrada',
+                    tipo: 'data',
+                    render: (row) => fmtDate(row.createdAt)
+                  }
+                ]}
+                itens={data.leadsPrimeiroContato || []}
+                vazio="Nenhum lead com atraso de primeiro contato."
+                storageKey="tabela:crm-dashboard-sla:leads-primeiro-contato"
+                rotuloRolagem="Leads sem primeiro contato"
+              />
+            </BlocoConteudo>
 
-          <BlocoFaixas
-            titulo="Runtime de automacoes"
-            descricao={`Execucoes nos ultimos ${data.thresholds?.recentDays || filters.recent_days} dias.`}
-            rows={data.automacoes?.execucoesPorStatus?.map((item) => ({ faixa: item.chave, total: item.total }))}
-            storageKey="tabela:crm-dashboard-sla:runtime-automacoes"
-          />
+            <BlocoConteudo
+              titulo="Leads sem atividade"
+              descricao="Carteira que exige retomada, redistribuicao ou encerramento."
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'lead',
+                    titulo: 'Lead',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (row) => (
+                      <CelulaDupla
+                        principal={(
+                          <Link to={`/crm/leads/${row.id}`} className="text-[var(--c-primary)] hover:underline">
+                            {row.nome}
+                          </Link>
+                        )}
+                        sub={row.telefone || '-'}
+                        title={`${row.nome || ''} — ${row.telefone || 'sem telefone'}`}
+                      />
+                    )
+                  },
+                  {
+                    id: 'responsavel',
+                    titulo: 'Responsavel',
+                    tipo: 'texto',
+                    render: (row) => row.responsavel?.nome || '-'
+                  },
+                  {
+                    id: 'etapa',
+                    titulo: 'Etapa',
+                    tipo: 'texto',
+                    render: (row) => row.etapa?.nome || '-'
+                  },
+                  {
+                    id: 'atraso',
+                    titulo: 'Atraso',
+                    tipo: 'numero',
+                    render: (row) => fmtHours(row.atrasoHoras)
+                  },
+                  {
+                    id: 'ultima',
+                    titulo: 'Ultima interacao',
+                    tipo: 'data',
+                    render: (row) => fmtDate(row.ultimaInteracaoAt)
+                  }
+                ]}
+                itens={data.leadsSemAtividade || []}
+                vazio="Nenhum lead sem atividade acima do limite configurado."
+                storageKey="tabela:crm-dashboard-sla:leads-sem-atividade"
+                rotuloRolagem="Leads sem atividade"
+              />
+            </BlocoConteudo>
+
+            <BlocoConteudo
+              titulo="Tarefas vencidas"
+              descricao="Fila operacional que ja passou do prazo."
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'titulo',
+                    titulo: 'Tarefa',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (row) => (
+                      <CelulaDupla
+                        principal={row.title}
+                        sub={row.lead?.nome || '-'}
+                        title={`${row.title || ''} — ${row.lead?.nome || 'sem lead'}`}
+                      />
+                    )
+                  },
+                  {
+                    id: 'responsavel',
+                    titulo: 'Responsavel',
+                    tipo: 'texto',
+                    render: (row) => row.responsavel?.nome || '-'
+                  },
+                  {
+                    id: 'priority',
+                    titulo: 'Prioridade',
+                    tipo: 'badge',
+                    render: (row) => row.priority
+                  },
+                  {
+                    id: 'atraso',
+                    titulo: 'Atraso',
+                    tipo: 'numero',
+                    render: (row) => fmtHours(row.atrasoHoras)
+                  },
+                  {
+                    id: 'dueAt',
+                    titulo: 'Vencimento',
+                    tipo: 'data',
+                    render: (row) => fmtDate(row.dueAt)
+                  }
+                ]}
+                itens={data.tarefas || []}
+                vazio="Nenhuma tarefa vencida no momento."
+                storageKey="tabela:crm-dashboard-sla:tarefas-vencidas"
+                rotuloRolagem="Tarefas vencidas"
+              />
+            </BlocoConteudo>
+
+            <BlocoConteudo
+              titulo="Conversas pendentes"
+              descricao="Inbox que ainda exige resposta ou tratamento comercial."
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'lead',
+                    titulo: 'Lead',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (row) => (
+                      <CelulaDupla
+                        principal={row.lead?.id ? (
+                          <Link to={`/crm/leads/${row.lead.id}`} className="text-[var(--c-primary)] hover:underline">
+                            {row.lead?.nome || `Lead #${row.lead?.id}`}
+                          </Link>
+                        ) : (row.lead?.nome || '-')}
+                        sub={`Conversa #${row.id}`}
+                        title={`${row.lead?.nome || 'Sem lead'} — conversa #${row.id}`}
+                      />
+                    )
+                  },
+                  {
+                    id: 'responsavel',
+                    titulo: 'Responsavel',
+                    tipo: 'texto',
+                    render: (row) => row.responsavel?.nome || '-'
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'badge',
+                    render: (row) => `${row.status} / ${row.priority}`
+                  },
+                  {
+                    id: 'unreadCount',
+                    titulo: 'Nao lidas',
+                    tipo: 'numero',
+                    render: (row) => row.unreadCount
+                  },
+                  {
+                    id: 'lastMessageAt',
+                    titulo: 'Ultima mensagem',
+                    tipo: 'data',
+                    render: (row) => fmtDate(row.lastMessageAt)
+                  }
+                ]}
+                itens={data.conversas || []}
+                vazio="Nenhuma conversa aberta ou pendente no inbox."
+                storageKey="tabela:crm-dashboard-sla:conversas-pendentes"
+                rotuloRolagem="Conversas pendentes"
+              />
+            </BlocoConteudo>
+
+            {/*
+              As três faixas ficam DEPOIS das listas: elas são leitura de
+              contexto (como o atraso se distribui), enquanto as listas acima
+              são o que gera ação. Regra 1 de organização — dado que gera ação
+              primeiro, contexto depois.
+            */}
+            <BlocoFaixas data-bloco-id="faixas-sem-primeiro-contato" data-bloco-rotulo="Faixas sem primeiro contato"
+              titulo="Faixas sem primeiro contato"
+              descricao="Leads novos ou em contato que ja estouraram o SLA inicial."
+              rows={data.buckets?.primeiroContato}
+              storageKey="tabela:crm-dashboard-sla:faixas-primeiro-contato"
+            />
+
+            <BlocoFaixas data-bloco-id="faixas-sem-atividade" data-bloco-rotulo="Faixas sem atividade"
+              titulo="Faixas sem atividade"
+              descricao="Leads sem interacao recente conforme a regra configurada."
+              rows={data.buckets?.semAtividade}
+              storageKey="tabela:crm-dashboard-sla:faixas-sem-atividade"
+            />
+
+            <BlocoFaixas data-bloco-id="runtime-de-automacoes" data-bloco-rotulo="Runtime de automacoes"
+              titulo="Runtime de automacoes"
+              descricao={`Execucoes nos ultimos ${data.thresholds?.recentDays || filters.recent_days} dias.`}
+              rows={data.automacoes?.execucoesPorStatus?.map((item) => ({ faixa: item.chave, total: item.total }))}
+              storageKey="tabela:crm-dashboard-sla:runtime-automacoes"
+            />
+          </BlocosPersonalizaveis>
         </>
       )}
     </Pagina>

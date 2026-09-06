@@ -5,10 +5,10 @@ import { getVisibleModules, resolveLabel } from './navigationConfig';
 import { getPendenciasUsuario } from '../services/pendencias';
 import { getDetalheLayouts } from '../services/detalheLayout';
 import { getListaPreferencias, salvarListaPreferencias } from '../services/listasPreferencias';
-import { blocosPermitidos, resolverLayoutHome, rotuloBlocoHome } from './blocosHome';
+import { blocosPermitidos, resolverLayoutHome } from './blocosHome';
 import { COMPONENTE_BLOCO_EXTRA } from './BlocosHomeExtras';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
-import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, BlocosPersonalizaveis } from '../components/padrao';
 import NavCard from './NavCard';
 import SeusAtalhos from './SeusAtalhos';
 import { vencimentoHumano } from '../utils/formatarTexto';
@@ -60,15 +60,12 @@ export default function HomeHub() {
   const [layoutSetor, setLayoutSetor] = useState(null);
   const [prefsLayoutUsuario, setPrefsLayoutUsuario] = useState(null);
   const [personalizando, setPersonalizando] = useState(false);
-  const [adicionarBlocoAberto, setAdicionarBlocoAberto] = useState(false);
   const [adicionarModuloAberto, setAdicionarModuloAberto] = useState(false);
   const [toast, setToast] = useState('');
-  const dragBlocoRef = useRef(null);
   const dragModuloRef = useRef(null);
   const toastTimerRef = useRef(null);
   // Painéis suspensos fecham ao clicar fora e com Esc — mesmo hook do
   // menu "Colunas" do ListaAvancada (useFecharAoSair).
-  const adicionarBlocoRef = useRef(null);
   const adicionarModuloRef = useRef(null);
   const [isMobileHome, setIsMobileHome] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
@@ -85,7 +82,6 @@ export default function HomeHub() {
     typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches
   ));
 
-  useFecharAoSair(adicionarBlocoRef, adicionarBlocoAberto, () => setAdicionarBlocoAberto(false));
   useFecharAoSair(adicionarModuloRef, adicionarModuloAberto, () => setAdicionarModuloAberto(false));
 
   const modules = useMemo(() => getVisibleModules(user), [user]);
@@ -160,7 +156,13 @@ export default function HomeHub() {
     ordem: ordemBlocos,
     ocultos: blocosOcultos,
     larguras: largurasBlocos,
-    adicionados: blocosAdicionados
+    adicionados: blocosAdicionados,
+    /* RECOLHER CHEGA À HOME (05/09). O motor já resolvia `recolhidos` —
+       era o detalhe da solicitação que usava e a Home que ignorava, e a
+       extração do componente é o que torna a diferença gratuita: somar as
+       capacidades das duas telas custou ler mais um campo que já vinha
+       resolvido. */
+    recolhidos: blocosRecolhidos
   } = resolverLayoutHome({ configSetor: layoutSetor, prefsUsuario: prefsLayoutUsuario });
 
   // ----- Personalização dos MÓDULOS (cards dentro do bloco Módulos) ---
@@ -181,6 +183,7 @@ export default function HomeHub() {
   const temCamadaUsuario = (novo) => Boolean(
     novo && (
       novo.ordem?.length || novo.removidos?.length || novo.adicionados?.length
+      || novo.recolhidos?.length
       || Object.keys(novo.larguras || {}).length
       || novo.modulos?.ordem?.length || novo.modulos?.removidos?.length
       || novo.modulos?.aviso_ctrlk_visto
@@ -190,11 +193,27 @@ export default function HomeHub() {
     setPrefsLayoutUsuario(temCamadaUsuario(novo) ? novo : null);
     salvarListaPreferencias('home', novo || {}).catch(() => {});
   };
+  /*
+    AS SEIS FUNÇÕES DE BLOCO SAÍRAM DAQUI (05/09) — `moverBloco`,
+    `removerBloco`, `readicionarBloco`, `definirLarguraBloco`,
+    `restaurarPadraoSetor` e a barra/popover que as acompanhava existiam
+    palavra por palavra no detalhe da solicitação, e esta tela ainda
+    desenhava tudo com as classes `sol-detail-*`, o prefixo da OUTRA tela.
+    Agora o mecanismo é um só (`BlocosPersonalizaveis`) e o que sobra aqui
+    é o que é DA HOME e não é bloco: a personalização dos MÓDULOS.
+  */
+  const persistirArranjoBlocos = (camada) => {
+    persistirLayoutUsuario(camada ? { ...camada, modulos: camadaAtual().modulos } : null);
+  };
   // Sempre grava a camada completa — mudar uma coisa não perde as outras.
   const camadaAtual = () => ({
     ordem: prefsLayoutUsuario?.ordem?.length ? ordemBlocos : [],
     removidos: Array.from(blocosOcultos).filter((id) => !blocosAdicionados.has(id)),
     adicionados: Array.from(blocosAdicionados),
+    // Recolher entrou na Home junto com o componente: sem esta linha uma
+    // mudança de MÓDULO gravaria a camada sem os blocos recolhidos e
+    // desfaria a escolha de quem só recolheu.
+    recolhidos: Array.from(blocosRecolhidos),
     larguras: { ...(prefsLayoutUsuario?.larguras || {}) },
     modulos: {
       ordem: Array.isArray(modulosPrefs.ordem) ? modulosPrefs.ordem : [],
@@ -202,35 +221,6 @@ export default function HomeHub() {
       aviso_ctrlk_visto: Boolean(modulosPrefs.aviso_ctrlk_visto)
     }
   });
-  const moverBloco = (origemId, alvoId) => {
-    if (!origemId || !alvoId || origemId === alvoId) return;
-    const ordem = ordemBlocos.slice();
-    const de = ordem.indexOf(origemId);
-    const para = ordem.indexOf(alvoId);
-    if (de < 0 || para < 0) return;
-    ordem.splice(para, 0, ordem.splice(de, 1)[0]);
-    persistirLayoutUsuario({ ...camadaAtual(), ordem });
-  };
-  const removerBloco = (blocoId) => {
-    const camada = camadaAtual();
-    const removidos = new Set(camada.removidos);
-    removidos.add(blocoId);
-    const adicionados = camada.adicionados.filter((id) => id !== blocoId);
-    persistirLayoutUsuario({ ...camada, removidos: Array.from(removidos), adicionados });
-  };
-  const readicionarBloco = (blocoId) => {
-    const camada = camadaAtual();
-    const removidos = camada.removidos.filter((id) => id !== blocoId);
-    const adicionados = new Set(camada.adicionados);
-    adicionados.add(blocoId);
-    persistirLayoutUsuario({ ...camada, removidos, adicionados: Array.from(adicionados) });
-  };
-  const definirLarguraBloco = (blocoId, largura) => {
-    const camada = camadaAtual();
-    const larguras = { ...camada.larguras };
-    larguras[blocoId] = largura === 'normal' ? 'normal' : 'total';
-    persistirLayoutUsuario({ ...camada, larguras });
-  };
   const restaurarPadraoSetor = () => {
     persistirLayoutUsuario(null);
   };
@@ -384,7 +374,7 @@ export default function HomeHub() {
             <span className="text-sm text-[var(--c-muted)]">
               Arraste os cards para reordenar; "×" oculta um módulo.
             </span>
-            <div className="sol-detail-adicionar-wrap" ref={adicionarModuloRef}>
+            <div className="app-blocos-adicionar" ref={adicionarModuloRef}>
               <button
                 type="button"
                 className="btn btn-outline btn-sm"
@@ -395,7 +385,7 @@ export default function HomeHub() {
                 Adicionar módulo{modulosOcultaveis.length > 0 ? ` (${modulosOcultaveis.length})` : ''}
               </button>
               {adicionarModuloAberto && modulosOcultaveis.length > 0 && (
-                <div className="sol-detail-adicionar-pop" role="menu" aria-label="Módulos ocultos">
+                <div className="app-blocos-adicionar-pop" role="menu" aria-label="Módulos ocultos">
                   {modulosOcultaveis.map((mod) => (
                     <button
                       key={mod.id}
@@ -501,33 +491,6 @@ export default function HomeHub() {
     .map((blocoId) => ({ id: blocoId, conteudo: conteudoBlocos[blocoId] }))
     .filter((bloco) => bloco.conteudo && bloco.conteudo !== 'disponivel');
 
-  // Catálogo do "Adicionar bloco": só o que a permissão permite e está
-  // oculto agora (padrão-desligados incluídos).
-  const blocosDisponiveisParaAdicionar = ordemBlocos
-    .filter((blocoId) => idsPermitidos.has(blocoId) && blocosOcultos.has(blocoId))
-    .map((blocoId) => ({ id: blocoId, conteudo: conteudoBlocos[blocoId] }))
-    .filter((bloco) => bloco.conteudo);
-
-  // Segmentos para a grade: largura 'normal' flui em 2 colunas; 'total'
-  // quebra a linha e ocupa tudo.
-  const segmentosBlocos = (() => {
-    const segmentos = [];
-    let corrente = null;
-    for (const bloco of blocosVisiveis) {
-      if (largurasBlocos[bloco.id] === 'normal') {
-        if (!corrente) {
-          corrente = { tipo: 'colunas', blocos: [] };
-          segmentos.push(corrente);
-        }
-        corrente.blocos.push(bloco);
-      } else {
-        segmentos.push({ tipo: 'total', blocos: [bloco] });
-        corrente = null;
-      }
-    }
-    return segmentos;
-  })();
-
   /*
     B2 — UM bloco principal por tela, e nesta a pergunta central é "o que
     eu resolvo agora?": a barra de cor fica em "Para resolver agora" e,
@@ -544,57 +507,43 @@ export default function HomeHub() {
     : (['resolver', 'pendencias'].find((id) => blocosVisiveis.some((b) => b.id === id))
       || blocosVisiveis[0]?.id);
 
-  const renderizarBloco = (bloco) => (
-    <BlocoConteudo
-      key={bloco.id}
-      className="hub-bloco"
-      variante={bloco.id === idBlocoPrimario ? 'primario' : 'neutro'}
-      /* Tom semântico da barra do principal: pendência é "atenção"
-         (--sem-warning); em qualquer outro bloco ela é só hierarquia. */
-      cor={bloco.id !== idBlocoPrimario
-        ? undefined
-        : (bloco.id === 'resolver' || bloco.id === 'pendencias'
-          ? 'var(--sem-warning)'
-          : 'var(--c-primary)')}
-      draggable={personalizando && !isMobileHome}
-      onDragStart={() => { dragBlocoRef.current = bloco.id; }}
-      onDragOver={(event) => { if (personalizando) event.preventDefault(); }}
-      onDrop={() => {
-        if (!personalizando) return;
-        moverBloco(dragBlocoRef.current, bloco.id);
-        dragBlocoRef.current = null;
-      }}
-    >
-      {personalizando && (
-        <div className="sol-detail-bloco-toolbar">
-          <span className="sol-detail-bloco-arrastar" aria-hidden="true">⋮⋮</span>
-          <span className="sol-detail-bloco-nome">{rotuloBlocoHome(bloco.id)}</span>
-          {!isMobileHome && (
-            <label className="sol-detail-bloco-largura">
-              <select
-                value={largurasBlocos[bloco.id] === 'normal' ? 'normal' : 'total'}
-                onChange={(event) => definirLarguraBloco(bloco.id, event.target.value)}
-                aria-label={`Largura do bloco ${rotuloBlocoHome(bloco.id)}`}
-              >
-                <option value="normal">Normal</option>
-                <option value="total">Largura total</option>
-              </select>
-            </label>
-          )}
-          <button
-            type="button"
-            className="sol-detail-bloco-remover"
-            onClick={() => removerBloco(bloco.id)}
-            title={`Remover ${rotuloBlocoHome(bloco.id)} da sua Home`}
-            aria-label={`Remover ${rotuloBlocoHome(bloco.id)} da sua Home`}
-          >
-            ×
-          </button>
-        </div>
-      )}
-      {bloco.conteudo}
-    </BlocoConteudo>
-  );
+  /*
+    Cada bloco continua sendo um `BlocoConteudo` desenhado AQUI — é esta
+    tela que sabe qual é o primário e de que cor é a barra dele (B2). O
+    que o componente recebe é o catálogo: id, rótulo, largura padrão do
+    catálogo da Home ('total', com os compactos em 'normal') e o conteúdo
+    pronto. O marcador 'disponivel' de um bloco extra DESLIGADO viaja
+    inteiro: é ele que mantém o bloco no "Adicionar bloco" sem montar o
+    componente que consultaria dados.
+  */
+  const catalogoBlocos = catalogoPermitido.map((meta) => {
+    const conteudo = conteudoBlocos[meta.id];
+    const real = conteudo && conteudo !== 'disponivel' ? conteudo : null;
+    return {
+      id: meta.id,
+      rotulo: meta.rotulo,
+      grupo: meta.grupo,
+      padraoOculto: meta.padraoOculto,
+      larguraPadrao: meta.larguraPadrao === 'normal' ? 'normal' : 'total',
+      conteudo: real ? (
+        <BlocoConteudo
+          className="hub-bloco"
+          variante={meta.id === idBlocoPrimario ? 'primario' : 'neutro'}
+          /* Tom semântico da barra do principal: pendência é "atenção"
+             (--sem-warning); em qualquer outro bloco ela é só hierarquia. */
+          cor={meta.id !== idBlocoPrimario
+            ? undefined
+            : (meta.id === 'resolver' || meta.id === 'pendencias'
+              ? 'var(--sem-warning)'
+              : 'var(--c-primary)')}
+        >
+          {real}
+        </BlocoConteudo>
+      ) : conteudo
+    };
+  });
+  const grupoDoBloco = (id) => catalogoPermitido.find((meta) => meta.id === id)?.grupo || 'Home';
+  const GRUPOS_HOME = ['Home', 'Trabalho', 'Financeiro', 'Obras e Compras', 'Institucional'];
 
   return (
     <Pagina className="hub-home-page">
@@ -619,68 +568,16 @@ export default function HomeHub() {
           // e não só ao rótulo. O `aria-pressed` existia no arranjo anterior
           // e voltou pelo `pressionada` da ação (PageHeader, 05/09).
           pressionada: personalizando,
-          classe: personalizando ? 'sol-detail-personalizando' : undefined,
+          classe: personalizando ? 'app-blocos-ligado' : undefined,
           title: personalizando
             ? 'Sair do modo de personalização da Home'
             : 'Reordenar, ocultar e redimensionar os blocos da sua Home',
           onClick: () => {
             setPersonalizando((atual) => !atual);
-            setAdicionarBlocoAberto(false);
             setAdicionarModuloAberto(false);
           }
         }]}
       />
-
-      {personalizando && (
-        <div className="sol-detail-blocos-toolbar hub-personalizar-toolbar">
-          <div className="sol-detail-adicionar-wrap" ref={adicionarBlocoRef}>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => setAdicionarBlocoAberto((aberto) => !aberto)}
-              aria-expanded={adicionarBlocoAberto}
-              disabled={blocosDisponiveisParaAdicionar.length === 0}
-            >
-              Adicionar bloco{blocosDisponiveisParaAdicionar.length > 0 ? ` (${blocosDisponiveisParaAdicionar.length})` : ''}
-            </button>
-            {adicionarBlocoAberto && blocosDisponiveisParaAdicionar.length > 0 && (
-              <div className="sol-detail-adicionar-pop hub-adicionar-pop" role="menu" aria-label="Blocos disponíveis">
-                {['Home', 'Trabalho', 'Financeiro', 'Obras e Compras', 'Institucional'].map((grupo) => {
-                  const doGrupo = blocosDisponiveisParaAdicionar.filter((bloco) => (
-                    (catalogoPermitido.find((meta) => meta.id === bloco.id)?.grupo || 'Home') === grupo
-                  ));
-                  if (doGrupo.length === 0) return null;
-                  return (
-                    <div key={grupo} className="hub-adicionar-grupo">
-                      <span className="hub-adicionar-grupo-titulo">{grupo}</span>
-                      {doGrupo.map((bloco) => (
-                        <button
-                          key={bloco.id}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            readicionarBloco(bloco.id);
-                            setAdicionarBlocoAberto(false);
-                          }}
-                        >
-                          {rotuloBlocoHome(bloco.id)}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <button type="button" className="btn btn-outline btn-sm" onClick={restaurarPadraoSetor}>
-            Restaurar padrão
-          </button>
-          <span className="text-sm text-[var(--c-muted)]">
-            Arraste para reordenar; largura e "×" em cada bloco. Salvo automaticamente.
-            No celular valem a ordem e os blocos mantidos — largura é só do desktop.
-          </span>
-        </div>
-      )}
 
       {/* Sem módulo liberado, ESTE é o bloco principal da tela (B2): é ele
           que responde a única pergunta que sobra — "e agora?". */}
@@ -702,15 +599,33 @@ export default function HomeHub() {
         </BlocoConteudo>
       )}
 
-      {segmentosBlocos.map((segmento, indice) => (
-        segmento.tipo === 'colunas' ? (
-          <div key={`seg-${indice}`} className="hub-blocos-colunas">
-            {segmento.blocos.map(renderizarBloco)}
-          </div>
-        ) : (
-          segmento.blocos.map(renderizarBloco)
-        )
-      ))}
+      <BlocosPersonalizaveis
+        blocos={catalogoBlocos}
+        arranjo={{
+          ordem: ordemBlocos,
+          ocultos: blocosOcultos,
+          recolhidos: blocosRecolhidos,
+          larguras: largurasBlocos,
+          adicionados: blocosAdicionados
+        }}
+        preferenciasBrutas={prefsLayoutUsuario}
+        aoMudarArranjo={persistirArranjoBlocos}
+        aoRestaurar={restaurarPadraoSetor}
+        larguraPadrao="total"
+        /* O modo é ligado na barra de ações da faixa (personalizar é ação
+           SOBRE ESTA TELA — R11/C6), então ele vem controlado daqui e a
+           entrada própria do componente não aparece. */
+        personalizando={personalizando}
+        aoAlternarPersonalizando={(ligado) => {
+          setPersonalizando(ligado);
+          if (!ligado) setAdicionarModuloAberto(false);
+        }}
+        /* O catálogo da Home é grande (17 blocos em cinco grupos): o
+           popover agrupa, como já agrupava. */
+        agruparPor={grupoDoBloco}
+        gruposOrdem={GRUPOS_HOME}
+        classes={{ colunas: 'hub-blocos-colunas' }}
+      />
 
       {toast && (
         <div className="hub-toast" role="status">

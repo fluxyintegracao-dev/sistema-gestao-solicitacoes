@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -336,115 +337,125 @@ export default function ComprasRelatorioCiclo() {
         />
       </StatGrid>
 
-      <BlocoConteudo
-        titulo="Ciclo medio por etapa"
-        descricao="Gargalos do processo calculados pelas datas reais registradas na solicitacao, cotacao e pedido."
-      >
-        {loading ? (
-          <div className="app-empty-card">Carregando etapas do ciclo...</div>
-        ) : etapasCiclo.length === 0 ? (
-          <div className="app-empty-card">Sem datas suficientes para montar o grafico do ciclo.</div>
-        ) : (
-          <div className="grid gap-3">
-            {etapasCiclo.map((etapa) => (
-              <div key={`ciclo-etapa-${etapa.key}`} className="grid gap-2">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <strong className="text-sm text-[var(--c-text)]">{etapa.label}</strong>
-                    <span className="ml-2 text-xs text-[var(--c-muted)]">{etapa.detail}</span>
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 3 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-ciclo" larguraPadrao="total">
+        <BlocoConteudo
+          titulo="Ciclo medio por etapa"
+          descricao="Gargalos do processo calculados pelas datas reais registradas na solicitacao, cotacao e pedido."
+        >
+          {loading ? (
+            <div className="app-empty-card">Carregando etapas do ciclo...</div>
+          ) : etapasCiclo.length === 0 ? (
+            <div className="app-empty-card">Sem datas suficientes para montar o grafico do ciclo.</div>
+          ) : (
+            <div className="grid gap-3">
+              {etapasCiclo.map((etapa) => (
+                <div key={`ciclo-etapa-${etapa.key}`} className="grid gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <strong className="text-sm text-[var(--c-text)]">{etapa.label}</strong>
+                      <span className="ml-2 text-xs text-[var(--c-muted)]">{etapa.detail}</span>
+                    </div>
+                    <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatHours(etapa.value)}</strong>
                   </div>
-                  <strong className="text-sm tabular-nums text-[var(--c-text)]">{formatHours(etapa.value)}</strong>
+                  <BarraProporcao valor={etapa.value} maximo={maiorTempoEtapa} />
                 </div>
-                <BarraProporcao valor={etapa.value} maximo={maiorTempoEtapa} />
-              </div>
-            ))}
-          </div>
-        )}
-      </BlocoConteudo>
+              ))}
+            </div>
+          )}
+        </BlocoConteudo>
 
-      {/* Estes tres tempos JA aparecem no grafico acima (mesma origem, mesmo
-          numero). Ficam porque a reorganizacao e pura — a proposta de
-          remover a segunda aparicao esta no relatorio, nao no codigo. */}
-      <BlocoConteudo titulo="Etapas iniciais em numeros" variante="secundario">
-        <StatGrid colunas={3}>
-          <StatTile
-            label="Criacao ate liberacao"
-            valor={formatHours(resumo.tempo_medio_criacao_liberacao_horas)}
-            sub="Tempo medio"
-          />
-          <StatTile
-            label="Liberacao ate primeiro envio"
-            valor={formatHours(resumo.tempo_medio_liberacao_envio_horas)}
-            sub="Tempo medio"
-          />
-          <StatTile
-            label="Envio ate primeira resposta"
-            valor={formatHours(resumo.tempo_medio_envio_primeira_resposta_horas)}
-            sub="Tempo medio"
-          />
-        </StatGrid>
-      </BlocoConteudo>
+        {/* Estes tres tempos JA aparecem no grafico acima (mesma origem, mesmo
+            numero). Ficam porque a reorganizacao e pura — a proposta de
+            remover a segunda aparicao esta no relatorio, nao no codigo. */}
+        <BlocoConteudo titulo="Etapas iniciais em numeros" variante="secundario">
+          <StatGrid colunas={3}>
+            <StatTile
+              label="Criacao ate liberacao"
+              valor={formatHours(resumo.tempo_medio_criacao_liberacao_horas)}
+              sub="Tempo medio"
+            />
+            <StatTile
+              label="Liberacao ate primeiro envio"
+              valor={formatHours(resumo.tempo_medio_liberacao_envio_horas)}
+              sub="Tempo medio"
+            />
+            <StatTile
+              label="Envio ate primeira resposta"
+              valor={formatHours(resumo.tempo_medio_envio_primeira_resposta_horas)}
+              sub="Tempo medio"
+            />
+          </StatGrid>
+        </BlocoConteudo>
 
-      {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
-          scrollport e matava o `position: sticky` da coluna fixa e do
-          cabecalho — sem erro, sem falha de build. O BlocoConteudo nao
-          recorta nada; quem precisa rolar e o proprio contêiner da tabela. */}
-      <BlocoConteudo
-        titulo="Ciclo por solicitacao"
-        descricao="Cada solicitacao com os tempos reais entre criacao, encerramento e pedido."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'solicitacao',
-              titulo: 'Solicitacao',
-              // R17: a solicitacao NOMEIA o registro desta linha.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (linha) => (
-                <div>
-                  <strong>SC #{linha.solicitacao.id}</strong>
-                  <div className="text-xs text-[var(--c-muted)]">{linha.solicitacao.titulo || 'Sem titulo'}</div>
-                </div>
-              )
-            },
-            { id: 'status', titulo: 'Status', tipo: 'status', render: (linha) => linha.solicitacao.status },
-            {
-              id: 'datas',
-              titulo: 'Datas',
-              tipo: 'texto',
-              render: (linha) => (
-                <div>
-                  <div>Criada: {formatDate(linha.solicitacao.criado_em)}</div>
-                  <div className="text-xs text-[var(--c-muted)]">Encerrada: {formatDate(linha.solicitacao.encerrado_em)}</div>
-                </div>
-              )
-            },
-            {
-              id: 'fornecedores',
-              titulo: 'Fornecedores',
-              tipo: 'numero',
-              render: (linha) => (
-                <>
-                  {formatNumber(linha.contadores.fornecedores_respondidos)} de{' '}
-                  {formatNumber(linha.contadores.fornecedores_enviados)}
-                </>
-              )
-            },
-            { id: 'criacao_encerramento', titulo: 'Criacao → encerramento', tipo: 'numero', render: (linha) => formatHours(linha.tempos.criacao_para_encerramento_horas) },
-            { id: 'encerramento_pedido', titulo: 'Encerramento → pedido', tipo: 'numero', render: (linha) => formatHours(linha.tempos.encerramento_para_pedido_horas) },
-            { id: 'ciclo_total', titulo: 'Ciclo total', tipo: 'numero', render: (linha) => formatHours(linha.tempos.ciclo_total_ate_pedido_horas) }
-          ]}
-          itens={solicitacoes}
-          getId={(linha) => linha.solicitacao.id}
-          carregando={loading}
-          storageKey="tabela:compras-ciclo:solicitacoes"
-          rotuloRolagem="Ciclo por solicitacao"
-          vazio="Nenhuma solicitacao encontrada para os filtros selecionados."
-        />
-      </BlocoConteudo>
+        {/* R18: o `overflow-hidden` que embrulhava esta tabela criava um
+            scrollport e matava o `position: sticky` da coluna fixa e do
+            cabecalho — sem erro, sem falha de build. O BlocoConteudo nao
+            recorta nada; quem precisa rolar e o proprio contêiner da tabela. */}
+        <BlocoConteudo
+          titulo="Ciclo por solicitacao"
+          descricao="Cada solicitacao com os tempos reais entre criacao, encerramento e pedido."
+          variante="primario"
+          cor="var(--c-primary)"
+        >
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'solicitacao',
+                titulo: 'Solicitacao',
+                // R17: a solicitacao NOMEIA o registro desta linha.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (linha) => (
+                  <div>
+                    <strong>SC #{linha.solicitacao.id}</strong>
+                    <div className="text-xs text-[var(--c-muted)]">{linha.solicitacao.titulo || 'Sem titulo'}</div>
+                  </div>
+                )
+              },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (linha) => linha.solicitacao.status },
+              {
+                id: 'datas',
+                titulo: 'Datas',
+                tipo: 'texto',
+                render: (linha) => (
+                  <div>
+                    <div>Criada: {formatDate(linha.solicitacao.criado_em)}</div>
+                    <div className="text-xs text-[var(--c-muted)]">Encerrada: {formatDate(linha.solicitacao.encerrado_em)}</div>
+                  </div>
+                )
+              },
+              {
+                id: 'fornecedores',
+                titulo: 'Fornecedores',
+                tipo: 'numero',
+                render: (linha) => (
+                  <>
+                    {formatNumber(linha.contadores.fornecedores_respondidos)} de{' '}
+                    {formatNumber(linha.contadores.fornecedores_enviados)}
+                  </>
+                )
+              },
+              { id: 'criacao_encerramento', titulo: 'Criacao → encerramento', tipo: 'numero', render: (linha) => formatHours(linha.tempos.criacao_para_encerramento_horas) },
+              { id: 'encerramento_pedido', titulo: 'Encerramento → pedido', tipo: 'numero', render: (linha) => formatHours(linha.tempos.encerramento_para_pedido_horas) },
+              { id: 'ciclo_total', titulo: 'Ciclo total', tipo: 'numero', render: (linha) => formatHours(linha.tempos.ciclo_total_ate_pedido_horas) }
+            ]}
+            itens={solicitacoes}
+            getId={(linha) => linha.solicitacao.id}
+            carregando={loading}
+            storageKey="tabela:compras-ciclo:solicitacoes"
+            rotuloRolagem="Ciclo por solicitacao"
+            vazio="Nenhuma solicitacao encontrada para os filtros selecionados."
+          />
+        </BlocoConteudo>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

@@ -1,5 +1,6 @@
 import { HiOutlineMagnifyingGlass, HiOutlineXMark } from 'react-icons/hi2';
 import { FiltroRapido } from '../lista-avancada/ListaAvancada';
+import PainelFiltrosVisiveis from './PainelFiltrosVisiveis';
 
 /**
  * BARRA DE FILTROS PADRÃO — o padrão das Solicitações para QUALQUER tela
@@ -39,12 +40,27 @@ import { FiltroRapido } from '../lista-avancada/ListaAvancada';
  * NÃO use para recorte enumerável — status, obra, vínculo e empresa são
  * `filtros`, com marcação e etiqueta removível. Campo aqui é exceção
  * declarada, não porta dos fundos.
+ *
+ * ## `visibilidade` — QUAIS filtros aparecem (05/09, fechamento do N53)
+ *
+ * Medido: três telas ofereciam essa escolha, cada uma com uma interface
+ * própria (modal de marcação na Consulta de títulos, menu de marcação nas
+ * Solicitações, bloco recolhível que não gravava nada nos
+ * Provisionamentos). A superfície única mora em `PainelFiltrosVisiveis`;
+ * esta prop é só o LUGAR dela — na própria faixa de filtros, junto do que
+ * ela governa, e não numa barra de ações ou num bloco à parte, onde a
+ * pessoa tinha de adivinhar a ligação entre o painel e a faixa.
+ *
+ * Recebe o objeto devolvido por `useFiltrosVisiveis(chave, filtros, …)`.
+ * A tela continua dona de QUAIS campos e dimensões monta — o painel só
+ * diz quais ids estão à vista.
  */
 export default function BarraFiltros({
   busca,               // { valor, aoMudar, placeholder }
   campos = [],         // [{ id, rotulo, tipo, valor, aoMudar, min, max, step, placeholder, sugestoes }]
   filtros = [],        // [{ id, rotulo, unico?, opcoes: [{ valor, rotulo }] }]
   ativos = {},         // { [id]: Set<string> }
+  visibilidade = null, // retorno de `useFiltrosVisiveis` — ver acima
   aoAlternar,
   aoLimpar
 }) {
@@ -140,9 +156,9 @@ export default function BarraFiltros({
         </div>
       )}
 
-      {filtros.length > 0 && (
+      {(filtros.length > 0 || visibilidade) && (
         <div className="la-filtros-linha">
-          <span className="la-filtros-rotulo">Filtrar:</span>
+          {filtros.length > 0 ? <span className="la-filtros-rotulo">Filtrar:</span> : null}
           {filtros.map((dim) => (
             <FiltroRapido
               key={dim.id}
@@ -151,6 +167,7 @@ export default function BarraFiltros({
               onToggle={(valor) => aoAlternar(dim.id, valor, { unico: Boolean(dim.unico) })}
             />
           ))}
+          {visibilidade ? <PainelFiltrosVisiveis visibilidade={visibilidade} /> : null}
         </div>
       )}
 

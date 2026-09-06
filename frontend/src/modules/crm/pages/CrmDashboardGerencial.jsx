@@ -3,6 +3,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -200,44 +201,58 @@ export default function CrmDashboardGerencial() {
             ))}
           </StatGrid>
 
-          <RankingPorResponsavel
-            titulo="Carteira por responsavel"
-            descricao="Top usuarios com backlog ativo."
-            rows={data.leadsPorResponsavel}
-            storageKey="tabela:crm-dashboard-gerencial:responsaveis"
-          />
+          {/*
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 5 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
+          */}
+          <BlocosPersonalizaveis
+            chave="blocos:crm-dashboard-gerencial"
+            larguraPadrao="total"
+            dentroDeGrade
+          >
+            <RankingPorResponsavel data-bloco-id="carteira-por-responsavel" data-bloco-rotulo="Carteira por responsavel"
+              titulo="Carteira por responsavel"
+              descricao="Top usuarios com backlog ativo."
+              rows={data.leadsPorResponsavel}
+              storageKey="tabela:crm-dashboard-gerencial:responsaveis"
+            />
 
-          <RankingPorChave
-            titulo="Origens de leads"
-            descricao="Entradas captadas no recorte atual."
-            rotuloChave="Origem"
-            rows={data.leadsPorOrigem}
-            storageKey="tabela:crm-dashboard-gerencial:origens"
-          />
+            <RankingPorChave data-bloco-id="origens-de-leads" data-bloco-rotulo="Origens de leads"
+              titulo="Origens de leads"
+              descricao="Entradas captadas no recorte atual."
+              rotuloChave="Origem"
+              rows={data.leadsPorOrigem}
+              storageKey="tabela:crm-dashboard-gerencial:origens"
+            />
 
-          <RankingPorChave
-            titulo="Conversas por canal"
-            descricao="Distribuicao da operacao de atendimento."
-            rotuloChave="Canal"
-            rows={data.conversasPorCanal}
-            storageKey="tabela:crm-dashboard-gerencial:conversas-canal"
-          />
+            <RankingPorChave data-bloco-id="conversas-por-canal" data-bloco-rotulo="Conversas por canal"
+              titulo="Conversas por canal"
+              descricao="Distribuicao da operacao de atendimento."
+              rotuloChave="Canal"
+              rows={data.conversasPorCanal}
+              storageKey="tabela:crm-dashboard-gerencial:conversas-canal"
+            />
 
-          <RankingPorChave
-            titulo="Conversas por status"
-            descricao="Acompanhamento de backlog e resolucao."
-            rotuloChave="Status"
-            rows={data.conversasPorStatus}
-            storageKey="tabela:crm-dashboard-gerencial:conversas-status"
-          />
+            <RankingPorChave data-bloco-id="conversas-por-status" data-bloco-rotulo="Conversas por status"
+              titulo="Conversas por status"
+              descricao="Acompanhamento de backlog e resolucao."
+              rotuloChave="Status"
+              rows={data.conversasPorStatus}
+              storageKey="tabela:crm-dashboard-gerencial:conversas-status"
+            />
 
-          <RankingPorChave
-            titulo="Automacoes por gatilho"
-            descricao="Base cadastral configurada para a proxima etapa de execucao automatica."
-            rotuloChave="Gatilho"
-            rows={data.automacoesPorGatilho}
-            storageKey="tabela:crm-dashboard-gerencial:automacoes-gatilho"
-          />
+            <RankingPorChave data-bloco-id="automacoes-por-gatilho" data-bloco-rotulo="Automacoes por gatilho"
+              titulo="Automacoes por gatilho"
+              descricao="Base cadastral configurada para a proxima etapa de execucao automatica."
+              rotuloChave="Gatilho"
+              rows={data.automacoesPorGatilho}
+              storageKey="tabela:crm-dashboard-gerencial:automacoes-gatilho"
+            />
+          </BlocosPersonalizaveis>
         </>
       )}
     </Pagina>

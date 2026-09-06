@@ -4,6 +4,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   TabelaPadrao,
@@ -125,142 +126,157 @@ export default function FiscalDashboard() {
             />
           </StatGrid>
 
-          <BlocoConteudo
-            titulo="Estado da fundacao"
-            descricao="Como o modulo esta configurado neste ambiente."
-          >
-            <StatGrid colunas={3}>
-              <StatTile label="SEFAZ real" valor={modulo.sefaz_enabled ? 'habilitada' : 'desabilitada'} />
-              <StatTile label="S3 fiscal" valor={modulo.storage_configured ? 'configurado' : 'pendente'} />
-              <StatTile label="Prefixo S3" valor={modulo.storage_prefix || '—'} />
-            </StatGrid>
-          </BlocoConteudo>
-
           {/*
-            R1/R17 — as duas listas eram pares rótulo/valor em <div> soltos:
-            sem coluna declarada, sem alinhamento por tipo, sem
-            redimensionamento e sem largura salva por usuário.
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 4 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
           */}
-          <BlocoConteudo titulo="Documentos por status">
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'status',
-                  titulo: 'Status',
-                  // R17: `semIdentidade` abaixo — status é classificação, não
-                  // nome de registro.
-                  tipo: 'texto',
-                  noCard: 'titulo',
-                  render: (item) => <StatusBadge status={item.status || '-'} />
-                },
-                {
-                  id: 'total',
-                  titulo: 'Documentos',
-                  tipo: 'numero',
-                  render: (item) => item.total
-                }
-              ]}
-              itens={documentos.por_status || []}
-              semIdentidade
-              getId={(item) => item.status}
-              storageKey="tabela:painel-fiscal:documentos-por-status"
-              rotuloRolagem="Documentos por status"
-              vazio="Sem dados ainda."
-            />
-          </BlocoConteudo>
-
-          <BlocoConteudo titulo="Documentos por origem">
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'origem',
-                  titulo: 'Origem',
-                  tipo: 'texto',
-                  noCard: 'titulo',
-                  render: (item) => item.source || '-'
-                },
-                {
-                  id: 'total',
-                  titulo: 'Documentos',
-                  tipo: 'numero',
-                  render: (item) => item.total
-                }
-              ]}
-              itens={documentos.por_origem || []}
-              semIdentidade
-              getId={(item) => item.source}
-              storageKey="tabela:painel-fiscal:documentos-por-origem"
-              rotuloRolagem="Documentos por origem"
-              vazio="Sem dados ainda."
-            />
-          </BlocoConteudo>
-
-          {/*
-            B2 — UM primário por tela: é a caixa de entrada recente que gera
-            ação, e por isso ela carrega a barra de cor.
-            O "Ver todos" fica: ele é caminho no CORPO, junto do dado que o
-            origina (a lista completa daquelas linhas), não navegação vestida
-            de ação na faixa.
-          */}
-          <BlocoConteudo
-            titulo="Documentos recentes"
-            variante="primario"
-            cor="var(--module-fiscal)"
-            acoes={(
-              <Link className="btn btn-outline btn-sm" to="/fiscal/documentos">Ver todos</Link>
-            )}
+          <BlocosPersonalizaveis
+            chave="blocos:fiscal-dashboard"
+            larguraPadrao="total"
+            dentroDeGrade
           >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'emissao',
-                  titulo: 'Emissao',
-                  tipo: 'data',
-                  render: (item) => formatDate(item.emission_date)
-                },
-                {
-                  id: 'fornecedor',
-                  titulo: 'Fornecedor',
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (item) => (
-                    <Link className="text-[var(--c-primary)] hover:underline" to={`/fiscal/documentos/${item.id}`}>
-                      {item.issuer_name || item.issuer_cnpj || '-'}
-                    </Link>
-                  )
-                },
-                {
-                  id: 'numero',
-                  titulo: 'Numero',
-                  tipo: 'codigo',
-                  render: (item) => item.document_number || '-'
-                },
-                {
-                  id: 'valor',
-                  titulo: 'Valor',
-                  // T7: dinheiro nunca trunca — 190px, à direita, tabular.
-                  tipo: 'valor',
-                  render: (item) => formatMoney(item.total_value)
-                },
-                {
-                  id: 'status',
-                  titulo: 'Status',
-                  tipo: 'status',
-                  render: (item) => <StatusBadge status={item.document_status} />
-                }
-              ]}
-              itens={documentos.recentes || []}
-              storageKey="tabela:painel-fiscal:documentos-recentes"
-              rotuloRolagem="Documentos recentes"
-              vazio="Nenhum documento fiscal encontrado."
-            />
-          </BlocoConteudo>
+            <BlocoConteudo
+              titulo="Estado da fundacao"
+              descricao="Como o modulo esta configurado neste ambiente."
+            >
+              <StatGrid colunas={3}>
+                <StatTile label="SEFAZ real" valor={modulo.sefaz_enabled ? 'habilitada' : 'desabilitada'} />
+                <StatTile label="S3 fiscal" valor={modulo.storage_configured ? 'configurado' : 'pendente'} />
+                <StatTile label="Prefixo S3" valor={modulo.storage_prefix || '—'} />
+              </StatGrid>
+            </BlocoConteudo>
+
+            {/*
+              R1/R17 — as duas listas eram pares rótulo/valor em <div> soltos:
+              sem coluna declarada, sem alinhamento por tipo, sem
+              redimensionamento e sem largura salva por usuário.
+            */}
+            <BlocoConteudo titulo="Documentos por status">
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    // R17: `semIdentidade` abaixo — status é classificação, não
+                    // nome de registro.
+                    tipo: 'texto',
+                    noCard: 'titulo',
+                    render: (item) => <StatusBadge status={item.status || '-'} />
+                  },
+                  {
+                    id: 'total',
+                    titulo: 'Documentos',
+                    tipo: 'numero',
+                    render: (item) => item.total
+                  }
+                ]}
+                itens={documentos.por_status || []}
+                semIdentidade
+                getId={(item) => item.status}
+                storageKey="tabela:painel-fiscal:documentos-por-status"
+                rotuloRolagem="Documentos por status"
+                vazio="Sem dados ainda."
+              />
+            </BlocoConteudo>
+
+            <BlocoConteudo titulo="Documentos por origem">
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'origem',
+                    titulo: 'Origem',
+                    tipo: 'texto',
+                    noCard: 'titulo',
+                    render: (item) => item.source || '-'
+                  },
+                  {
+                    id: 'total',
+                    titulo: 'Documentos',
+                    tipo: 'numero',
+                    render: (item) => item.total
+                  }
+                ]}
+                itens={documentos.por_origem || []}
+                semIdentidade
+                getId={(item) => item.source}
+                storageKey="tabela:painel-fiscal:documentos-por-origem"
+                rotuloRolagem="Documentos por origem"
+                vazio="Sem dados ainda."
+              />
+            </BlocoConteudo>
+
+            {/*
+              B2 — UM primário por tela: é a caixa de entrada recente que gera
+              ação, e por isso ela carrega a barra de cor.
+              O "Ver todos" fica: ele é caminho no CORPO, junto do dado que o
+              origina (a lista completa daquelas linhas), não navegação vestida
+              de ação na faixa.
+            */}
+            <BlocoConteudo
+              titulo="Documentos recentes"
+              variante="primario"
+              cor="var(--module-fiscal)"
+              acoes={(
+                <Link className="btn btn-outline btn-sm" to="/fiscal/documentos">Ver todos</Link>
+              )}
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'emissao',
+                    titulo: 'Emissao',
+                    tipo: 'data',
+                    render: (item) => formatDate(item.emission_date)
+                  },
+                  {
+                    id: 'fornecedor',
+                    titulo: 'Fornecedor',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => (
+                      <Link className="text-[var(--c-primary)] hover:underline" to={`/fiscal/documentos/${item.id}`}>
+                        {item.issuer_name || item.issuer_cnpj || '-'}
+                      </Link>
+                    )
+                  },
+                  {
+                    id: 'numero',
+                    titulo: 'Numero',
+                    tipo: 'codigo',
+                    render: (item) => item.document_number || '-'
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor',
+                    // T7: dinheiro nunca trunca — 190px, à direita, tabular.
+                    tipo: 'valor',
+                    render: (item) => formatMoney(item.total_value)
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'status',
+                    render: (item) => <StatusBadge status={item.document_status} />
+                  }
+                ]}
+                itens={documentos.recentes || []}
+                storageKey="tabela:painel-fiscal:documentos-recentes"
+                rotuloRolagem="Documentos recentes"
+                vazio="Nenhum documento fiscal encontrado."
+              />
+            </BlocoConteudo>
+          </BlocosPersonalizaveis>
 
           {/* Histórico/auditoria nasce recolhido, mas o título fica à vista. */}
           <BlocoConteudo
             titulo="Logs recentes"
             variante="secundario"
             recolhivel
+            chavePreferencia="bloco:fiscal-dashboard:logs-recentes"
             recolhidoPadrao={!(sincronizacao.logs_recentes || []).length}
           >
             {/* semIdentidade: log de sincronizacao nao nomeia registro algum —

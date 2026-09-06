@@ -4,6 +4,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -263,137 +264,147 @@ export default function ComprasRelatorioPendenciasCotacoes() {
         <StatTile label="Taxa resposta" valor={formatPercent(resumo.taxa_resposta)} sub="Respondidos sobre enviados" />
       </StatGrid>
 
-      {/* R18: o `overflow-hidden` que envolvia estas tabelas criava um
-          scrollport e matava o `position: sticky` do cabeçalho fixo e da
-          coluna fixa — sem erro nenhum no console. O BlocoConteudo não
-          recorta; onde precisar cortar, o idioma é `overflow: clip`. */}
-      <BlocoConteudo
-        titulo="Cotacoes com pendencias"
-        contagem="Top 100"
-        descricao="Cotacoes priorizadas por prazo vencido e falta de respostas minimas."
-        variante="primario"
-        cor="var(--c-primary)"
-      >
-        <TabelaPadrao
-          colunas={[
-            {
-              id: 'cotacao',
-              titulo: 'Cotacao',
-              // R17: a cotacao (SC) NOMEIA o registro.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => (
-                <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.id}`}>
-                  SC #{item.id}
-                </Link>
-              )
-            },
-            { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
-            { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
-            {
-              id: 'status',
-              titulo: 'Status',
-              tipo: 'status',
-              render: (item) => <StatusBadge status={item.status || '-'} />
-            },
-            { id: 'fornecedores', titulo: 'Enviados', tipo: 'numero', render: (item) => formatNumber(item.fornecedores_enviados) },
-            { id: 'respostas', titulo: 'Respostas', tipo: 'numero', render: (item) => `${formatNumber(item.fornecedores_respondidos)} / ${formatNumber(item.minimo_cotacoes)}` },
-            {
-              id: 'pendencias',
-              titulo: 'Pendencias',
-              tipo: 'badge',
-              /*
-                R25: o `PendenciaBadge` local cravava a paleta do Tailwind
-                (amber/red) na tela. As duas pendências não perderam a
-                distinção — ganharam FAMÍLIA SEMÂNTICA explícita no
-                StatusBadge do sistema: falta de mínimo é `warning`
-                (pendência, ainda dá para agir), prazo vencido é `danger`
-                (o prazo já passou). E vêm com ícone, porque cor sozinha não
-                comunica para daltônicos.
-              */
-              render: (item) => (
-                <div className="flex flex-wrap gap-2">
-                  {item.sem_minimo ? <StatusBadge status="Sem minimo" kind="warning" /> : null}
-                  {item.prazo_vencido ? <StatusBadge status="Prazo vencido" kind="danger" /> : null}
-                </div>
-              )
-            },
-            { id: 'criada', titulo: 'Criada em', tipo: 'data', render: (item) => formatDate(item.criada_em) }
-          ]}
-          itens={cotacoes}
-          carregando={loading}
-          storageKey="tabela:compras-pendencias-cotacoes:cotacoes"
-          rotuloRolagem="Cotacoes com pendencias"
-          vazio="Sem cotacoes com fornecedores nos filtros."
-        />
-      </BlocoConteudo>
-
-      <div className="grid gap-4 xl:grid-cols-2">
+      {/*
+        BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+        em que ligar isto é SEGURO: estes 2 blocos são leituras
+        independentes — sem ordem obrigatória entre si, sem botão de gravar
+        dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+        sendo o do código; a preferência guarda só o DESVIO. No celular o
+        modo não existe (arrastar é HTML5 nativo e não responde a toque).
+      */}
+      <BlocosPersonalizaveis chave="blocos:compras-relatorio-pendencias-cotacoes" larguraPadrao="total">
+        {/* R18: o `overflow-hidden` que envolvia estas tabelas criava um
+            scrollport e matava o `position: sticky` do cabeçalho fixo e da
+            coluna fixa — sem erro nenhum no console. O BlocoConteudo não
+            recorta; onde precisar cortar, o idioma é `overflow: clip`. */}
         <BlocoConteudo
-          titulo="Fornecedores vencidos sem resposta"
-          descricao="Fornecedores com prazo de resposta anterior a hoje e sem resposta registrada."
+          titulo="Cotacoes com pendencias"
+          contagem="Top 100"
+          descricao="Cotacoes priorizadas por prazo vencido e falta de respostas minimas."
+          variante="primario"
+          cor="var(--c-primary)"
         >
           <TabelaPadrao
             colunas={[
               {
                 id: 'cotacao',
                 titulo: 'Cotacao',
-                tipo: 'codigo',
+                // R17: a cotacao (SC) NOMEIA o registro.
+                tipo: 'identidade',
+                noCard: 'titulo',
                 render: (item) => (
-                  <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.cotacao_id}`}>
-                    SC #{item.cotacao_id}
+                  <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.id}`}>
+                    SC #{item.id}
                   </Link>
                 )
               },
-              {
-                id: 'fornecedor',
-                titulo: 'Fornecedor',
-                // R17: o fornecedor NOMEIA a pendencia listada.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.fornecedor_nome
-              },
+              { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
               { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
-              { id: 'enviado', titulo: 'Enviado', tipo: 'data', render: (item) => formatDate(item.enviado_em) },
-              { id: 'visualizado', titulo: 'Visualizado', tipo: 'data', render: (item) => formatDate(item.visualizado_em) },
-              { id: 'prazo', titulo: 'Prazo', tipo: 'data', render: (item) => <span className="font-semibold text-[var(--c-danger)]">{formatDate(item.prazo_resposta)}</span> }
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => <StatusBadge status={item.status || '-'} />
+              },
+              { id: 'fornecedores', titulo: 'Enviados', tipo: 'numero', render: (item) => formatNumber(item.fornecedores_enviados) },
+              { id: 'respostas', titulo: 'Respostas', tipo: 'numero', render: (item) => `${formatNumber(item.fornecedores_respondidos)} / ${formatNumber(item.minimo_cotacoes)}` },
+              {
+                id: 'pendencias',
+                titulo: 'Pendencias',
+                tipo: 'badge',
+                /*
+                  R25: o `PendenciaBadge` local cravava a paleta do Tailwind
+                  (amber/red) na tela. As duas pendências não perderam a
+                  distinção — ganharam FAMÍLIA SEMÂNTICA explícita no
+                  StatusBadge do sistema: falta de mínimo é `warning`
+                  (pendência, ainda dá para agir), prazo vencido é `danger`
+                  (o prazo já passou). E vêm com ícone, porque cor sozinha não
+                  comunica para daltônicos.
+                */
+                render: (item) => (
+                  <div className="flex flex-wrap gap-2">
+                    {item.sem_minimo ? <StatusBadge status="Sem minimo" kind="warning" /> : null}
+                    {item.prazo_vencido ? <StatusBadge status="Prazo vencido" kind="danger" /> : null}
+                  </div>
+                )
+              },
+              { id: 'criada', titulo: 'Criada em', tipo: 'data', render: (item) => formatDate(item.criada_em) }
             ]}
-            itens={fornecedoresVencidos}
-            getId={(item) => `${item.cotacao_id}-${item.fornecedor_id || item.fornecedor_nome}`}
+            itens={cotacoes}
             carregando={loading}
-            storageKey="tabela:compras-pendencias-cotacoes:fornecedores-vencidos"
-            rotuloRolagem="Fornecedores vencidos sem resposta"
-            vazio="Sem fornecedores vencidos sem resposta."
+            storageKey="tabela:compras-pendencias-cotacoes:cotacoes"
+            rotuloRolagem="Cotacoes com pendencias"
+            vazio="Sem cotacoes com fornecedores nos filtros."
           />
         </BlocoConteudo>
 
-        <BlocoConteudo
-          titulo="Pendencias por obra/centro"
-          descricao="Onde estao concentradas cotacoes sem minimo e com prazo vencido."
-        >
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'obra',
-                titulo: 'Obra/Centro',
-                // R17: a obra/centro NOMEIA a linha deste resumo.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => item.obra_nome
-              },
-              { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes) },
-              { id: 'sem_minimo', titulo: 'Sem minimo', tipo: 'numero', render: (item) => formatNumber(item.sem_minimo) },
-              { id: 'vencidas', titulo: 'Vencidas', tipo: 'numero', render: (item) => formatNumber(item.vencidas) }
-            ]}
-            itens={obrasResumo}
-            getId={(item) => item.key}
-            carregando={loading}
-            storageKey="tabela:compras-pendencias-cotacoes:obras"
-            rotuloRolagem="Pendencias por obra/centro"
-            vazio="Sem pendencias por obra/centro."
-          />
-        </BlocoConteudo>
-      </div>
+        <div data-bloco-id="fornecedores-vencidos-sem-resposta" data-bloco-rotulo="Fornecedores vencidos sem resposta" className="grid gap-4 xl:grid-cols-2">
+          <BlocoConteudo
+            titulo="Fornecedores vencidos sem resposta"
+            descricao="Fornecedores com prazo de resposta anterior a hoje e sem resposta registrada."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'cotacao',
+                  titulo: 'Cotacao',
+                  tipo: 'codigo',
+                  render: (item) => (
+                    <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.cotacao_id}`}>
+                      SC #{item.cotacao_id}
+                    </Link>
+                  )
+                },
+                {
+                  id: 'fornecedor',
+                  titulo: 'Fornecedor',
+                  // R17: o fornecedor NOMEIA a pendencia listada.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.fornecedor_nome
+                },
+                { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
+                { id: 'enviado', titulo: 'Enviado', tipo: 'data', render: (item) => formatDate(item.enviado_em) },
+                { id: 'visualizado', titulo: 'Visualizado', tipo: 'data', render: (item) => formatDate(item.visualizado_em) },
+                { id: 'prazo', titulo: 'Prazo', tipo: 'data', render: (item) => <span className="font-semibold text-[var(--c-danger)]">{formatDate(item.prazo_resposta)}</span> }
+              ]}
+              itens={fornecedoresVencidos}
+              getId={(item) => `${item.cotacao_id}-${item.fornecedor_id || item.fornecedor_nome}`}
+              carregando={loading}
+              storageKey="tabela:compras-pendencias-cotacoes:fornecedores-vencidos"
+              rotuloRolagem="Fornecedores vencidos sem resposta"
+              vazio="Sem fornecedores vencidos sem resposta."
+            />
+          </BlocoConteudo>
+
+          <BlocoConteudo
+            titulo="Pendencias por obra/centro"
+            descricao="Onde estao concentradas cotacoes sem minimo e com prazo vencido."
+          >
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'obra',
+                  titulo: 'Obra/Centro',
+                  // R17: a obra/centro NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.obra_nome
+                },
+                { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes) },
+                { id: 'sem_minimo', titulo: 'Sem minimo', tipo: 'numero', render: (item) => formatNumber(item.sem_minimo) },
+                { id: 'vencidas', titulo: 'Vencidas', tipo: 'numero', render: (item) => formatNumber(item.vencidas) }
+              ]}
+              itens={obrasResumo}
+              getId={(item) => item.key}
+              carregando={loading}
+              storageKey="tabela:compras-pendencias-cotacoes:obras"
+              rotuloRolagem="Pendencias por obra/centro"
+              vazio="Sem pendencias por obra/centro."
+            />
+          </BlocoConteudo>
+        </div>
+      </BlocosPersonalizaveis>
     </Pagina>
   );
 }

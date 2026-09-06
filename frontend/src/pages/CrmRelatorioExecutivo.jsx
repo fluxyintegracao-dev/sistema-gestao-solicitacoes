@@ -3,6 +3,7 @@ import {
   Pagina,
   PageHeader,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   StatGrid,
   StatTile,
   BarraFiltros,
@@ -227,7 +228,23 @@ export default function CrmRelatorioExecutivo() {
           ) : null}
 
           {isVisible('crm.relatorio_executivo.distribuicoes') ? (
-            <>
+            /*
+              BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o
+              grupo em que ligar isto é SEGURO: estes 3 blocos são leituras
+              independentes — sem ordem obrigatória entre si, sem botão de
+              gravar dentro e sem campo obrigatório que ocultar esconda. O
+              fragmento que existia aqui não posicionava nada, então o
+              componente entra no lugar dele com `dentroDeGrade`: os
+              invólucros somem do layout (`display: contents`) e o desenho
+              de hoje fica igual enquanto ninguém personalizar nada. No
+              celular o modo não existe (arrastar é HTML5 nativo e não
+              responde a toque).
+            */
+            <BlocosPersonalizaveis
+              chave="blocos:crm-relatorio-executivo"
+              larguraPadrao="total"
+              dentroDeGrade
+            >
               <BlocoDistribuicao
                 titulo="Origens de leads"
                 descricao="Canais que geraram entrada no recorte."
@@ -249,7 +266,7 @@ export default function CrmRelatorioExecutivo() {
                 labelGetter={(row) => row.usuario?.nome || '-'}
                 valueGetter={(row) => row.total}
               />
-            </>
+            </BlocosPersonalizaveis>
           ) : null}
         </>
       )}

@@ -51,6 +51,7 @@ import {
   useAvisos,
   useConfirmacao
 } from '../components/padrao';
+import PainelFiltrosVisiveis, { useFiltrosVisiveis } from '../components/padrao/PainelFiltrosVisiveis';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -102,25 +103,52 @@ const NATUREZAS_INTERCOMPANY_BAIXA = [
   }
 ];
 
-const FILTER_DEFINITIONS = [
-  { id: 'codigo', label: 'Titulo', group: 'basic', span: 'xl:col-span-2' },
-  { id: 'q', label: 'Busca rapida', group: 'basic', span: 'xl:col-span-4' },
-  { id: 'status', label: 'Status', group: 'basic', span: 'xl:col-span-2' },
-  { id: 'numero_documento', label: 'N. documento', group: 'basic', span: 'xl:col-span-2' },
-  { id: 'parceiro_id', label: 'Cliente/Credor', group: 'basic', span: 'xl:col-span-4' },
-  { id: 'obra_id', label: 'Obra', group: 'basic', span: 'xl:col-span-4' },
-  { id: 'valor_min', label: 'Valor mínimo', group: 'advanced', span: 'xl:col-span-2' },
-  { id: 'valor_max', label: 'Valor máximo', group: 'advanced', span: 'xl:col-span-2' },
-  { id: 'data_emissao_inicial', label: 'Emissao inicio', group: 'basic', span: 'xl:col-span-2' },
-  { id: 'data_emissao_final', label: 'Emissao fim', group: 'basic', span: 'xl:col-span-2' },
-  { id: 'categoria_financeira_id', label: 'Categoria financeira', group: 'advanced', span: 'xl:col-span-3' },
-  { id: 'forma_pagamento_id', label: 'Forma de pagamento', group: 'advanced', span: 'xl:col-span-3', defaultVisibleWhenMissing: true },
-  { id: 'cartao_id', label: 'Cartao', group: 'advanced', span: 'xl:col-span-3', defaultVisibleWhenMissing: true },
-  { id: 'vencimento_inicial', label: 'Vencimento inicio', group: 'advanced', span: 'xl:col-span-2' },
-  { id: 'vencimento_final', label: 'Vencimento fim', group: 'advanced', span: 'xl:col-span-2' }
-];
+/*
+  OS 15 FILTROS DESTA TELA, E DUAS MUDANÇAS DE 05/09.
 
-const DEFAULT_VISIBLE_FILTER_IDS = FILTER_DEFINITIONS.map((item) => item.id);
+  1) O CONJUNTO INICIAL APROVADO PELO CLIENTE — `rotulo` + `padrao: false`
+     (nasce escondido). Os cinco à vista são os que respondem à pergunta da
+     tela: busca rápida, status, obra e as duas pontas do VENCIMENTO. Os
+     outros dez ficam a um clique no painel "Filtros visíveis". O padrão
+     vale SÓ para quem nunca configurou — quem já tem escolha salva mantém
+     a dele, aqui e no banco.
+
+  2) EMISSÃO E VENCIMENTO TROCAM DE GRUPO, e isso é correção de
+     significado, não arrumação. Emissão era `basic` (aberta sempre) e
+     vencimento era `advanced` (atrás de "Mais filtros"). Para quem paga e
+     cobra contas a pergunta da tela é "o que vence e quanto soma" — a data
+     de emissão é do documento, o vencimento é do compromisso. A ordem
+     estava invertida em três endereços (`/financeiro/titulos`,
+     `?tipo=pagar` e `?tipo=receber`).
+
+  `obrigatorio` em `q`: a busca rápida é o único caminho para achar um
+  título pelo que a pessoa lembra dele. Mesma família da coluna de
+  identidade travada da TabelaPadrao — o resto continua escondível,
+  inclusive "Status", que nasce preenchido (ABERTO) e é justamente um dos
+  que mais se quer tirar da faixa.
+
+  `defaultVisibleWhenMissing` SAIU porque `padrao` faz o mesmo trabalho e
+  faz melhor: a reconciliação do painel único trata todo id que a
+  preferência não cita — não só os dois marcados à mão — pelo padrão que a
+  tela declara. Filtro novo continua aparecendo sozinho; nenhum some.
+*/
+const FILTER_DEFINITIONS = [
+  { id: 'q', rotulo: 'Busca rapida', group: 'basic', span: 'xl:col-span-4', obrigatorio: true },
+  { id: 'status', rotulo: 'Status', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'obra_id', rotulo: 'Obra', group: 'basic', span: 'xl:col-span-4' },
+  { id: 'vencimento_inicial', rotulo: 'Vencimento inicio', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'vencimento_final', rotulo: 'Vencimento fim', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'codigo', rotulo: 'Titulo', group: 'basic', span: 'xl:col-span-2', padrao: false },
+  { id: 'numero_documento', rotulo: 'N. documento', group: 'basic', span: 'xl:col-span-2', padrao: false },
+  { id: 'parceiro_id', rotulo: 'Cliente/Credor', group: 'basic', span: 'xl:col-span-4', padrao: false },
+  { id: 'data_emissao_inicial', rotulo: 'Emissao inicio', group: 'advanced', span: 'xl:col-span-2', padrao: false },
+  { id: 'data_emissao_final', rotulo: 'Emissao fim', group: 'advanced', span: 'xl:col-span-2', padrao: false },
+  { id: 'valor_min', rotulo: 'Valor mínimo', group: 'advanced', span: 'xl:col-span-2', padrao: false },
+  { id: 'valor_max', rotulo: 'Valor máximo', group: 'advanced', span: 'xl:col-span-2', padrao: false },
+  { id: 'categoria_financeira_id', rotulo: 'Categoria financeira', group: 'advanced', span: 'xl:col-span-3', padrao: false },
+  { id: 'forma_pagamento_id', rotulo: 'Forma de pagamento', group: 'advanced', span: 'xl:col-span-3', padrao: false },
+  { id: 'cartao_id', rotulo: 'Cartao', group: 'advanced', span: 'xl:col-span-3', padrao: false }
+];
 
 /*
   D2 (decisão do cliente) — PORTA ÚNICA COM O RECORTE NA URL.
@@ -522,22 +550,31 @@ function getVisibilityStorageKey(user, storagePrefix = FILTER_VISIBILITY_STORAGE
   return `${storagePrefix}.${userToken}`;
 }
 
-function loadVisibleFilterIds(user, storagePrefix = FILTER_VISIBILITY_STORAGE_PREFIX) {
+/*
+  A CHAVE ANTIGA DO NAVEGADOR, LIDA SÓ COMO `legado` (05/09).
+
+  A escolha de quais filtros aparecem passa a morar no BANCO (tipo
+  `filtros`, pelo `PreferenciasContext`) — é a metade do N53 que ainda
+  estava aberta. "Esconder limpa" já tinha tirado do envio a diferença que
+  a máquina fazia, mas a ESCOLHA continuava por navegador: quem escondia
+  "Obra" no desktop e abria a mesma tela no notebook via outra faixa e, ao
+  consultar, outro total.
+
+  Esta função responde a uma coisa só: "o que este usuário já tinha
+  configurado NESTA máquina". `null` quando não há nada — e a distinção
+  importa, porque só quem nunca configurou recebe o conjunto inicial
+  aprovado pelo cliente. A chave NÃO é apagada: é a rede de rollback.
+*/
+function lerLegadoFiltrosVisiveis(user, storagePrefix = FILTER_VISIBILITY_STORAGE_PREFIX) {
   try {
     const stored = localStorage.getItem(getVisibilityStorageKey(user, storagePrefix));
     const parsed = stored ? JSON.parse(stored) : null;
-    if (!Array.isArray(parsed)) {
-      return DEFAULT_VISIBLE_FILTER_IDS;
-    }
-
+    if (!Array.isArray(parsed)) return null;
     const allowed = new Set(FILTER_DEFINITIONS.map((item) => item.id));
     const normalized = parsed.filter((id) => allowed.has(id));
-    FILTER_DEFINITIONS
-      .filter((item) => item.defaultVisibleWhenMissing && !normalized.includes(item.id))
-      .forEach((item) => normalized.push(item.id));
-    return normalized.length > 0 ? normalized : DEFAULT_VISIBLE_FILTER_IDS;
+    return normalized.length > 0 ? normalized : null;
   } catch (error) {
-    return DEFAULT_VISIBLE_FILTER_IDS;
+    return null;
   }
 }
 
@@ -958,23 +995,66 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       : 'Filtre a carteira antes de operar baixas, boletos e integracoes.';
   const [saveFilterCache, setSaveFilterCache] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [filterChooserOpen, setFilterChooserOpen] = useState(false);
-  const [visibleFilterIds, setVisibleFilterIds] = useState(() => loadVisibleFilterIds(user, visibilityStoragePrefix));
   const [draftFilters, setDraftFilters] = useState(() => {
-    /* N53 (05/09): o PADRÃO nasce respeitando o que está escondido. Sem isso,
-       quem escondesse "Status" (que nasce em ABERTO) veria o filtro invisível
-       voltar a recortar a lista na recarga seguinte — o defeito de novo, por
-       outra porta. Valor SALVO pelo usuário não é mascarado aqui: quem revela
-       o campo dele é o efeito de reconciliação abaixo. */
+    /* Sem a máscara de visibilidade aqui (05/09): ela precisa da escolha do
+       usuário, e a escolha agora vem do `PreferenciasContext` — que é um
+       hook, e hook não roda dentro do inicializador de outro estado. Quem
+       aplica a máscara é o efeito de montagem logo abaixo, e ele roda ANTES
+       de qualquer consulta: `appliedFilters` nasce `null`, então nenhum
+       número chega à tela com o padrão bruto. */
     try {
       const stored = localStorage.getItem(filterStorageKey);
-      const padrao = limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), visibleFilterIds);
+      const padrao = getDefaultFilters(fixedTipo || 'RECEBER');
       return normalizeFilters(stored ? JSON.parse(stored) : padrao, fixedTipo);
     } catch (error) {
-      return limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), visibleFilterIds);
+      return getDefaultFilters(fixedTipo || 'RECEBER');
     }
   });
   const [appliedFilters, setAppliedFilters] = useState(null);
+  /*
+    N53 (05/09) — filtro com valor é filtro VISÍVEL, nas DUAS fontes.
+
+    O rascunho do formulário e a consulta em curso. Um valor pode chegar do
+    rascunho salvo no navegador ou do link do Hub e cair sobre um filtro
+    escondido — e era esse par que fazia a mesma consulta responder números
+    diferentes em máquinas diferentes. O painel REVELA em vez de apagar: o
+    recorte foi o usuário que montou, então ele aparece na faixa. Depois
+    disso vale a invariante que o resto do arquivo assume: nenhum filtro
+    invisível carrega valor.
+  */
+  const preenchidosVisiveis = useMemo(
+    () => FILTER_DEFINITIONS
+      .filter((item) => filtroPreenchido(item.id, draftFilters, appliedFilters))
+      .map((item) => item.id),
+    [draftFilters, appliedFilters]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que a TabelaPadrao desta carteira
+    já usa (`tabela:financeiro-titulos:<carteira>`): é a mesma lista
+    respondendo a duas perguntas (quais colunas, quais filtros), e o
+    contexto separa as duas pelo TIPO. Uma chave por carteira, porque os
+    três endereços são três recortes de trabalho distintos.
+  */
+  /* Lido uma vez por usuário e carteira: é a chave ANTIGA do navegador, e
+     ela não muda enquanto a pessoa não trocar de sessão ou de recorte. */
+  const legadoFiltrosVisiveis = useMemo(
+    () => lerLegadoFiltrosVisiveis(user, visibilityStoragePrefix),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user?.id, user?.email, visibilityStoragePrefix]
+  );
+  const visibilidadeFiltros = useFiltrosVisiveis(
+    `tabela:financeiro-titulos:${fixedTipo ? String(fixedTipo).toLowerCase() : 'geral'}`,
+    FILTER_DEFINITIONS,
+    {
+      preenchidos: preenchidosVisiveis,
+      legado: legadoFiltrosVisiveis,
+      // N53: o filtro escondido não pode continuar restringindo — nem por
+      // ser enviado escondido, nem por deixar de ser enviado. Ele fica VAZIO,
+      // no rascunho E na consulta em curso.
+      aoEsconder: (filterId) => limparValorDoFiltro(filterId)
+    }
+  );
+  const visibleFilterIds = visibilidadeFiltros.visiveis;
   const [obras, setObras] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -1082,15 +1162,19 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     };
   }, [relatorioModalOpen]);
 
+  /*
+    O efeito que RELIA a escolha na troca de usuário saiu (05/09): a
+    preferência é indexada por usuário NO SERVIDOR, e o
+    `PreferenciasContext` descarta a memória inteira no logout. Ler de novo
+    aqui seria repetir no navegador uma separação que o banco já faz.
+  */
   useEffect(() => {
-    setVisibleFilterIds(loadVisibleFilterIds(user, visibilityStoragePrefix));
-    setFilterChooserOpen(false);
-  }, [user?.id, user?.email, visibilityStoragePrefix]);
-
-  useEffect(() => {
-    // N53 (05/09): mesmo tratamento do estado inicial — padrão não ressuscita
-    // filtro escondido.
-    const defaults = limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), visibleFilterIds);
+    /* A máscara "padrão não ressuscita filtro escondido" saiu daqui e ganhou
+       efeito próprio, logo abaixo. Este continua sendo o efeito de TROCA DE
+       CARTEIRA: ele zera consulta, seleção e paginação, e por isso não pode
+       reagir à visibilidade — esconder um campo apagaria a consulta que a
+       pessoa está lendo, o oposto do que a N53 pede. */
+    const defaults = getDefaultFilters(fixedTipo || 'RECEBER');
     let nextFilters = defaults;
 
     try {
@@ -1107,40 +1191,61 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setLoading(false);
     setError('');
     setSelectedTituloIds([]);
-    // `visibleFilterIds` é LIDO aqui e de propósito NÃO entra nas
-    // dependências: este efeito zera consulta, seleção e paginação, e ele
-    // reage a TROCA DE CARTEIRA/USUÁRIO. Se reagisse também à visibilidade,
-    // esconder um campo apagaria a consulta que a pessoa está lendo — o
-    // oposto do que a N53 pede.
   }, [filterStorageKey, fixedTipo]);
 
   /*
-    N53 (05/09) — RECONCILIAÇÃO: filtro com valor é filtro VISÍVEL.
+    N53 (05/09) — O PADRÃO DO SISTEMA NÃO RESSUSCITA FILTRO ESCONDIDO, NEM
+    QUANDO A ESCOLHA CHEGA DEPOIS.
 
-    O outro lado do contrato. "Esconder limpa" cuida do que a pessoa faz
-    agora; isto cuida do que ela encontra ao abrir a tela. Um valor salvo no
-    navegador (ou vindo do link do Hub) pode chegar sobre um filtro que está
-    escondido nesta máquina — e era exatamente esse par que fazia a mesma
-    consulta responder números diferentes em máquinas diferentes.
+    `status` nasce em ABERTO. Quem escondeu "Status" veria o filtro
+    invisível voltar a recortar a lista na recarga seguinte — e, pior, ele
+    voltaria VISÍVEL, porque um filtro com valor é revelado pela
+    reconciliação. O padrão desfaria a escolha da pessoa toda vez.
 
-    A saída aqui é REVELAR, não apagar: o recorte foi o usuário que montou,
-    então ele aparece na faixa em vez de sumir em silêncio. Depois de rodar,
-    vale a invariante que o resto do arquivo assume: NENHUM filtro invisível
-    carrega valor, então o que a faixa mostra é o recorte inteiro.
+    Por que EFEITO, e não máscara no estado inicial: a escolha vem do banco
+    e chega depois do primeiro desenho. Na primeira abertura de uma máquina
+    nova não há semente local, então mascarar só na montagem usaria o padrão
+    da tela como se fosse a escolha do usuário — e a preferência que chegasse
+    um instante depois seria derrotada pelo valor que ela mesma deveria ter
+    apagado. Reagindo a `escolhidos`, a regra vale no instante em que a
+    verdade sobre "escondido" existe, seja ela síncrona ou não.
+
+    Três limites, para não ir além do que a regra diz:
+      - só age com a consulta AINDA NÃO FEITA (`appliedFilters` nulo) — com
+        uma lista à vista, quem limpa é `aoEsconder`, na ação da pessoa;
+      - só apaga valor IDÊNTICO ao padrão do sistema. Valor que o usuário
+        montou não é jogado fora: ele revela o campo, como sempre;
+      - só olha `escolhidos` (a preferência), nunca `visiveis` — senão a
+        própria revelação impediria a limpeza que a causa.
   */
+  const escolhidosFiltros = visibilidadeFiltros.escolhidos;
+  const assinaturaEscolhidos = escolhidosFiltros.join(',');
   useEffect(() => {
-    const preenchidos = FILTER_DEFINITIONS
-      .filter((item) => filtroPreenchido(item.id, draftFilters, appliedFilters))
-      .map((item) => item.id);
-    if (preenchidos.length === 0) return;
-
-    setVisibleFilterIds((atuais) => {
-      if (preenchidos.every((id) => atuais.includes(id))) return atuais;
-      return FILTER_DEFINITIONS
-        .map((item) => item.id)
-        .filter((id) => atuais.includes(id) || preenchidos.includes(id));
+    if (appliedFilters) return;
+    const padraoDoSistema = getDefaultFilters(fixedTipo || 'RECEBER');
+    setDraftFilters((atual) => {
+      const vazios = {};
+      FILTER_DEFINITIONS
+        .filter((item) => !escolhidosFiltros.includes(item.id))
+        .forEach((item) => chavesDoFiltro(item.id).forEach((chave) => {
+          const proposto = String(padraoDoSistema[chave] ?? '');
+          if (proposto !== '' && String(atual?.[chave] ?? '') === proposto) vazios[chave] = '';
+        }));
+      // Mesmo objeto quando não há o que limpar: sem isto o efeito pediria
+      // um render a cada carga de preferência, com o estado parado.
+      return Object.keys(vazios).length > 0 ? { ...atual, ...vazios } : atual;
     });
-  }, [draftFilters, appliedFilters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assinaturaEscolhidos, appliedFilters, fixedTipo]);
+
+  /*
+    A RECONCILIAÇÃO "filtro com valor é filtro visível" deixou de ser um
+    efeito (05/09): ela virou LEITURA, em `preenchidosVisiveis` acima. Como
+    efeito ela empurrava a revelação para dentro do estado — e a revelação é
+    consequência dos VALORES, não escolha do usuário; guardá-la faria a
+    preferência gravar o que a pessoa nunca clicou. Lida em render, ela
+    revela sem gravar, e some sozinha quando o valor sai.
+  */
 
   // Links das pendências do Hub chegam com a tela já filtrada:
   // ?vencidos=1 (vencimento até ontem) ou ?vencendo_ate=AAAA-MM-DD
@@ -1191,11 +1296,10 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
     if (Object.keys(sobrescritas).length === 0) return;
 
-    setVisibleFilterIds((atuais) => Array.from(new Set([
-      ...atuais, 'status', 'vencimento_inicial', 'vencimento_final',
-      ...(sobrescritas.obra_id ? ['obra_id'] : []),
-      ...(buscaUrl ? ['q'] : [])
-    ])));
+    /* A revelação dos campos que o link do Hub preenche NÃO precisa mais
+       ser feita aqui: `preenchidosVisiveis` lê os valores em render, então
+       todo campo que o link escreveu aparece na faixa sozinho — e some
+       quando o valor sai, em vez de ficar marcado para sempre. */
     // Os links do Hub SUBSTITUEM os filtros salvos (não se misturam a
     // eles): a lista abre mostrando exatamente o conjunto contado.
     const proximos = normalizeFilters(sobrescritas, fixedTipo);
@@ -1612,7 +1716,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   function clearFilters() {
     // N53 (05/09): "Limpar" devolve o padrão, e o padrão respeita o que está
     // escondido — senão o botão faria o filtro invisível voltar a recortar.
-    const defaults = limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), visibleFilterIds);
+    const defaults = limparFiltrosInvisiveis(getDefaultFilters(fixedTipo || 'RECEBER'), escolhidosFiltros);
     setDraftFilters(defaults);
     setAppliedFilters(null);
     setTitulos([]);
@@ -2174,12 +2278,6 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
   }
 
-  function persistVisibleFilters(nextIds) {
-    const normalized = nextIds.length > 0 ? nextIds : DEFAULT_VISIBLE_FILTER_IDS;
-    setVisibleFilterIds(normalized);
-    localStorage.setItem(getVisibilityStorageKey(user, visibilityStoragePrefix), JSON.stringify(normalized));
-  }
-
   /*
     N53 (05/09) — ESCONDER LIMPA, e limpa nos DOIS lugares.
 
@@ -2203,25 +2301,15 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     });
   }
 
-  function toggleVisibleFilter(filterId) {
-    const current = new Set(visibleFilterIds);
-    if (current.has(filterId)) {
-      current.delete(filterId);
-      // N53: o filtro escondido não pode continuar restringindo — nem por
-      // ser enviado escondido, nem por deixar de ser enviado. Ele fica VAZIO.
-      limparValorDoFiltro(filterId);
-    } else {
-      current.add(filterId);
-    }
-
-    persistVisibleFilters(FILTER_DEFINITIONS
-      .map((item) => item.id)
-      .filter((id) => current.has(id)));
-  }
-
-  function resetVisibleFilters() {
-    persistVisibleFilters(DEFAULT_VISIBLE_FILTER_IDS);
-  }
+  /*
+    `toggleVisibleFilter`/`resetVisibleFilters`/`persistVisibleFilters`
+    saíram (05/09): as três viraram uma superfície só, o
+    `PainelFiltrosVisiveis`, que as três telas com o seletor usam. A
+    gravação no `localStorage` que morava aqui virou gravação no BANCO — é o
+    miolo do N53, porque a escolha mexe no resultado da consulta e por
+    máquina ela dava listas diferentes para a mesma pessoa. `limparValorDoFiltro`
+    fica: ele é o `aoEsconder` que a tela entrega ao painel.
+  */
 
   function renderFilterField(filter) {
     const commonClass = `app-filter-field ${filter.span || ''}`;
@@ -2606,7 +2694,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             {basicVisibleFilters.map((filter) => renderFilterField(filter))}
             {basicVisibleFilters.length === 0 ? (
               <div className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-4 text-sm text-[var(--c-muted)] xl:col-span-12">
-                Nenhum filtro principal visivel. Use o olho em filtros para escolher os campos.
+                Nenhum filtro principal visivel. Use “Filtros visiveis” para escolher os campos.
               </div>
             ) : null}
           </div>
@@ -2621,23 +2709,32 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
 
           <div className="flex flex-col gap-3 border-t border-[var(--c-border)] pt-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setAdvancedOpen((current) => !current)}
-              >
-                <HiOutlineAdjustmentsHorizontal className="h-4 w-4" />
-                {advancedOpen ? 'Menos filtros' : 'Mais filtros'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setFilterChooserOpen(true)}
-                title="Escolher filtros visiveis"
-              >
-                <HiOutlineEye className="h-4 w-4" />
-                Filtros
-              </button>
+              {/*
+                "Mais filtros" só aparece quando HÁ filtro avançado à vista
+                (05/09). Com o conjunto inicial aprovado, os dez escondidos
+                incluem todos os avançados: o botão abriria uma gaveta vazia,
+                que é a capacidade aparente da R15. Ele volta sozinho no
+                instante em que a pessoa revela um deles no painel.
+              */}
+              {advancedVisibleFilters.length > 0 ? (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setAdvancedOpen((current) => !current)}
+                >
+                  <HiOutlineAdjustmentsHorizontal className="h-4 w-4" />
+                  {advancedOpen ? 'Menos filtros' : 'Mais filtros'}
+                </button>
+              ) : null}
+              {/*
+                O MODAL DE TELA CHEIA VIROU O PAINEL PADRÃO (05/09). Ele era
+                o terceiro desenho da mesma ideia no sistema — modal aqui,
+                menu de marcação nas Solicitações, bloco recolhível nos
+                Provisionamentos. Um modal para escolher quais campos ficam
+                à vista também tirava a faixa da tela justamente enquanto a
+                pessoa decidia sobre ela.
+              */}
+              <PainelFiltrosVisiveis visibilidade={visibilidadeFiltros} />
               <button type="button" className="btn btn-outline btn-sm" onClick={clearFilters}>
                 <HiOutlineXMark className="h-4 w-4" />
                 Limpar
@@ -2652,85 +2749,6 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         </div>
       </form>
       </BlocoConteudo>
-
-      {filterChooserOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--modal-overlay)] px-4 py-6 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3">
-              <div>
-                <div className="text-sm font-semibold text-[var(--c-text)]">Filtros visiveis</div>
-                {/*
-                  N53 (05/09) — o painel passa a DIZER o que o clique faz.
-                  A escolha continua morando neste navegador (e por usuário,
-                  pela chave de `getVisibilityStorageKey`), mas ela não mexe
-                  mais no resultado da consulta em silêncio: esconder limpa o
-                  valor, e a linha do filtro preenchido avisa antes.
-                */}
-                <div className="text-xs text-[var(--c-muted)]">
-                  Salvo apenas para este usuario neste navegador. Esconder um filtro LIMPA o valor dele.
-                </div>
-              </div>
-              <button
-                type="button"
-                className="rounded-md p-1 text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
-                onClick={() => setFilterChooserOpen(false)}
-                title="Fechar"
-              >
-                <HiOutlineXMark className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="max-h-[60vh] space-y-1 overflow-y-auto px-3 py-3">
-              {FILTER_DEFINITIONS.map((filter) => {
-                const checked = visibleFilterSet.has(filter.id);
-                /*
-                  N53 (05/09) — B do achado, na forma "a interface avisa".
-
-                  A outra saída registrada era tirar o filtro preenchido da
-                  lista de escondíveis. Não foi essa, e o motivo é a regra de
-                  que capacidade não sai: "Status" nasce preenchido (ABERTO)
-                  em toda consulta, e quem trabalha com uma obra fixa tem
-                  "Obra" sempre preenchido — bloquear tornaria justamente
-                  esses dois impossíveis de esconder, que é o uso para o qual
-                  o painel existe. O aviso fica na linha do clique, nomeia a
-                  consequência ANTES e não tira nada de ninguém.
-                */
-                const preenchido = filtroPreenchido(filter.id, draftFilters, appliedFilters);
-                return (
-                  <label
-                    key={filter.id}
-                    className="flex cursor-pointer items-start justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-[var(--c-bg)]"
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-[var(--c-text)]">{filter.label}</span>
-                      {checked && preenchido ? (
-                        <span className="mt-1 block text-xs text-[var(--sem-warning)]">
-                          Preenchido: esconder limpa o valor e refaz a consulta.
-                        </span>
-                      ) : null}
-                    </span>
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 shrink-0 accent-[var(--c-primary)]"
-                      checked={checked}
-                      onChange={() => toggleVisibleFilter(filter.id)}
-                    />
-                  </label>
-                );
-              })}
-            </div>
-
-            <div className="flex justify-between border-t border-[var(--c-border)] px-4 py-3">
-              <button type="button" className="btn btn-outline btn-sm" onClick={resetVisibleFilters}>
-                Restaurar
-              </button>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => setFilterChooserOpen(false)}>
-                Aplicar
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {/*
         StatGrid/StatTile (M2/R10): o ladrilho do sistema no lugar de quatro

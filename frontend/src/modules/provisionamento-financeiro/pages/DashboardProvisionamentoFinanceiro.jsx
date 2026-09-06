@@ -13,6 +13,7 @@ import {
   Avisos,
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -462,101 +463,115 @@ export default function DashboardProvisionamentoFinanceiro() {
         <BlocoConteudo>Carregando dados do dashboard...</BlocoConteudo>
       ) : (
         <>
-          <BlocoBarras
-            titulo="Provisionamento por mes"
-            descricao="Curva de previsao para antecipar picos de desembolso."
-            variante="primario"
-            itens={(dashboard?.graficos?.por_mes || []).map((item) => ({
-              label: formatarMes(item.mes),
-              valor: Number(item.total_valor || 0),
-              meta: `${item.quantidade || 0} registro(s)`
-            }))}
-          />
-
-          <BlocoBarras
-            titulo="Top obras por valor"
-            descricao="Onde a concentracao financeira esta mais forte."
-            itens={obrasOrdenadas.map((item) => ({
-              label: formatarObra(item.obra),
-              valor: Number(item.total_valor || 0),
-              meta: `${item.quantidade || 0} registro(s)`
-            }))}
-          />
-
-          <BlocoBarras
-            titulo="Provisionamento por item macro"
-            descricao="Composicao da previsao por natureza de gasto."
-            itens={categoriasOrdenadas.map((item) => ({
-              label: item.categoria?.nome || '-',
-              valor: Number(item.total_valor || 0),
-              meta: `${item.quantidade || 0} registro(s)`
-            }))}
-          />
-
-          <BlocoBarras
-            titulo="Curva semanal"
-            descricao="Distribuicao da previsao nas proximas semanas do recorte."
-            itens={curvaSemanal.map((item) => ({
-              label: item.semana_label || '-',
-              valor: Number(item.total_valor || 0),
-              meta: `${item.quantidade || 0} registro(s)`
-            }))}
-          />
-
-          <BlocoAlerta
-            titulo="Vencidas nao tratadas"
-            descricao="Itens que precisam de regularizacao."
-            itens={vencidasNaoTratadas}
-            storageKey="tabela:provisionamento-dashboard:vencidas"
-            aoAbrir={abrirProvisao}
-            vazio="Nenhum item neste alerta."
-          />
-
-          <BlocoAlerta
-            titulo="Criticas proximas"
-            descricao="Itens de prioridade critica no horizonte imediato."
-            itens={criticasProximas}
-            storageKey="tabela:provisionamento-dashboard:criticas"
-            aoAbrir={abrirProvisao}
-            vazio="Nenhum item neste alerta."
-          />
-
-          <BlocoConteudo
-            titulo="Concentracao por obra"
-            contagem={`${obrasConcentracaoAlta.length} obra(s)`}
-            descricao="Obras com peso mais alto dentro do valor previsto do recorte."
-            variante="secundario"
+          {/*
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 7 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
+          */}
+          <BlocosPersonalizaveis
+            chave="blocos:dashboard-provisionamento-financeiro"
+            larguraPadrao="total"
+            dentroDeGrade
           >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'obra',
-                  titulo: 'Obra',
-                  // R17: a obra NOMEIA a linha da concentração.
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (item) => formatarObra(item.obra)
-                },
-                {
-                  id: 'valor',
-                  titulo: 'Valor previsto',
-                  tipo: 'valor',
-                  render: (item) => formatarMoedaBRL(item.total_valor)
-                },
-                {
-                  id: 'percentual',
-                  titulo: 'Participacao',
-                  tipo: 'numero',
-                  render: (item) => `${item.percentual}%`
-                }
-              ]}
-              itens={obrasConcentracaoAlta}
-              getId={(item) => item.obra_id}
-              storageKey="tabela:provisionamento-dashboard:concentracao"
-              rotuloRolagem="Concentracao por obra"
-              vazio="Nenhuma obra acima do limiar de concentracao."
+            <BlocoBarras data-bloco-id="provisionamento-por-mes" data-bloco-rotulo="Provisionamento por mes"
+              titulo="Provisionamento por mes"
+              descricao="Curva de previsao para antecipar picos de desembolso."
+              variante="primario"
+              itens={(dashboard?.graficos?.por_mes || []).map((item) => ({
+                label: formatarMes(item.mes),
+                valor: Number(item.total_valor || 0),
+                meta: `${item.quantidade || 0} registro(s)`
+              }))}
             />
-          </BlocoConteudo>
+
+            <BlocoBarras data-bloco-id="top-obras-por-valor" data-bloco-rotulo="Top obras por valor"
+              titulo="Top obras por valor"
+              descricao="Onde a concentracao financeira esta mais forte."
+              itens={obrasOrdenadas.map((item) => ({
+                label: formatarObra(item.obra),
+                valor: Number(item.total_valor || 0),
+                meta: `${item.quantidade || 0} registro(s)`
+              }))}
+            />
+
+            <BlocoBarras data-bloco-id="provisionamento-por-item-macro" data-bloco-rotulo="Provisionamento por item macro"
+              titulo="Provisionamento por item macro"
+              descricao="Composicao da previsao por natureza de gasto."
+              itens={categoriasOrdenadas.map((item) => ({
+                label: item.categoria?.nome || '-',
+                valor: Number(item.total_valor || 0),
+                meta: `${item.quantidade || 0} registro(s)`
+              }))}
+            />
+
+            <BlocoBarras data-bloco-id="curva-semanal" data-bloco-rotulo="Curva semanal"
+              titulo="Curva semanal"
+              descricao="Distribuicao da previsao nas proximas semanas do recorte."
+              itens={curvaSemanal.map((item) => ({
+                label: item.semana_label || '-',
+                valor: Number(item.total_valor || 0),
+                meta: `${item.quantidade || 0} registro(s)`
+              }))}
+            />
+
+            <BlocoAlerta data-bloco-id="vencidas-nao-tratadas" data-bloco-rotulo="Vencidas nao tratadas"
+              titulo="Vencidas nao tratadas"
+              descricao="Itens que precisam de regularizacao."
+              itens={vencidasNaoTratadas}
+              storageKey="tabela:provisionamento-dashboard:vencidas"
+              aoAbrir={abrirProvisao}
+              vazio="Nenhum item neste alerta."
+            />
+
+            <BlocoAlerta data-bloco-id="criticas-proximas" data-bloco-rotulo="Criticas proximas"
+              titulo="Criticas proximas"
+              descricao="Itens de prioridade critica no horizonte imediato."
+              itens={criticasProximas}
+              storageKey="tabela:provisionamento-dashboard:criticas"
+              aoAbrir={abrirProvisao}
+              vazio="Nenhum item neste alerta."
+            />
+
+            <BlocoConteudo
+              titulo="Concentracao por obra"
+              contagem={`${obrasConcentracaoAlta.length} obra(s)`}
+              descricao="Obras com peso mais alto dentro do valor previsto do recorte."
+              variante="secundario"
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'obra',
+                    titulo: 'Obra',
+                    // R17: a obra NOMEIA a linha da concentração.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => formatarObra(item.obra)
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor previsto',
+                    tipo: 'valor',
+                    render: (item) => formatarMoedaBRL(item.total_valor)
+                  },
+                  {
+                    id: 'percentual',
+                    titulo: 'Participacao',
+                    tipo: 'numero',
+                    render: (item) => `${item.percentual}%`
+                  }
+                ]}
+                itens={obrasConcentracaoAlta}
+                getId={(item) => item.obra_id}
+                storageKey="tabela:provisionamento-dashboard:concentracao"
+                rotuloRolagem="Concentracao por obra"
+                vazio="Nenhuma obra acima do limiar de concentracao."
+              />
+            </BlocoConteudo>
+          </BlocosPersonalizaveis>
         </>
       )}
     </Pagina>

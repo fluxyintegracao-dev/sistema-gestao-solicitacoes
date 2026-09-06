@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   BarraFiltros,
   BlocoConteudo,
+  BlocosPersonalizaveis,
   Pagina,
   PageHeader,
   StatGrid,
@@ -302,125 +303,147 @@ export default function ComercialRelatorioOperacional() {
           </StatGrid>
           ) : null}
 
-          {isVisible('comercial.relatorio_operacional.distribuicoes_principais') ? (
-          <div className="grid gap-4 xl:grid-cols-3">
-            <DistributionList
-              title="VGV por empreendimento"
-              descricao={`Os ${LINHAS_DISTRIBUICAO} primeiros da lista que o servidor devolve, do maior para o menor.`}
-              rows={contratos.vgv_por_empreendimento || []}
-              valueKey="valor"
-              formatter={formatCurrency}
-            />
-            <DistributionList
-              title="Contratos por status"
-              descricao="Todos os status com contrato no recorte."
-              rows={contratos.por_status || []}
-            />
-            <DistributionList
-              title="Unidades por situação"
-              descricao="Todas as situações com unidade no recorte."
-              rows={unidades.por_situacao || []}
-            />
-          </div>
-          ) : null}
-
-          {isVisible('comercial.relatorio_operacional.contratos') ? (
-          <BlocoConteudo
-            titulo="Contratos comerciais"
-            // Antes o bloco prometia "a base analítica do período" e mostrava
-            // no máximo 150 linhas, sem dizer. A contagem agora fala do que
-            // está na tela e a descrição diz onde o servidor corta.
-            contagem={`${analitico.length} contrato(s) nesta lista`}
-            descricao={`Valores reais cadastrados. O servidor devolve no máximo ${LIMITE_ANALITICO} contratos do período — acima disso a lista não é a base inteira.`}
-            variante="primario"
-            cor="var(--module-comercial)"
+          {/*
+            BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
+            em que ligar isto é SEGURO: estes 3 blocos são leituras
+            independentes — sem ordem obrigatória entre si, sem botão de gravar
+            dentro e sem campo obrigatório que ocultar esconda. O padrão continua
+            sendo o do código; a preferência guarda só o DESVIO. No celular o
+            modo não existe (arrastar é HTML5 nativo e não responde a toque).
+          */}
+          <BlocosPersonalizaveis
+            chave="blocos:comercial-relatorio-operacional"
+            larguraPadrao="total"
+            dentroDeGrade
           >
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'numero',
-                  titulo: 'Número',
-                  tipo: 'codigo',
-                  render: (contrato) => contrato.numero
-                },
-                {
-                  id: 'empreendimento',
-                  titulo: 'Empreendimento',
-                  tipo: 'texto',
-                  render: (contrato) => contrato.empreendimento_nome || '-'
-                },
-                {
-                  id: 'unidade',
-                  titulo: 'Unidade',
-                  tipo: 'codigo',
-                  render: (contrato) => contrato.unidade_codigo || '-'
-                },
-                {
-                  id: 'cliente',
-                  titulo: 'Cliente',
-                  // R17: quem nomeia o contrato na leitura do dia a dia é o
-                  // CLIENTE — o número já vem na coluna de código.
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (contrato) => contrato.cliente_nome || '-'
-                },
-                {
-                  id: 'status',
-                  titulo: 'Status',
-                  tipo: 'status',
-                  render: (contrato) => (
-                    <StatusBadge status={contrato.status || '-'} kind={familiaStatus(contrato.status)} />
-                  )
-                },
-                {
-                  id: 'data',
-                  titulo: 'Data',
-                  tipo: 'data',
-                  render: (contrato) => formatDate(contrato.data_contrato)
-                },
-                {
-                  id: 'valor',
-                  titulo: 'Valor',
-                  tipo: 'valor',
-                  render: (contrato) => formatCurrency(contrato.valor_total)
-                },
-                {
-                  id: 'desconto',
-                  titulo: 'Desconto',
-                  tipo: 'valor',
-                  render: (contrato) => formatCurrency(contrato.desconto_concedido)
-                }
-              ]}
-              itens={analitico}
-              getId={(contrato) => contrato.id}
-              storageKey="tabela:comercial-relatorio-operacional:contratos"
-              rotuloRolagem="Contratos comerciais"
-              vazio="Nenhum contrato encontrado no período."
-            />
-          </BlocoConteudo>
-          ) : null}
+            {isVisible('comercial.relatorio_operacional.distribuicoes_principais') ? (
+            <div
+              className="grid gap-4 xl:grid-cols-3"
+              data-bloco-id="distribuicoes-principais"
+              data-bloco-rotulo="Distribuições principais"
+            >
+              <DistributionList
+                title="VGV por empreendimento"
+                descricao={`Os ${LINHAS_DISTRIBUICAO} primeiros da lista que o servidor devolve, do maior para o menor.`}
+                rows={contratos.vgv_por_empreendimento || []}
+                valueKey="valor"
+                formatter={formatCurrency}
+              />
+              <DistributionList
+                title="Contratos por status"
+                descricao="Todos os status com contrato no recorte."
+                rows={contratos.por_status || []}
+              />
+              <DistributionList
+                title="Unidades por situação"
+                descricao="Todas as situações com unidade no recorte."
+                rows={unidades.por_situacao || []}
+              />
+            </div>
+            ) : null}
 
-          {isVisible('comercial.relatorio_operacional.distribuicoes_secundarias') ? (
-          <div className="grid gap-4 xl:grid-cols-3">
-            <DistributionList
-              title="Estoque disponível por empreendimento"
-              descricao={`Os ${LINHAS_DISTRIBUICAO} primeiros da lista que o servidor devolve, do maior para o menor.`}
-              rows={unidades.estoque_por_empreendimento || []}
-              valueKey="valor"
-              formatter={formatCurrency}
-            />
-            <DistributionList
-              title="Contratos por corretor"
-              descricao={`Os ${LINHAS_DISTRIBUICAO} primeiros da lista que o servidor devolve, do maior para o menor.`}
-              rows={contratos.por_corretor || []}
-            />
-            <DistributionList
-              title="Contratos por mês"
-              descricao={`Os ${LINHAS_DISTRIBUICAO} primeiros meses da lista que o servidor devolve.`}
-              rows={contratos.por_mes || []}
-            />
-          </div>
-          ) : null}
+            {isVisible('comercial.relatorio_operacional.contratos') ? (
+            <BlocoConteudo
+              titulo="Contratos comerciais"
+              // Antes o bloco prometia "a base analítica do período" e mostrava
+              // no máximo 150 linhas, sem dizer. A contagem agora fala do que
+              // está na tela e a descrição diz onde o servidor corta.
+              contagem={`${analitico.length} contrato(s) nesta lista`}
+              descricao={`Valores reais cadastrados. O servidor devolve no máximo ${LIMITE_ANALITICO} contratos do período — acima disso a lista não é a base inteira.`}
+              variante="primario"
+              cor="var(--module-comercial)"
+            >
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'numero',
+                    titulo: 'Número',
+                    tipo: 'codigo',
+                    render: (contrato) => contrato.numero
+                  },
+                  {
+                    id: 'empreendimento',
+                    titulo: 'Empreendimento',
+                    tipo: 'texto',
+                    render: (contrato) => contrato.empreendimento_nome || '-'
+                  },
+                  {
+                    id: 'unidade',
+                    titulo: 'Unidade',
+                    tipo: 'codigo',
+                    render: (contrato) => contrato.unidade_codigo || '-'
+                  },
+                  {
+                    id: 'cliente',
+                    titulo: 'Cliente',
+                    // R17: quem nomeia o contrato na leitura do dia a dia é o
+                    // CLIENTE — o número já vem na coluna de código.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (contrato) => contrato.cliente_nome || '-'
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'status',
+                    render: (contrato) => (
+                      <StatusBadge status={contrato.status || '-'} kind={familiaStatus(contrato.status)} />
+                    )
+                  },
+                  {
+                    id: 'data',
+                    titulo: 'Data',
+                    tipo: 'data',
+                    render: (contrato) => formatDate(contrato.data_contrato)
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor',
+                    tipo: 'valor',
+                    render: (contrato) => formatCurrency(contrato.valor_total)
+                  },
+                  {
+                    id: 'desconto',
+                    titulo: 'Desconto',
+                    tipo: 'valor',
+                    render: (contrato) => formatCurrency(contrato.desconto_concedido)
+                  }
+                ]}
+                itens={analitico}
+                getId={(contrato) => contrato.id}
+                storageKey="tabela:comercial-relatorio-operacional:contratos"
+                rotuloRolagem="Contratos comerciais"
+                vazio="Nenhum contrato encontrado no período."
+              />
+            </BlocoConteudo>
+            ) : null}
+
+            {isVisible('comercial.relatorio_operacional.distribuicoes_secundarias') ? (
+            <div
+              className="grid gap-4 xl:grid-cols-3"
+              data-bloco-id="distribuicoes-secundarias"
+              data-bloco-rotulo="Distribuições secundárias"
+            >
+              <DistributionList
+                title="Estoque disponível por empreendimento"
+                descricao={`Os ${LINHAS_DISTRIBUICAO} primeiros da lista que o servidor devolve, do maior para o menor.`}
+                rows={unidades.estoque_por_empreendimento || []}
+                valueKey="valor"
+                formatter={formatCurrency}
+              />
+              <DistributionList
+                title="Contratos por corretor"
+                descricao={`Os ${LINHAS_DISTRIBUICAO} primeiros da lista que o servidor devolve, do maior para o menor.`}
+                rows={contratos.por_corretor || []}
+              />
+              <DistributionList
+                title="Contratos por mês"
+                descricao={`Os ${LINHAS_DISTRIBUICAO} primeiros meses da lista que o servidor devolve.`}
+                rows={contratos.por_mes || []}
+              />
+            </div>
+            ) : null}
+          </BlocosPersonalizaveis>
         </>
       )}
     </Pagina>

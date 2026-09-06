@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import BlocoConteudo from '../../components/padrao/BlocoConteudo';
 import BarraFiltros from '../../components/padrao/BarraFiltros';
 import { alternarValorFiltro } from '../../components/padrao/BarraFiltros';
+import { useFiltrosVisiveis } from '../../components/padrao/PainelFiltrosVisiveis';
 import StatGrid from '../../components/padrao/StatGrid';
 import { StatTile } from '../../components/padrao/StatGrid';
-import { FiltroRapido } from '../../components/lista-avancada/ListaAvancada';
 
 /**
  * FILTROS AVANÇADOS DAS SOLICITAÇÕES — migrados para `BarraFiltros` (R12).
@@ -47,28 +47,53 @@ import { FiltroRapido } from '../../components/lista-avancada/ListaAvancada';
  *
  * ## Filtros visíveis
  *
- * O seletor de quais filtros aparecem continua, como menu de MARCAÇÃO
- * (`FiltroRapido`), no lugar do painel flutuante posicionado em pixels à mão
- * (R10). A chave de `localStorage` MUDOU em 05/09 (N53): passou a nomear o
- * usuário, e esconder um filtro passou a LIMPAR o valor dele — ver o bloco
- * de `chaveVisibilidade` e o de `alternarFiltroVisivel`.
+ * O seletor de quais filtros aparecem SAIU da barra de ações e virou a
+ * superfície única do sistema (`components/padrao/PainelFiltrosVisiveis`),
+ * dentro da própria faixa. Medido em 05/09: as 3 telas que oferecem essa
+ * escolha (Consulta de títulos, esta e Provisionamentos — 5 endereços) a
+ * ofereciam de 3 jeitos diferentes; esta era a do menu de marcação.
+ *
+ * E a escolha deixa de morar no navegador. A chave por usuário que o N53
+ * criou aqui resolvia a estação compartilhada, mas não o resto do achado:
+ * como esconder um filtro LIMPA o valor dele, a escolha muda o resultado da
+ * consulta — e por máquina ela dava listas diferentes para a mesma pessoa.
+ * Agora vai para o banco, tipo `filtros`, pelo `PreferenciasContext`. A
+ * chave antiga vira `legado`: quem já configurou continua com a
+ * configuração dele, que sobe para o banco uma vez.
  */
+
+/*
+  O CONJUNTO INICIAL APROVADO PELO CLIENTE (05/09) — `padrao: false` nasce
+  escondido. São os cinco recortes que a operação usa todo dia; os outros
+  sete ficam a um clique. O padrão vale SÓ para quem nunca configurou:
+  quem tem escolha salva mantém a dele.
+
+  `obrigatorio` em `descricao`: é a busca livre desta faixa (a busca da
+  ListaAvancada é de outro dono, ver acima), e sem ela não sobra caminho
+  para achar uma solicitação pelo que a pessoa lembra dela. `codigo` DEIXA
+  de ser obrigatório — o cliente o pôs entre os escondidos, e um filtro que
+  o padrão esconde não pode ser um filtro que não desmarca.
+*/
 const FILTROS_DISPONIVEIS = [
-  { id: 'codigo', label: 'Codigo da solicitacao' },
-  { id: 'descricao', label: 'Descrição' },
-  { id: 'numero_sienge', label: 'Numero do pedido' },
-  { id: 'obra_ids', label: 'Obra' },
-  { id: 'area', label: 'Setor' },
-  { id: 'tipo_solicitacao_id', label: 'Tipo de solicitacao' },
-  { id: 'status', label: 'Status' },
-  { id: 'valor_min', label: 'Valor minimo' },
-  { id: 'valor_max', label: 'Valor maximo' },
-  { id: 'data_registro', label: 'Data de registro' },
-  { id: 'data_vencimento', label: 'Periodo Data Resposta/Pagamento' },
-  { id: 'responsavel', label: 'Responsavel' }
+  { id: 'descricao', rotulo: 'Descrição', obrigatorio: true },
+  { id: 'status', rotulo: 'Status' },
+  { id: 'obra_ids', rotulo: 'Obra' },
+  { id: 'area', rotulo: 'Setor' },
+  { id: 'tipo_solicitacao_id', rotulo: 'Tipo de solicitacao' },
+  { id: 'codigo', rotulo: 'Codigo da solicitacao', padrao: false },
+  { id: 'numero_sienge', rotulo: 'Numero do pedido', padrao: false },
+  { id: 'valor_min', rotulo: 'Valor minimo', padrao: false },
+  { id: 'valor_max', rotulo: 'Valor maximo', padrao: false },
+  { id: 'data_registro', rotulo: 'Data de registro', padrao: false },
+  { id: 'data_vencimento', rotulo: 'Periodo Data Resposta/Pagamento', padrao: false },
+  { id: 'responsavel', rotulo: 'Responsavel', padrao: false }
 ];
 
-const FILTROS_OBRIGATORIOS = ['codigo', 'descricao'];
+/* A identidade da lista no banco. Sem o usuário no nome, e isso é o
+   conserto: o servidor indexa a preferência POR USUÁRIO, então a estação
+   compartilhada deixa de vazar a escolha de um operador para o próximo sem
+   precisar que a chave carregue quem é. */
+const CHAVE_FILTROS_VISIVEIS = 'solicitacoes:filtros-visiveis';
 
 /*
   N53 (05/09) — QUAIS CHAVES DE `filtros` CADA MARCA DO SELETOR GOVERNA.
@@ -91,55 +116,33 @@ function filtroPreenchido(filtroId, filtros) {
 }
 
 /*
-  N53 (05/09) — A CHAVE PASSA A TER O USUÁRIO.
+  A CHAVE ANTIGA DO NAVEGADOR, LIDA SÓ COMO `legado` (05/09).
 
-  Era `solicitacoes:filtros-visiveis`, uma chave só para o navegador inteiro.
-  Em estação compartilhada (caixa, obra, recepção) a escolha de quem sentou
-  antes valia para o próximo — e, como esconder mudava o resultado da
-  consulta, o próximo herdava um recorte que ele não montou e não via. A
-  chave agora nomeia o usuário, na MESMA forma que o `filtrosStorageKey` do
-  `Solicitacoes/index.jsx` já usava para os valores dos filtros.
+  Ela nasceu no N53 nomeando o usuário, para resolver a estação
+  compartilhada. Isso continua valendo aqui: é a escolha DAQUELA pessoa que
+  se lê, nunca a de quem sentou antes. O que muda é o destino — ela agora só
+  responde "o que este usuário já tinha configurado nesta máquina", uma vez,
+  para o `useFiltrosVisiveis` preservar a configuração e subi-la ao banco.
+  A chave NÃO é apagada: é a rede de rollback, exatamente como no
+  `PreferenciasContext`.
 
-  De propósito NÃO há migração da chave antiga: importá-la seria copiar para
-  o usuário novo a escolha do anterior, que é exatamente o defeito. Quem
-  abrir a tela pela primeira vez vê TODOS os filtros — nada escondido é nada
-  recortando escondido.
+  Devolve `null` quando não há nada gravado — e isso é o ponto: "nunca
+  configurou" tem de ser distinguível de "configurou tudo visível", porque
+  só o primeiro recebe o conjunto inicial aprovado pelo cliente.
 */
-function chaveVisibilidade(user) {
+function chaveLegadoVisibilidade(user) {
   const identificador = user?.id || user?.email || user?.nome || user?.perfil || 'anon';
   return `solicitacoes:filtros-visiveis:${identificador}`;
 }
 
-function lerFiltrosVisiveis(user) {
+function lerLegadoFiltrosVisiveis(user) {
   try {
-    const salvo = localStorage.getItem(chaveVisibilidade(user));
+    const salvo = localStorage.getItem(chaveLegadoVisibilidade(user));
     const lidos = salvo ? JSON.parse(salvo) : null;
-    if (Array.isArray(lidos)) {
-      const completos = [...lidos];
-      FILTROS_OBRIGATORIOS.slice().reverse().forEach((filtroId) => {
-        if (!completos.includes(filtroId)) completos.unshift(filtroId);
-      });
-      return completos;
-    }
+    return Array.isArray(lidos) && lidos.length > 0 ? lidos : null;
   } catch (error) {
     console.error('Erro ao carregar filtros visíveis', error);
-  }
-  return FILTROS_DISPONIVEIS.map((f) => f.id);
-}
-
-/*
-  N53 (05/09) — a gravação é IMPERATIVA, na ação, e não num efeito que
-  observa o estado. Com efeito, a troca de usuário gravava a escolha do
-  anterior sob a chave do novo antes de a leitura acontecer: a separação por
-  usuário existiria no nome da chave e não no conteúdo. Só a escolha
-  DELIBERADA (o clique no menu) é preferência; o que a reconciliação revela
-  é consequência dos valores, e não se guarda.
-*/
-function gravarFiltrosVisiveis(user, ids) {
-  try {
-    localStorage.setItem(chaveVisibilidade(user), JSON.stringify(ids));
-  } catch (error) {
-    console.error('Erro ao salvar filtros visíveis', error);
+    return null;
   }
 }
 
@@ -185,53 +188,62 @@ export default function Filtros({
   errosDatas = {}
 }) {
   const { user } = useAuth() || {};
-  const chaveFiltrosVisiveis = chaveVisibilidade(user);
-
-  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => lerFiltrosVisiveis(user));
 
   /*
-    N53 (05/09) — TROCA DE USUÁRIO NA MESMA ABA.
-
-    A chave passou a nomear o usuário, então quando o usuário muda a escolha
-    guardada muda junto. Sem isto, quem entrasse depois na mesma aba
-    continuaria operando com a escolha de quem saiu — a chave nova não teria
-    resolvido nada, que é justamente o caso da estação compartilhada.
+    Os filtros que esta tela DECLARA. `responsavel` só existe para quem tem
+    a permissão: fora dela, ele não entra na lista — e como a preferência
+    guarda o DESVIO do padrão, uma escolha antiga que o cite continua lá,
+    ignorada na leitura e nunca apagada. Quem recuperar a permissão
+    reencontra a escolha dele.
   */
-  useEffect(() => {
-    setFiltrosVisiveis(lerFiltrosVisiveis(user));
-    // `user` entra pela CHAVE que ele produz: é o que de fato muda o que se
-    // deve ler, e evita reler a cada troca de referência do objeto.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chaveFiltrosVisiveis]);
+  const declaracaoFiltros = useMemo(
+    () => FILTROS_DISPONIVEIS.filter((filtro) => filtro.id !== 'responsavel' || mostrarFiltroResponsavel),
+    [mostrarFiltroResponsavel]
+  );
 
   /*
-    N53 (05/09) — RECONCILIAÇÃO: filtro com valor é filtro VISÍVEL.
-
-    O outro lado do contrato de "esconder limpa". Os VALORES dos filtros são
-    restaurados pelo `Solicitacoes/index.jsx` (chave própria, por usuário) e
-    também chegam pela URL; a escolha de visibilidade vem daqui. Nada impede
-    que um valor restaurado caia sobre uma marca que está desligada — e era
-    esse par que deixava a lista recortada por um critério fora da tela, com
-    a pessoa lendo "12 solicitações" e concluindo que eram todas.
-
-    Revela em vez de apagar: o recorte foi o usuário que montou, então ele
-    aparece na faixa. Depois disto vale a invariante da tela: filtro
-    invisível está VAZIO, e o que se vê é o recorte inteiro.
+    Filtro com valor é filtro VISÍVEL — o outro lado do contrato de
+    "esconder limpa". Os VALORES são restaurados pelo `Solicitacoes/index`
+    (chave própria) e também chegam pela URL; nada impede que um deles caia
+    sobre uma marca desligada, e era esse par que deixava a lista recortada
+    por um critério fora da tela. O painel REVELA em vez de apagar: o
+    recorte foi o usuário que montou, então ele aparece na faixa.
   */
-  useEffect(() => {
-    const preenchidos = FILTROS_DISPONIVEIS
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DISPONIVEIS
       .filter((filtro) => filtroPreenchido(filtro.id, filtros))
-      .map((filtro) => filtro.id);
-    if (preenchidos.length === 0) return;
+      .map((filtro) => filtro.id),
+    [filtros]
+  );
 
-    setFiltrosVisiveis((prev) => (
-      preenchidos.every((id) => prev.includes(id))
-        ? prev
-        : FILTROS_DISPONIVEIS.map((f) => f.id).filter((id) => prev.includes(id) || preenchidos.includes(id))
-    ));
-  }, [filtros]);
+  /* Lido uma vez por usuário: é a chave ANTIGA do navegador, e ela não muda
+     enquanto a pessoa não trocar de sessão. */
+  const legadoFiltrosVisiveis = useMemo(
+    () => lerLegadoFiltrosVisiveis(user),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chaveLegadoVisibilidade(user)]
+  );
 
-  const isFiltroVisivel = (filtroId) => filtrosVisiveis.includes(filtroId);
+  const visibilidadeFiltros = useFiltrosVisiveis(CHAVE_FILTROS_VISIVEIS, declaracaoFiltros, {
+    preenchidos: filtrosPreenchidos,
+    legado: legadoFiltrosVisiveis,
+    /*
+      N53 (05/09) — ESCONDER LIMPA O VALOR.
+
+      A lista das Solicitações é refeita a cada mudança de `filtros`, então
+      esconder sem limpar deixava um recorte ativo que não estava em lugar
+      nenhum da tela — a pessoa lia "12 solicitações" e concluía que eram
+      todas. Limpar dispara a consulta de novo: a lista ALARGA no mesmo
+      instante em que o campo sai da faixa. O número e a tela mudam juntos,
+      que é a diferença entre corrigir e disfarçar.
+    */
+    aoEsconder: (filtroId) => {
+      const vazios = Object.fromEntries(chavesDoFiltro(filtroId).map((chave) => [chave, '']));
+      setFiltros((prev) => ({ ...prev, ...vazios }));
+    }
+  });
+
+  const isFiltroVisivel = (filtroId) => visibilidadeFiltros.ehVisivel(filtroId);
 
   function definirCampo(nome, valor) {
     setFiltros((prev) => ({ ...prev, [nome]: valor }));
@@ -239,35 +251,6 @@ export default function Filtros({
 
   function limparFiltros() {
     setFiltros({ ...FILTROS_VAZIOS });
-  }
-
-  /*
-    N53 (05/09) — ESCONDER LIMPA O VALOR.
-
-    Antes esta função só mexia na lista do que aparece: o campo sumia e o
-    VALOR continuava aplicado. Como a lista das Solicitações é refeita a cada
-    mudança de `filtros`, a pessoa ficava com um recorte ativo que não estava
-    em lugar nenhum da tela — lia "12 solicitações" e concluía que eram
-    todas, sem nada para desconfiar. É o contrato que a tela de
-    Provisionamentos (`ProvisionamentosFinanceiros.jsx`) já cumpria; as três
-    telas passam a dizer a mesma coisa.
-
-    Limpar dispara a consulta de novo (o efeito de busca do
-    `Solicitacoes/index.jsx` depende de `filtros`), então a lista ALARGA no
-    mesmo instante em que o campo sai da faixa. O número e a tela mudam
-    juntos, que é a diferença entre corrigir e disfarçar.
-  */
-  function alternarFiltroVisivel(filtroId) {
-    const escondendo = filtrosVisiveis.includes(filtroId);
-    if (escondendo && filtroPreenchido(filtroId, filtros)) {
-      const vazios = Object.fromEntries(chavesDoFiltro(filtroId).map((chave) => [chave, '']));
-      setFiltros((prev) => ({ ...prev, ...vazios }));
-    }
-    const proximos = escondendo
-      ? filtrosVisiveis.filter((id) => id !== filtroId)
-      : [...filtrosVisiveis, filtroId];
-    setFiltrosVisiveis(proximos);
-    gravarFiltrosVisiveis(user, proximos);
   }
 
   /* ---- Marcação: o estado da tela é o CSV; `ativos` é a leitura dele ---- */
@@ -419,36 +402,6 @@ export default function Filtros({
   */
   const errosVisiveis = Object.entries(errosDatas || {}).filter(([, mensagem]) => Boolean(mensagem));
 
-  /*
-    N53 (05/09) — B do achado, na forma "a interface AVISA antes do clique".
-
-    A outra saída registrada era tirar o filtro preenchido da lista de
-    escondíveis. Não foi essa, por dois motivos medidos aqui:
-
-    1) capacidade não sai. Quem trabalha numa obra fixa tem "Obra" sempre
-       preenchido; bloquear tornaria impossível esconder justamente o filtro
-       que mais atrapalha a faixa — o uso para o qual o seletor existe.
-    2) o menu é o `FiltroRapido` da `ListaAvancada`, componente compartilhado
-       que não tem opção desligada. "Sair da lista" ali significaria SUMIR
-       com a linha, e um filtro que desaparece da lista de filtros é uma
-       mentira pior que a que se está consertando.
-
-    O aviso vai no rótulo da própria linha que se clica, nomeia a
-    consequência ANTES, e o clique cumpre exatamente o que ele diz.
-  */
-  const dimensaoVisibilidade = {
-    id: 'filtros-visiveis',
-    rotulo: 'Filtros visíveis',
-    opcoes: FILTROS_DISPONIVEIS
-      .filter((filtro) => filtro.id !== 'responsavel' || mostrarFiltroResponsavel)
-      .map((filtro) => ({
-        valor: filtro.id,
-        rotulo: isFiltroVisivel(filtro.id) && filtroPreenchido(filtro.id, filtros)
-          ? `${filtro.label} — preenchido: esconder limpa`
-          : filtro.label
-      }))
-  };
-
   return (
     <BlocoConteudo
       variante="secundario"
@@ -475,6 +428,12 @@ export default function Filtros({
         campos={campos}
         filtros={dimensoes}
         ativos={ativos}
+        /*
+          O seletor desce da barra de ações para DENTRO da faixa (05/09):
+          junto do que ele governa, e no mesmo lugar das outras duas telas
+          que oferecem a escolha.
+        */
+        visibilidade={visibilidadeFiltros}
         aoAlternar={aoAlternar}
         aoLimpar={limparFiltros}
       />
@@ -488,11 +447,6 @@ export default function Filtros({
       )}
 
       <div className="app-actionbar">
-        <FiltroRapido
-          dim={dimensaoVisibilidade}
-          selecionados={new Set(filtrosVisiveis)}
-          onToggle={(valor) => alternarFiltroVisivel(valor)}
-        />
         <button className="btn btn-outline" type="button" onClick={limparFiltros}>
           Limpar filtros
         </button>
