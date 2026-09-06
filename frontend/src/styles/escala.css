@@ -56,6 +56,35 @@
   display: grid;
   gap: var(--esp-4);
   align-content: start;
+  /*
+    A TRILHA DA PÁGINA NÃO PODE SER DITADA PELO CONTEÚDO (06/09, X3).
+
+    A grade era `display: grid` SEM `grid-template-columns`: uma trilha
+    implícita `auto`, cujo tamanho é o MAIOR mínimo-de-conteúdo entre os
+    filhos. Num celular de 390px isso virava, medido no preview publicado:
+
+      sst-dashboard            trilha  468px   (o `<h1>` da faixa)
+      config-hub               trilha  698px
+      sst-centro-operacional   trilha  618px
+      solicitacoes-rel-oper.   trilha 1114px   (o `.app-stat-grid`)
+      dashboard                trilha 1231px   (a faixa com a barra de ação)
+
+    E a trilha ESTICA TODOS os filhos: um único conteúdo teimoso levava a
+    página inteira para além da janela. Como `html, body, #root` e o
+    `.layout-shell` têm `overflow-x: clip` (de propósito — R18, para tabela
+    larga rolar dentro do bloco e não deslocar o documento), o transbordo
+    era RECORTADO: nenhuma barra de rolagem, o conteúdo simplesmente NÃO
+    EXISTIA para quem usa o celular. Foram 15 telas do X3, e as seis
+    "famílias" diferentes que o relatório listou (título, ladrilho,
+    etiqueta, cabeçalho de bloco, botão) eram todas a MESMA causa: esta.
+
+    `minmax(0, 1fr)` é a trilha que já se escreve em todo o resto do
+    sistema (`.app-stat-grid`, `.form-grid`, `.app-blocos-colunas`): o piso
+    ZERO impede o conteúdo de empurrar a coluna, e o `1fr` continua dando a
+    largura inteira. Não é degrau novo — é o mesmo degrau que a folha usa
+    para toda grade que precisa caber.
+  */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /*

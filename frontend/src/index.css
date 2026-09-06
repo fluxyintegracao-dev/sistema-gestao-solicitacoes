@@ -12835,6 +12835,17 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--esp-4);
+  /* Item de grade da `.app-pagina` — sem `min-width: 0` o mínimo dele é o
+     mínimo do CONTEÚDO, e o invólucro deixa de segurar o que está dentro.
+     `.app-blocos-item` já tomava esta medida; os dois invólucros de fora
+     ficaram sem ela, e é por eles que a tabela larga empurrava o bloco para
+     fora da janela (medido em 06/09: 1981px numa viewport de 1920 durante o
+     arrasto de coluna). Mesma medida, mesmo motivo — R16. */
+  min-width: 0;
+}
+
+.app-blocos-segmento-total {
+  min-width: 0;
 }
 
 .app-blocos-entrada {

@@ -129,6 +129,36 @@ const COM_TETO_DE_REGUA = [
 ].join('\n');
 const SEM_TETO_DE_REGUA = '  const regua = larguraContainer;';
 
+/*
+  A OUTRA METADE DO LAÇO, e por que ela precisa ser plantada junto (06/09).
+
+  O laço tinha DOIS elos: a régua sem teto (o JS acima) e o CONTÊINER QUE
+  CRESCE COM A TABELA (o CSS). O segundo era invisível daqui: nas páginas de
+  `BlocosPersonalizaveis` os invólucros `.app-blocos-arranjo` e
+  `.app-blocos-segmento-total` não tinham `min-width: 0`, então, sendo itens
+  da grade `.app-pagina`, o mínimo deles era o mínimo do CONTEÚDO — a tabela
+  empurrava o invólucro, o invólucro empurrava o bloco, e o bloco saía da
+  janela (medido: 1981px numa viewport de 1920). Com o contêiner crescendo,
+  arrastar +130px movia +227px.
+
+  Em 06/09 o `min-width: 0` entrou nos dois invólucros (`src/index.css`) e o
+  contêiner passou a segurar: 1911px → 1793px, medido nesta mesma prova, no
+  passo 6b. O efeito colateral é que plantar SÓ a régua sem teto deixou de
+  amplificar — o outro elo do laço não existe mais — e a mordida passou a
+  dizer "não acusou" sobre um defeito que o CSS já impede sozinho.
+
+  Uma mordida tem de plantar o defeito INTEIRO. Este CSS devolve o elo que
+  saiu do `index.css`; junto com a régua sem teto, o laço volta a fechar e a
+  medida de fidelidade volta a acusar. Se um dia ela parar de acusar com os
+  DOIS elos plantados, aí sim o passo 6 não está medindo nada.
+*/
+const CSS_DO_LACO = [
+  /* A trilha da página volta a ser ditada pelo conteúdo (`escala.css`)… */
+  '.app-pagina { grid-template-columns: none; }',
+  /* …e os invólucros voltam a não segurar nada (`index.css`). */
+  '.app-blocos-arranjo, .app-blocos-segmento-total { min-width: auto; }'
+].join('\n');
+
 async function servidorComAmplificacaoPlantada() {
   const original = fs.readFileSync(COMPONENTE, 'utf8');
   if (!original.includes(COM_TETO_DE_REGUA)) {
@@ -229,13 +259,14 @@ function avaliarCabimento(m) {
   };
 }
 
-async function abrir(navegador, servidor, busca, viewport) {
+async function abrir(navegador, servidor, busca, viewport, cssPlantado = '') {
   const contexto = await navegador.newContext({ viewport });
   const pagina = await contexto.newPage();
   const erros = [];
   pagina.on('pageerror', (e) => erros.push(e.message));
   await pagina.goto(servidor.rota(busca), { waitUntil: 'domcontentloaded' });
   await pagina.waitForSelector('.resizable-table thead th', { timeout: 15000 });
+  if (cssPlantado) await pagina.addStyleTag({ content: cssPlantado });
   await pagina.waitForTimeout(500);
   return { contexto, pagina, erros };
 }
@@ -270,8 +301,8 @@ async function arrastar(pagina, delta) {
   que o ponteiro andou? — mais o registro guardado, para o passo seguinte
   poder REABRIR a mesma preferência e cobrar que ela sobreviveu.
 */
-async function medirFidelidade(navegador, servidor, busca, viewport) {
-  const { contexto, pagina } = await abrir(navegador, servidor, busca, viewport);
+async function medirFidelidade(navegador, servidor, busca, viewport, cssPlantado = '') {
+  const { contexto, pagina } = await abrir(navegador, servidor, busca, viewport, cssPlantado);
   const antes = await pagina.evaluate(medir);
   await arrastar(pagina, ARRASTO);
   const depois = await pagina.evaluate(medir);
@@ -469,7 +500,7 @@ async function main() {
     {
       const plantado = await servidorComAmplificacaoPlantada();
       try {
-        const m = await medirFidelidade(navegador, plantado, '?forma=estreita&arranjo=blocos', LARGA);
+        const m = await medirFidelidade(navegador, plantado, '?forma=estreita&arranjo=blocos', LARGA, CSS_DO_LACO);
         const erro = m.andou - ARRASTO;
         const acusou = Math.abs(erro) > TOLERANCIA_ARRASTO;
         registrar(acusou, `sem o teto da régua, +${ARRASTO}px de arrasto moveram ${m.andou >= 0 ? '+' : ''}${m.andou}px`

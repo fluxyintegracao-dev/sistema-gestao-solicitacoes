@@ -277,6 +277,35 @@
   max-width: 78ch;
 }
 
+/*
+  NO CELULAR O APOIO QUEBRA — porque ali a outra metade NÃO EXISTE (06/09).
+
+  A truncagem acima é honesta em UMA condição, escrita no próprio comentário
+  de 05/09: "o texto inteiro continua alcançável" pelo `title`. No toque não
+  há hover, e `title` não abre: a metade que tornava a reticência honesta
+  some, e sobra só a metade que esconde. A exceção `--integral` já tinha
+  reconhecido isso para três textos ("as duas telas de senha ... são as mais
+  usadas no celular, onde hover não existe"); o que faltava era aplicar o
+  mesmo raciocínio a TODOS eles, na largura em que a condição falha.
+
+  E o `nowrap` cobrava um segundo preço, este medido no X3 de 06/09: texto
+  que não quebra tem mínimo-de-conteúdo do tamanho da FRASE INTEIRA. Num
+  cartão de hub isso fixava o piso do cartão em 484px (modulo-relatorios) e
+  664px (config-hub) numa janela de 390px — o cartão estourava a página e o
+  transbordo era recortado sem rolagem. Deixar quebrar derruba o mínimo para
+  a maior PALAVRA, e as duas telas passaram a caber.
+
+  Acima de 768px nada muda: lá existe hover, o tooltip funciona e a linha
+  única continua sendo o desenho (o irmão `.app-page-lead` idem).
+*/
+@media (max-width: 767px) {
+  .app-bloco-lead {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
 .app-bloco-lead strong {
   color: var(--c-text);
   font-weight: 700;
@@ -397,6 +426,51 @@
 .app-bloco--secundario {
   background: var(--ui-surface-2);
   box-shadow: none;
+}
+
+/*
+  O BLOCO É DONO DA PRÓPRIA SUPERFÍCIE (06/09, M3) — e não era.
+
+  MEDIDO no preview publicado, em `financeiro-endividamento`,
+  `financeiro-executivo-grupo`, `financeiro-fluxo-consolidado` e
+  `financeiro-intercompany`: o `p.app-bloco-lead` reprovava AA com 4,45:1.
+  A conta não fechava com nenhum token do sistema — `--c-muted` (#5f6e83)
+  sobre `--ui-surface-2` (#f7f9fc) dá 4,92:1, com folga. O 4,45 vinha de
+  outro lugar: o fundo que a medição encontrava era o do `body`
+  (rgb(232,238,248)), porque o bloco NÃO TINHA FUNDO NENHUM.
+
+  Quem tirou: `index.css` tem, desde a casca antiga,
+
+      .layout-shell .card, … , .layout-shell .app-table-shell, … {
+        background: linear-gradient(180deg,
+          var(--shell-panel-strong) 0%, var(--shell-panel) 100%);
+      }
+
+  com `--shell-panel: rgba(255,255,255,0.92)`. Os blocos de relatório
+  carregam `app-table-shell` junto de `app-bloco--secundario`; a regra da
+  casca tem DUAS classes (0,2,0) contra UMA da nossa (0,1,0), vence por
+  especificidade, e o atalho `background` zera o `background-color` — o
+  bloco vira vidro translúcido e o texto passa a repousar no que estiver
+  atrás dele, que ninguém declarou.
+
+  São dois estragos, não um. O visível: o "branco rebaixado" que faz o bloco
+  secundário RECUAR deixa de existir — o bloco fica quase branco sobre a
+  página. O invisível: o par texto/fundo deixa de ser um par declarado; hoje
+  a composição salva por acaso (~5,1:1 sobre a página clara), e bastaria a
+  página escurecer para o texto ficar ilegível de verdade. Contraste que
+  depende do que está por baixo não é contraste garantido.
+
+  A correção é de POSSE (R16), não de cor: quem responde pela superfície do
+  bloco é o bloco. Só o fundo volta para cá — borda, raio e sombra da casca
+  continuam onde estão, porque não é isso que o M3 mede e trocá-las mexeria
+  no desenho de dezenas de telas sem medida que peça.
+*/
+.layout-shell .app-bloco {
+  background: var(--ui-surface);
+}
+
+.layout-shell .app-bloco--secundario {
+  background: var(--ui-surface-2);
 }
 
 /* =====================================================================
