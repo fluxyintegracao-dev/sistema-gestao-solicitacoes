@@ -41,11 +41,32 @@ São as 28 telas do módulo de Compras/Cotações/Gestão: `compra-finalizada`,
 Faixa vermelha com `<!DOCTYPE html> … <pre>Cannot GET
 /api/comercial/unidades-configuracao</pre>`. Em 390px ocupa 7 linhas.
 
-**Correção ao enquadramento do revisor, medida por mim:** a rota **existe** no
-backend (`backend/src/routes.js:1775`) e o front a chama certo
-(`services/comercial.js:101`). O que falha é o **ambiente**: a API publicada
-devolve **HTTP 404** nessa rota enquanto `/health` devolve 200. Não é código
-faltando — é a API de desenvolvimento atrás do repositório.
+**Correção ao enquadramento do revisor:** a rota **existe** no backend
+(`backend/src/routes.js:1775`) e o front a chama certo
+(`services/comercial.js:101`).
+
+**CORREÇÃO À MINHA PRÓPRIA CORREÇÃO (06/09).** Eu havia escrito aqui que "a
+API de desenvolvimento está atrás do repositório", a partir de um `curl` que
+devolveu 404. **Estava errado, e o erro era do meu teste:** chamei sem o
+prefixo `/api`. O front normaliza a base para terminar em `/api`
+(`services/api.js:1-7`), e a URL real é `https://api-dev.jrfluxy.com.br/api/...`.
+
+Refeito com o prefixo, a API responde **401** — a rota existe e exige login:
+
+| chamada | sem `/api` (meu teste errado) | com `/api` (correto) |
+|---|---|---|
+| `/comercial/unidades-configuracao` | 404 | **401** |
+| `/rh/jornada/colaboradores` | 404 | **401** |
+| `/obras` (controle, funciona no app) | 404 | **401** |
+| `/health` | 200 | — |
+
+O controle é o que fecha o argumento: `/obras` também dava 404 no meu teste, e
+essa tela funciona todo dia. Um teste que reprova o que sabidamente funciona
+está medindo outra coisa.
+
+**Não há defasagem de API.** A causa do "Cannot GET" que o revisor viu segue
+**não diagnosticada** — e fica assim registrada, sem hipótese vestida de
+medida.
 
 O defeito de produto continua: **erro de servidor não pode chegar cru ao
 usuário**, seja qual for a causa.
