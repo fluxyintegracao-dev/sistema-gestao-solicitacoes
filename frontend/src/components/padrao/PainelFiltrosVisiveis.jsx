@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
+import { usePosicaoFlutuante } from '../../hooks/usePosicaoFlutuante';
 import {
   TIPO_FILTROS,
   usePreferenciaDeLista,
@@ -302,22 +303,47 @@ export function useFiltrosVisiveis(chave, filtros = [], opcoes = {}) {
 /**
  * O painel: botão + menu de marcação, no molde do painel "Colunas".
  *
- * O MENU É O DROPDOWN PADRÃO (`.app-mais-menu`), ancorado ao botão. O
- * painel de colunas usa `position: fixed` medido porque 9 tabelas do
- * sistema vivem DENTRO de modal, onde o corpo rolante recorta um menu
- * preso ao contêiner. Nenhuma das faixas de filtro está nesse caso — elas
- * são de página. As três declarações de posição abaixo existem só para
- * desfazer o `position: fixed` que a classe `.app-colunas-menu` traz: dela
- * o painel aproveita a medida (largura mínima, teto de altura e rolagem),
- * que é o que faz uma lista de 15 filtros continuar cabendo na janela.
- * No dia em que esta faixa entrar num modal, a resposta certa é levantar o
- * `usePosicaoFlutuante` da `TabelaPadrao` para `hooks/` e usá-lo aqui —
- * nunca copiar o cálculo, que é como o defeito volta.
+ * O DEFEITO QUE O CLIENTE ACHOU NA CAPTURA (06/09): ESTE PAINEL ABRIA PARA
+ * FORA DA BORDA ESQUERDA DA JANELA E FICAVA CORTADO PELA METADE.
+ *
+ * A causa, medida: o menu vinha `position: absolute; right: 0` — três
+ * declarações inline postas aqui só para DESFAZER o `position: fixed` da
+ * `.app-colunas-menu`. `right: 0` ancora a borda DIREITA da caixa à borda
+ * direita do botão, e a caixa tem `min-width: 260px`. Numa faixa de
+ * filtros o botão fica à ESQUERDA da barra: a 390px de janela, com o botão
+ * começando em x≈16, a borda esquerda do painel caía em x negativo. Metade
+ * do conteúdo — inclusive o aviso "preenchido: esconder limpa e refaz a
+ * consulta", que é o que explica a consequência do clique — ficava
+ * inalcançável, e nem rolagem trazia de volta.
+ *
+ * A resposta é a que o comentário anterior deste bloco já previa por
+ * escrito, e ela veio inteira: o `usePosicaoFlutuante` saiu da
+ * `TabelaPadrao` para `hooks/` e é usado aqui. O painel volta a ser
+ * `fixed` (o que a classe já dizia), a posição é MEDIDA com o tamanho real
+ * do menu, e as três respostas valem: alinha pela direita do botão
+ * ENQUANTO COUBER — que é o desenho de sempre, herdado do painel de
+ * colunas —, vira para o outro lado quando não couber, e ganha rolagem
+ * interna quando a lista de 15 filtros não couber na janela.
+ *
+ * O `ref` do `useFecharAoSair` continua no MESMO elemento (o wrap), e o
+ * menu continua sendo FILHO dele — nada de portal. É o que preserva a
+ * seleção: `contains` continua verdadeiro para a caixa de marcação, e o
+ * `mousedown` do hook não fecha o painel antes do `onChange` da opção.
  */
 export default function PainelFiltrosVisiveis({ visibilidade, rotulo = 'Filtros visíveis' }) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef(null);
+  const botaoRef = useRef(null);
+  const menuRef = useRef(null);
   useFecharAoSair(ref, aberto, () => setAberto(false));
+  /*
+    R29 — OS DOIS HOOKS FICAM ACIMA DOS `return null` DE BAIXO, sempre
+    chamados. Hook depois de saída antecipada é o React #310, que derrubou
+    a `TabelaPadrao` inteira em 05/09; e este componente tem DUAS saídas
+    (sem chave, e abaixo do limiar de filtros) que mudam de valor conforme
+    a tela e a preferência carregada.
+  */
+  const posicao = usePosicaoFlutuante(botaoRef, menuRef, aberto, { ancorarADireita: true });
 
   const declarados = visibilidade?.declarados || [];
   const escondiveis = declarados.filter((filtro) => !filtro.obrigatorio).length;
@@ -337,6 +363,7 @@ export default function PainelFiltrosVisiveis({ visibilidade, rotulo = 'Filtros 
       <button
         type="button"
         className="btn btn-outline btn-sm"
+        ref={botaoRef}
         aria-haspopup="menu"
         aria-expanded={aberto}
         title="Escolher quais filtros aparecem nesta tela"
@@ -344,12 +371,12 @@ export default function PainelFiltrosVisiveis({ visibilidade, rotulo = 'Filtros 
       >
         {rotulo} ({visiveis.length}/{declarados.length})
       </button>
-      {aberto && (
+      {aberto && posicao && (
         <span
           className="app-mais-menu app-colunas-menu"
           role="menu"
-          /* Desfaz só o `position: fixed` da classe — ver o bloco acima. */
-          style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, left: 'auto' }}
+          ref={menuRef}
+          style={posicao.estilo}
         >
           {declarados.map((filtro) => {
             const visivel = visiveis.includes(filtro.id);

@@ -322,7 +322,7 @@ function FinanceiroFilterAutocomplete({
     Fechar por foco deixava de fora o uso comum desta barra: rolar a lista de
     titulos, clicar num rotulo de outro filtro ou abrir outra caixa com o
     foco preso no campo mantinham a camada aberta — e ela sobe o `z-index` da
-    coluna inteira (`z-[60]`), tapando os filtros vizinhos. Nao havia `Esc`
+    coluna inteira (`z-dropdown`), tapando os filtros vizinhos. Nao havia `Esc`
     para o autocomplete (so para o modal "ver todas"); agora ha.
 
     POR QUE A SELECAO SOBREVIVE: o ref cobre a coluna inteira do filtro —
@@ -345,7 +345,7 @@ function FinanceiroFilterAutocomplete({
   };
 
   return (
-    <div key={label} ref={campoRef} className={`${className} relative ${open ? 'z-[60]' : 'z-0'}`}>
+    <div key={label} ref={campoRef} className={`${className} relative ${open ? 'z-dropdown' : 'z-base'}`}>
       <span className="app-filter-label">{label}</span>
       <div className="relative">
         <input
@@ -371,7 +371,7 @@ function FinanceiroFilterAutocomplete({
         {browseEnabled ? (
           <button
             type="button"
-            className="absolute right-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-primary)] shadow-sm transition-colors hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-primary)] disabled:opacity-50"
+            className="absolute right-1 top-1/2 z-conteudo flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-primary)] shadow-sm transition-colors hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-primary)] disabled:opacity-50"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setOpen(false);
@@ -387,7 +387,7 @@ function FinanceiroFilterAutocomplete({
         ) : null}
       </div>
       {open && !disabled && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-dropdown mt-1 max-h-64 overflow-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
           <button
             type="button"
             className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--c-text)] hover:bg-[var(--c-bg)]"
@@ -426,7 +426,7 @@ function FinanceiroFilterAutocomplete({
       )}
       {browseEnabled && browseOpen ? createPortal(
         <div
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-[var(--modal-overlay)] p-0 backdrop-blur-sm sm:p-4"
+          className="fixed inset-0 z-modal-acima flex items-center justify-center bg-[var(--modal-overlay)] p-0 backdrop-blur-sm sm:p-4"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setBrowseOpen(false);
@@ -2628,86 +2628,69 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         titulo={`Consulta de titulos ${tipoLabel}`}
         descricao="A lista abaixo atualiza somente ao consultar."
         variante="secundario"
-        acoes={(
-          <label className="inline-flex items-center gap-2 text-sm text-[var(--c-text)]">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-[var(--c-primary)]"
-              checked={saveFilterCache}
-              onChange={(event) => setSaveFilterCache(event.target.checked)}
-            />
-            Salvar filtro neste navegador
-          </label>
-        )}
-      >
-      <form className="relative z-20 overflow-visible" onSubmit={submitFilters}>
-        <div className="flex flex-col gap-4">
-          {/*
-            D2 — SELETOR DE RECORTE, e ele é o ÚNICO dono da carteira nesta
-            tela (R16). Antes havia dois arranjos: uma pastilha morta
-            "Carteira fixa: …" quando a prop vinha da rota, e um par de
-            botões que só mexia num campo do formulário quando não vinha.
-            Agora é um controle só, sempre visível, que NAVEGA — o endereço
-            passa a dizer o recorte, então dá para favoritar, compartilhar
-            e fixar como tela inicial "só a pagar".
+        controles={(
+          <>
+            {/*
+              OS CONTROLES DO BLOCO SUBIRAM PARA A FAIXA DO TÍTULO (06/09,
+              regra do cliente). Medido nesta tela, antes: o cabeçalho
+              entregava o lado direito ao vazio (só a caixa "Salvar filtro"
+              na ponta) e os controles — Carteira, "Mais filtros", "Filtros
+              visíveis" e "Limpar" — ocupavam DUAS linhas do corpo, uma em
+              cima dos campos e outra embaixo deles. Agora eles moram no
+              cabeçalho, pela prop `controles` do BlocoConteudo, e o corpo
+              fica com o que ele é: os campos do recorte.
 
-            Seletor de CONTEXTO, não filtro de lista: a R12 continua valendo
-            para os filtros abaixo.
-          */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="app-filter-label">Carteira</span>
-            <div className="inline-grid w-full grid-cols-2 gap-1 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1 sm:w-auto">
-              {/*
-                DUAS opções, e não três: NÃO existe "todas as carteiras"
-                nesta consulta. O backend recebe sempre `tipo` (a tela manda
-                RECEBER por padrão), então uma terceira opção "Todas"
-                mostraria só os a receber com um rótulo dizendo o contrário —
-                o usuário leria "todas" e veria metade. Se o cliente quiser a
-                carteira inteira, é filtro novo no serviço, não rótulo novo
-                aqui. (Registrado no relatório.)
-              */}
-              {[
-                { value: 'RECEBER', label: 'A receber' },
-                { value: 'PAGAR', label: 'A pagar' }
-              ].map((option) => {
-                // Sem `?tipo` na URL a tela opera no padrão do formulário —
-                // é o que o `getDefaultFilters` já fazia. O botão aceso diz
-                // qual carteira está de fato sendo consultada, venha ela do
-                // endereço ou do padrão.
-                const active = (fixedTipo || draftFilters.tipo) === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={active}
-                    className={`btn btn-sm ${active ? 'btn-primary' : 'btn-ghost'}`}
-                    onClick={() => irParaRecorte(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+              O "Consultar" NÃO subiu: ele é o `submit` do formulário e o
+              fim do fluxo — continua à direita, embaixo dos campos, que é
+              onde o cliente pediu.
+            */}
+            {/*
+              D2 — SELETOR DE RECORTE, e ele é o ÚNICO dono da carteira nesta
+              tela (R16). Antes havia dois arranjos: uma pastilha morta
+              "Carteira fixa: …" quando a prop vinha da rota, e um par de
+              botões que só mexia num campo do formulário quando não vinha.
+              Agora é um controle só, sempre visível, que NAVEGA — o endereço
+              passa a dizer o recorte, então dá para favoritar, compartilhar
+              e fixar como tela inicial "só a pagar".
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-            {basicVisibleFilters.map((filter) => renderFilterField(filter))}
-            {basicVisibleFilters.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-4 text-sm text-[var(--c-muted)] xl:col-span-12">
-                Nenhum filtro principal visivel. Use “Filtros visiveis” para escolher os campos.
-              </div>
-            ) : null}
-          </div>
-
-          <div className={`grid transition-[grid-template-rows] duration-200 ${advancedOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-            <div className={advancedOpen ? 'overflow-visible' : 'overflow-hidden'}>
-              <div className="grid gap-3 border-t border-[var(--c-border)] pt-3 md:grid-cols-2 xl:grid-cols-12">
-                {advancedVisibleFilters.map((filter) => renderFilterField(filter))}
+              Seletor de CONTEXTO, não filtro de lista: a R12 continua valendo
+              para os filtros abaixo.
+            */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <span className="app-filter-label">Carteira</span>
+              <div className="inline-grid w-full grid-cols-2 gap-1 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1 sm:w-auto">
+                {/*
+                  DUAS opções, e não três: NÃO existe "todas as carteiras"
+                  nesta consulta. O backend recebe sempre `tipo` (a tela manda
+                  RECEBER por padrão), então uma terceira opção "Todas"
+                  mostraria só os a receber com um rótulo dizendo o contrário —
+                  o usuário leria "todas" e veria metade. Se o cliente quiser a
+                  carteira inteira, é filtro novo no serviço, não rótulo novo
+                  aqui. (Registrado no relatório.)
+                */}
+                {[
+                  { value: 'RECEBER', label: 'A receber' },
+                  { value: 'PAGAR', label: 'A pagar' }
+                ].map((option) => {
+                  // Sem `?tipo` na URL a tela opera no padrão do formulário —
+                  // é o que o `getDefaultFilters` já fazia. O botão aceso diz
+                  // qual carteira está de fato sendo consultada, venha ela do
+                  // endereço ou do padrão.
+                  const active = (fixedTipo || draftFilters.tipo) === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={active}
+                      className={`btn btn-sm ${active ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => irParaRecorte(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-col gap-3 border-t border-[var(--c-border)] pt-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               {/*
                 "Mais filtros" só aparece quando HÁ filtro avançado à vista
@@ -2740,7 +2723,43 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 Limpar
               </button>
             </div>
+          </>
+        )}
+        acoes={(
+          <label className="inline-flex items-center gap-2 text-sm text-[var(--c-text)]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[var(--c-primary)]"
+              checked={saveFilterCache}
+              onChange={(event) => setSaveFilterCache(event.target.checked)}
+            />
+            Salvar filtro neste navegador
+          </label>
+        )}
+      >
+      <form className="relative overflow-visible" onSubmit={submitFilters}>
+        <div className="flex flex-col gap-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+            {basicVisibleFilters.map((filter) => renderFilterField(filter))}
+            {basicVisibleFilters.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-4 text-sm text-[var(--c-muted)] xl:col-span-12">
+                Nenhum filtro principal visivel. Use “Filtros visiveis” para escolher os campos.
+              </div>
+            ) : null}
+          </div>
 
+          <div className={`grid transition-[grid-template-rows] duration-200 ${advancedOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+            <div className={advancedOpen ? 'overflow-visible' : 'overflow-hidden'}>
+              <div className="grid gap-3 border-t border-[var(--c-border)] pt-3 md:grid-cols-2 xl:grid-cols-12">
+                {advancedVisibleFilters.map((filter) => renderFilterField(filter))}
+              </div>
+            </div>
+          </div>
+
+          {/* Só o "Consultar" mora aqui agora — os outros controles subiram
+              para a faixa do título. `justify-end` porque não há mais par
+              do lado esquerdo para o `justify-between` separar. */}
+          <div className="flex flex-col gap-3 border-t border-[var(--c-border)] pt-3 md:flex-row md:items-center md:justify-end">
             <button type="submit" className="btn btn-primary btn-sm">
               <HiOutlineMagnifyingGlass className="h-4 w-4" />
               Consultar
@@ -3264,7 +3283,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
 
       {relatorioModalOpen ? (
         <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--modal-overlay)] p-0 backdrop-blur-sm sm:p-4"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-[var(--modal-overlay)] p-0 backdrop-blur-sm sm:p-4"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) fecharRelatorio();
@@ -3909,7 +3928,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       ) : null}
 
       {importandoCodigos ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--modal-overlay)] px-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-[var(--modal-overlay)] px-4 backdrop-blur-sm">
           <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-4 text-sm font-semibold text-[var(--c-text)] shadow-xl">
             Importando codigos de barras...
           </div>

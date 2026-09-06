@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { TIPO_BLOCOS, usePreferenciaDeLista } from '../../contexts/PreferenciasContext';
 
 function Seta() {
@@ -36,6 +36,63 @@ function Seta() {
  * por isso o CSS não podia mudar sozinho: `nowrap` sem tooltip é remover
  * capacidade. Com o `title` abaixo, o par fica completo e o CSS trunca.
  */
+/* =====================================================================
+   O ESPAÇO AO LADO DO TÍTULO É DO BLOCO — `controles` (06/09)
+   ---------------------------------------------------------------------
+   REGRA DO CLIENTE, dita na Consulta de títulos a receber e declarada
+   maior que aquela tela: "espaço horizontal vago ao lado do título deve
+   ser usado pelos controles do bloco, em vez de empurrar tudo para
+   baixo. Aplique onde o mesmo arranjo existir."
+
+   O QUE FOI MEDIDO (06/09, varredura das 655 montagens de BlocoConteudo
+   em 185 arquivos):
+     - 67 nascem SEM título (não têm cabeçalho, e portanto não têm vazio);
+     - 94 declaram `acoes=` (a faixa da direita já é usada);
+     - 494 têm título e NENHUMA ação — a `<span class="app-bloco-acoes">`
+       é desenhada, mede 0px de conteúdo, e o `space-between` do
+       `.app-bloco-head` deixa TODO o lado direito vazio;
+     - dessas, 193 desenham controles (botões, BarraFiltros, painéis)
+       EMPILHADOS no corpo, logo abaixo do título. É esse o arranjo que a
+       regra corrige: linha de cabeçalho vazia à direita + linha extra de
+       controles embaixo.
+
+   O QUE ESTE COMPONENTE PASSA A OFERECER:
+
+   1. `controles` — a prop explícita. O que ela recebe vai para a MESMA
+      faixa do título, alinhado à direita (a mesma borda que `acoes` já
+      usa; alinhar à esquerda criaria uma segunda margem no cabeçalho).
+      Quando ela existe, `acoes` sai de dentro do `.app-bloco-head` e vai
+      para o FIM da faixa, depois dos controles — é onde o cliente pediu
+      que a caixa "Salvar filtro neste navegador" fosse acomodada.
+
+   2. O SLOT, publicado por contexto (`ContextoControlesDoBloco`). Sem
+      ele, aplicar a regra às 193 montagens medidas exigiria editar 193
+      pontos de tela, um a um. Com ele, um componente compartilhado que
+      já desenha controle de bloco — hoje a `BarraFiltros`, com o painel
+      "Filtros visíveis" — sobe sozinho para a faixa do título, sem que a
+      tela precise saber. O contexto entrega o NÓ (`no`) e diz se o
+      cabeçalho já tem ações (`temAcoes`).
+
+   ONDE A REGRA PARA:
+     - a faixa é `flex-wrap: wrap`: se os controles não couberem ao lado
+       do título, eles DESCEM inteiros — melhor empilhar que espremer;
+     - abaixo de 768px o CSS devolve a faixa inteira aos controles
+       (`flex: 1 1 100%`), porque ali não há vazio nenhum ao lado do
+       título e o arranjo tem de voltar a empilhar sozinho;
+     - nada é removido para caber, e nada vira tooltip: `title` é
+       inalcançável no toque.
+   ===================================================================== */
+export const ContextoControlesDoBloco = createContext(null);
+
+/**
+ * O slot de controles do bloco mais próximo — `{ no, temAcoes }` ou `null`
+ * quando não há bloco em volta (ou quando ele não tem título, e portanto
+ * não tem cabeçalho onde caber). Quem usa: `BarraFiltros`.
+ */
+export function useControlesDoBloco() {
+  return useContext(ContextoControlesDoBloco);
+}
+
 export default function BlocoConteudo({
   titulo,
   contagem,
@@ -43,6 +100,7 @@ export default function BlocoConteudo({
   variante = 'neutro',
   cor,
   acoes,
+  controles,
   recolhivel = false,
   recolhidoPadrao = false,
   recolhido,
@@ -137,11 +195,30 @@ export default function BlocoConteudo({
     className
   ].filter(Boolean).join(' ');
 
+  /*
+    O NÓ DO SLOT vira estado (e não `ref`) de propósito: quem o consome
+    monta DEPOIS deste componente, e um `ref` mudando não avisa ninguém —
+    a `BarraFiltros` precisa de um novo render para desenhar o portal no
+    nó recém-criado. O hook é chamado SEMPRE, sem condição na frente (R29).
+  */
+  const [noDosControles, setNoDosControles] = useState(null);
+  const temControles = Boolean(controles);
+  const temAcoes = Boolean(acoes);
+  const valorDoContexto = useMemo(
+    () => ({ no: noDosControles, temAcoes }),
+    [noDosControles, temAcoes]
+  );
+
   const cabecalho = titulo ? (
     <>
       <h2 className="app-bloco-titulo">{titulo}</h2>
+      {/* A barra continua sendo desenhada SEMPRE que há título — é o que
+          as 494 montagens sem ação já tinham, e mexer nisso mudaria o
+          cabeçalho de todas elas por nada. O que muda com `controles` é só
+          ONDE as ações ficam: elas saem daqui e vão para o fim da faixa,
+          depois dos controles. */}
       <span className="app-bloco-acoes" onClick={(e) => recolhivel && e.stopPropagation()}>
-        {acoes}
+        {temControles ? null : acoes}
         {recolhivel ? <Seta /> : null}
       </span>
     </>
@@ -159,35 +236,62 @@ export default function BlocoConteudo({
     ? [contagem, descricao].filter(Boolean).join(' · ')
     : '';
 
-  return (
-    <section
-      className={classes}
-      style={cor ? { '--bloco-cor': cor } : undefined}
-      {...props}
+  const apoio = (contagem || descricao) ? (
+    <p
+      className={`app-bloco-lead${apoioEhTexto ? '' : ' app-bloco-lead--integral'}`}
+      title={textoApoio || undefined}
     >
-      {titulo && recolhivel ? (
-        <button
-          type="button"
-          className="app-bloco-recolher"
-          aria-expanded={!estaRecolhido}
-          onClick={alternarRecolhido}
-        >
-          {cabecalho}
-        </button>
-      ) : titulo ? (
-        <div className="app-bloco-head">{cabecalho}</div>
-      ) : null}
-      {(contagem || descricao) ? (
-        <p
-          className={`app-bloco-lead${apoioEhTexto ? '' : ' app-bloco-lead--integral'}`}
-          title={textoApoio || undefined}
-        >
-          {contagem ? <strong>{contagem}</strong> : null}
-          {contagem && descricao ? ' · ' : ''}
-          {descricao}
-        </p>
-      ) : null}
-      {!estaRecolhido && <div className="app-bloco-corpo">{children}</div>}
-    </section>
+      {contagem ? <strong>{contagem}</strong> : null}
+      {contagem && descricao ? ' · ' : ''}
+      {descricao}
+    </p>
+  ) : null;
+
+  return (
+    <ContextoControlesDoBloco.Provider value={valorDoContexto}>
+      <section
+        className={classes}
+        style={cor ? { '--bloco-cor': cor } : undefined}
+        {...props}
+      >
+        {titulo ? (
+          /*
+            A FAIXA DO CABEÇALHO. `identidade` é a coluna de quem o bloco é
+            (título + apoio); o apoio entrou nela para que os controles
+            fiquem ao lado do PAR, e não empurrados pela linha do apoio.
+            O slot dos controles é desenhado sempre e some sozinho quando
+            ninguém o preenche (`.app-bloco-controles:empty`), porque quem
+            o preenche pode ser um descendente que ainda nem montou.
+          */
+          <div className="app-bloco-cabecalho">
+            <div className="app-bloco-identidade">
+              {recolhivel ? (
+                <button
+                  type="button"
+                  className="app-bloco-recolher"
+                  aria-expanded={!estaRecolhido}
+                  onClick={alternarRecolhido}
+                >
+                  {cabecalho}
+                </button>
+              ) : (
+                <div className="app-bloco-head">{cabecalho}</div>
+              )}
+              {apoio}
+            </div>
+            {/* Recolhido, os controles somem com o que eles governam — é o
+                que já acontece sozinho com quem chega pelo slot (o corpo
+                não é montado, o portal não desenha). */}
+            <div className="app-bloco-controles" ref={setNoDosControles}>
+              {estaRecolhido ? null : controles}
+            </div>
+            {temControles && acoes ? (
+              <span className="app-bloco-acoes app-bloco-acoes--fim">{acoes}</span>
+            ) : null}
+          </div>
+        ) : apoio}
+        {!estaRecolhido && <div className="app-bloco-corpo">{children}</div>}
+      </section>
+    </ContextoControlesDoBloco.Provider>
   );
 }

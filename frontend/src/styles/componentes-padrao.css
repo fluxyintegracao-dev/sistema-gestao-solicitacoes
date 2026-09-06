@@ -387,6 +387,85 @@
   box-shadow: none;
 }
 
+/* =====================================================================
+   A FAIXA DO CABEÇALHO — o vazio ao lado do título é dos controles do
+   bloco (06/09, regra do cliente)
+   ---------------------------------------------------------------------
+   MEDIDO em 06/09: das 655 montagens de `BlocoConteudo`, 494 têm título e
+   NENHUMA ação declarada. A `.app-bloco-acoes` continua sendo desenhada,
+   mede 0px de conteúdo, e o `space-between` acima entrega o lado direito
+   inteiro ao vazio — enquanto 193 dessas montagens desenham os próprios
+   controles EMPILHADOS logo abaixo, no corpo. Duas linhas para o que cabe
+   em uma.
+
+   `.app-bloco-cabecalho` é a faixa: identidade (título + apoio) de um
+   lado, controles do outro. Ela só existe quando há título, e o slot dos
+   controles some sozinho quando ninguém o preenche — sem isso, os 494
+   blocos ganhariam um item flex vazio e um `gap` a mais no cabeçalho.
+
+   ONDE A REGRA PARA está no fim deste bloco (`flex-wrap` e o @media de
+   768px): sem espaço, o arranjo volta a empilhar em vez de espremer.
+   ===================================================================== */
+.app-bloco-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  /* Se os controles não couberem ao lado do título, eles DESCEM inteiros:
+     melhor empilhar que espremer (e nada some para caber). */
+  flex-wrap: wrap;
+}
+
+/* A coluna de quem o bloco é. `flex: 1 1 auto` + `min-width: 0` mantêm o
+   cabeçalho de quem NÃO tem controles idêntico ao de antes: a identidade
+   ocupa a faixa inteira e o `space-between` do `.app-bloco-head` segue
+   levando as ações para a borda direita. */
+.app-bloco-identidade {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* O que a regra criou: os controles do bloco na MESMA faixa do título,
+   encostados na direita — a mesma borda que as ações já usam. */
+.app-bloco-controles {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Slot vazio não é item: sem isto, os 494 cabeçalhos sem controle
+   ganhariam um `gap` de sobra à direita do título. */
+.app-bloco-controles:empty {
+  display: none;
+}
+
+/* Com `controles`, as ações do bloco saem de dentro do `.app-bloco-head` e
+   vão para o FIM da faixa, depois deles. Aqui elas não crescem: quem ocupa
+   o vazio são os controles. */
+.app-bloco-acoes--fim {
+  flex: 0 1 auto;
+}
+
+/* ONDE A REGRA PARA. Abaixo de 768px não existe vazio nenhum ao lado do
+   título: a faixa devolve a linha inteira aos controles, alinhados à
+   esquerda como todo o resto da tela estreita. Empilhar aqui é o certo —
+   é espremer que seria o defeito. */
+@media (max-width: 767px) {
+  .app-bloco-controles {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .app-bloco-acoes--fim {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+}
+
 .app-bloco-head {
   display: flex;
   align-items: center;

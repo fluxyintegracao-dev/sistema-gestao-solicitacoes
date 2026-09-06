@@ -1,5 +1,7 @@
+import { createPortal } from 'react-dom';
 import { HiOutlineMagnifyingGlass, HiOutlineXMark } from 'react-icons/hi2';
 import { FiltroRapido } from '../lista-avancada/ListaAvancada';
+import { useControlesDoBloco } from './BlocoConteudo';
 import PainelFiltrosVisiveis from './PainelFiltrosVisiveis';
 
 /**
@@ -54,6 +56,27 @@ import PainelFiltrosVisiveis from './PainelFiltrosVisiveis';
  * Recebe o objeto devolvido por `useFiltrosVisiveis(chave, filtros, …)`.
  * A tela continua dona de QUAIS campos e dimensões monta — o painel só
  * diz quais ids estão à vista.
+ *
+ * ## O painel SOBE para a faixa do título quando ela está vazia (06/09)
+ *
+ * Regra do cliente, dita na Consulta de títulos e declarada maior que
+ * aquela tela: espaço horizontal vago ao lado do título é dos controles
+ * do bloco, em vez de empurrar tudo para baixo.
+ *
+ * MEDIDO: 83 faixas de `BarraFiltros` no sistema, 75 delas dentro de um
+ * `BlocoConteudo`; 48 passam `visibilidade`, e em 24 o bloco em volta tem
+ * título e NENHUMA ação declarada — cabeçalho com o lado direito inteiro
+ * vazio, e o botão "Filtros visíveis" desenhado uma linha abaixo. Nessas
+ * 24 o painel passa a ser desenhado no slot do cabeçalho, por portal, sem
+ * que nenhuma das 24 telas precise mudar uma linha.
+ *
+ * O CRITÉRIO É O VAZIO MEDIDO, não o gosto: só sobe onde `temAcoes` é
+ * falso. Onde o cabeçalho já declara ações, a faixa da direita já tem
+ * dono e quem decide o arranjo é a tela, pela prop `controles` do bloco.
+ *
+ * O QUE NÃO SOBE: as marcas de filtro (`FiltroRapido`) e as etiquetas.
+ * Elas são o recorte, não o controle do bloco — o cliente pediu os campos
+ * de filtro logo abaixo do título, e é onde eles ficam.
  */
 export default function BarraFiltros({
   busca,               // { valor, aoMudar, placeholder }
@@ -64,6 +87,14 @@ export default function BarraFiltros({
   aoAlternar,
   aoLimpar
 }) {
+  /* O slot de controles do bloco em volta — `null` quando não há bloco, ou
+     quando ele não tem título (e portanto não tem cabeçalho). O hook é
+     chamado SEMPRE, antes de qualquer condição (R29). */
+  const slotDoBloco = useControlesDoBloco();
+  const painel = visibilidade ? <PainelFiltrosVisiveis visibilidade={visibilidade} /> : null;
+  /* Sobe só onde o vazio foi medido: bloco com cabeçalho e sem ações. */
+  const painelPromovido = Boolean(painel && slotDoBloco?.no && !slotDoBloco.temAcoes);
+
   const etiquetas = [];
   filtros.forEach((dim) => {
     const selecionados = ativos[dim.id] || new Set();
@@ -83,6 +114,10 @@ export default function BarraFiltros({
 
   return (
     <div className="app-filtros">
+      {/* O painel desenhado LÁ EM CIMA, no cabeçalho do bloco. Portal, e
+          não uma prop nova em 24 telas: o componente que sabe onde há
+          vazio é o bloco, e ele publica o lugar por contexto. */}
+      {painelPromovido ? createPortal(painel, slotDoBloco.no) : null}
       {busca ? (
         <div className="la-busca app-filtros-busca">
           <HiOutlineMagnifyingGlass aria-hidden="true" />
@@ -156,7 +191,7 @@ export default function BarraFiltros({
         </div>
       )}
 
-      {(filtros.length > 0 || visibilidade) && (
+      {(filtros.length > 0 || (painel && !painelPromovido)) && (
         <div className="la-filtros-linha">
           {filtros.length > 0 ? <span className="la-filtros-rotulo">Filtrar:</span> : null}
           {filtros.map((dim) => (
@@ -167,7 +202,7 @@ export default function BarraFiltros({
               onToggle={(valor) => aoAlternar(dim.id, valor, { unico: Boolean(dim.unico) })}
             />
           ))}
-          {visibilidade ? <PainelFiltrosVisiveis visibilidade={visibilidade} /> : null}
+          {painelPromovido ? null : painel}
         </div>
       )}
 
