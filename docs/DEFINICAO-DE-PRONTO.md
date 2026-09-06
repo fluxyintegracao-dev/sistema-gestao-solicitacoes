@@ -524,6 +524,21 @@ depois.
   verdade no ambiente compartilhado. Camada que fecha nas duas primeiras e
   não tem opção segura para a terceira é **SEM DADO**, não aprovação.
 
+**Alcance medido em 06/09, sobre as 189 telas do manifesto** (estimativa
+estática — quem decide célula a célula é a corrida):
+
+| item | mede | N/A, com o motivo | por que |
+|---|---|---|---|
+| P1 | **124** telas renderizam `TabelaPadrao` | 65 sem tabela | tela de formulário, hub e painel sem lista |
+| P2 | **3** telas têm o seletor (`financeiro-titulos`, `solicitacoes`, `provisoes`) | 186 sem seletor | 88 telas com filtro ainda não o receberam (item 2 do plano) |
+| P3 | **8** telas declaram `chavePreferencia` em bloco | 27 com bloco recolhível **sem** chave + 154 sem bloco | a persistência foi ligada em 8 das 40 rotas com bloco recolhível |
+| P4 | **135** telas têm alguma camada flutuante | 54 sem camada | formulário e detalhe sem menu, sem painel e sem filtro marcável |
+
+As células **SEM DADO** não entram nesta conta porque dependem da base do
+preview no dia (tabela sem linha, nenhum filtro que corte a lista, camada
+sem opção segura de exercitar) — e é justamente por isso que a matriz as
+imprime ao lado das que falharam, e não no rodapé.
+
 **Regras de medição que valem para os quatro** (e não se negociam):
 somente navegação e leitura — nenhum registro criado, alterado ou apagado;
 preferência de exibição pode ser mexida **desde que restaurada** no fim, em

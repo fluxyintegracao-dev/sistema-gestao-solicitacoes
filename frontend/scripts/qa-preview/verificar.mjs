@@ -32,6 +32,23 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TELAS, ITENS_DOD } from './telas.mjs';
 import { checksEstaticos, checkFaixaRolada, checksMobile, checkStickyEAcessibilidade } from './checks.mjs';
+/*
+  OS QUATRO ITENS DA LEVA DE PREFERÊNCIAS (06/09) moram em arquivo próprio.
+
+  Não é organização por gosto: eles são a única bateria daqui que mede
+  CAPACIDADE NOVA (as outras 35 provam que o que existia não quebrou) e a
+  única que mexe em preferência gravada no BANCO — com restauração
+  obrigatória no fim de cada um. Juntá-los aos 2.300 linhas deste arquivo
+  esconderia essa diferença; separados, dá para ler os quatro de uma vez e
+  a prova de mordida os importa sem acordar o harness inteiro.
+*/
+import {
+  criarEspiaDePreferencias,
+  checarColunasEscolhiveis,
+  checarEsconderFiltro,
+  checarRecolhimentoPersiste,
+  checarCamadaFlutuante
+} from './preferencias.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ_FRONT = path.resolve(AQUI, '..', '..');
@@ -67,13 +84,29 @@ const SENHA = process.env.QA_PREVIEW_PASS;
 const EXECUTADO_DIRETO = Boolean(process.argv[1])
   && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
-if (EXECUTADO_DIRETO && (!USUARIO || !SENHA)) {
+/*
+  `process.exitCode`, NUNCA `process.exit()` — e isto já custou caro aqui.
+
+  A saída do harness vai para PIPE (tee, redirecionamento, log de rodada).
+  `process.exit()` derruba o processo com bytes ainda na fila do stdout, e o
+  que se perde é justamente o fim: a última célula da matriz sai cortada, e
+  célula truncada é INDISTINGUÍVEL de célula aprovada para quem lê o log.
+  Com `exitCode` o Node termina sozinho quando a fila esvazia, e o código de
+  saída é o mesmo.
+
+  A guarda de credenciais continua valendo só para quem EXECUTA — quem só
+  IMPORTA uma função daqui (a prova de mordida) não pode ser derrubado por
+  ela. Por isso ela agora marca `CREDENCIAIS_AUSENTES` e é a chamada de
+  `main()`, lá no fim, que não acontece.
+*/
+const CREDENCIAIS_AUSENTES = EXECUTADO_DIRETO && (!USUARIO || !SENHA);
+if (CREDENCIAIS_AUSENTES) {
   console.error(
     '[qa-preview] ABORTADO: defina QA_PREVIEW_USER e QA_PREVIEW_PASS no '
     + 'ambiente. As credenciais de QA vivem SOMENTE em variáveis de ambiente '
     + '— nunca em arquivo do repositório.'
   );
-  process.exit(2);
+  process.exitCode = 2;
 }
 
 const filtroTelas = valorDe('--telas')?.split(',').map((s) => s.trim()).filter(Boolean);
@@ -462,6 +495,81 @@ function rodarValidadorEstatico() {
   } catch (erro) {
     return { ok: false, saida: `${erro.stdout || ''}${erro.stderr || ''}` };
   }
+}
+
+/*
+  O QUE O HARNESS ABRE, O HARNESS FECHA (06/09) — e isto virou obrigação
+  nesta leva, não zelo.
+
+  Para medir a tabela que vive dentro de um bloco recolhido, o harness
+  expande TODOS os blocos recolhidos da tela. Isso sempre foi inofensivo:
+  o recolhimento era `useState` puro, morria com a página, e o navegador do
+  harness é descartável.
+
+  Deixou de ser. Desde que o recolhimento passa pelo `PreferenciasContext`,
+  cada clique desses GRAVA no banco, indexado pelo usuário de QA. O harness
+  passaria a reescrever, em 189 telas por corrida, a preferência de quem
+  usa esse usuário — e o pior: um bloco que nasce recolhido de propósito
+  (histórico, auditoria) ficaria gravado como ABERTO para sempre, mudando a
+  tela que a próxima corrida vai medir. O verificador deixaria de observar
+  o sistema para passar a alterá-lo.
+
+  A restauração é pelo TÍTULO, e não por referência ao nó: entre expandir e
+  restaurar há recarga, mudança de aba e re-render — o nó de antes já não é
+  o nó de agora, e guardar a referência traria de volta um elemento morto.
+*/
+async function titulosDosBlocosRecolhidos(page) {
+  return page.evaluate(() => Array.from(document.querySelectorAll('.app-bloco-recolher[aria-expanded="false"]'))
+    .map((b) => String(b.querySelector('.app-bloco-titulo')?.innerText || '').trim().replace(/\s+/g, ' '))
+    .filter(Boolean)).catch(() => []);
+}
+
+async function recolherDeVolta(page, titulos) {
+  if (!titulos?.length) return;
+  await page.evaluate((lista) => {
+    const normal = (t) => String(t || '').trim().replace(/\s+/g, ' ');
+    Array.from(document.querySelectorAll('.app-bloco-recolher[aria-expanded="true"]'))
+      .filter((b) => lista.includes(normal(b.querySelector('.app-bloco-titulo')?.innerText)))
+      .forEach((b) => b.click());
+  }, titulos).catch(() => {});
+  // A gravação da preferência é adiada em 700ms; sair antes disso deixaria
+  // a restauração na fila de um navegador que vai fechar.
+  await page.waitForTimeout(1200);
+}
+
+/*
+  O PORTÃO ESTÁTICO DA P3 — "esta tela LIGOU o recolhimento persistente?"
+
+  A resposta não está no DOM: um bloco recolhível com `chavePreferencia` é
+  idêntico, na tela, a um sem. Está no ARQUIVO, e é de lá que ela sai —
+  mesmo caminho que a M2 já usa (o validador estático fala do arquivo da
+  rota) e a R3 (o trinco é indexado por arquivo).
+
+  Ela NÃO decide o item sozinha: a P3 cruza esta leitura com o que
+  acontece na tela ao recolher. O arquivo declarar e a gravação não sair é
+  FALHOU, não N/A — a nota longa está em `preferencias.mjs`.
+
+  Lê também os arquivos que a entrada declara cobrir (`tambemCobre`): as
+  abas medidas dentro de outra tela têm arquivo próprio, e o bloco com
+  chave pode estar em qualquer um deles.
+*/
+const CACHE_CHAVE_DE_BLOCO = new Map();
+function telaDeclaraChaveDeBloco(tela) {
+  const arquivos = [tela.arquivo, ...(tela.tambemCobre || [])].filter(Boolean);
+  return arquivos.some((relativo) => {
+    if (!CACHE_CHAVE_DE_BLOCO.has(relativo)) {
+      let declara = false;
+      try {
+        const fonte = fs.readFileSync(path.join(RAIZ_FRONT, relativo), 'utf8');
+        declara = /chavePreferencia/.test(fonte);
+      } catch {
+        // Arquivo fora do clone (tela de outro pacote): não afirma nada.
+        declara = false;
+      }
+      CACHE_CHAVE_DE_BLOCO.set(relativo, declara);
+    }
+    return CACHE_CHAVE_DE_BLOCO.get(relativo);
+  });
 }
 
 /**
@@ -1815,6 +1923,21 @@ const errosDeJs = [];
     await dialog.dismiss().catch(() => {});
   });
 
+  /*
+    P1/P3 (leva de preferências) — o espião de rede.
+
+    Ele escuta as rotas de preferência (`/listas/:lista/preferencias/:tipo` e
+    a carga única `/me/preferencias`) e é a ÚNICA prova possível de que a
+    escolha do usuário foi para o BANCO. No DOM, esconder coluna e
+    sobreviver ao F5 é indistinguível entre o banco e o localStorage — e
+    era exatamente o localStorage que fazia a mesma pessoa ver listas
+    diferentes conforme a máquina.
+
+    Passivo, nunca `page.route`: interceptar mudaria o que a tela recebe, e
+    medição que altera o medido não mede.
+  */
+  const espiaPreferencias = criarEspiaDePreferencias(page);
+
   try {
     await esperarDeploy(page);
     await login(page);
@@ -1976,6 +2099,10 @@ const errosDeJs = [];
         // Zera antes da tela: o que for capturado daqui em diante é DESTA
         // tela, não sobra da anterior.
         caixasDoNavegador.length = 0;
+
+        /* Quais blocos a tela ENTREGOU recolhidos — para devolvê-los assim
+           no fim da medição (ver a nota em `recolherDeVolta`). */
+        const blocosRecolhidosNaChegada = await titulosDosBlocosRecolhidos(page);
 
         fundir(resultado.itens, await page.evaluate(checksEstaticos, { tipo: tela.tipo }));
         fundir(resultado.itens, await page.evaluate(checkStickyEAcessibilidade));
@@ -2252,6 +2379,52 @@ const errosDeJs = [];
 
         await checarMobile(page, contexto, tela, `${BASE}${rota}`, resultado.itens);
 
+        /*
+          A LEVA DE PREFERÊNCIAS (P1–P4) RODA POR ÚLTIMO, e a ordem é
+          deliberada.
+
+          Estes quatro são os únicos checks do harness que MEXEM em
+          preferência gravada no banco: escondem coluna, escondem filtro,
+          recolhem bloco, marcam opção. Cada um restaura o padrão no
+          próprio `finally`, mas restauração é promessa, e os outros 35
+          itens não podem depender dela: se a P1 deixasse uma coluna
+          escondida no meio da tela, a T4 mediria a largura de uma tabela
+          que o próprio harness mutilou e acusaria a tela por isso. Rodando
+          depois de tudo — inclusive do mobile e das capturas —, o pior
+          caso de uma restauração falha fica contido na tela seguinte, que
+          abre da rota do zero.
+
+          A P1 e a P3 RECARREGAM a página (é assim que se prova
+          persistência), então nada que dependa do estado desta navegação
+          pode vir depois delas.
+
+          LACUNA DECLARADA, porque lacuna calada é o mesmo que cobertura
+          falsa: os quatro medem a ROTA BASE, não as VARIANTES (abas). Os
+          outros itens ganharam medição por variante em 02/09 justamente
+          porque 24 deles nunca eram medidos nas abas — e um formulário
+          deslocado 450px passou batido por isso. Aqui a conta é outra:
+          cada P1/P3 recarrega a página, e repeti-los nas 60+ variantes do
+          manifesto multiplicaria a corrida por um fator que ela não paga.
+          A tabela de uma aba tem a MESMA `TabelaPadrao` e a MESMA chave da
+          tabela da rota base, então o que se perde é a chance de pegar uma
+          aba que declare a capacidade de um jeito próprio. Quando isso
+          existir, é aqui que entra — e não em silêncio.
+        */
+        const ctxPreferencias = {
+          esperarCarregar,
+          mirarAlvo,
+          espia: espiaPreferencias,
+          declaraChaveDeBloco: telaDeclaraChaveDeBloco(tela)
+        };
+        await checarCamadaFlutuante(page, tela, resultado.itens, ctxPreferencias);
+        await checarEsconderFiltro(page, tela, resultado.itens, ctxPreferencias);
+        await checarColunasEscolhiveis(page, tela, resultado.itens, ctxPreferencias);
+        await checarRecolhimentoPersiste(page, tela, resultado.itens, ctxPreferencias);
+
+        /* Fim da medição desta tela: devolve os blocos que ela entregou
+           recolhidos e que o harness abriu para medir por dentro. */
+        await recolherDeVolta(page, blocosRecolhidosNaChegada);
+
         // N/A declarados no manifesto SEMPRE vencem o check automático —
         // são decisões registradas (o motivo vai para a matriz).
         Object.entries(tela.naoAplica || {}).forEach(([item, motivo]) => {
@@ -2350,7 +2523,9 @@ const errosDeJs = [];
       "0 FALHOU" com lacuna de evidência NÃO é entrega fechada.
     */
     console.log(`\n[qa-preview] matriz gravada em docs/MATRIZ-COBERTURA.md — ${totalFalhas} célula(s) FALHOU, ${semDado} SEM DADO (não provadas)`);
-    process.exit(totalFalhas === 0 ? 0 : 1);
+    // `exitCode` e não `exit()`: a saída vai para pipe, e `exit()` trunca
+    // com bytes na fila — célula cortada lê como célula aprovada.
+    process.exitCode = totalFalhas === 0 ? 0 : 1;
   } finally {
     await navegador.close();
   }
@@ -2369,16 +2544,19 @@ const errosDeJs = [];
   podem ser importadas para serem PROVADAS sem que ninguém acorde o
   preview por engano.
 */
-if (EXECUTADO_DIRETO) {
+if (EXECUTADO_DIRETO && !CREDENCIAIS_AUSENTES) {
   main().catch((erro) => {
     console.error(`[qa-preview] ${erro.message || erro}`);
-    process.exit(3);
+    process.exitCode = 3;
   });
 }
 
-/* Exportadas para a prova de mordida do runner (provas/itensDoRunner...). */
+/* Exportadas para a prova de mordida do runner (provas/itensDoRunner...) e,
+   desde 06/09, para a prova da leva de preferências
+   (`qa-preview/provaPreferenciasMordem.mjs`), que reusa a mira e a espera
+   de carga em vez de manter cópias — copiar mira é como o defeito volta. */
 export {
   checarFaixa, checarRedimensionamento, checarEtiquetasFiltro,
   checarModalCadastro, checarMobile, checarAlinhamentoDaColuna,
-  r3Para, m2Para, login, esperarCarregar
+  r3Para, m2Para, login, esperarCarregar, mirarAlvo, telaDeclaraChaveDeBloco
 };

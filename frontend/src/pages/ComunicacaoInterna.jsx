@@ -58,6 +58,7 @@ import {
   useConfirmacao
 } from '../components/padrao';
 import OverlayModal from '../components/ui/OverlayModal';
+import useFecharAoSair from '../hooks/useFecharAoSair';
 
 const LIST_POLL_INTERVAL_MS = 15000;
 const ACTIVE_CHAT_POLL_INTERVAL_MS = 5000;
@@ -280,6 +281,16 @@ export default function ComunicacaoInterna() {
   const [participantesLeitura, setParticipantesLeitura] = useState([]);
   const [menuMsgId, setMenuMsgId] = useState(null);
   const [menuMsgOpenUpward, setMenuMsgOpenUpward] = useState(true);
+  /* ITEM 6 DA LEVA (06/09) — Esc fechava em 26 telas e NAO fechava aqui.
+     O clique fora ja fechava, mas por outro caminho: um veu de tela cheia
+     (`position: fixed; inset: 0`) logo abaixo do menu. O veu resolve o
+     ponteiro e nao resolve o teclado, e era so isso que faltava.
+     Mantenho o veu (ele tambem impede que o clique de fechar caia na
+     mensagem debaixo — remove-lo mudaria o que a pessoa ve) e somo o
+     gancho padrao do sistema, que traz o Esc. Um ref so basta: o
+     `menuMsgId` garante que existe no maximo UM menu aberto na lista. */
+  const menuMsgRef = useRef(null);
+  useFecharAoSair(menuMsgRef, menuMsgId !== null, () => setMenuMsgId(null));
   const [infoMsg, setInfoMsg] = useState(null);
   const [mensagemRespondendo, setMensagemRespondendo] = useState(null);
   const [alturaPaineis, setAlturaPaineis] = useState(null);
@@ -1171,7 +1182,7 @@ export default function ComunicacaoInterna() {
 
                             {/* Dropdown menu — direção dinâmica */}
                             {menuAberto && (
-                              <div style={{
+                              <div ref={menuMsgRef} style={{
                                 position: 'absolute',
                                 ...(menuMsgOpenUpward
                                   ? { bottom: '100%', marginBlockEnd: 'var(--esp-1)' }

@@ -1839,5 +1839,21 @@ export const ITENS_DOD = [
   'X1', 'X2', 'X3',
   // Leva do componente (02/09): sticky sequestrado por overflow hidden e
   // acessibilidade por teclado da linha acionável.
-  'R18', 'A1'
+  'R18', 'A1',
+  /*
+    LEVA DE PREFERÊNCIAS DO USUÁRIO (06/09) — os quatro itens que medem o
+    que ESTA leva construiu.
+
+    Os 35 acima provam, com rigor, que o que existia antes não quebrou.
+    Nenhum deles olha para as quatro capacidades novas: escolher colunas,
+    escolher quais filtros aparecem, recolher bloco que sobrevive ao F5 e
+    camada flutuante que fecha sem perder a seleção. Sem estes quatro, a
+    leva fecharia com "eu acho que funciona" — 189 linhas verdes falando
+    de outra coisa.
+
+    Eles ficam no fim da fileira de propósito: são os únicos que MEXEM em
+    preferência gravada (e restauram), e a matriz lida da esquerda para a
+    direita conta primeiro a regressão e depois a capacidade nova.
+  */
+  'P1', 'P2', 'P3', 'P4'
 ];
