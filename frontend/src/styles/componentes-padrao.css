@@ -1442,10 +1442,14 @@ fieldset.form-section {
   ficariam presos — a caixa esticaria até a borda direita da janela. É
   literalmente o defeito que o `.app-th-menu` já pagou em 05/09.
 
-  Sem portal, de propósito: o `--z-dropdown-portal` (90) é MENOR que o
-  `--z-modal` (100), então um painel mandado para o `body` ficaria atrás do
-  modal que o abriu. No lugar, ele herda o contexto de empilhamento do
-  modal e fica por cima do conteúdo dele.
+  FORA DE MODAL ELE SAI POR PORTAL desde 06/09, e o z-index do portal vem
+  INLINE (`--z-dropdown-portal`), não daqui: `fixed` só tem a janela por
+  bloco continente enquanto nenhum ancestral for bloco continente, e o
+  `.app-table-shell` é um (o `backdrop-filter` de `index.css`). Sendo bloco
+  continente, o `overflow: auto hidden` dele recorta o painel que vira para
+  cima — medido em três telas do preview, 13px de 320 sobrando. DENTRO de
+  modal ele continua no lugar: lá o `--z-dropdown-portal` (900) perderia
+  para o `--z-modal` (1000). Ver a nota longa em `TabelaPadrao.jsx`.
 */
 .app-colunas-menu {
   position: fixed;

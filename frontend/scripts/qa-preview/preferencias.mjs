@@ -208,9 +208,44 @@ export function criarEspiaDePreferencias(page) {
    causa.
 */
 
-/** As colunas de CONTEÚDO no cabeçalho: as que o painel governa. */
+/**
+ * As colunas de CONTEÚDO no cabeçalho: as que o painel governa.
+ *
+ * A TABELA É A DO PAINEL, NÃO A PRIMEIRA DA PÁGINA (06/09) — e a diferença
+ * reprovou uma tela que estava certa.
+ *
+ * Esta função lia `document.querySelector('.resizable-table')`, e o alvo do
+ * clique é `.app-colunas-wrap > button` PRIMEIRO. Numa tela com uma tabela
+ * só as duas escolhas coincidem; em `fiscal-dashboard` são QUATRO tabelas,
+ * medidas no preview:
+ *
+ *   #0 "Documentos por status"   STATUS, DOCUMENTOS      2 colunas, SEM painel
+ *   #1 "Documentos por origem"   ORIGEM, DOCUMENTOS      2 colunas, SEM painel
+ *   #2 "Documentos recentes"     EMISSAO…STATUS          5 colunas, COM painel
+ *   #3 "Logs recentes"           INICIO…MENSAGEM         5 colunas, COM painel
+ *
+ * O botão `.first()` é o da tabela #2 — as duas primeiras não oferecem
+ * painel porque têm 2 colunas, e o componente está certo em não oferecer.
+ * O check escondia "Status" da #2 (e ela sumia: 5 → 4 colunas, com
+ * `PUT …/documentos-recentes/preferencias/colunas` saindo) e depois lia o
+ * cabeçalho da #0, onde "STATUS" continuava porque nunca foi tocado. Saía
+ * "2 colunas, as mesmas 2 de antes — o painel marca e não faz nada", sobre
+ * um painel que fazia.
+ *
+ * O pareamento não é heurística: o botão e a tabela dele moram no MESMO
+ * `.app-table-shell`. Subir do botão até o primeiro ancestral que contenha
+ * uma `.resizable-table` devolve a tabela daquele painel, sempre.
+ */
 const lerColunas = () => {
-  const tabela = document.querySelector('.resizable-table');
+  const botao = document.querySelector('.app-colunas-wrap > button');
+  let tabela = null;
+  for (let no = botao; no && no !== document.body; no = no.parentElement) {
+    const achada = no.querySelector?.('.resizable-table');
+    if (achada) { tabela = achada; break; }
+  }
+  /* Sem painel na tela não há o que parear: vale a primeira tabela, que é
+     o que os ramos de "a tela não oferece o painel" precisam medir. */
+  if (!tabela) tabela = document.querySelector('.resizable-table');
   if (!tabela) return null;
   const ths = Array.from(tabela.querySelectorAll('thead th'));
   /*
@@ -248,6 +283,10 @@ const lerColunas = () => {
       && !tr.classList.contains('app-tabela-grupo'));
   return {
     titulos: conteudo.map(({ th }) => (th.innerText || '').trim().replace(/\s+/g, ' ')),
+    /* A IDENTIDADE, quando a tabela a publica (`data-coluna` no `th`, desde
+       06/09). Com ela a conferência é exata; sem ela (build antigo servido)
+       cai-se no título, com a regra apertada de `mesmoTitulo`. */
+    ids: conteudo.map(({ th }) => th.getAttribute('data-coluna')).filter(Boolean),
     totalTh: ths.length,
     celulasNaLinha: linha ? linha.children.length : null,
     /* O texto da linha inteira: se a coluna sumir do cabeçalho e a célula
@@ -309,11 +348,47 @@ const normalizarTitulo = (t) => String(t || '')
   .replace(/\s+/g, ' ')
   .trim();
 
-const mesmoTitulo = (a, b) => {
-  const x = normalizarTitulo(a);
-  const y = normalizarTitulo(b);
+/*
+  CONTER NÃO PODE SER CONTER QUALQUER COISA (06/09).
+
+  A regra era `x === y || x.includes(y) || y.includes(x)`, e ela casava
+  "PEDIDO MINIMO" com "PEDIDO". Em `pedidos-compra` isso fez o item
+  reprovar a tela: a coluna "Pedido" foi escondida de verdade (8 títulos
+  viraram 7, e o `PUT …/preferencias/colunas` saiu com "ocultas":
+  ["pedido"]), mas "PEDIDO MINIMO" ainda estava no cabeçalho e satisfazia
+  o `includes` — o motivo saiu "7 colunas, as mesmas 8 de antes", um número
+  que não bate consigo mesmo e que era o próprio check se contradizendo.
+
+  O conter continua existindo pelo motivo que o criou — o `th.innerText`
+  traz o título MAIS a decoração do cabeçalho —, mas agora com a condição
+  que faltava: o que sobra além do rótulo NÃO PODE SER PALAVRA. "CÓDIGO ↑"
+  casa com "Código" (a seta some na normalização, e o resto é vazio);
+  "Status (3)" casa com "Status" (sobra um número); "Pedido mínimo" NÃO
+  casa com "Pedido", porque sobra "MINIMO", que é uma palavra — e palavra
+  a mais é outra coluna.
+*/
+const mesmoTitulo = (tituloNoCabecalho, rotuloDoPainel) => {
+  const x = normalizarTitulo(tituloNoCabecalho);
+  const y = normalizarTitulo(rotuloDoPainel);
   if (!x || !y) return false;
-  return x === y || x.includes(y) || y.includes(x);
+  if (x === y) return true;
+  if (!x.includes(y)) return false;
+  return !/\p{L}/u.test(x.split(y).join(' '));
+};
+
+/**
+ * A coluna do painel está no cabeçalho medido?
+ *
+ * PELO ID QUANDO ELE EXISTE, pelo título quando não. O id (`data-coluna`,
+ * publicado pelo `th` e pelo item do painel desde 06/09) não tem
+ * vocabulário nem homônimo: é a mesma chave que o componente usa para
+ * governar a coluna. O título só entra quando o preview servir build
+ * anterior a isso — e aí vale a regra apertada de `mesmoTitulo`, que já
+ * não confunde "Pedido" com "Pedido mínimo".
+ */
+const estaNoCabecalho = (medida, alvo) => {
+  if (alvo.id && medida.ids?.length) return medida.ids.includes(alvo.id);
+  return medida.titulos.some((t) => mesmoTitulo(t, alvo.rotulo));
 };
 
 const mesmaAssinatura = (a, b) => Boolean(a) && Boolean(b)
@@ -506,8 +581,9 @@ export async function checarColunasEscolhiveis(page, tela, resultado, ctx) {
       if (!(await caixa.isChecked())) continue; // já escondida: nada a esconder
       const rotulo = (await itens.nth(i).locator('.app-colunas-rotulo span').last().innerText())
         .trim().replace(/\s+/g, ' ');
-      if (!antes.titulos.some((t) => mesmoTitulo(t, rotulo))) continue;
-      alvo = { indice: i, rotulo, caixa };
+      const id = await itens.nth(i).getAttribute('data-coluna');
+      if (!estaNoCabecalho(antes, { id, rotulo })) continue;
+      alvo = { indice: i, id, rotulo, caixa };
       break;
     }
     if (!alvo) {
@@ -527,8 +603,7 @@ export async function checarColunasEscolhiveis(page, tela, resultado, ctx) {
     await page.waitForTimeout(300);
 
     const depois = await page.evaluate(lerColunas);
-    const sumiuDoCabecalho = depois
-      && !depois.titulos.some((t) => mesmoTitulo(t, alvo.rotulo));
+    const sumiuDoCabecalho = depois && !estaNoCabecalho(depois, alvo);
     const celulasCairam = depois && depois.celulasNaLinha !== null
       && depois.celulasNaLinha === antes.celulasNaLinha - 1;
     if (!sumiuDoCabecalho) {
@@ -581,8 +656,7 @@ export async function checarColunasEscolhiveis(page, tela, resultado, ctx) {
       return;
     }
     const recarregado = await page.evaluate(lerColunas);
-    const continuaEscondida = recarregado
-      && !recarregado.titulos.some((t) => mesmoTitulo(t, alvo.rotulo));
+    const continuaEscondida = recarregado && !estaNoCabecalho(recarregado, alvo);
     if (!continuaEscondida) {
       resultado.P1 = {
         estado: 'FALHOU',

@@ -743,6 +743,20 @@ export function ResizableTh({ columnKey, children, className = '', title, ...pro
   return (
     <th
       className={`resizable-th ${className}`.trim()}
+      /*
+        O ID DA COLUNA NO DOM (06/09) — para que ninguém precise adivinhar
+        por RÓTULO qual `th` é qual.
+
+        Sem isto, quem verifica só tem o texto do cabeçalho, e texto de
+        cabeçalho não identifica coluna: em `pedidos-compra` existem
+        "Pedido" e "Pedido mínimo", e a comparação por conter-em-qualquer-
+        -sentido que o verificador usava dizia que a primeira continuava lá
+        depois de escondida — 8 colunas viraram 7 na tela e a célula da
+        matriz saiu "o painel marca e não faz nada" sobre um painel que
+        fazia. O atributo é a identidade que já existe no código
+        (`columnKey`) chegando onde ela é lida.
+      */
+      data-coluna={columnKey}
       style={width ? { width: `${width}px` } : undefined}
       title={title}
       {...props}

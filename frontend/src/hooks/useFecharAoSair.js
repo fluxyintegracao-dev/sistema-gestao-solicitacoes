@@ -24,7 +24,37 @@ import { useEffect, useRef } from 'react';
 //    sino de notificações (`NotificacoesBell`) já ouvia `touchstart`; a
 //    regra passa a valer para todo painel que usa este hook.
 //
-// 3) SÓ O ESC (06/09, decisão do cliente). Terceiro parâmetro de opções:
+// 3) O PONTEIRO ANTES DO MOUSE (06/09). O fechamento ouvia `mousedown` e
+//    `touchstart`. Medido no preview, na tela `solicitacoes`, com os
+//    ouvintes instrumentados no `document`:
+//
+//      clique sobre `.la-td` (célula comum)
+//        pointerdown captura, pointerdown bolha, mousedown captura,
+//        mousedown bolha …  → a camada FECHA
+//      clique sobre `.la-resize` (alça de largura de coluna)
+//        pointerdown CAPTURA … e MAIS NADA. `mousedown` NÃO EXISTIU.
+//        → a camada continua aberta
+//
+//    Duas coisas, do mesmo handler (`iniciarRedimensionamento`): o
+//    `preventDefault()` no `pointerdown` SUPRIME o `mousedown` de
+//    compatibilidade — ele não é engolido no caminho, ele nunca nasce —, e
+//    o `stopPropagation()` impede que o `pointerdown` chegue ao `document`
+//    na fase de BOLHA. As duas são legítimas numa alça de arrasto (sem
+//    elas o arrasto seleciona texto e dispara o clique do cabeçalho), e
+//    juntas deixavam TODA camada flutuante do sistema presa aberta quando
+//    a pessoa clica numa alça — e alça de largura existe em cada coluna de
+//    cada tabela.
+//
+//    Por isso o ponteiro entra, e na fase de CAPTURA: capturar é o que
+//    torna o fechamento imune ao `stopPropagation` de quem estiver no
+//    caminho, e `pointerdown` é o evento que TODO apontador emite (mouse,
+//    toque, caneta) antes de qualquer compatibilidade. `mousedown` e
+//    `touchstart` FICAM: são o caminho de navegador sem Pointer Events, e
+//    quando os três disparam o efeito é o mesmo — `fechar()` já é
+//    idempotente, e o clique DENTRO da camada continua não fechando nada
+//    porque a checagem é a mesma lista de refs.
+//
+// 4) SÓ O ESC (06/09, decisão do cliente). Terceiro parâmetro de opções:
 //    `{ apenasEsc: true }` liga o Esc e NÃO liga o clique fora.
 //
 //    Existe para três listas de resultado EM FLUXO — favorecidos da
@@ -73,12 +103,14 @@ export function useFecharAoSair(refOuRefs, aberto, fechar, opcoes) {
     };
 
     if (!apenasEsc) {
+      document.addEventListener('pointerdown', aoApontar, true);
       document.addEventListener('mousedown', aoApontar);
       document.addEventListener('touchstart', aoApontar);
     }
     document.addEventListener('keydown', aoTeclar);
     return () => {
       if (!apenasEsc) {
+        document.removeEventListener('pointerdown', aoApontar, true);
         document.removeEventListener('mousedown', aoApontar);
         document.removeEventListener('touchstart', aoApontar);
       }

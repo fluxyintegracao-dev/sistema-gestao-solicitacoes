@@ -742,6 +742,17 @@ export const TELAS = [
     rota: '/permissoes-setor',
     tipo: 'listagem',
     naoAplica: {
+      // A RECUSA É INTENCIONAL, E ESTAVA ESCRITA SÓ NO CÓDIGO (declarada
+      // aqui em 06/09, depois de conferida em `PermissoesSetor.jsx:83`).
+      // A tela passa `colunasConfiguraveis={false}` com o motivo por
+      // extenso: das 3 colunas, DUAS são campos de digitação ("Usuario pode
+      // assumir" e "Usuario pode atribuir" são caixas de marcação que
+      // GRAVAM permissão). É grade de lançamento, não lista de consulta —
+      // esconder a coluna aqui é esconder o campo que a pessoa precisa
+      // preencher, e ela não descobre por que o lançamento parou de
+      // funcionar. O check não tem como ler essa intenção do silêncio, e
+      // ele mesmo diz onde ela se declara: é aqui.
+      P1: "grade de LANÇAMENTO: 2 das 3 colunas são campos de digitação que gravam permissão, e a tela recusa a escolha em `colunasConfiguraveis={false}` (motivo escrito em PermissoesSetor.jsx, 05/09) — esconder coluna aqui é esconder o campo que a pessoa precisa preencher",
       F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
       F2: "idem F1: não há recorte de lista por filtro",
       F3: "idem F1",

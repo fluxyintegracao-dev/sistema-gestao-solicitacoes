@@ -449,13 +449,76 @@ function colunaTravada(coluna) {
  * tem a janela como bloco continente e nenhum ancestral com `overflow` o
  * recorta.
  *
- * E ele NÃO sai por `createPortal`, ao contrário do menu de alinhamento:
- * o portal manda o nó para o `body`, onde ele precisa de um z-index
- * próprio — e o nosso é `--z-dropdown-portal` (900), ABAIXO de
- * `--z-modal: 100`. Dentro de um modal o painel portado ficaria ATRÁS
- * dele. Renderizado no lugar, o painel herda o contexto de empilhamento do
- * modal e fica por cima do conteúdo dele, que é onde ele tem de estar.
+ * ELE SAI POR `createPortal` — MENOS DENTRO DE MODAL (06/09). A versão
+ * anterior desta nota dizia "NÃO sai por portal", e o motivo estava certo:
+ * `--z-dropdown-portal` (900) é MENOR que `--z-modal` (1000), então dentro
+ * de um modal o painel portado ficaria ATRÁS do modal que o abriu. O que
+ * ela não sabia é que FORA do modal o `fixed` não é a janela.
+ *
+ * MEDIDO NO PREVIEW (build bd0a2ee), com o painel aberto e a caixa lida no
+ * DOM — quatro telas, o mesmo desenho:
+ *
+ *   financeiro-titulos   botão y 849..887   painel y 526..846
+ *                        `.app-table-shell` começa em y=833
+ *   crm-dashboard-sla    botão y 788..825   painel y 465..785
+ *                        `.app-table-shell` começa em y=772
+ *   rhdp-importacoes     botão y 814..852   painel y 508..811
+ *                        `.app-table-shell` começa em y=798
+ *
+ * O painel não cabe abaixo do botão, então o hook o vira PARA CIMA — e
+ * para cima é fora do cartão. Como `index.css` dá `backdrop-filter` ao
+ * `.app-table-shell`, o cartão é o BLOCO CONTINENTE do `fixed` (o hook já
+ * compensa a origem desde acb4f8e) e, sendo bloco continente, o
+ * `overflow: auto hidden` dele TAMBÉM RECORTA. Dos 320px do painel
+ * sobravam 13. `elementFromPoint` no centro entregava o que estava atrás —
+ * "app-stat-valor", "app-stat-grid", "app-bloco" —, três nomes
+ * diferentes para o mesmo recorte.
+ *
+ * No `body` não há bloco continente nem recorte, e é para lá que o painel
+ * vai quando o botão NÃO está dentro de um `.app-modal-portal`. Dentro do
+ * modal nada muda: o modal já é portado para o `body`, o `.layout-shell`
+ * não é ancestral dele, a regra do `backdrop-filter` não alcança o cartão
+ * de lá, e o painel continua sendo desenhado no lugar — que é o arranjo
+ * medido em 05/09 nas 9 tabelas de modal.
+ *
+ * O destino é escolhido NA ABERTURA, não a cada render: trocar de
+ * contêiner no meio do ciclo remonta o nó e joga fora a medição que o
+ * `usePosicaoFlutuante` acabou de fazer nele.
+ *
+ * E a saída pelo portal OBRIGA o `menuRef` a entrar no `useFecharAoSair`:
+ * portado, o painel deixa de ser descendente do `ref` do embrulho, o
+ * `contains` passa a dar falso PARA O PRÓPRIO PAINEL, o `mousedown` na
+ * caixa de marcação fecharia a camada antes do `onChange` dela e a escolha
+ * morreria no caminho. É o defeito que o `CabecalhoColuna` já pagou.
  */
+/** Manda a camada para `destino` quando há um; senão devolve no lugar. */
+const envolver = (destino, camada) => (destino ? createPortal(camada, destino) : camada);
+
+/*
+  O PAINEL PODE SAIR PARA O `body`?
+
+  Não pode quando o botão já está DENTRO de uma camada pintada acima da
+  página: no `body` o painel vale `--z-dropdown-portal` (900), e 900 perde
+  para `--z-modal` (1000). Sair de lá seria trocar "recortado pelo cartão"
+  por "escondido atrás do modal".
+
+  A pergunta é feita de dois jeitos porque o sistema tem dois arranjos, e
+  medir só o primeiro envelheceria: `.app-modal-portal` é o embrulho do
+  `ModalPortal` — e TODO modal daqui passa por ele, inclusive o
+  `OverlayModal`, que o compõe em vez de repetir —, e o degrau de
+  empilhamento cobre qualquer camada futura que se pinte por cima da
+  página sem usar aquele embrulho.
+*/
+const acimaDaPagina = (no) => {
+  if (!no) return true;
+  if (no.closest('.app-modal-portal')) return true;
+  for (let atual = no; atual && atual !== document.body; atual = atual.parentElement) {
+    const z = Number.parseInt(window.getComputedStyle(atual).zIndex, 10);
+    if (Number.isFinite(z) && z >= 900) return true;
+  }
+  return false;
+};
+
 function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoReordenar, aoRestaurar }) {
   const [aberto, setAberto] = useState(false);
   // Id do item que a alça liberou para arrasto, e id do item sob o ponteiro.
@@ -464,7 +527,9 @@ function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoReorde
   const ref = useRef(null);
   const botaoRef = useRef(null);
   const menuRef = useRef(null);
-  useFecharAoSair(ref, aberto, () => setAberto(false));
+  /* `null` = desenhar no lugar (dentro de modal); um nó = para onde portar. */
+  const [destino, setDestino] = useState(null);
+  useFecharAoSair([ref, menuRef], aberto, () => setAberto(false));
   const posicao = usePosicaoFlutuante(botaoRef, menuRef, aberto, { ancorarADireita: true });
   const ordenadas = ordem.map((id) => colunas.find((c) => c.id === id)).filter(Boolean);
 
@@ -481,16 +546,27 @@ function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoReorde
         ref={botaoRef}
         aria-haspopup="menu"
         aria-expanded={aberto}
-        onClick={() => setAberto((atual) => !atual)}
+        onClick={() => {
+          if (!aberto) {
+            /* Decidido aqui, uma vez por abertura: ver a nota do portal
+               acima. Dentro de modal fica no lugar (destino `null`). */
+            const preso = typeof document === 'undefined' || acimaDaPagina(botaoRef.current);
+            setDestino(preso ? null : document.body);
+          }
+          setAberto((atual) => !atual);
+        }}
       >
         Colunas
       </button>
-      {aberto && posicao && (
+      {aberto && posicao && envolver(destino, (
         <span
           className="app-mais-menu app-colunas-menu"
           role="menu"
           ref={menuRef}
-          style={posicao.estilo}
+          /* No `body` o painel perde o contexto de empilhamento da página e
+             precisa do degrau próprio dos portais. No lugar, ele continua
+             com o `--z-dropdown` da folha. */
+          style={destino ? { ...posicao.estilo, zIndex: 'var(--z-dropdown-portal)' } : posicao.estilo}
         >
           {ordenadas.map((coluna, indice) => {
             const travada = colunaTravada(coluna);
@@ -509,6 +585,10 @@ function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoReorde
               <span
                 className={classes}
                 key={coluna.id}
+                /* O mesmo id que o `th` publica em `data-coluna`: é por ele
+                   que se confere qual coluna o painel escondeu, sem passar
+                   pelo rótulo. */
+                data-coluna={coluna.id}
                 draggable={arrastando === coluna.id}
                 onDragStart={(evento) => {
                   evento.dataTransfer.effectAllowed = 'move';
@@ -582,7 +662,7 @@ function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoReorde
             Restaurar padrão
           </button>
         </span>
-      )}
+      ))}
     </span>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MenuMais from './MenuMais';
 
@@ -65,6 +65,10 @@ function BotaoAcao({ acao, classe }) {
  * SEMPRE — a R11 vale para menus de ações e "Voltar" redundantes em
  * LISTAGENS, nunca para esta seta. `voltar={{ to }}` ou `{{ onClick }}`.
  */
+/* Onde a faixa passa a ser "rolada". A banda morta é medida, não fixa —
+   ver a nota extensa dentro do componente. */
+const LIMIAR_COMPACTAR = 24;
+
 function SetaVoltar() {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" width="20" height="20">
@@ -87,6 +91,98 @@ export default function PageHeader({
   const headerRef = useRef(null);
   const sentinelaRef = useRef(null);
   const [compacto, setCompacto] = useState(false);
+  /*
+    A BANDA MORTA, E POR QUE ELA NÃO É ZELO (06/09).
+
+    ESTE EFEITO SE REALIMENTAVA A 60fps, EM TODA TELA COM FAIXA. Medido no
+    preview publicado (build bd0a2ee), quatro telas, com `window.scrollTo`
+    e leitura por quadro:
+
+      contratos-rel-operacional  scrollY 24 ⇄ 35   (altura do doc 9987 ⇄ 9998)
+      rhdp-relatorio-operacional scrollY 18 ⇄ 28   (3971 ⇄ 3982)
+      compras-rel-economia       scrollY  7 ⇄ 26   (2170 ⇄ 2188)
+      solicitacoes               scrollY  1 ⇄ 28   (1624 ⇄ 1651)
+
+    O laço, inteiro: compactar ENCOLHE a faixa (11px, 18px ou 27px,
+    conforme a tela) → o documento encolhe o mesmo tanto → a ANCORAGEM DE
+    ROLAGEM do navegador (`overflow-anchor`, ligada por padrão) devolve
+    essa diferença em `scrollY` para manter o conteúdo no lugar → o
+    `scrollY` novo cai abaixo do limiar → descompacta → a faixa cresce de
+    volta → a ancoragem empurra o `scrollY` para cima → compacta. Para
+    sempre, enquanto a rolagem parar dentro da faixa (24, 24+Δ].
+
+    Provado nos dois sentidos: injetando `* { overflow-anchor: none }` no
+    preview, SEM tocar neste arquivo, a oscilação some nas quatro telas.
+
+    O que a pessoa vê é a faixa piscando entre os dois tamanhos e a página
+    tremendo sob o dedo. O que o robô vê é "element is not stable": DUAS
+    telas voltaram como "NÃO ABRIU" na matriz de 06/09 e três células P4
+    reprovaram por um clique que nunca conseguiu sair.
+
+    A SAÍDA É UMA BANDA MORTA MAIOR QUE O PRÓPRIO SALTO, e ela é MEDIDA,
+    não chutada: um número fixo aqui envelheceria com o desenho (o salto
+    já vale 11, 18 e 27px em telas diferentes hoje) e o laço voltaria
+    calado no dia em que a faixa mudasse. O componente mede a própria
+    altura nos dois estados e usa a diferença como banda: compacta acima de
+    `24 + Δ`, solta abaixo de `24`. Com isso, a correção que a ancoragem
+    aplica (exatamente Δ) nunca atravessa a banda — seja qual for Δ.
+  */
+  const saltoRef = useRef(0);
+
+  useLayoutEffect(() => {
+    /*
+      Δ medido no próprio elemento, ANTES da pintura: liga a classe, lê a
+      altura, desliga, lê de novo. É a mesma técnica da "posição de
+      medição" do `usePosicaoFlutuante` — medir o estado que ainda não
+      existe em vez de suor sobre uma constante.
+    */
+    const medirSalto = () => {
+      const no = headerRef.current;
+      if (!no) return;
+      /*
+        A TRANSIÇÃO PRECISA SAIR DURANTE A MEDIDA. A faixa anima `padding`
+        e o título anima `font-size` em 0,15s: ligar a classe e ler a
+        altura no mesmo instante devolveria a altura de ANTES (a animação
+        acabou de começar), o salto sairia zero, a banda sairia zero e o
+        laço continuaria — de pé, e com um comentário dizendo que estava
+        resolvido. Uma folha temporária desliga as duas por três leituras.
+      */
+      const trava = document.createElement('style');
+      trava.textContent = '.app-page-header,.app-page-header *{transition:none !important}';
+      document.head.appendChild(trava);
+      const tinha = no.classList.contains('app-page-header--compacto');
+      no.classList.add('app-page-header--compacto');
+      const alturaCompacta = no.getBoundingClientRect().height;
+      no.classList.remove('app-page-header--compacto');
+      const alturaSolta = no.getBoundingClientRect().height;
+      if (tinha) no.classList.add('app-page-header--compacto');
+      no.getBoundingClientRect();
+      trava.remove();
+      /*
+        O +1 NÃO É SUPERSTIÇÃO. A banda tem de ser ESTRITAMENTE maior que o
+        salto: com banda exatamente igual, sair da compactação em
+        `scrollY = 24` devolve `24 + Δ` — e com Δ fracionário (11,1875px
+        medidos hoje) esse valor cai um fio ACIMA do limiar de compactar, o
+        laço volta pela porta dos fundos e ninguém vê. Um pixel de folga
+        custa nada e fecha o arredondamento de subpixel.
+      */
+      const salto = Math.max(0, Math.ceil(alturaSolta - alturaCompacta));
+      if (salto > 0) saltoRef.current = salto + 1;
+    };
+    medirSalto();
+    /* A largura muda o quanto o título quebra, e o quanto ele quebra muda o
+       salto — por isso a medida é refeita, e não guardada para sempre. Só
+       quando a LARGURA muda: `resize` também dispara ao abrir o teclado do
+       celular, e remedir a cada disparo seria forçar refluxo à toa. */
+    let larguraMedida = window.innerWidth;
+    const aoRedimensionar = () => {
+      if (window.innerWidth === larguraMedida) return;
+      larguraMedida = window.innerWidth;
+      medirSalto();
+    };
+    window.addEventListener('resize', aoRedimensionar);
+    return () => window.removeEventListener('resize', aoRedimensionar);
+  }, []);
 
   // A posição da faixa (--pos-cabecalho-fixo) vem do Pagina, que mede a
   // topbar real — aqui só a compactação.
@@ -98,7 +194,12 @@ export default function PageHeader({
     let raf = null;
     const medir = () => {
       raf = null;
-      setCompacto(window.scrollY > 24);
+      /* A leitura depende do estado ATUAL: é isso que faz a banda existir.
+         Um `setCompacto(scrollY > 24)` puro é sem história — e sem
+         história não há banda morta possível. */
+      setCompacto((atual) => (atual
+        ? window.scrollY > LIMIAR_COMPACTAR
+        : window.scrollY > LIMIAR_COMPACTAR + saltoRef.current));
     };
     const agendar = () => { if (raf == null) raf = requestAnimationFrame(medir); };
     medir();
