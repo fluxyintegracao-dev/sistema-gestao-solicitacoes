@@ -116,6 +116,38 @@ import {
   Mesmas duas regras do `LIMIAR_COLUNAS_PAINEL` da `TabelaPadrao`, e pelo
   mesmo motivo: abaixo disso o painel é um botão a mais na barra para não
   decidir nada. As três telas de hoje declaram 15, 12 e 9 filtros.
+
+  ---------------------------------------------------------------------
+  O MESMO 3 DECIDIU QUAIS TELAS FORAM LIGADAS NA LEVA DE 06/09 — e este é
+  o ponto do código onde o limiar existe, então é aqui que ele fica escrito.
+
+  MEDIDA. 79 arquivos .jsx montam uma `<BarraFiltros>`, em 82 faixas (três
+  arquivos têm duas). Contando o que cada faixa DECLARA — a busca livre,
+  cada `campo` e cada dimensão de `filtros` —, a distribuição foi:
+
+      1 filtro declarado ....... 16 faixas
+      2 filtros ................ 16 faixas
+      3 a 5 filtros ............ 38 faixas
+      6 ou mais ................ 12 faixas
+
+  As 32 faixas de 1 ou 2 filtros ficaram FORA, e não por gosto: o painel
+  abaixo já se recusa a desenhar nelas (`declarados < 3` ou menos de dois
+  escondíveis). Ligá-las acrescentaria hook, declaração e uma passada de
+  `ehVisivel` em cada uma para produzir um botão que nunca aparece — e uma
+  chave de preferência que nunca é escrita. As 50 faixas de 3 ou mais
+  passam `visibilidade` hoje: as 2 do N53 mais as 48 desta leva.
+
+  O corte é o MESMO número nos dois lugares de propósito. Se o limiar
+  mudar aqui, a única coisa que acontece nas telas ligadas é o painel
+  passar a aparecer (ou sumir) — nenhuma delas depende do valor, porque
+  nenhuma delas repete a conta.
+
+  E NENHUMA das 48 nasceu com filtro escondido: nenhuma declaração passa
+  `padrao: false`. Conjunto inicial reduzido existe só nas três telas em
+  que o cliente aprovou um. Onde a tela propõe um valor de partida (um
+  `status: 'ABERTO'`, o mês corrente), ele é excluído de `preenchidos` —
+  senão o padrão revelaria de volta, a cada recarga, exatamente o filtro
+  que a pessoa acabou de esconder.
 */
 const LIMIAR_FILTROS_PAINEL = 3;
 

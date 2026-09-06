@@ -12,7 +12,8 @@ import {
   TabelaPadrao,
   alternarValorFiltro,
   useAvisos,
-  useConfirmacao
+  useConfirmacao,
+  useFiltrosVisiveis
 } from '../components/padrao';
 import Alert from '../components/ui/Alert';
 import StatusBadge from '../components/StatusBadge';
@@ -153,6 +154,25 @@ function toEditState(item) {
  * empilhadas seriam justamente o defeito que a R16 evita. O ritmo vertical
  * vem da grade do `.app-pagina`.
  */
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'competencia', rotulo: 'Competência' },
+  { id: 'empresa_grupo_id', rotulo: 'Empresa do grupo' },
+  { id: 'obra_id', rotulo: 'Obra' },
+  { id: 'tipo_vinculo', rotulo: 'Vínculo' },
+  { id: 'status', rotulo: 'Status' }
+];
+
 export default function RhDpApuracao() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -179,6 +199,36 @@ export default function RhDpApuracao() {
   // MARCACAO — um conjunto por dimensao; competencia e continua e vive na
   // prop `campos` da BarraFiltros (R16b).
   const [filtros, setFiltros] = useState(filtrosVazios);
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      const valor = filtros[filtro.id];
+      return valor instanceof Set ? valor.size > 0 : String(valor ?? '').trim() !== '';
+    }).map((filtro) => filtro.id),
+    [filtros]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:rh-dp-apuracao:lista', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      setFiltros((atual) => ({ ...atual, [id]: atual[id] instanceof Set ? new Set() : '' }));
+    }
+  });
   const [form, setForm] = useState(initialForm());
   const [fechamentoForm, setFechamentoForm] = useState({
     data_fechamento: new Date().toISOString().slice(0, 10),
@@ -591,8 +641,8 @@ export default function RhDpApuracao() {
             tipo: 'month',
             valor: filtros.competencia,
             aoMudar: (valor) => setFiltros((atuais) => ({ ...atuais, competencia: valor }))
-          }]}
-          filtros={dimensoesFiltro}
+          }].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
+          filtros={dimensoesFiltro.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={{
             empresa_grupo_id: filtros.empresa_grupo_id,
             obra_id: filtros.obra_id,
@@ -601,6 +651,7 @@ export default function RhDpApuracao() {
           }}
           aoAlternar={(dimensao, valor, opcoes) => setFiltros((atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes))}
           aoLimpar={() => setFiltros(filtrosVazios())}
+          visibilidade={visibilidadeFiltros}
         />
 
         <TabelaPadrao

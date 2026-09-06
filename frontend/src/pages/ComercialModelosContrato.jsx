@@ -10,7 +10,8 @@ import {
   Pagina,
   TabelaPadrao,
   alternarValorFiltro,
-  useAvisos
+  useAvisos,
+  useFiltrosVisiveis
 } from '../components/padrao';
 import {
   criarModeloContratoComercial,
@@ -39,6 +40,27 @@ function documentoTipoLabel(tipo) {
   return TIPOS_DOCUMENTO_MODELO.find((item) => item.value === String(tipo || '').toUpperCase())?.label || tipo || '-';
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'q', rotulo: 'Busca', obrigatorio: true },
+  { id: 'empreendimento', rotulo: 'Empreendimento' },
+  { id: 'tipo', rotulo: 'Tipo de documento' }
+];
+
 export default function ComercialModelosContrato() {
   const [empreendimentos, setEmpreendimentos] = useState([]);
   const [modelos, setModelos] = useState([]);
@@ -47,6 +69,36 @@ export default function ComercialModelosContrato() {
   // não a escolha única de um select — a BarraFiltros mostra o que está
   // filtrando em etiquetas removíveis.
   const [filtros, setFiltros] = useState({ q: '', empreendimento: new Set(), tipo: new Set() });
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      const valor = filtros[filtro.id];
+      return valor instanceof Set ? valor.size > 0 : String(valor ?? '').trim() !== '';
+    }).map((filtro) => filtro.id),
+    [filtros]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:comercial-modelos-contrato', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      setFiltros((atual) => ({ ...atual, [id]: atual[id] instanceof Set ? new Set() : '' }));
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   // O <input type="file"> é NÃO CONTROLADO: zerar `form.file` no estado não
@@ -296,11 +348,11 @@ export default function ComercialModelosContrato() {
             removíveis — os dois <select> de recorte saíram. O filtro aplica
             ao marcar (R23: uma dimensão local, nada de botão "aplicar"). */}
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((prev) => ({ ...prev, q: valor })),
             placeholder: 'Buscar por nome, descricao ou empreendimento'
-          }}
+          } : null}
           filtros={[
             {
               id: 'empreendimento',
@@ -312,13 +364,14 @@ export default function ComercialModelosContrato() {
               rotulo: 'Tipo de documento',
               opcoes: TIPOS_DOCUMENTO_MODELO.map((item) => ({ valor: item.value, rotulo: item.label }))
             }
-          ]}
+          ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={{ empreendimento: filtros.empreendimento, tipo: filtros.tipo }}
           aoAlternar={(dim, valor, opcoes) => setFiltros((prev) => ({
             ...alternarValorFiltro(prev, dim, valor, opcoes),
             q: prev.q
           }))}
           aoLimpar={() => setFiltros((prev) => ({ ...prev, empreendimento: new Set(), tipo: new Set() }))}
+          visibilidade={visibilidadeFiltros}
         />
 
         <TabelaPadrao

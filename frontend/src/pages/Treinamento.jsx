@@ -24,7 +24,8 @@ import {
   alternarValorFiltro,
   Avisos,
   useAvisos,
-  useConfirmacao
+  useConfirmacao,
+  useFiltrosVisiveis
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../contexts/AuthContext';
@@ -170,6 +171,28 @@ function primeiroValor(conjunto) {
   return Array.from(conjunto || [])[0] || '';
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'busca', rotulo: 'Busca', obrigatorio: true },
+  { id: 'tipo', rotulo: 'Tipo' },
+  { id: 'modulo', rotulo: 'Modulo' },
+  { id: 'status', rotulo: 'Status' }
+];
+
 export default function Treinamento() {
   const { user } = useAuth();
   const podeGerenciar = canManageTreinamento(user);
@@ -199,6 +222,40 @@ export default function Treinamento() {
     status: podeGerenciar ? new Set() : new Set(['PUBLICADO'])
   });
   const [busca, setBusca] = useState('');
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      if (filtro.id === 'busca') return busca.trim() !== '';
+      if (filtro.id === 'status' && !podeGerenciar) return false;
+      return (filtros[filtro.id]?.size || 0) > 0;
+    }).map((filtro) => filtro.id),
+    [busca, filtros, podeGerenciar]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:treinamento:conteudos', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => setFiltros((atual) => ({
+      ...atual,
+      // Quem não gerencia continua vendo só o publicado: esconder o campo
+      // não pode ampliar o que a pessoa tem direito de ver.
+      [id]: id === 'status' && !podeGerenciar ? new Set(['PUBLICADO']) : new Set()
+    }))
+  });
   const [form, setForm] = useState(EMPTY_FORM);
   // R3/R19: o `window.confirm` do arquivamento e as duas faixas de
   // erro/sucesso pintadas com paleta crua viraram componentes do sistema.
@@ -572,11 +629,11 @@ export default function Treinamento() {
         cor="var(--c-primary)"
       >
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: busca,
             aoMudar: setBusca,
             placeholder: 'Buscar por pergunta, titulo, modulo ou tag'
-          }}
+          } : null}
           filtros={[
             { id: 'tipo', rotulo: 'Tipo', unico: true, opcoes: TIPOS },
             {
@@ -588,10 +645,11 @@ export default function Treinamento() {
             ...(podeGerenciar
               ? [{ id: 'status', rotulo: 'Status', unico: true, opcoes: STATUS_GESTAO }]
               : [])
-          ]}
+          ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={filtros}
           aoAlternar={alternarFiltro}
           aoLimpar={limparFiltros}
+          visibilidade={visibilidadeFiltros}
         />
 
         <TabelaPadrao

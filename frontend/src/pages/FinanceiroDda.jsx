@@ -33,7 +33,8 @@ import {
   TabelaPadrao,
   Avisos,
   useAvisos,
-  useConfirmacao
+  useConfirmacao,
+  useFiltrosVisiveis
 } from '../components/padrao';
 
 const STATUS = [
@@ -69,9 +70,56 @@ function date(value) {
   return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleDateString('pt-BR');
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'q', rotulo: 'Busca', obrigatorio: true },
+  { id: 'data_inicio', rotulo: 'Vencimento de' },
+  { id: 'data_fim', rotulo: 'Vencimento ate' },
+  { id: 'status', rotulo: 'Status' }
+];
+
 export default function FinanceiroDda() {
   const { user } = useAuth();
   const [filters, setFilters] = useState({ q: '', status: '', data_inicio: '', data_fim: '', page: 1, limit: 25 });
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => String(filters[filtro.id] ?? '').trim() !== '').map((filtro) => filtro.id),
+    [filters]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:financeiro-dda:documentos', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => setFilters((atual) => ({ ...atual, [id]: '', page: 1 }))
+  });
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState({ total: 0, valor_total: 0, por_status: {}, integracao: {} });
@@ -261,11 +309,11 @@ export default function FinanceiroDda() {
           seria a terceira aparição da mesma informação, sem função nova. */}
       <BlocoConteudo titulo="Documentos apresentados" descricao="Recorte atual da fila de correspondencia.">
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filters.q,
             aoMudar: (valor) => setFilters((prior) => ({ ...prior, q: valor, page: 1 })),
             placeholder: 'Beneficiario, CPF/CNPJ, nosso numero ou linha digitavel'
-          }}
+          } : null}
           campos={[
             {
               id: 'data_inicio',
@@ -281,13 +329,14 @@ export default function FinanceiroDda() {
               valor: filters.data_fim,
               aoMudar: (valor) => setFilters((prior) => ({ ...prior, data_fim: valor, page: 1 }))
             }
-          ]}
+          ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
           filtros={[
             { id: 'status', rotulo: 'Status', unico: true, opcoes: STATUS.map((item) => ({ valor: item.value, rotulo: item.label })) }
-          ]}
+          ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={filtrosAtivos}
           aoAlternar={alternarFiltro}
           aoLimpar={() => setFilters((prior) => ({ ...prior, status: '', page: 1 }))}
+          visibilidade={visibilidadeFiltros}
         />
 
         <TabelaPadrao

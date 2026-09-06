@@ -9,7 +9,8 @@ import {
   PageHeader,
   StatGrid,
   StatTile,
-  TabelaPadrao
+  TabelaPadrao,
+  useFiltrosVisiveis
 } from '../components/padrao';
 import { obterRelatorioComprasDiretas } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
@@ -128,6 +129,31 @@ function RankingTable({ title, subtitle, rows, valueLabel = 'Valor', nameKey = '
   );
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'q', rotulo: 'Busca', obrigatorio: true },
+  { id: 'data_inicio', rotulo: 'Criada de' },
+  { id: 'data_fim', rotulo: 'Criada ate' },
+  { id: 'item', rotulo: 'Nome do item comprado' },
+  { id: 'limit', rotulo: 'Limite de linhas' },
+  { id: 'obra_id', rotulo: 'Obra / Centro de custo' },
+  { id: 'status', rotulo: 'Status' }
+];
+
 export default function ComprasRelatorioComprasDiretas() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filtros, setFiltros] = useState(() => readFilters(searchParams));
@@ -228,6 +254,48 @@ export default function ComprasRelatorioComprasDiretas() {
       opcoes: statusOptions.map((entry) => ({ valor: String(entry.key), rotulo: entry.label }))
     }
   ], [obras, statusOptions]);
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      /* O valor que o SISTEMA propõe não conta como preenchido: se contasse,
+         o padrão revelaria de volta, a cada recarga, exatamente o filtro que
+         a pessoa escondeu. */
+      const padrao = String(DEFAULT_FILTERS[filtro.id] ?? '');
+      const rascunho = String(filtros[filtro.id] ?? '');
+      const emCurso = String(searchParams.get(filtro.id) ?? '');
+      return (rascunho !== '' && rascunho !== padrao) || (emCurso !== '' && emCurso !== padrao);
+    }).map((filtro) => filtro.id),
+    [filtros, searchParams]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:compras-diretas', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      atualizarCampo(id, DEFAULT_FILTERS[id] ?? '');
+      // A consulta em curso mora na URL: sem tirar a chave dali, o recorte
+      // seguiria valendo com o campo já fora da faixa.
+      if (searchParams.get(id)) {
+        const proximos = new URLSearchParams(searchParams);
+        proximos.delete(id);
+        setSearchParams(proximos);
+      }
+    }
+  });
 
   function atualizarCampo(campo, valor) {
     setFiltros((current) => ({ ...current, [campo]: valor }));
@@ -279,11 +347,11 @@ export default function ComprasRelatorioComprasDiretas() {
             texto do item e limite de linhas nao tem lista fechada e vao em
             `campos`, o espaco declarado da BarraFiltros para o continuo. */}
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => atualizarCampo('q', valor),
             placeholder: 'SOL, SC, solicitante, credor ou obra'
-          }}
+          } : null}
           campos={[
             {
               id: 'data_inicio',
@@ -315,14 +383,15 @@ export default function ComprasRelatorioComprasDiretas() {
               valor: filtros.limit,
               aoMudar: (valor) => atualizarCampo('limit', valor)
             }
-          ]}
-          filtros={dimensoes}
+          ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
+          filtros={dimensoes.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
           /* R16: "Limpar" tem UM dono nesta tela — o botao secundario do
              cabecalho. Passar `aoLimpar` aqui poria um segundo controle
              com a MESMA acao no mesmo contexto visual; o ✕ de cada
              etiqueta continua removendo o recorte individual. */
           aoAlternar={alternarFiltro}
+          visibilidade={visibilidadeFiltros}
         />
       </BlocoConteudo>
 

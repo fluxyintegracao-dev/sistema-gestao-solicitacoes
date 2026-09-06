@@ -17,7 +17,8 @@ import {
   alternarValorFiltro,
   Avisos,
   useAvisos,
-  useConfirmacao
+  useConfirmacao,
+  useFiltrosVisiveis
 } from '../../../components/padrao';
 import StatusBadge from '../../../components/StatusBadge';
 
@@ -72,6 +73,27 @@ function normalizarBusca(valor) {
     .toLowerCase();
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'q', rotulo: 'Busca', obrigatorio: true },
+  { id: 'type', rotulo: 'Tipo' },
+  { id: 'status', rotulo: 'Status' }
+];
+
 export default function CrmAdminCanais() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +103,36 @@ export default function CrmAdminCanais() {
   // R12: o recorte da lista é um conjunto de MARCAS (vazio = todos), nunca
   // um select de escolha única.
   const [filtros, setFiltros] = useState({ q: '', type: new Set(), status: new Set() });
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      const valor = filtros[filtro.id];
+      return valor instanceof Set ? valor.size > 0 : String(valor ?? '').trim() !== '';
+    }).map((filtro) => filtro.id),
+    [filtros]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:crm-admin-canais', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      setFiltros((atual) => ({ ...atual, [id]: atual[id] instanceof Set ? new Set() : '' }));
+    }
+  });
   // R22: hook usado é hook importado — o useRef está no import acima. Leva o
   // foco ao formulário, que fica ACIMA da lista; não mede nada.
   const campoNomeRef = useRef(null);
@@ -381,11 +433,11 @@ export default function CrmAdminCanais() {
         {/* R12/R3: busca única em cima ocupando a faixa e, abaixo, os
             filtros por MARCAÇÃO com etiquetas removíveis. */}
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((prev) => ({ ...prev, q: valor })),
             placeholder: 'Buscar nome, nome publico, fornecedor ou numero'
-          }}
+          } : null}
           filtros={[
             {
               id: 'type',
@@ -397,13 +449,14 @@ export default function CrmAdminCanais() {
               rotulo: 'Status',
               opcoes: Object.entries(STATUS_LABEL).map(([valor, rotulo]) => ({ valor, rotulo }))
             }
-          ]}
+          ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={{ type: filtros.type, status: filtros.status }}
           aoAlternar={(dim, valor, opcoes) => setFiltros((prev) => ({
             ...alternarValorFiltro(prev, dim, valor, opcoes),
             q: prev.q
           }))}
           aoLimpar={() => setFiltros((prev) => ({ ...prev, type: new Set(), status: new Set() }))}
+          visibilidade={visibilidadeFiltros}
         />
 
         {/* A1: a ação da linha é um <button> focável e a linha inteira é

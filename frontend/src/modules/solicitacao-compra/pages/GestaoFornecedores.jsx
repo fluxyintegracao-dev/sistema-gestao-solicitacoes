@@ -11,7 +11,8 @@ import {
   alternarValorFiltro,
   Avisos,
   useAvisos,
-  useConfirmacao
+  useConfirmacao,
+  useFiltrosVisiveis
 } from '../../../components/padrao';
 import StatusBadge from '../../../components/StatusBadge';
 import {
@@ -91,6 +92,28 @@ function formDoRegistro(fornecedor) {
   };
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'q', rotulo: 'Busca', obrigatorio: true },
+  { id: 'estado', rotulo: 'Estado' },
+  { id: 'categoria', rotulo: 'Categoria' },
+  { id: 'situacao', rotulo: 'Situacao' }
+];
+
 export default function GestaoFornecedores() {
   const { user } = useAuth();
   const canManage = canManageComprasFornecedores(user);
@@ -126,6 +149,36 @@ export default function GestaoFornecedores() {
     estado: new Set(),
     categoria: new Set(),
     situacao: new Set()
+  });
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      const valor = filtros[filtro.id];
+      return valor instanceof Set ? valor.size > 0 : String(valor ?? '').trim() !== '';
+    }).map((filtro) => filtro.id),
+    [filtros]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:gestao-fornecedores', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      setFiltros((atual) => ({ ...atual, [id]: atual[id] instanceof Set ? new Set() : '' }));
+    }
   });
 
   /*
@@ -637,11 +690,11 @@ export default function GestaoFornecedores() {
         cor="var(--c-primary)"
       >
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((atual) => ({ ...atual, q: valor })),
             placeholder: 'Buscar por nome, CNPJ, email ou contato'
-          }}
+          } : null}
           filtros={[
             {
               id: 'estado',
@@ -661,7 +714,7 @@ export default function GestaoFornecedores() {
               unico: true,
               opcoes: [{ valor: 'inativos', rotulo: 'Incluir inativos' }]
             }
-          ]}
+          ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={{
             estado: filtros.estado,
             categoria: filtros.categoria,
@@ -677,6 +730,7 @@ export default function GestaoFornecedores() {
             categoria: new Set(),
             situacao: new Set()
           }))}
+          visibilidade={visibilidadeFiltros}
         />
 
         {/* A1: a ação da linha é um <button> focável ("Editar"), e a linha

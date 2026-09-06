@@ -7,7 +7,8 @@ import {
   TabelaPadrao,
   alternarValorFiltro,
   useAvisos,
-  useConfirmacao
+  useConfirmacao,
+  useFiltrosVisiveis
 } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
@@ -35,6 +36,10 @@ import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatter
  */
 
 const COMPETENCIA_ATUAL = new Date().toISOString().slice(0, 7);
+/* O 30 estava só no `useState`; virou nome para o painel de filtros poder
+   distinguir "a pessoa escolheu 30" de "o sistema propôs 30" — sem isso o
+   campo contaria como preenchido sempre e nunca sairia da faixa. */
+const DIAS_BASE_PADRAO = 30;
 const SEM_FILTRO = { obra: new Set(), empresa: new Set() };
 
 /** Dimensao de valor UNICO: o `ativos` guarda um conjunto, o servico recebe um id. */
@@ -73,6 +78,24 @@ function linhaVazia(colaborador) {
  * nem `PageHeader`. Duas faixas fixas empilhadas e exatamente o defeito que a R16 evita; excecao
  * declarada ao cabecalho padrao, valida para os componentes que so existem como aba.
  */
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'competencia', rotulo: 'Competência' },
+  { id: 'diasBase', rotulo: 'Dias base do mes' },
+  { id: 'obra', rotulo: 'Obra' },
+  { id: 'empresa', rotulo: 'Empresa do grupo' }
+];
+
 export default function RhDpJornada() {
   const { user } = useAuth();
   const { avisos, avisar, fechar, limpar } = useAvisos();
@@ -84,8 +107,48 @@ export default function RhDpJornada() {
   // removivel, e nao lista suspensa. Ambas com `unico`, porque o servico
   // recebe UM id por recorte (marcar dois mandaria nenhum).
   const [ativos, setAtivos] = useState(SEM_FILTRO);
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      /* Competência e dias base NASCEM com o valor que o sistema propõe
+         (mês corrente, 30 dias). O padrão não conta como preenchido: se
+         contasse, ele revelaria de volta, a cada abertura, exatamente o
+         campo que a pessoa tirou da faixa. */
+      if (filtro.id === 'competencia') return String(competencia ?? '') !== COMPETENCIA_ATUAL;
+      if (filtro.id === 'diasBase') return String(diasBase ?? '') !== String(DIAS_BASE_PADRAO);
+      return (ativos[filtro.id]?.size || 0) > 0;
+    }).map((filtro) => filtro.id),
+    [competencia, diasBase, ativos]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:rh-dp-jornada:colaboradores', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      /* Competência e dias base voltam ao PADRÃO, não a vazio: a lista é
+         montada a partir dos dois, e um campo escondido em branco deixaria
+         a tela sem conseguir montar nada. Vazio aqui é o valor do sistema. */
+      if (id === 'competencia') { setCompetencia(COMPETENCIA_ATUAL); return; }
+      if (id === 'diasBase') { setDiasBase(DIAS_BASE_PADRAO); return; }
+      setAtivos((atuais) => ({ ...atuais, [id]: new Set() }));
+    }
+  });
   const [competencia, setCompetencia] = useState(COMPETENCIA_ATUAL);
-  const [diasBase, setDiasBase] = useState(30);
+  const [diasBase, setDiasBase] = useState(DIAS_BASE_PADRAO);
 
   const [linhas, setLinhas] = useState([]);
   const [carregando, setCarregando] = useState(false);
@@ -317,13 +380,14 @@ export default function RhDpJornada() {
               min: 1,
               max: 31
             }
-          ]}
-          filtros={dimensoesFiltro}
+          ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
+          filtros={dimensoesFiltro.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
           aoAlternar={(dimensao, valor, opcoes) => setAtivos(
             (atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes)
           )}
           aoLimpar={() => setAtivos(SEM_FILTRO)}
+          visibilidade={visibilidadeFiltros}
         />
 
         <div className="space-y-3">

@@ -15,7 +15,8 @@ import {
   StatTile,
   TabelaPadrao,
   Avisos,
-  useAvisos
+  useAvisos,
+  useFiltrosVisiveis
 } from '../components/padrao';
 
 const STATUS = [
@@ -86,9 +87,60 @@ function umValor(conjunto) {
   return primeiro || '';
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'busca', rotulo: 'Busca', obrigatorio: true },
+  { id: 'status', rotulo: 'Status' },
+  { id: 'cartao_id', rotulo: 'Cartão' }
+];
+
 export default function FinanceiroFaturasCartao() {
   const [filtrosAtivos, setFiltrosAtivos] = useState(FILTROS_INICIAIS);
   const [busca, setBusca] = useState('');
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      if (filtro.id === 'busca') return busca.trim() !== '';
+      const atual = [...(filtrosAtivos[filtro.id] || [])].sort().join(',');
+      const padrao = [...(FILTROS_INICIAIS[filtro.id] || [])].sort().join(',');
+      return atual !== '' && atual !== padrao;
+    }).map((filtro) => filtro.id),
+    [busca, filtrosAtivos]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:faturas-cartao', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => setFiltrosAtivos((atual) => ({ ...atual, [id]: new Set() }))
+  });
   const [faturas, setFaturas] = useState([]);
   const [cartoes, setCartoes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -233,11 +285,11 @@ export default function FinanceiroFaturasCartao() {
             com etiqueta removível. Os dois <select> de escolha única saíram;
             as dimensões são `unico` porque o serviço só aceita um valor. */}
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: busca,
             aoMudar: setBusca,
             placeholder: 'Competência, cartão ou conta'
-          }}
+          } : null}
           filtros={[
             { id: 'status', rotulo: 'Status', unico: true, opcoes: STATUS },
             {
@@ -246,10 +298,11 @@ export default function FinanceiroFaturasCartao() {
               unico: true,
               opcoes: loadingOptions ? [] : opcoesCartao
             }
-          ]}
+          ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={filtrosAtivos}
           aoAlternar={alternarFiltro}
           aoLimpar={() => { setFiltrosAtivos({ status: new Set(), cartao_id: new Set() }); setBusca(''); }}
+          visibilidade={visibilidadeFiltros}
         />
 
         <TabelaPadrao

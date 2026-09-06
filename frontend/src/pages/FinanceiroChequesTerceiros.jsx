@@ -22,7 +22,8 @@ import {
   CelulaDupla,
   TabelaPadrao,
   Avisos,
-  useAvisos
+  useAvisos,
+  useFiltrosVisiveis
 } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -100,9 +101,66 @@ function StatusBadge({ status }) {
   return <span className={tone}>{STATUS_LABELS[normalized] || normalized || '-'}</span>;
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'q', rotulo: 'Busca', obrigatorio: true },
+  { id: 'empresa_id', rotulo: 'Empresa detentora' },
+  { id: 'status', rotulo: 'Status' }
+];
+
+/*
+  O recorte com que a tela ABRE. Existe para o `preenchidos` do painel: o
+  valor que o SISTEMA propõe (`status: 'EM_CARTEIRA'`) não conta como
+  preenchido, senão ele revelaria de volta, a cada abertura, o filtro que a
+  pessoa escondeu.
+*/
+const FILTROS_INICIAIS = { q: '', empresa_id: '', status: 'EM_CARTEIRA' };
+
 export default function FinanceiroChequesTerceiros() {
   const { user } = useAuth();
   const [filters, setFilters] = useState({ q: '', empresa_id: '', status: 'EM_CARTEIRA' });
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      const valor = String(filters[filtro.id] ?? '').trim();
+      return valor !== '' && valor !== String(FILTROS_INICIAIS[filtro.id] ?? '');
+    }).map((filtro) => filtro.id),
+    [filters]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:financeiro-cheques-terceiros:carteira', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => setFilters((atual) => ({ ...atual, [id]: '' }))
+  });
   const [data, setData] = useState({ cheques: [], totais: {}, total: 0 });
   const [empresas, setEmpresas] = useState([]);
   const [contas, setContas] = useState([]);
@@ -296,11 +354,11 @@ export default function FinanceiroChequesTerceiros() {
       {/* B2: a carteira é o conteúdo da tela. */}
       <BlocoConteudo titulo="Carteira de cheques" variante="primario" descricao="O recorte vale assim que a marca é feita.">
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filters.q,
             aoMudar: (valor) => setFilters((v) => ({ ...v, q: valor })),
             placeholder: 'Código, número, titular ou banco'
-          }}
+          } : null}
           filtros={[
             {
               id: 'empresa_id',
@@ -314,10 +372,11 @@ export default function FinanceiroChequesTerceiros() {
               unico: true,
               opcoes: Object.entries(STATUS_LABELS).map(([value, label]) => ({ valor: value, rotulo: label }))
             }
-          ]}
+          ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={filtrosAtivos}
           aoAlternar={alternarFiltro}
           aoLimpar={() => setFilters((v) => ({ ...v, empresa_id: '', status: '' }))}
+          visibilidade={visibilidadeFiltros}
         />
 
         <TabelaPadrao

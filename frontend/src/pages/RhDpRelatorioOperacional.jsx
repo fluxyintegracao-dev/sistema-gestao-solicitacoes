@@ -7,7 +7,8 @@ import {
   PageHeader,
   StatGrid,
   StatTile,
-  TabelaPadrao
+  TabelaPadrao,
+  useFiltrosVisiveis
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 import { useUiVisibility } from '../hooks/useUiVisibility';
@@ -97,10 +98,64 @@ function DistributionList({ title, rows, valueKey = 'total', formatter = (value)
   );
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'data_inicial', rotulo: 'Data inicial' },
+  { id: 'data_final', rotulo: 'Data final' },
+  { id: 'periodo', rotulo: 'Período' },
+  { id: 'empresa_grupo_id', rotulo: 'Empresa' },
+  { id: 'obra_id', rotulo: 'Obra/Centro' },
+  { id: 'status', rotulo: 'Status' }
+];
+
 export default function RhDpRelatorioOperacional() {
   const { isVisible } = useUiVisibility();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      const padrao = String(DEFAULT_FILTERS[filtro.id] ?? '');
+      const rascunho = String(filters[filtro.id] ?? '');
+      const emCurso = String(appliedFilters[filtro.id] ?? '');
+      return (rascunho !== '' && rascunho !== padrao) || (emCurso !== '' && emCurso !== padrao);
+    }).map((filtro) => filtro.id),
+    [filters, appliedFilters]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:rh-dp-relatorio-operacional', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      /* O rascunho E o recorte em curso — a consulta usa o segundo. */
+      setFilters((atual) => ({ ...atual, [id]: DEFAULT_FILTERS[id] ?? '' }));
+      setAppliedFilters((atual) => ({ ...atual, [id]: DEFAULT_FILTERS[id] ?? '' }));
+    }
+  });
   const [empresas, setEmpresas] = useState([]);
   const [obras, setObras] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
@@ -241,10 +296,11 @@ export default function RhDpRelatorioOperacional() {
               valor: filters.data_final,
               aoMudar: (valor) => updateFilter('data_final', valor)
             }
-          ]}
-          filtros={dimensoes}
+          ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
+          filtros={dimensoes.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
           aoAlternar={alternarFiltro}
+          visibilidade={visibilidadeFiltros}
         />
       </BlocoConteudo>
 

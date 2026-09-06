@@ -16,7 +16,8 @@ import {
   StatTile,
   TabelaPadrao,
   alternarValorFiltro,
-  useAvisos
+  useAvisos,
+  useFiltrosVisiveis
 } from '../../../components/padrao';
 import { chaveStatusCompra, familiaStatusCompra } from '../utils/statusCompras';
 
@@ -71,6 +72,27 @@ async function carregarStatusPedidosComFallback() {
   }
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'busca', rotulo: 'Busca', obrigatorio: true },
+  { id: 'status', rotulo: 'Status' },
+  { id: 'obra_id', rotulo: 'Obra' }
+];
+
 export default function PedidosCompra() {
   const navigate = useNavigate();
   const { avisos, avisar, fechar } = useAvisos();
@@ -88,6 +110,33 @@ export default function PedidosCompra() {
     valor só: a lista não estreitaria e a etiqueta mentiria (R15).
   */
   const [ativos, setAtivos] = useState({ status: new Set(), obra_id: new Set() });
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => (filtro.id === 'busca'
+      ? busca.trim() !== ''
+      : (ativos[filtro.id]?.size || 0) > 0)).map((filtro) => filtro.id),
+    [busca, ativos]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:pedidos-compra', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => setAtivos((atuais) => ({ ...atuais, [id]: new Set() }))
+  });
 
   const status = useMemo(() => [...(ativos.status || [])][0] || '', [ativos.status]);
   const obraId = useMemo(() => [...(ativos.obra_id || [])][0] || '', [ativos.obra_id]);
@@ -266,15 +315,16 @@ export default function PedidosCompra() {
           o recolher do bloco. */}
       <BlocoConteudo titulo="Filtros" variante="secundario" recolhivel>
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: busca,
             aoMudar: setBusca,
             placeholder: 'Fornecedor, obra ou pedido'
-          }}
-          filtros={dimensoes}
+          } : null}
+          filtros={dimensoes.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
           aoAlternar={alternarFiltro}
           aoLimpar={limparFiltros}
+          visibilidade={visibilidadeFiltros}
         />
       </BlocoConteudo>
 

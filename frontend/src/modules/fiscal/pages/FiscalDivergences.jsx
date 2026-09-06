@@ -8,7 +8,8 @@ import {
   CelulaDupla,
   BarraFiltros,
   Avisos,
-  useAvisos
+  useAvisos,
+  useFiltrosVisiveis
 } from '../../../components/padrao';
 import StatusBadge from '../../../components/StatusBadge';
 import { getFiscalCompanies, getFiscalDivergences } from '../services/fiscalApi';
@@ -67,11 +68,77 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('pt-BR');
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'q', rotulo: 'Busca', obrigatorio: true },
+  { id: 'company_id', rotulo: 'Empresa' },
+  { id: 'status', rotulo: 'Status' },
+  { id: 'severity', rotulo: 'Severidade' },
+  { id: 'divergence_type', rotulo: 'Tipo' }
+];
+
+/*
+  O recorte com que a tela ABRE. Ele existe para o `preenchidos` do painel:
+  o valor que o SISTEMA propõe (`status: 'open'`) NÃO conta como preenchido,
+  senão ele revelaria de volta, a cada abertura, exatamente o filtro que a
+  pessoa escondeu — o mesmo cuidado da consulta de títulos.
+*/
+const FILTROS_INICIAIS = { ...FILTROS_VAZIOS, status: 'open' };
+
 export default function FiscalDivergences() {
   const [items, setItems] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
   const [filters, setFilters] = useState({ ...FILTROS_VAZIOS, status: 'open' });
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      const valor = String(filters[filtro.id] ?? '').trim();
+      return valor !== '' && valor !== String(FILTROS_INICIAIS[filtro.id] ?? '');
+    }).map((filtro) => filtro.id),
+    [filters]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:divergencias-fiscais', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      // A lista desta tela é buscada por `load`, não por efeito sobre o
+      // estado: limpar sem recarregar deixaria a consulta em curso recortada
+      // por um critério que já saiu da faixa.
+      const proximos = { ...filters, [id]: '' };
+      setFilters(proximos);
+      load(proximos);
+    }
+  });
   const [loading, setLoading] = useState(true);
   // R3/R19: a faixa de erro pintada à mão (border-red-200/bg-red-50) vira o
   // aviso do sistema, com tom semântico e botão de fechar de verdade.
@@ -157,11 +224,11 @@ export default function FiscalDivergences() {
         cor="var(--module-fiscal)"
       >
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filters.q,
             aoMudar: (valor) => updateFilter('q', valor),
             placeholder: 'Buscar por nota, fornecedor ou descricao'
-          }}
+          } : null}
           filtros={[
             {
               id: 'company_id',
@@ -187,10 +254,11 @@ export default function FiscalDivergences() {
               unico: true,
               opcoes: divergenceTypes.map(([valor, rotulo]) => ({ valor, rotulo }))
             }
-          ]}
+          ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
           aoAlternar={(dimensao, valor) => alternarMarca(dimensao, valor)}
           aoLimpar={limparFiltros}
+          visibilidade={visibilidadeFiltros}
         />
 
         {/*

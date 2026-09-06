@@ -10,7 +10,8 @@ import {
   StatGrid,
   StatTile,
   TabelaPadrao,
-  useAvisos
+  useAvisos,
+  useFiltrosVisiveis
 } from '../components/padrao';
 import { listarAuditoriaItensPedidoCompra } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
@@ -228,6 +229,29 @@ function normalizeAuditErrorMessage(error) {
  * porque a entrada e um card dentro do hub de Relatorios de Compras, e o
  * breadcrumb nao carrega esse nome sozinho.
  */
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+
+  `obrigatorio` na busca livre: é o único caminho para achar um registro
+  pelo que a pessoa lembra dele. Mesma família da coluna de identidade
+  travada da TabelaPadrao — aparece na lista, marcada e sem desmarcar.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'q', rotulo: 'Busca', obrigatorio: true },
+  { id: 'pedido_id', rotulo: 'Pedido' },
+  { id: 'item_id', rotulo: 'Item' },
+  { id: 'obra_id', rotulo: 'Obra' },
+  { id: 'acao', rotulo: 'Acao' }
+];
+
 export default function RelatoriosAdministrativos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filtros, setFiltros] = useState(() => readFilters(searchParams));
@@ -342,6 +366,48 @@ export default function RelatoriosAdministrativos() {
     obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : []),
     acao: new Set(filtros.acao ? [String(filtros.acao)] : [])
   }), [filtros]);
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => FILTROS_DA_TELA.filter((filtro) => {
+      /* O valor que o SISTEMA propõe não conta como preenchido: se contasse,
+         o padrão revelaria de volta, a cada recarga, exatamente o filtro que
+         a pessoa escondeu. */
+      const padrao = String(DEFAULT_FILTERS[filtro.id] ?? '');
+      const rascunho = String(filtros[filtro.id] ?? '');
+      const emCurso = String(searchParams.get(filtro.id) ?? '');
+      return (rascunho !== '' && rascunho !== padrao) || (emCurso !== '' && emCurso !== padrao);
+    }).map((filtro) => filtro.id),
+    [filtros, searchParams]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:relatorios-administrativos', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      atualizarFiltro(id, DEFAULT_FILTERS[id] ?? '');
+      // A consulta em curso mora na URL: sem tirar a chave dali, o recorte
+      // seguiria valendo com o campo já fora da faixa.
+      if (searchParams.get(id)) {
+        const proximos = new URLSearchParams(searchParams);
+        proximos.delete(id);
+        setSearchParams(proximos);
+      }
+    }
+  });
 
   function atualizarFiltro(campo, valor) {
     setFiltros((atual) => ({ ...atual, [campo]: valor }));
@@ -402,11 +468,11 @@ export default function RelatoriosAdministrativos() {
           `campos`; obra e acao ficam na marcacao.
         */}
         <BarraFiltros
-          busca={{
+          busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => atualizarFiltro('q', valor),
             placeholder: 'Pedido, item, obra, usuario ou descricao'
-          }}
+          } : null}
           campos={[
             {
               id: 'pedido_id',
@@ -422,13 +488,14 @@ export default function RelatoriosAdministrativos() {
               valor: filtros.item_id,
               aoMudar: (valor) => atualizarFiltro('item_id', valor)
             }
-          ]}
-          filtros={dimensoes}
+          ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
+          filtros={dimensoes.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
           aoAlternar={alternarFiltro}
           /* R16: UM dono para "limpar" — o botao do cabecalho. O "Limpar
              tudo" da barra seria o segundo, com o mesmo efeito. As etiquetas
              seguem removiveis uma a uma (F3). */
+          visibilidade={visibilidadeFiltros}
         />
       </BlocoConteudo>
 

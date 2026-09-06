@@ -25,7 +25,8 @@ import {
   BarraFiltros,
   Paginacao,
   Avisos,
-  useAvisos
+  useAvisos,
+  useFiltrosVisiveis
 } from '../../../components/padrao';
 import StatusBadge from '../../../components/StatusBadge';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -258,6 +259,28 @@ function eventFields(event) {
     .filter((field) => !contextualFields.has(field));
 }
 
+/*
+  QUAIS FILTROS APARECEM (N53) — a declaração desta tela para o painel
+  único de `PainelFiltrosVisiveis`, no molde do painel "Colunas" da
+  TabelaPadrao.
+
+  NENHUM `padrao: false`: todos os filtros continuam VISÍVEIS na primeira
+  abertura. Só três telas têm conjunto inicial reduzido, e é o que o
+  cliente aprovou nelas — aqui o seletor apenas passa a EXISTIR, para quem
+  quiser mexer. Esconder por padrão mudaria o que a pessoa vê sem ela ter
+  pedido.
+*/
+const FILTROS_DA_TELA = [
+  { id: 'data_inicio', rotulo: 'De' },
+  { id: 'data_fim', rotulo: 'Ate' },
+  { id: 'usuario_id', rotulo: 'Usuario' },
+  { id: 'setor_id', rotulo: 'Setor' },
+  { id: 'modulo', rotulo: 'Modulo' },
+  { id: 'categoria', rotulo: 'Categoria' },
+  { id: 'tipo_evento', rotulo: 'Evento' },
+  { id: 'resultado', rotulo: 'Resultado' }
+];
+
 export default function AuditoriaOperacional() {
   const { user } = useAuth();
   const { avisos, avisar, fechar } = useAvisos();
@@ -274,6 +297,50 @@ export default function AuditoriaOperacional() {
   const [selectedUser, setSelectedUser] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  /*
+    N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
+    ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
+    vez de apagar, porque o recorte foi o usuário que montou.
+  */
+  const filtrosPreenchidos = useMemo(
+    () => {
+      /* O que o SISTEMA propõe (o período de hoje) NÃO conta como
+         preenchido: se contasse, o padrão revelaria de volta, a cada
+         abertura, exatamente o filtro que a pessoa escondeu. */
+      const padroes = initialFilters();
+      return FILTROS_DA_TELA.filter((filtro) => {
+        const padrao = String(padroes[filtro.id] ?? '');
+        const rascunho = String(filters[filtro.id] ?? '');
+        const emCurso = String(applied[filtro.id] ?? '');
+        return (rascunho !== '' && rascunho !== padrao)
+          || (emCurso !== '' && emCurso !== padrao);
+      }).map((filtro) => filtro.id);
+    },
+    [filters, applied]
+  );
+  /*
+    A escolha mora na MESMA chave de lista que esta tela já usa na
+    TabelaPadrao: é a mesma lista respondendo a duas perguntas (quais
+    colunas, quais filtros), e o `PreferenciasContext` separa as duas pelo
+    TIPO. Sem `legado`: esta faixa nunca gravou a escolha em lugar nenhum,
+    então não há chave antiga de onde migrar.
+  */
+  const visibilidadeFiltros = useFiltrosVisiveis('tabela:auditoria-operacional', FILTROS_DA_TELA, {
+    preenchidos: filtrosPreenchidos,
+    /*
+      Contrato 1 do painel: esconder LIMPA o valor. Filtro fora da faixa que
+      continuasse recortando a lista seria critério invisível — a pessoa lê a
+      contagem e conclui que é o conjunto inteiro.
+    */
+    aoEsconder: (id) => {
+      /* O recorte EM CURSO é o `applied` — é ele que a consulta usa.
+         Limpar só o rascunho deixaria a lista recortada por um critério
+         que já não está em lugar nenhum da tela. */
+      setFilters((atual) => ({ ...atual, [id]: '' }));
+      setApplied((atual) => ({ ...atual, [id]: '' }));
+      setPage(1);
+    }
+  });
 
   const query = useMemo(() => ({ ...applied, usuario_id: selectedUser || applied.usuario_id || '', page, limit: 30 }), [applied, page, selectedUser]);
 
@@ -465,11 +532,12 @@ export default function AuditoriaOperacional() {
               valor: filters.data_fim,
               aoMudar: (valor) => setFilters((old) => ({ ...old, data_fim: valor }))
             }
-          ]}
-          filtros={dimensoesFiltro}
+          ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
+          filtros={dimensoesFiltro.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={filtrosAtivos}
           aoAlternar={alternarDimensao}
           aoLimpar={clearFilters}
+          visibilidade={visibilidadeFiltros}
         />
       </BlocoConteudo>
 
