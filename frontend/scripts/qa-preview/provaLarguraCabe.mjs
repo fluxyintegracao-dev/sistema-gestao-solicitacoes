@@ -29,14 +29,36 @@
  * teste verde — foi exatamente o que aconteceu em 02 e 03/09, três vezes.
  *
  * ----------------------------------------------------------------------------
- * A MORDIDA. O cenário `pixel absoluto` guarda a MESMA largura no formato
- * ANTIGO (pixel, no espelho `:v3`, sem proporção e sem a carga do banco) e a
- * prova EXIGE que a medição reprove. Se ela não reprovar, esta prova não
- * está medindo nada — e é isso que o relatório precisa dizer.
+ * A FIDELIDADE DO ARRASTO — o que faltava aqui até 06/09 (tarde).
+ *
+ * Esta prova media que a largura PERSISTE e que a tabela CABE. Não media que
+ * arrastar N pixels move a coluna N pixels. Foi preciso a matriz real contra
+ * o preview para achar a falta: quatro telas reprovaram o T3 com "coluna
+ * arrastada mudou 99px (esperado ~64px)" — e, medido aqui, o número muda a
+ * cada corrida (116, 133, −99, 97 numa; 99, 0, 180, 97 na anterior), porque
+ * não é um fator, é um LAÇO. A razão está escrita em `ResizableTable.jsx`,
+ * em "A RÉGUA NUNCA CRESCE ALÉM DA RÉGUA GRAVADA".
+ *
+ * O que o laço precisa para existir, e por que a fixture antiga não o via:
+ * um contêiner de rolagem que ACOMPANHA a tabela em vez de contê-la. É o que
+ * o `BlocosPersonalizaveis` produz — e as quatro telas reprovadas são
+ * exatamente as que montam a página com ele e têm poucas colunas fixas. Daí
+ * `?arranjo=blocos` e `?forma=estreita` na fixture: os dois eixos que
+ * separam a montagem que passava da montagem que reprovava.
+ *
+ * ----------------------------------------------------------------------------
+ * AS DUAS MORDIDAS. A primeira (`pixel absoluto`) guarda a MESMA largura no
+ * formato ANTIGO (pixel, no espelho `:v3`, sem proporção e sem a carga do
+ * banco) e a prova EXIGE que a medição reprove. A segunda planta a
+ * AMPLIFICAÇÃO de volta — o mesmo componente, com o teto da régua removido —
+ * e exige que a medida de fidelidade reprove. Se qualquer uma não reprovar,
+ * esta prova não está medindo nada — e é isso que o relatório precisa dizer.
  *
  * Rode com `npm run provas` ou `node scripts/qa-preview/provaLarguraCabe.mjs`.
  */
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { criarServidorDeFixture } from './servidorCamadas.mjs';
 
@@ -51,9 +73,85 @@ const ESTREITA = { width: 1366, height: 900 };
    legítima, e o que o T3 protege). */
 const ARRASTO = 130;
 
+/* A MESMA tolerância que o harness usa no T3 (`Math.abs(delta - 64) > 12`).
+   Não é número novo: é o critério que já reprova as telas lá fora, trazido
+   para cá para a prova falhar ANTES da matriz, não depois. */
+const TOLERANCIA_ARRASTO = 12;
+
+/* O celular: a `TabelaPadrao` vira CARDS abaixo de 768px e não existe alça
+   para arrastar. A prova mede as três larguras do harness e diz isso em
+   voz alta — pular em silêncio é como não ter medido. */
+const CELULAR = { width: 390, height: 844 };
+
+/*
+  OS ARRANJOS QUE A MATRIZ SEPAROU.
+
+  `arranjo=bloco` é a montagem que esta prova já cobria: o cartão dentro da
+  `Pagina`, com contêiner de rolagem de largura FIXA. `arranjo=blocos` é a
+  montagem das quatro telas reprovadas (`BlocosPersonalizaveis`), em que o
+  contêiner ACOMPANHA a tabela. `forma=estreita` é a tabela de duas colunas
+  da `sst-producao` — as colunas fixas somam 132px, o menor denominador do
+  sistema, e por isso a maior amplificação medida.
+*/
+const CASOS_DE_FIDELIDADE = [
+  ['arranjo em cartão, 6 colunas  (controle)', '?forma=padrao&arranjo=bloco', LARGA],
+  ['BlocosPersonalizaveis, 6 colunas', '?forma=padrao&arranjo=blocos', LARGA],
+  ['BlocosPersonalizaveis, 2 colunas', '?forma=estreita&arranjo=blocos', LARGA],
+  ['BlocosPersonalizaveis, 2 colunas, janela estreita', '?forma=estreita&arranjo=blocos', ESTREITA]
+];
+
 const CSS_FIXTURE = `
   body { margin: 0; }
 `;
+
+const AQUI = path.dirname(fileURLToPath(import.meta.url));
+const COMPONENTE = path.join(AQUI, '..', '..', 'src', 'components', 'ResizableTable.jsx');
+
+/*
+  A MORDIDA DA RÉGUA — planta a amplificação de volta, NO COMPONENTE REAL.
+
+  Não dá para plantar este defeito por dado, como a mordida do pixel
+  absoluto: o commit do arrasto regrava a régua a cada movimento do
+  ponteiro, então qualquer régua semeada pela query morre no primeiro
+  `pointermove`. O que se planta, então, é a linha: o teto
+  `Math.min(largura de agora, régua gravada)` volta a ser a largura de
+  agora — que é EXATAMENTE o código de antes do conserto.
+
+  O arquivo fica trocado só enquanto o esbuild lê o pacote (a
+  `criarServidorDeFixture` empacota de forma síncrona ali dentro e serve o
+  texto de memória depois). Restaurar vai no `finally` E num `process.on
+  ('exit')`: prova que deixa `src/` plantado é pior que prova nenhuma.
+*/
+const COM_TETO_DE_REGUA = [
+  '  const regua = conteinerDeReferencia > 0',
+  '    ? Math.min(larguraContainer, conteinerDeReferencia)',
+  '    : larguraContainer;'
+].join('\n');
+const SEM_TETO_DE_REGUA = '  const regua = larguraContainer;';
+
+async function servidorComAmplificacaoPlantada() {
+  const original = fs.readFileSync(COMPONENTE, 'utf8');
+  if (!original.includes(COM_TETO_DE_REGUA)) {
+    throw new Error('a mordida não achou o teto da régua em ResizableTable.jsx — '
+      + 'o conserto mudou de forma e esta mordida precisa ser reescrita, não removida');
+  }
+  const restaurar = () => {
+    try {
+      if (fs.readFileSync(COMPONENTE, 'utf8') !== original) fs.writeFileSync(COMPONENTE, original);
+    } catch (_) { /* nada a fazer no caminho de saída */ }
+  };
+  process.on('exit', restaurar);
+  try {
+    fs.writeFileSync(COMPONENTE, original.replace(COM_TETO_DE_REGUA, SEM_TETO_DE_REGUA));
+    return await criarServidorDeFixture({
+      entrada: 'fixtureLarguras.jsx',
+      cssExtra: CSS_FIXTURE,
+      caminho: 'larguras-mordida'
+    });
+  } finally {
+    restaurar();
+  }
+}
 
 let falhas = 0;
 const registrar = (ok, texto) => {
@@ -142,6 +240,16 @@ async function abrir(navegador, servidor, busca, viewport) {
   return { contexto, pagina, erros };
 }
 
+/* Em 390 não há `.resizable-table` para esperar — a espera do `abrir`
+   estouraria por 15s antes de a prova poder dizer o que mediu. */
+async function abrir390(navegador, servidor, busca) {
+  const contexto = await navegador.newContext({ viewport: CELULAR });
+  const pagina = await contexto.newPage();
+  await pagina.goto(servidor.rota(busca), { waitUntil: 'domcontentloaded' });
+  await pagina.waitForTimeout(900);
+  return { contexto, pagina };
+}
+
 async function arrastar(pagina, delta) {
   const alca = pagina.locator('.resizable-table thead th').first().locator('.resizable-th-handle');
   const caixa = await alca.boundingBox();
@@ -153,6 +261,22 @@ async function arrastar(pagina, delta) {
   await pagina.mouse.move(x + delta, y, { steps: 8 });
   await pagina.mouse.up();
   await pagina.waitForTimeout(400);
+}
+
+/*
+  UMA MEDIDA DE FIDELIDADE: abre, mede, arrasta, mede de novo.
+
+  O que ela devolve é a única pergunta que faltava aqui — a coluna andou o
+  que o ponteiro andou? — mais o registro guardado, para o passo seguinte
+  poder REABRIR a mesma preferência e cobrar que ela sobreviveu.
+*/
+async function medirFidelidade(navegador, servidor, busca, viewport) {
+  const { contexto, pagina } = await abrir(navegador, servidor, busca, viewport);
+  const antes = await pagina.evaluate(medir);
+  await arrastar(pagina, ARRASTO);
+  const depois = await pagina.evaluate(medir);
+  await contexto.close();
+  return { antes, depois, andou: depois.nome - antes.nome, guardado: JSON.parse(depois.guardado || '{}') };
 }
 
 async function main() {
@@ -268,6 +392,93 @@ async function main() {
           ? ` · a medição ACUSA, como tem de acusar`
           : ' · NÃO ACUSOU, e devia: esta prova não está medindo nada'));
       await contexto.close();
+    }
+    /* ---------------------------------------------------------------- 6 --
+       FIDELIDADE DO ARRASTO — o que a matriz achou e esta prova não pegava.
+       Arrastar N pixels tem de mover a coluna N pixels, nos DOIS arranjos e
+       nas duas janelas. É aqui que as quatro telas reprovadas moram. */
+    console.log('\n— 6. fidelidade: arrastar N px move N px (o que a matriz achou) —');
+    let ajusteEmBlocos = null;
+    for (const [rotulo, busca, viewport] of CASOS_DE_FIDELIDADE) {
+      const m = await medirFidelidade(navegador, servidor, busca, viewport);
+      const erro = m.andou - ARRASTO;
+      registrar(Math.abs(erro) <= TOLERANCIA_ARRASTO,
+        `${rotulo} @${viewport.width} :: arrastei +${ARRASTO}px e a coluna andou ${m.andou >= 0 ? '+' : ''}${m.andou}px`
+        + ` (erro ${erro >= 0 ? '+' : ''}${erro}px) · contêiner ${m.antes.conteiner} → ${m.depois.conteiner}px`
+        + (Math.abs(erro) <= TOLERANCIA_ARRASTO ? '' : ' — é a AMPLIFICAÇÃO: a fração se realimenta pelo contêiner'));
+      if (busca === '?forma=estreita&arranjo=blocos' && viewport === LARGA) ajusteEmBlocos = m;
+    }
+
+    /* ---------------------------------------------------------------- 6b -
+       E o arrasto SOBREVIVE à recarga no mesmo arranjo. O T3 do harness
+       mede as duas coisas, e a segunda foi a que a `sst-producao` também
+       reprovou ("largura não persistiu ao recarregar"). */
+    console.log('\n— 6b. o mesmo arrasto reabre com a mesma largura (T3, arranjo em blocos) —');
+    const propBlocos = ajusteEmBlocos?.guardado?.colunas?.nome;
+    const refBlocos = ajusteEmBlocos?.guardado?.conteiner;
+    const pxBlocos = ajusteEmBlocos?.depois?.nome;
+    {
+      const busca = `?forma=estreita&arranjo=blocos&prop=nome:${propBlocos}&ref=${refBlocos}`;
+      const { contexto, pagina } = await abrir(navegador, servidor, busca, LARGA);
+      const m = await pagina.evaluate(medir);
+      const diferenca = m.nome - pxBlocos;
+      registrar(Math.abs(diferenca) <= TOLERANCIA_ARRASTO,
+        `reabrir na janela em que ajustou :: NOME volta com ${m.nome}px contra ${pxBlocos}px arrastados`
+        + ` (${diferenca >= 0 ? '+' : ''}${diferenca}px) · ${resumo(m)}`);
+      await contexto.close();
+    }
+
+    /* ---------------------------------------------------------------- 6c -
+       NÃO-REGRESSÃO DA DECISÃO DO CLIENTE, no arranjo novo: ajustou em 1920,
+       abre em 1366 e CABE. O teto da régua não pode ter comprado a
+       fidelidade do arrasto às custas disto. */
+    console.log('\n— 6c. ajustado em 1920, aberto em 1366: continua cabendo —');
+    {
+      const busca = `?forma=estreita&arranjo=blocos&prop=nome:${propBlocos}&ref=${refBlocos}`;
+      const { contexto, pagina } = await abrir(navegador, servidor, busca, ESTREITA);
+      const m = await pagina.evaluate(medir);
+      const c = avaliarCabimento(m);
+      registrar(c.cabe, `proporção ${Number(propBlocos).toFixed(4)} medida num contêiner de ${refBlocos}px`
+        + ` :: ${resumo(m)} — ${c.texto}`);
+      await contexto.close();
+    }
+
+    /* ---------------------------------------------------------------- 7 --
+       A TERCEIRA LARGURA DO HARNESS. Em 390 a `TabelaPadrao` vira cards: não
+       há tabela nem alça, então não há arrasto a amplificar. A prova mede e
+       DIZ — se um dia a tabela voltar a aparecer no celular, este item vira
+       vermelho e alguém decide de propósito. */
+    console.log('\n— 7. a terceira largura do harness (390) —');
+    {
+      const { contexto, pagina } = await abrir390(navegador, servidor, '?forma=estreita&arranjo=blocos');
+      const tem = await pagina.evaluate(() => ({
+        tabela: Boolean(document.querySelector('.resizable-table')),
+        alca: document.querySelectorAll('.resizable-th-handle').length
+      }));
+      registrar(!tem.tabela && tem.alca === 0,
+        `em 390px não há tabela nem alça para arrastar :: tabela no DOM: ${tem.tabela ? 'SIM' : 'não'},`
+        + ` alças: ${tem.alca} — a lista é de cards, e não existe largura de coluna para amplificar`);
+      await contexto.close();
+    }
+
+    /* ---------------------------------------------------------------- 8 --
+       A MORDIDA DA AMPLIFICAÇÃO. O MESMO componente, com o teto da régua
+       removido — o código de antes do conserto. A medida de fidelidade TEM
+       de reprovar; se não reprovar, o passo 6 não está medindo nada. */
+    console.log('\n— 8. mordida: a amplificação plantada de volta —');
+    {
+      const plantado = await servidorComAmplificacaoPlantada();
+      try {
+        const m = await medirFidelidade(navegador, plantado, '?forma=estreita&arranjo=blocos', LARGA);
+        const erro = m.andou - ARRASTO;
+        const acusou = Math.abs(erro) > TOLERANCIA_ARRASTO;
+        registrar(acusou, `sem o teto da régua, +${ARRASTO}px de arrasto moveram ${m.andou >= 0 ? '+' : ''}${m.andou}px`
+          + ` (erro ${erro >= 0 ? '+' : ''}${erro}px) · contêiner ${m.antes.conteiner} → ${m.depois.conteiner}px`
+          + (acusou ? ' · a medição ACUSA, como tem de acusar'
+            : ' · NÃO ACUSOU, e devia: a medida de fidelidade não está medindo nada'));
+      } finally {
+        plantado.fechar();
+      }
     }
   } finally {
     await navegador.close();

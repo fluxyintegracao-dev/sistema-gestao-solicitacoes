@@ -321,6 +321,68 @@ export function ResizableTable({
   }, []);
 
   /*
+    A RÉGUA NUNCA CRESCE ALÉM DA RÉGUA GRAVADA — e é isto que impede a
+    fração de se realimentar.
+
+    DEFEITO MEDIDO EM 06/09, no preview, com o arrasto instrumentado
+    passo a passo (`sst-rel-operacional`, `sst-observabilidade`,
+    `sst-producao`, `provisoes-rel-operacional`): arrastar 64px movia a
+    coluna 116px, 133px, −99px, 97px — cada corrida um número diferente,
+    porque não é um fator, é um LAÇO.
+
+    O laço: em página montada com `BlocosPersonalizaveis`, a largura da
+    tabela empurra a página e o `.resizable-table-scroll` CRESCE junto —
+    medido: contêiner 1793 → 1806 → 1829 → 1887 → 1897 durante um único
+    arrasto, com `clientWidth === scrollWidth === largura da tabela` o
+    tempo todo. Ali o contêiner não é uma janela, é o próprio conteúdo.
+    Com a largura em PIXEL isso era inofensivo (o pixel não relê nada);
+    com a largura em FRAÇÃO, cada quadro reconverte `fração × contêiner`,
+    o resultado alarga a tabela, a tabela alarga o contêiner, e o quadro
+    seguinte reconverte contra um denominador maior. Confirmado à mão em
+    cada passo: 1360/1793 × 1806 = 1369 (medido 1369); 1376/1806 × 1829 =
+    1393 (medido 1392); 1408/1829 × 1887 = 1452 (medido 1450).
+
+    O ganho por volta é `alvo/régua` (≈0,77 ali), então a série converge —
+    mas para `+64 · alvo/(régua − alvo)` acima do arrasto, que com as
+    colunas fixas somando só 132px (a `sst-producao`) passa de 300px. E
+    como cada movimento do ponteiro reancora a fração, quantas voltas o
+    navegador dá entre dois movimentos é TEMPO — daí os números
+    irreproduzíveis, inclusive o negativo.
+
+    O CORTE: a régua gravada junto com a fração (`conteiner`) é o teto do
+    denominador. A fração passa a valer contra `min(contêiner de agora,
+    régua gravada)`. Não é um segundo cálculo de largura ao lado do que
+    existe — é o MESMO denominador, com o teto que ele sempre precisou
+    ter, e o laço morre porque o contêiner inflado pela nossa própria
+    tabela deixa de contar.
+
+    O que NÃO muda, e é o que a decisão do cliente exige: janela MENOR
+    que a régua continua encolhendo a coluna exatamente como antes
+    (`min` devolve o contêiner de agora), e o teto de `devolverExcesso`
+    segue medindo contra o contêiner REAL — "a tabela abrir certa em
+    qualquer tela" não perde nada aqui.
+
+    O que muda: numa janela MAIOR que a régua a coluna para de crescer
+    junto e fica no pixel que a pessoa arrastou. É o lado seguro do
+    mesmo trade que o cliente já aceitou ("ajuste fino vale menos"), e é
+    a única forma de a reconversão ser idempotente numa página cujo
+    contêiner acompanha o conteúdo.
+
+    E ela mora AQUI, fora do `useMemo`, porque quem GRAVA precisa da mesma
+    régua de quem LÊ. A primeira versão deste conserto capava só a leitura e
+    seguia gravando `conteiner: larguraContainer`: no arranjo em blocos o
+    arrasto ficava fiel na tela e a régua ia para o banco já inflada
+    (1895px em vez de 1793px), então a recarga lia "janela menor", o teto
+    de `devolverExcesso` entrava e devolvia o arrasto INTEIRO — 1779px
+    voltando a 1649px. É a regressão das 16 telas de 03/09 por outra porta,
+    e foi o passo 6b da `provaLarguraCabe` que a pegou antes da matriz.
+    Uma régua só, para os dois lados.
+  */
+  const regua = conteinerDeReferencia > 0
+    ? Math.min(larguraContainer, conteinerDeReferencia)
+    : larguraContainer;
+
+  /*
     AS LARGURAS EM PIXEL, DERIVADAS — não há estado espelhando estado.
 
     A versão anterior guardava as larguras num `useState` e um efeito de
@@ -338,6 +400,7 @@ export function ResizableTable({
     const daProporcao = new Set();
     const propostaPorColuna = {};
 
+
     normalizedColumns.forEach((column) => {
       const key = getColumnKey(column);
       const minimo = Number(column.minWidth || minColumnWidth);
@@ -351,9 +414,9 @@ export function ResizableTable({
         // Enquanto o contêiner não foi medido não há denominador: a coluna
         // JÁ é do usuário (senão o cálculo a levaria), mas desenha com o
         // pixel do espelho, ou com a proposta, até a primeira medição.
-        if (larguraContainer > 0) {
+        if (regua > 0) {
           daProporcao.add(key);
-          mapa[key] = Math.max(minimo, Math.round(proporcao * larguraContainer));
+          mapa[key] = Math.max(minimo, Math.round(proporcao * regua));
           return;
         }
       }
@@ -402,6 +465,7 @@ export function ResizableTable({
     conteinerDeReferencia,
     pixelDoEspelho,
     larguraContainer,
+    regua,
     minColumnWidth
   ]);
 
@@ -473,14 +537,15 @@ export function ResizableTable({
     const comTeto = devolverExcesso(larguras, new Set(pendentes), propostas, larguraContainer);
     const colunas = { ...proporcoes };
     pendentes.forEach((key) => {
-      colunas[key] = Math.max(1, Number(comTeto[key] || 0)) / larguraContainer;
+      colunas[key] = Math.max(1, Number(comTeto[key] || 0)) / regua;
     });
-    definirGuardado({ colunas, conteiner: larguraContainer });
+    definirGuardado({ colunas, conteiner: regua });
   }, [
     storageKey,
     pronto,
     erro,
     larguraContainer,
+    regua,
     normalizedColumns,
     proporcoes,
     pixelDoEspelho,
@@ -506,11 +571,14 @@ export function ResizableTable({
   /*
     O COMMIT DE UM AJUSTE DO USUÁRIO — arrasto ou seta do teclado.
 
-    Ele grava PROPORÇÃO, nunca pixel: `px / largura do contêiner`. O
-    `PreferenciasContext` cuida do resto (memória agora, banco em 700ms), e
-    o espelho em pixel sai do efeito acima, a partir da largura efetiva.
+    Ele grava PROPORÇÃO, nunca pixel: `px / régua`. E a régua é a MESMA que
+    a leitura usa (`min(contêiner de agora, régua gravada)`), não o
+    contêiner cru — a razão está em "A RÉGUA NUNCA CRESCE ALÉM DA RÉGUA
+    GRAVADA", acima. O `PreferenciasContext` cuida do resto (memória agora,
+    banco em 700ms), e o espelho em pixel sai do efeito acima, a partir da
+    largura efetiva.
 
-    Sem contêiner medido não há denominador — aí o ajuste fica em pixel
+    Sem régua medida não há denominador — aí o ajuste fica em pixel
     local, e a migração o converte assim que houver medida. É caminho de
     borda (o contêiner é medido no mesmo quadro da montagem), mas perder o
     arrasto por causa dele seria a regressão do T3 de novo.
@@ -520,13 +588,18 @@ export function ResizableTable({
     if (!column) return;
     const minimo = Number(column.minWidth || minColumnWidth);
     const alvo = Math.max(minimo, Math.round(px));
-    if (larguraContainer > 0) {
+    if (regua > 0) {
       /*
-        A RÉGUA É REGRAVADA A CADA AJUSTE, e junto com ele: o contêiner de
-        agora passa a ser o contêiner de referência de TODAS as frações
-        desta tabela. É o que mantém o conjunto coerente — frações medidas
-        com réguas diferentes no mesmo registro fariam o teto comparar
-        maçã com laranja.
+        A RÉGUA É REGRAVADA A CADA AJUSTE, e junto com ele: a régua de
+        agora passa a ser a referência de TODAS as frações desta tabela. É
+        o que mantém o conjunto coerente — frações medidas com réguas
+        diferentes no mesmo registro fariam o teto comparar maçã com
+        laranja.
+
+        E é a régua CAPADA que vai para o banco, não o contêiner cru:
+        numa página cujo contêiner acompanha a tabela, gravar o cru manda
+        para o banco uma régua que a própria tabela inflou, e a recarga
+        seguinte lê "janela menor" e devolve o arrasto inteiro.
 
         Regravar aqui também é o que faz o teto soltar a coluna assim que
         a pessoa ajusta na janela pequena: dali em diante a janela pequena
@@ -535,14 +608,14 @@ export function ResizableTable({
       const colunas = { ...proporcoes };
       Object.keys(colunas).forEach((chave) => {
         const atual = larguras[chave];
-        if (Number.isFinite(atual) && atual > 0) colunas[chave] = atual / larguraContainer;
+        if (Number.isFinite(atual) && atual > 0) colunas[chave] = atual / regua;
       });
-      colunas[columnKey] = alvo / larguraContainer;
-      definirGuardado({ colunas, conteiner: larguraContainer });
+      colunas[columnKey] = alvo / regua;
+      definirGuardado({ colunas, conteiner: regua });
       return;
     }
     setPixelDoEspelho((atual) => ({ ...atual, [columnKey]: alvo }));
-  }, [normalizedColumns, minColumnWidth, larguraContainer, proporcoes, larguras, definirGuardado]);
+  }, [normalizedColumns, minColumnWidth, regua, proporcoes, larguras, definirGuardado]);
 
   /* O ponteiro é ouvido UMA vez, na janela: registrar de novo a cada
      movimento (as dependências mudam a cada pixel arrastado) trocaria os

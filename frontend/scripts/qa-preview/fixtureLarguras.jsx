@@ -49,6 +49,7 @@
 import { useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import BlocoConteudo from '../../src/components/padrao/BlocoConteudo';
+import BlocosPersonalizaveis from '../../src/components/padrao/BlocosPersonalizaveis';
 import Pagina from '../../src/components/padrao/Pagina';
 import TabelaPadrao from '../../src/components/padrao/TabelaPadrao';
 import PreferenciasContext, {
@@ -75,6 +76,25 @@ const PROPORCAO_GUARDADA = pares(params.get('prop'));
 const CONTEINER_DE_REFERENCIA = Number(params.get('ref')) || 0;
 const CARGA_PRONTA = params.get('pronto') === '1';
 
+/*
+  A FORMA DA TABELA E O ARRANJO DA PÁGINA — os dois eixos que separam a
+  fixture que PASSAVA da matriz que REPROVAVA (06/09, medido no preview).
+
+  `?forma=estreita` monta a tabela de DUAS colunas da `sst-producao`: uma
+  de identidade (que recebe a sobra) e um `status` de 132px. É o menor
+  denominador do sistema — as colunas que NÃO são de conteúdo somam 132px,
+  contra 975px da forma padrão daqui — e é ele que decide o tamanho da
+  amplificação medida.
+
+  `?arranjo=blocos` põe a tabela dentro do `BlocosPersonalizaveis`, que é
+  como as quatro telas reprovadas montam a página. Sem ele o contêiner de
+  rolagem é FIXO e o arrasto é fiel; com ele o contêiner ACOMPANHA a
+  tabela, e é essa realimentação que amplifica o arrasto. Os dois modos
+  ficam na mesma fixture de propósito: a diferença entre eles é a medida.
+*/
+const FORMA = params.get('forma') || 'padrao';
+const ARRANJO = params.get('arranjo') || 'bloco';
+
 /* O espelho local é escrito ANTES de a árvore montar — a `ResizableTable` o
    lê de forma síncrona no primeiro render, exatamente como no app. */
 try {
@@ -89,6 +109,13 @@ const COLUNAS = [
   { id: 'status', titulo: 'Status', tipo: 'status', render: (i) => i.status },
   { id: 'admissao', titulo: 'Admissão', tipo: 'data', render: (i) => i.admissao },
   { id: 'salario', titulo: 'Salário', tipo: 'valor', render: (i) => i.salario }
+];
+
+/* A tabela da `sst-producao`: `flag` (identidade, recebe a sobra) e
+   `estado` (status, 132px). Duas colunas, e nada mais. */
+const COLUNAS_ESTREITA = [
+  { id: 'nome', titulo: 'Flag', tipo: 'identidade', noCard: 'titulo', render: (i) => i.nome },
+  { id: 'status', titulo: 'Estado', tipo: 'status', render: (i) => i.status }
 ];
 
 const ITENS = Array.from({ length: 12 }, (_, i) => ({
@@ -136,6 +163,20 @@ function Placar() {
   );
 }
 
+function Tabela() {
+  return (
+    <TabelaPadrao
+      colunas={FORMA === 'estreita' ? COLUNAS_ESTREITA : COLUNAS}
+      itens={ITENS}
+      storageKey={CHAVE}
+      rotuloRolagem="Tabela de pessoal"
+      acoesLinha={FORMA === 'estreita' ? undefined : () => (
+        <button type="button" className="btn btn-outline btn-sm">Editar</button>
+      )}
+    />
+  );
+}
+
 function Tela() {
   return (
     <div className="layout-shell fluxy-app-shell">
@@ -143,17 +184,17 @@ function Tela() {
       <main className="layout-main">
         <div className="layout-content-shell">
           <Pagina>
-            <BlocoConteudo titulo="Pessoal" variante="primario">
-              <TabelaPadrao
-                colunas={COLUNAS}
-                itens={ITENS}
-                storageKey={CHAVE}
-                rotuloRolagem="Tabela de pessoal"
-                acoesLinha={() => (
-                  <button type="button" className="btn btn-outline btn-sm">Editar</button>
-                )}
-              />
-            </BlocoConteudo>
+            {ARRANJO === 'blocos' ? (
+              <BlocosPersonalizaveis chave="blocos:prova-largura" larguraPadrao="total">
+                <BlocoConteudo titulo="Pessoal" variante="primario">
+                  <Tabela />
+                </BlocoConteudo>
+              </BlocosPersonalizaveis>
+            ) : (
+              <BlocoConteudo titulo="Pessoal" variante="primario">
+                <Tabela />
+              </BlocoConteudo>
+            )}
             <Placar />
           </Pagina>
         </div>

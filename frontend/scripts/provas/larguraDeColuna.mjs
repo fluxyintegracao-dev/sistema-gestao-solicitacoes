@@ -11,6 +11,13 @@
  *   2. guarda em `useRef` por mount   → o arrasto sumia a cada recarga;
  *   3. gravar o mapa inteiro          → um arrasto congelava TODAS as colunas.
  *
+ * EM 06/09 (tarde) ELA GANHOU UM QUINTO: a régua tem TETO. A fração vale
+ * contra `min(contêiner de agora, régua gravada)`, e não contra o contêiner
+ * cru — senão, numa página cujo contêiner ACOMPANHA a tabela, cada quadro
+ * reconverte contra um denominador que o quadro anterior alargou e o arrasto
+ * se amplifica sozinho (medido no preview: +64px de arrasto virando 116, 133,
+ * −99 e 97px em quatro telas). A razão longa está em `ResizableTable.jsx`.
+ *
  * EM 06/09 ELA GANHOU UM QUARTO CENÁRIO, e é o da decisão do cliente: a
  * largura deixou de ser guardada em PIXEL e passou a ser guardada como
  * PROPORÇÃO da largura do contêiner, com a régua (o contêiner em que foi
@@ -67,7 +74,18 @@ function devolverExcesso(larguras, ajustaveis, propostas, conteiner) {
   return ajustado;
 }
 
-function criarTabela(chave) {
+/*
+  `conteinerAcompanha` reproduz a montagem das quatro telas que reprovaram o
+  T3 (`BlocosPersonalizaveis`): ali o `.resizable-table-scroll` não contém a
+  tabela, ele CRESCE com ela — medido no preview, `clientWidth ===
+  scrollWidth === largura da tabela` durante todo o arrasto. É a realimentação
+  sem a qual a amplificação não existe.
+
+  `semTetoDeRegua` é a MORDIDA: devolve o denominador ao contêiner cru, que é
+  o código de antes do conserto. Ela é plantada em memória, não em `src/` —
+  mesma disciplina da `filtrosVisiveisMordem`.
+*/
+function criarTabela(chave, opcoes = {}) {
   const estado = { conteiner: 0 };
   const espelho = () => {
     try { return JSON.parse(armazenamento.getItem(`${chave}:v3`) || '{}'); } catch { return {}; }
@@ -79,6 +97,11 @@ function criarTabela(chave) {
     const g = guardado();
     const proporcoes = g?.colunas || {};
     const pixel = espelho();
+    /* A régua: o contêiner de agora, com teto na régua gravada. Uma só, e
+       ela serve tanto à leitura (aqui) quanto à gravação (`arrastar`). */
+    const regua = (!opcoes.semTetoDeRegua && Number(g?.conteiner) > 0)
+      ? Math.min(estado.conteiner, Number(g.conteiner))
+      : estado.conteiner;
     const propostas = {};
     const larguras = {};
     const posse = new Set();
@@ -90,9 +113,9 @@ function criarTabela(chave) {
       propostas[c.id] = proposta;
       if (Number.isFinite(proporcoes[c.id]) && proporcoes[c.id] > 0) {
         posse.add(c.id);
-        if (estado.conteiner > 0) {
+        if (regua > 0) {
           daProporcao.add(c.id);
-          larguras[c.id] = Math.max(minimo, Math.round(proporcoes[c.id] * estado.conteiner));
+          larguras[c.id] = Math.max(minimo, Math.round(proporcoes[c.id] * regua));
           return;
         }
       }
@@ -118,23 +141,55 @@ function criarTabela(chave) {
     if (Object.keys(doUsuario).length) {
       armazenamento.setItem(`${chave}:v3`, JSON.stringify(doUsuario));
     }
-    return { larguras: finais, doUsuario: posse, propostas };
+    return { larguras: finais, doUsuario: posse, propostas, regua };
+  };
+
+  /*
+    O CONTÊINER QUE ACOMPANHA — o assentamento que o navegador faz sozinho.
+
+    Cada quadro: a tabela é medida, o contêiner vira o maior entre a largura
+    que ele tinha e a soma das colunas, e a fração é reconvertida. Oito
+    voltas bastam: com o teto a série é constante já na primeira; sem ele ela
+    converge, mas para longe.
+  */
+  const assentar = (colunas) => {
+    let r = derivar(colunas);
+    if (!opcoes.conteinerAcompanha) return r;
+    const base = estado.conteiner;
+    for (let i = 0; i < 8; i += 1) {
+      const soma = Object.values(r.larguras).reduce((t, px) => t + px, 0);
+      const proximo = Math.max(base, soma);
+      if (proximo === estado.conteiner) break;
+      estado.conteiner = proximo;
+      r = derivar(colunas);
+    }
+    return r;
   };
 
   return {
     abrir(colunas, conteiner) {
       estado.conteiner = conteiner;
-      return derivar(colunas).larguras;
+      return assentar(colunas).larguras;
     },
     arrastar(colunas, id, px) {
       const atual = derivar(colunas);
       const colunasGuardadas = { ...(guardado()?.colunas || {}) };
       Object.keys(colunasGuardadas).forEach((k) => {
-        if (atual.larguras[k] > 0) colunasGuardadas[k] = atual.larguras[k] / estado.conteiner;
+        if (atual.larguras[k] > 0) colunasGuardadas[k] = atual.larguras[k] / atual.regua;
       });
-      colunasGuardadas[id] = px / estado.conteiner;
-      banco[chave] = { colunas: colunasGuardadas, conteiner: estado.conteiner };
-      return derivar(colunas).larguras;
+      colunasGuardadas[id] = px / atual.regua;
+      /* Grava a MESMA régua que a leitura vai usar. Gravar o contêiner cru
+         aqui manda para o banco uma régua inflada pela própria tabela, e a
+         recarga lê "janela menor" e devolve o arrasto inteiro. */
+      banco[chave] = { colunas: colunasGuardadas, conteiner: atual.regua };
+      return assentar(colunas).larguras;
+    },
+    /* O gesto como ele é: a alça anda `delta` pixels a partir da largura de
+       agora. É esta a pergunta que a matriz fez e a prova não fazia. */
+    arrastarDelta(colunas, id, delta) {
+      const partida = derivar(colunas).larguras[id];
+      const finais = this.arrastar(colunas, id, partida + delta);
+      return { partida, chegada: finais[id], andou: finais[id] - partida, larguras: finais };
     },
     /* A migração: pixel legado no espelho, nada no banco. O pixel não diz em
        que janela foi medido, então ele entra COM teto — sempre. */
@@ -145,9 +200,9 @@ function criarTabela(chave) {
       if (!pendentes.length) return atual.larguras;
       const comTeto = devolverExcesso(atual.larguras, new Set(pendentes), atual.propostas, estado.conteiner);
       const colunasGuardadas = { ...(guardado()?.colunas || {}) };
-      pendentes.forEach((id) => { colunasGuardadas[id] = comTeto[id] / estado.conteiner; });
-      banco[chave] = { colunas: colunasGuardadas, conteiner: estado.conteiner };
-      return derivar(colunas).larguras;
+      pendentes.forEach((id) => { colunasGuardadas[id] = comTeto[id] / atual.regua; });
+      banco[chave] = { colunas: colunasGuardadas, conteiner: atual.regua };
+      return assentar(colunas).larguras;
     },
     semearPixel(mapa) { armazenamento.setItem(`${chave}:v3`, JSON.stringify(mapa)); },
     limpar() { armazenamento.removeItem(`${chave}:v3`); delete banco[chave]; },
@@ -275,6 +330,67 @@ conferir('o arrasto sobrevive à recarga na mesma janela (T3)',
   conferirQue('e nenhuma das duas cai abaixo da proposta do componente',
     larguras.nome >= 160 && larguras.salario >= 190,
     `NOME ${larguras.nome}px (proposta 160) · SALÁRIO ${larguras.salario}px (proposta 190)`);
+}
+
+/*
+  9. FIDELIDADE DO ARRASTO — arrastar N pixels move N pixels.
+
+  O caso que a MATRIZ achou e nenhuma prova daqui fazia. A tabela é a da
+  `sst-producao`: duas colunas, as fixas somando 132px — o menor denominador
+  do sistema, e por isso a maior amplificação. O contêiner ACOMPANHA a
+  tabela, como no `BlocosPersonalizaveis`.
+
+  O erro que se cobra é o mesmo do harness (`Math.abs(delta - 64) > 12`):
+  nenhum número novo, o critério que já reprova as telas lá fora.
+*/
+const ARRASTO = 64;
+const TOLERANCIA_ARRASTO = 12;
+const SST_PRODUCAO = [
+  { id: 'flag', width: 1649, minWidth: 160 },
+  { id: 'estado', width: 132 }
+];
+{
+  const t = criarTabela('tabela:prova-fidelidade', { conteinerAcompanha: true });
+  t.limpar();
+  t.abrir(SST_PRODUCAO, 1793);
+  const m = t.arrastarDelta(SST_PRODUCAO, 'flag', ARRASTO);
+  conferirQue('o contêiner que acompanha a tabela não amplifica o arrasto',
+    Math.abs(m.andou - ARRASTO) <= TOLERANCIA_ARRASTO,
+    `arrastei +${ARRASTO}px e a coluna andou ${m.andou >= 0 ? '+' : ''}${m.andou}px`
+    + ` (${m.partida} → ${m.chegada}px), régua gravada ${t.guardado()?.conteiner}px`);
+
+  /* E o arrasto sobrevive à recarga na mesma janela: a régua gravada tem de
+     ser a de 1793, não o contêiner que a própria tabela inflou — senão a
+     recarga lê "janela menor", o teto entra e devolve o arrasto INTEIRO. */
+  const recarga = t.abrir(SST_PRODUCAO, 1793);
+  conferirQue('e ele sobrevive à recarga na mesma janela (T3)',
+    Math.abs(recarga.flag - m.chegada) <= TOLERANCIA_ARRASTO,
+    `${m.chegada}px arrastados → ${recarga.flag}px ao reabrir`);
+
+  /* E a decisão do cliente continua valendo: numa janela menor, cabe. */
+  const menor = t.abrir(SST_PRODUCAO.map((c) => (c.id === 'flag' ? { ...c, width: 1095 } : c)), 1239);
+  const soma = Object.values(menor).reduce((total, px) => total + px, 0);
+  conferirQue('e numa janela menor a tabela ainda abre cabendo',
+    soma <= 1239, `${soma}px em 1239px (FLAG ${menor.flag}px)`);
+}
+
+/*
+  10. A MORDIDA DA AMPLIFICAÇÃO. A mesma tabela, o mesmo contêiner que
+  acompanha, e o denominador de volta ao contêiner cru — o código de antes do
+  conserto. O item 9 TEM de reprovar aqui; se não reprovar, ele não mede nada.
+*/
+{
+  const t = criarTabela('tabela:prova-mordida', { conteinerAcompanha: true, semTetoDeRegua: true });
+  t.limpar();
+  t.abrir(SST_PRODUCAO, 1793);
+  const m = t.arrastarDelta(SST_PRODUCAO, 'flag', ARRASTO);
+  const acusou = Math.abs(m.andou - ARRASTO) > TOLERANCIA_ARRASTO;
+  conferirQue('mordida: sem o teto da régua o arrasto AMPLIFICA e o item 9 reprova',
+    acusou,
+    `arrastei +${ARRASTO}px e a coluna andou ${m.andou >= 0 ? '+' : ''}${m.andou}px`
+    + ` (${m.partida} → ${m.chegada}px)`
+    + (acusou ? ' — a medida ACUSA, como tem de acusar'
+      : ' — NÃO ACUSOU, e devia: o item 9 não está medindo nada'));
 }
 
 console.log(falhas ? `\n[provas] ${falhas} falha(s)` : '\n[provas] largura de coluna: ok');
