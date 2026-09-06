@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 
 function normalizeText(value) {
   return String(value || '')
@@ -24,9 +25,35 @@ export default function ParceiroAutocomplete({
   className = '',
   inputClassName = 'input w-full'
 }) {
+  const campoRef = useRef(null);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+
+  /*
+    A LISTA FECHA AO CLICAR FORA, NAO AO PERDER O FOCO (05/09).
+
+    Saiu o `onBlur` com `setTimeout(120)`. Aquele atraso nao era desenho: era
+    a corrida entre o fechamento por perda de foco e o clique na opcao. E o
+    fechamento por foco nao cobre o uso real — rolar a pagina, clicar num
+    rotulo ou abrir outro painel com o foco preso no campo deixavam a lista
+    aberta por cima do formulario, e o `Esc` so respondia com o foco dentro do
+    input.
+
+    Quem fecha agora e o `useFecharAoSair`: `mousedown`/`touchstart` fora do
+    campo e `Escape` no documento inteiro.
+
+    POR QUE A SELECAO SOBREVIVE: o ref e do `div` que embrulha o input E a
+    lista, entao clicar numa opcao e clique DENTRO — o hook nao fecha nada no
+    `mousedown` e a escolha corre inteira. Alem disso a opcao ja escolhia no
+    proprio `onMouseDown` com `preventDefault()`, que roda antes do listener
+    do documento e ainda impede o input de perder o foco.
+
+    Fechar aqui e so `setOpen(false)`: o efeito de sincronia logo abaixo
+    devolve ao campo o nome do parceiro escolhido (ou limpa, se nao ha
+    selecao) sempre que `open` muda, entao nao sobra texto solto no input.
+  */
+  useFecharAoSair(campoRef, open && !disabled, () => setOpen(false));
 
   const selectedOption = useMemo(
     () => options.find((item) => String(item.id) === String(value || '')),
@@ -121,14 +148,13 @@ export default function ParceiroAutocomplete({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={campoRef} className={`relative ${className}`}>
       {label ? <span className="sol-filter-label app-filter-label">{label}</span> : null}
       <input
         className={inputClassName}
         value={query}
         onChange={handleInputChange}
         onFocus={() => setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}

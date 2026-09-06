@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import { buscarParceiros } from '../../services/parceiros';
 
 function rotuloParceiro(parceiro) {
@@ -28,6 +29,7 @@ export default function ParceiroBuscaRemota({
 }) {
   const inputId = useId();
   const requisicaoRef = useRef(null);
+  const campoRef = useRef(null);
   const [termo, setTermo] = useState('');
   const [resultados, setResultados] = useState([]);
   const [aberto, setAberto] = useState(false);
@@ -75,6 +77,34 @@ export default function ParceiroBuscaRemota({
 
   useEffect(() => () => requisicaoRef.current?.abort(), []);
 
+  const listaVisivel = aberto && !selecionado && Boolean(termo.trim());
+
+  /*
+    A LISTA FECHA AO CLICAR FORA, NAO AO PERDER O FOCO (05/09).
+
+    Saiu o `onBlur` com `setTimeout(140)`. O atraso nao era desenho: a opcao
+    escolhe no `onClick`, que so dispara no `mouseup`, e sem os 140ms o
+    fechamento por perda de foco derrubava a lista antes disso — o clique
+    morria no meio. Em troca, o fechamento por foco nao cobria o uso real:
+    rolar a pagina, clicar num rotulo ou abrir outro painel com o foco preso
+    no campo deixavam a camada aberta, e nao havia `Esc` nenhum aqui.
+
+    Entrou o `useFecharAoSair`: `mousedown`/`touchstart` fora e `Escape` no
+    documento inteiro — o Esc e capacidade NOVA neste campo.
+
+    POR QUE A SELECAO SOBREVIVE, e este e o ponto delicado desta camada
+    porque a escolha e no `onClick`: o ref cobre o `div` que embrulha o input
+    E a lista, entao o `mousedown` sobre a opcao e DENTRO e o hook nao fecha
+    nada — a linha continua montada ate o `mouseup`, e o `onClick` roda. O
+    `onMouseDown` da opcao, que ja existia com `preventDefault()`, segura o
+    foco no input e evita que o navegador mexa na selecao de texto no meio.
+
+    Fechar aqui e so `setAberto(false)`: os efeitos acima ja limpam os
+    resultados e devolvem ao campo o rotulo do parceiro escolhido (ou o campo
+    vazio, se nao ha escolha).
+  */
+  useFecharAoSair(campoRef, listaVisivel, () => setAberto(false));
+
   function selecionar(parceiro) {
     onSelecionar(parceiro);
     setTermo(rotuloParceiro(parceiro));
@@ -84,7 +114,7 @@ export default function ParceiroBuscaRemota({
   }
 
   return (
-    <div className={`relative grid gap-1 text-sm ${className}`}>
+    <div ref={campoRef} className={`relative grid gap-1 text-sm ${className}`}>
       <label htmlFor={inputId}>{label}{obrigatorio ? ' *' : ''}</label>
       <div className="flex min-w-0 gap-2">
         <input
@@ -97,7 +127,6 @@ export default function ParceiroBuscaRemota({
           aria-autocomplete="list"
           required={obrigatorio}
           onFocus={() => setAberto(true)}
-          onBlur={() => window.setTimeout(() => setAberto(false), 140)}
           onChange={(event) => {
             setTermo(event.target.value);
             setAberto(true);
@@ -119,7 +148,7 @@ export default function ParceiroBuscaRemota({
         )}
       </div>
 
-      {aberto && !selecionado && termo.trim() && (
+      {listaVisivel && (
         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-lg">
           {carregando && <div className="px-3 py-2 text-xs text-[var(--c-muted)]">Buscando...</div>}
           {!carregando && erro && <div className="px-3 py-2 text-xs text-red-700">{erro}</div>}

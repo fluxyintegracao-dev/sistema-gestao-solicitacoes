@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 
 function normalize(v) {
   return String(v || '')
@@ -37,6 +38,7 @@ export default function ApropriacaoAutocomplete({
   // Em portal no body, nenhum ancestral consegue recortar — vale para este uso e para qualquer
   // outro lugar que ponha o campo dentro de uma area com rolagem.
   const campoRef = useRef(null);
+  const painelRef = useRef(null);
   const [caixa, setCaixa] = useState(null);
 
   useEffect(() => {
@@ -66,6 +68,33 @@ export default function ApropriacaoAutocomplete({
       setQuery(selectedOption ? optionLabel(selectedOption) : '');
     }
   }, [open, selectedOption]);
+
+  /*
+    A LISTA FECHA AO CLICAR FORA, NAO AO PERDER O FOCO (05/09).
+
+    Era `onBlur` com `setTimeout(150)`: quem fechava a camada era a saida do
+    FOCO, e o atraso existia so para o clique na opcao ganhar a corrida. O
+    preco era um fechamento que nao acompanha o uso real — clicar num rotulo,
+    rolar a pagina ou abrir outro painel com o foco preso no campo NAO fechava,
+    e o Esc so valia enquanto o foco estivesse dentro do input.
+
+    Agora quem fecha e o `useFecharAoSair`: `mousedown`/`touchstart` fora e
+    `Escape` em qualquer lugar do documento.
+
+    POR QUE A SELECAO SOBREVIVE — e aqui sao DOIS motivos, os dois necessarios
+    porque esta lista vive em PORTAL no `body`:
+    1) o hook recebe a LISTA de refs (campo + painel). O painel nao e
+       descendente do campo, entao com um ref so o clique na opcao seria
+       "fora" e a camada fecharia no `mousedown`, antes da escolha;
+    2) a opcao ja escolhe no proprio `onMouseDown` com `preventDefault()` — o
+       React ouve o portal no `body`, que borbulha ANTES do `document` onde o
+       hook escuta, entao `select()` roda primeiro de qualquer forma.
+
+    Fechar aqui e so `setOpen(false)`: o efeito acima ja devolve ao campo o
+    rotulo da opcao selecionada quando `open` vira falso, entao nao fica texto
+    solto de busca no input.
+  */
+  useFecharAoSair([campoRef, painelRef], open && !disabled, () => setOpen(false));
 
   const filteredOptions = useMemo(() => {
     const q = normalize(query.trim());
@@ -120,7 +149,6 @@ export default function ApropriacaoAutocomplete({
         value={query}
         onChange={handleInputChange}
         onFocus={() => setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         onKeyDown={handleKeyDown}
         placeholder={disabled ? disabledPlaceholder : placeholder}
         disabled={disabled}
@@ -133,6 +161,7 @@ export default function ApropriacaoAutocomplete({
 
       {open && !disabled && caixa && typeof document !== 'undefined' && createPortal((
         <div
+          ref={painelRef}
           className="fixed max-h-60 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
           style={{ left: caixa.left, top: caixa.top, width: caixa.width, zIndex: 'var(--z-dropdown-portal, 90)' }}
         >

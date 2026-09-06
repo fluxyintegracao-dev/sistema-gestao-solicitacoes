@@ -380,3 +380,30 @@ salvar. Mas dá para adiantar o que não depende dele.
 
 **O que trava:** os itens 2 e 7 esperam a palavra do cliente. O resto pode
 começar.
+
+---
+
+## O PREVIEW É FIXADO À OUTRA BRANCH — decisão registrada (05/09)
+
+**Medido:** `refactor-dev.jrfluxy.com.br` serve `5433cd3`, que é o HEAD de
+`refactor/frontend` — o commit anterior a esta leva. A documentação do projeto
+confirma que o domínio é **associado a uma branch do Git**, e não ao último
+push de qualquer branch.
+
+**A tensão:** o cliente pediu duas coisas que, com o preview assim, não cabem
+juntas — *"branch nova"* para esta leva, e *"matriz completa em regressão"* no
+preview real ao fim dela. Uma branch nova não é servida pelo preview; logo, a
+matriz não teria o que medir.
+
+**A saída, e por que ela não sacrifica nenhuma das duas:** ao fim da leva,
+`refactor/frontend` **avança para o HEAD desta branch**. Como
+`refactor/preferencias-usuario` nasceu de `refactor/frontend` e só acrescentou
+commits, é avanço direto — sem commit de mesclagem, sem reescrever histórico, e
+a branch da leva continua existindo como o registro dela.
+
+O cliente teve a branch separada durante o desenvolvimento, que era o ponto; e
+a matriz mede o preview real, que é o critério de pronto dele. Reversível: basta
+apontar `refactor/frontend` de volta ao commit anterior.
+
+**Não é decisão de negócio nem remoção de capacidade** — é mecânica de entrega,
+e por isso foi tomada sem interromper a leva, com o motivo registrado aqui.
