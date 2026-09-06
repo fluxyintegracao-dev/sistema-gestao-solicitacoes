@@ -24,12 +24,33 @@ import { useEffect, useRef } from 'react';
 //    sino de notificações (`NotificacoesBell`) já ouvia `touchstart`; a
 //    regra passa a valer para todo painel que usa este hook.
 //
+// 3) SÓ O ESC (06/09, decisão do cliente). Terceiro parâmetro de opções:
+//    `{ apenasEsc: true }` liga o Esc e NÃO liga o clique fora.
+//
+//    Existe para três listas de resultado EM FLUXO — favorecidos da
+//    medição, subitens do planejamento, credores do contrato. Elas não
+//    cobrem nada: empurram o formulário para baixo em vez de flutuar sobre
+//    ele, então não "prendem" a tela como uma camada prende. Medido o
+//    preço de convertê-las por inteiro: clicar em OUTRO CAMPO DO MESMO
+//    FORMULÁRIO passaria a sumir com a lista — e no caso dos credores essa
+//    lista é o ÚNICO caminho para vincular um credor ao contrato. Fechar
+//    por engano no meio do preenchimento é pior que ficar aberta.
+//
+//    Palavras do cliente: "fechar ao clicar fora quebraria o vínculo de
+//    credor, que é o caminho único; o Esc dá saída sem esse risco."
+//
+//    Sem `apenasEsc`, nada muda para os 35 chamadores existentes. E a
+//    opção mora AQUI em vez de virar três `keydown` escritos à mão nas
+//    telas: são três jeitos de posicionar camada que acabaram de virar um,
+//    e não vou abrir um quarto jeito de fechá-las.
+//
 // Nota de implementação: os refs e o `fechar` são lidos por referência
 // viva, então o efeito depende só de `aberto`. Chamador que passe um
 // array literal (`[botaoRef, painelRef]`) ou uma arrow inline como
 // `fechar` NÃO reassina o listener a cada render — e continua sempre
 // enxergando o valor mais novo.
-export function useFecharAoSair(refOuRefs, aberto, fechar) {
+export function useFecharAoSair(refOuRefs, aberto, fechar, opcoes) {
+  const apenasEsc = Boolean(opcoes && opcoes.apenasEsc);
   const refsVivos = useRef(refOuRefs);
   refsVivos.current = refOuRefs;
   const fecharVivo = useRef(fechar);
@@ -51,15 +72,19 @@ export function useFecharAoSair(refOuRefs, aberto, fechar) {
       if (event.key === 'Escape') fecharVivo.current();
     };
 
-    document.addEventListener('mousedown', aoApontar);
-    document.addEventListener('touchstart', aoApontar);
+    if (!apenasEsc) {
+      document.addEventListener('mousedown', aoApontar);
+      document.addEventListener('touchstart', aoApontar);
+    }
     document.addEventListener('keydown', aoTeclar);
     return () => {
-      document.removeEventListener('mousedown', aoApontar);
-      document.removeEventListener('touchstart', aoApontar);
+      if (!apenasEsc) {
+        document.removeEventListener('mousedown', aoApontar);
+        document.removeEventListener('touchstart', aoApontar);
+      }
       document.removeEventListener('keydown', aoTeclar);
     };
-  }, [aberto]);
+  }, [aberto, apenasEsc]);
 }
 
 export default useFecharAoSair;

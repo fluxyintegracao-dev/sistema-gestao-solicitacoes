@@ -7,6 +7,7 @@ import { HiPaperClip } from 'react-icons/hi2';
 import { chavePixPreferencial, formaPagamentoEhBoleto, formaPagamentoEhPix } from '../../utils/formaPagamento';
 import DateInputBR from '../DateInputBR';
 import CadastroRapidoFavorecidoButton from '../solicitacoes/CadastroRapidoFavorecidoButton';
+import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 
 /**
  * Bloco de MEDICAO (wireframe 2), montado dentro da Nova Solicitacao quando o contrato
@@ -98,6 +99,18 @@ export default function BlocoMedicaoContrato({
   const [favorecido, setFavorecido] = useState(null);
   const [buscaFavorecido, setBuscaFavorecido] = useState('');
   const [resultadosFavorecido, setResultadosFavorecido] = useState([]);
+  /*
+    SÓ O ESC (06/09, decisão do cliente — D5).
+
+    Esta lista é de resultado EM FLUXO: não cobre nada, empurra o
+    formulário para baixo. Por isso ela NÃO recebe o fechamento por clique
+    fora que as 35 camadas do sistema receberam. Medido o preço de
+    converter por inteiro: clicar em outro campo do MESMO formulário
+    passaria a sumir com a lista, no meio do preenchimento.
+
+    Palavras do cliente: "o Esc dá saída sem esse risco".
+  */
+  useFecharAoSair(null, resultadosFavorecido.length > 0, () => setResultadosFavorecido([]), { apenasEsc: true });
   const [carregandoFavorecido, setCarregandoFavorecido] = useState(false);
   const [chavePix, setChavePix] = useState('');
   const [contato, setContato] = useState('');

@@ -15,6 +15,7 @@ import {
 import { CelulaDupla, TabelaPadrao } from '../../../components/padrao';
 import CrPlanningImportModal from './CrPlanningImportModal';
 import { COMPETENCIA_ESTADO_LABELS } from '../constants/custosRecebiveis';
+import { useFecharAoSair } from '../../../hooks/useFecharAoSair';
 import {
   consolidarMedicaoCompetencia,
   baixarModeloPlanilhaPlanejamento,
@@ -153,6 +154,18 @@ export default function CrPlanejamentoView({
   const [reopenReason, setReopenReason] = useState('');
   const [decisionExpiry, setDecisionExpiry] = useState(localExpiryDefault);
   const [measurementPickerMacro, setMeasurementPickerMacro] = useState('');
+  /*
+    SÓ O ESC (06/09, decisão do cliente — D5).
+
+    Esta lista é de resultado EM FLUXO: não cobre nada, empurra o
+    formulário para baixo. Por isso ela NÃO recebe o fechamento por clique
+    fora que as 35 camadas do sistema receberam. Medido o preço de
+    converter por inteiro: clicar em outro campo do MESMO formulário
+    passaria a sumir com a lista, no meio do preenchimento.
+
+    Palavras do cliente: "o Esc dá saída sem esse risco".
+  */
+  useFecharAoSair(null, Boolean(measurementPickerMacro), () => setMeasurementPickerMacro(''), { apenasEsc: true });
   const [measurementSearch, setMeasurementSearch] = useState('');
   const [approvedPickerMacro, setApprovedPickerMacro] = useState('');
   const [approvedSearch, setApprovedSearch] = useState('');

@@ -51,6 +51,7 @@ import {
   useFiltrosVisiveis
 } from '../components/padrao';
 import OverlayModal from '../components/ui/OverlayModal';
+import { useFecharAoSair } from '../hooks/useFecharAoSair';
 
 const DESCRICAO_GESTAO = 'Cadastro, importacao e acompanhamento dos contratos por obra.';
 const DESCRICAO_OBRA = 'Acompanhamento dos contratos vinculados as suas obras.';
@@ -177,6 +178,24 @@ export default function GestaoContratos() {
   const [resultadosCredor, setResultadosCredor] = useState([]);
   const [buscaCredorEdicao, setBuscaCredorEdicao] = useState('');
   const [resultadosCredorEdicao, setResultadosCredorEdicao] = useState([]);
+  /*
+    SÓ O ESC (06/09, decisão do cliente — D5).
+
+    Esta lista é de resultado EM FLUXO: não cobre nada, empurra o
+    formulário para baixo. Por isso ela NÃO recebe o fechamento por clique
+    fora que as 35 camadas do sistema receberam. Medido o preço de
+    converter por inteiro: clicar em outro campo do MESMO formulário
+    passaria a sumir com a lista — e aqui ela é o ÚNICO caminho para vincular um credor ao contrato,
+    então fechá-la por engano custa o vínculo.
+
+    Palavras do cliente: "o Esc dá saída sem esse risco".
+  */
+  useFecharAoSair(
+    null,
+    resultadosCredor.length > 0 || resultadosCredorEdicao.length > 0,
+    () => { setResultadosCredor([]); setResultadosCredorEdicao([]); },
+    { apenasEsc: true }
+  );
   /*
     R3/R19 — as 38 caixas do navegador desta tela (33 alert, 4 confirm e 1
     prompt) saem juntas: aviso vira faixa do sistema (`useAvisos`) e

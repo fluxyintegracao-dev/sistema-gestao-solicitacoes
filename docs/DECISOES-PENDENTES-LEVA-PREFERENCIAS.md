@@ -1,4 +1,8 @@
-# Decisões que só o cliente pode tomar — leva de preferências (06/09)
+# Decisões do cliente — leva de preferências (06/09)
+
+> **TODAS RESPONDIDAS EM 06/09.** As respostas dele estão no topo de cada
+> item, com as palavras dele. O corpo de cada decisão continua abaixo, com a
+> medição que a sustentou — é ela que explica por que a resposta é essa.
 
 Lote acumulado durante a leva, em vez de parar a cada item, conforme
 combinado. Cada uma está aqui por um destes motivos: **remove capacidade**,
@@ -10,6 +14,17 @@ Tudo abaixo está **medido**, não estimado. Onde há número, há a medida.
 ---
 
 ## D1 — O espelho em localStorage contraria a letra da sua regra
+
+**RESPOSTA (06/09): MANTER o espelho.** Palavras dele:
+
+> *"A regra que eu escrevi visava a preferência que não acompanha o usuário —
+> não o cache local. O banco manda, o espelho só evita a tela nascer errada."*
+
+**A interpretação que fica registrada:** a regra "nada de preferência em
+localStorage" proíbe o localStorage como **fonte da verdade**, não como cache.
+O teste para saber se uma escrita local é permitida passa a ser um só: *a
+configuração acompanha o usuário para outra máquina?* Se sim, o espelho é
+cache e pode existir. Se não, é o defeito que a leva veio matar.
 
 **Motivo:** duas decisões suas se contradizem.
 
@@ -44,6 +59,11 @@ listas diferentes conforme a máquina"*, e isso acabou.
 
 ## D2 — Largura de coluna: ainda não foi para o banco, e a escolha é sua
 
+**RESPOSTA (06/09): opção (a) — PROPORÇÃO em vez de pixel.** Palavras dele:
+
+> *"Ajuste fino de coluna vale menos que a tabela abrir certa em qualquer tela
+> — e o caso de 1805px num contêiner de 1239px é o que eu quero evitar."*
+
 **Motivo:** as três saídas mudam o que você vê.
 
 A largura ficou de fora da migração, de propósito. Ela é guardada em **pixel
@@ -74,6 +94,12 @@ nem a ver coluna fora do cartão.
 
 ## D3 — Conjunto inicial reduzido de filtros: só 3 telas têm, e o resto?
 
+**RESPOSTA (06/09): deixar como está por ora.** Palavras dele:
+
+> *"Quando eu terminar de testar, digo se quero estender e em quais telas."*
+
+Nenhuma tela nova esconde filtro por padrão. O seletor continua em todas.
+
 **Motivo:** muda comportamento percebido (filtro some sem a pessoa pedir).
 
 Você aprovou o conjunto inicial reduzido para **3 telas em 5 endereços** (as
@@ -93,6 +119,18 @@ com as de títulos.
 ---
 
 ## D4 — O verificador grava preferência no banco de desenvolvimento
+
+**RESPOSTA (06/09): ACEITAR.** Palavras dele:
+
+> *"Escrever na linha de preferência do próprio usuário de QA não é escrever no
+> ambiente compartilhado no sentido que eu quis dizer — o que eu queria evitar
+> era criar registro de negócio. Com a restauração obrigatória e a reprovação se
+> falhar, está resolvido."*
+
+**A interpretação que fica registrada:** "somente navegação e leitura" protege
+**registro de negócio**. Preferência de interface do próprio usuário de QA,
+restaurada no fim e com falha de restauração reprovando o item, está dentro da
+regra.
 
 **Motivo:** duas decisões suas se contradizem.
 
@@ -119,6 +157,11 @@ verificada só à mão, por você, no caderno de teste.
 ---
 
 ## D5 — Três listas que não fecham ao clicar fora, e converter muda o que você vê
+
+**RESPOSTA (06/09): opção (b) — SÓ o Esc nas três.** Palavras dele:
+
+> *"Fechar ao clicar fora quebraria o vínculo de credor, que é o caminho único;
+> o Esc dá saída sem esse risco."*
 
 **Motivo:** muda comportamento percebido.
 
@@ -147,6 +190,11 @@ visível. Não converti nenhuma das duas formas sem sua palavra.
 ---
 
 ## D6 — Nenhuma regra estática pega a armadilha que mata a seleção
+
+**RESPOSTA (06/09): registrado; manter a conferência humana.** Palavras dele:
+
+> *"Entendi o que o verde vale ali. Mantenha a conferência humana como está e,
+> se algum dia houver como provar isso automaticamente, me traga."*
 
 **Motivo:** não é decisão sua, é aviso — mas você precisa saber, porque muda o
 quanto o portão verde vale.
