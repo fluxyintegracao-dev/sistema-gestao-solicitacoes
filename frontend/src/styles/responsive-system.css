@@ -339,7 +339,7 @@ body {
   }
 
   .topbar-title {
-    font-size: clamp(1rem, 5vw, 1.25rem);
+    font-size: var(--fonte-bloco);
   }
 
   .topbar-menu-button,

@@ -72,7 +72,7 @@ export default class AppErrorBoundary extends React.Component {
             <div className="mb-4 inline-flex rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
               Tela interrompida
             </div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-lg font-bold">
               Nao foi possivel abrir esta tela.
             </h1>
             <p className="mt-3 text-sm leading-6 text-[var(--c-muted)]">

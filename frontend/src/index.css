@@ -430,7 +430,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Títulos de página — clamp para fluir em mobile */
 .page-title {
-  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-size: var(--fonte-pagina);
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -439,14 +439,14 @@ h1, h2, h3, h4, h5, h6 {
 
 .page-subtitle {
   color: var(--app-muted-color, var(--premium-panel-muted));
-  font-size: clamp(0.8rem, 2vw, 0.9rem);
+  font-size: var(--fonte-corpo);
   margin-top: 0.15rem;
 }
 
 /* Tipografia de tabelas legível em mobile */
 .table th,
 .table td {
-  font-size: clamp(0.78rem, 1.8vw, 0.875rem);
+  font-size: var(--fonte-corpo);
 }
 
 /* Scroll horizontal em tabelas — não quebra layout mobile */
@@ -608,7 +608,7 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--ui-surface);
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
   color: var(--c-text);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
 }
 
 .input:focus,
@@ -621,7 +621,7 @@ h1, h2, h3, h4, h5, h6 {
 .input-sm {
   padding: 6px 10px;
   min-height: 32px;
-  font-size: 0.8125rem;
+  font-size: var(--fonte-corpo);
   border-radius: 8px;
 }
 
@@ -661,7 +661,7 @@ textarea {
   min-height: 40px;
   border-radius: 10px;
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: var(--fonte-corpo);
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, opacity 0.15s ease;
   border: 1px solid transparent;
   cursor: pointer;
@@ -741,14 +741,14 @@ textarea {
 .btn-sm {
   padding: 0.3rem 0.65rem;
   min-height: 32px;
-  font-size: 0.8125rem;
+  font-size: var(--fonte-corpo);
   border-radius: 6px;
 }
 
 .btn-lg {
   padding: 0.7rem 1.4rem;
   min-height: 48px;
-  font-size: 0.9375rem;
+  font-size: var(--fonte-corpo);
 }
 
 /* Modulo Fiscal: controles mais densos e com hierarquia operacional propria */
@@ -758,7 +758,7 @@ textarea {
   min-height: 36px;
   border-radius: 8px;
   padding: 0.46rem 0.9rem;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   letter-spacing: 0;
   box-shadow: none;
@@ -807,7 +807,7 @@ textarea {
   min-height: var(--alvo-clique);
   border-radius: 6px;
   padding: 0.25rem 0.58rem;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .fiscal-page .fiscal-documents-actions .btn-sm {
@@ -817,7 +817,7 @@ textarea {
   min-height: var(--alvo-clique);
   border-radius: 5px;
   padding: 0.16rem 0.42rem;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.1;
   white-space: nowrap;
 }
@@ -1162,7 +1162,7 @@ textarea {
 .table th {
   text-align: left;
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--c-muted);
@@ -1176,7 +1176,7 @@ textarea {
   border-bottom: 1px solid var(--ui-border);
   color: var(--c-text);
   background: transparent;
-  font-size: 0.875rem;
+  font-size: var(--fonte-corpo);
 }
 
 /* Alias — mantido por compatibilidade com páginas legadas */
@@ -1235,7 +1235,7 @@ a:hover {
 
 .brand-title {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--c-text);
@@ -1243,7 +1243,7 @@ a:hover {
 
 .brand-subtitle {
   margin: 0;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1254,12 +1254,12 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   color: var(--nav-text);
 }
 
 .user-role {
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   color: var(--nav-muted);
   letter-spacing: 0.05em;
 }
@@ -1286,7 +1286,7 @@ a:hover {
 .nav-group-title {
   margin: 0;
   padding: 0;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1381,7 +1381,7 @@ a:hover {
   border-radius: 10px;
   color: var(--nav-text);
   font-weight: 500;
-  font-size: 0.855rem;
+  font-size: var(--fonte-corpo);
   transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
@@ -1407,7 +1407,7 @@ a:hover {
   min-height: 34px;
   padding-left: 0.6rem;
   font-weight: 400;
-  font-size: 0.8375rem;
+  font-size: var(--fonte-corpo);
   color: var(--nav-muted);
 }
 
@@ -1459,7 +1459,7 @@ a:hover {
   background: var(--ui-surface);
   color: var(--c-muted);
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: var(--fonte-corpo);
   min-height: 38px;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
@@ -1705,7 +1705,7 @@ a:hover {
 
 .login-csc-name {
   color: #0c2748;
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   text-align: center;
   line-height: 1.3;
@@ -1741,7 +1741,7 @@ a:hover {
 
 .login-fluxy-name {
   color: #0b2448;
-  font-size: 1.9rem;
+  font-size: var(--fonte-destaque);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.05em;
@@ -1758,7 +1758,7 @@ a:hover {
 .login-heading {
   margin: 0 0 1.5rem;
   color: #07203e;
-  font-size: 1.4rem;
+  font-size: var(--fonte-pagina);
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1;
@@ -1784,7 +1784,7 @@ a:hover {
 
 .login-label {
   color: #0c3068;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1799,7 +1799,7 @@ a:hover {
   border-color: rgba(59, 91, 219, 0.28) !important;
   box-shadow: inset 0 1px 2px rgba(0, 18, 55, 0.04) !important;
   color: #0a1e42 !important;
-  font-size: 0.94rem !important;
+  font-size: var(--fonte-corpo) !important;
   transition: border-color 0.18s, box-shadow 0.18s, background 0.18s !important;
 }
 
@@ -1862,7 +1862,7 @@ a:hover {
   padding: 0;
   cursor: pointer;
   color: #1e52b8;
-  font-size: 0.79rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 500;
   line-height: 1.4;
   transition: color 0.15s;
@@ -1932,7 +1932,7 @@ a:hover {
 .login-btn {
   min-height: 50px;
   border-radius: 12px;
-  font-size: 0.88rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -1978,22 +1978,31 @@ a:hover {
     height: 32px;
   }
 
-  .login-fluxy-name {
-    font-size: 1.65rem;
-  }
 
   .login-heading {
-    font-size: 1.25rem;
+    font-size: var(--fonte-bloco);
     margin-bottom: 1.25rem;
   }
 
+  /*
+    R30 (05/09) — AS SOBRESCRITAS DE TAMANHO DESTA FAIXA SAIRAM.
+
+    O Login tinha o mesmo texto declarado em ate TRES larguras, com valores
+    diferentes em cada uma (`.login-fluxy-name` a 1,9rem / 1,65rem / 2,2rem /
+    2,45rem; `.login-heading` a 1,4rem / 1,25rem / 1,85-2,3rem / 1,8rem) —
+    sozinho ele respondia por uma parte grande dos 92 tamanhos distintos.
+
+    O que ficou: a marca no D5 (30px, identidade do Login, excecao que o
+    cliente manteve), o titulo da tela no D4 (22px) e os campos/botoes no D2
+    (14px). O piso de 12px passou a valer AQUI TAMBEM, por decisao expressa
+    do cliente em 05/09 — eram 6 violacoes, todas corrigidas.
+  */
   .login-label {
-    font-size: 0.72rem;
+    font-size: var(--fonte-detalhe);
   }
 
   .login-input {
     min-height: 50px !important;
-    font-size: 0.93rem !important;
   }
 
   .login-password-toggle {
@@ -2026,9 +2035,26 @@ a:hover {
 }
 
 .solicitacoes-page {
-  --sol-font-base: 13px;
-  --sol-font-small: 12px;
-  --sol-font-header: 11px;
+  /*
+    R30 (05/09) — ESCALA CLANDESTINA APOSENTADA.
+
+    Aqui moravam `--sol-font-base: 13px`, `--sol-font-small: 12px` e
+    `--sol-font-header: 11px`, com um segundo jogo (12/11/10px) num
+    `@media (max-width: 1023px)`. Era uma SEGUNDA escala tipografica, privada
+    do modulo de Solicitacoes, competindo com a de `styles/escala.css` — e
+    nenhum dos seis valores era um degrau. O cabecalho de 11px (10px em
+    notebook) que a medicao de 05/09 apontou saia daqui.
+
+    Escala paralela nao aparece como violacao: quem lia o CSS via
+    `font-size: var(--sol-font-header)` e concluia que a tela usava token.
+    Usava — token de outra escala. Por isso as duas foram apagadas em vez de
+    corrigidas: enquanto a variavel existir, alguem a usa de novo.
+
+    As oito declaracoes que dependiam delas passaram aos degraus do sistema:
+    filtro/toolbar/botao/input no D2 (14px), rotulo no D1 (12px), e a tabela
+    compacta — cabecalho E celula — no D1 (12px), pela excecao de tabela
+    densa que o cliente declarou em 05/09.
+  */
   --sol-surface: var(--ui-surface);
   --sol-surface-muted: var(--ui-surface-soft);
   --sol-surface-strong: var(--ui-surface-soft);
@@ -2059,7 +2085,7 @@ a:hover {
 }
 
 .solicitacoes-page .solicitacoes-filtros {
-  font-size: var(--sol-font-base);
+  font-size: var(--fonte-corpo);
 }
 
 .solicitacoes-page .solicitacoes-toolbar,
@@ -2085,14 +2111,14 @@ a:hover {
 
 .sol-filtros-title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-text);
 }
 
 .sol-filtros-subtitle {
   margin: 0.15rem 0 0;
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
 }
 
@@ -2114,7 +2140,7 @@ a:hover {
   min-height: 24px;
   padding: 0.15rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--c-primary);
   background: color-mix(in srgb, var(--c-primary) 10%, transparent);
@@ -2132,12 +2158,12 @@ a:hover {
 }
 
 .sol-filtros-soma-label {
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
 }
 
 .sol-filtros-soma-value {
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-text);
 }
 
@@ -2195,13 +2221,13 @@ a:hover {
 .quick-person-footer p {
   margin: 0;
   max-width: 48rem;
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   color: var(--c-muted);
 }
 
 .quick-person-kicker {
   margin: 0 0 0.2rem;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2210,7 +2236,7 @@ a:hover {
 
 .quick-person-title {
   margin: 0;
-  font-size: clamp(1.2rem, 1.08rem + 0.4vw, 1.5rem);
+  font-size: var(--fonte-bloco);
   font-weight: 700;
   color: var(--c-text);
 }
@@ -2232,14 +2258,14 @@ a:hover {
 
 .quick-person-section-head h3 {
   margin: 0;
-  font-size: 0.96rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-text);
 }
 
 .quick-person-section-head p {
   margin: 0.25rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
   color: var(--c-muted);
 }
@@ -2288,13 +2314,13 @@ a:hover {
 }
 
 .quick-person-check strong {
-  font-size: 0.86rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
 }
 
 .quick-person-check small {
   margin-top: 0.12rem;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
 }
 
@@ -2353,7 +2379,7 @@ a:hover {
 .sol-filter-label {
   display: block;
   margin-bottom: 0.35rem;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--c-muted);
 }
@@ -2369,7 +2395,7 @@ a:hover {
   border: 0;
   background: transparent;
   color: var(--c-primary);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   line-height: 1;
   padding: 0.1rem 0.2rem;
@@ -2460,13 +2486,13 @@ a:hover {
 }
 
 .sol-filter-multi-item span {
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   color: var(--c-text);
 }
 
 .sol-filter-multi-empty {
   margin: 0.25rem 0;
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
 }
 
@@ -2516,12 +2542,12 @@ a:hover {
 }
 
 .sol-floating-panel-title {
-  font-size: 0.88rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
 }
 
 .sol-floating-panel-caption {
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2533,7 +2559,7 @@ a:hover {
   background: transparent;
   padding: 0;
   color: var(--c-primary);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   cursor: pointer;
 }
@@ -2582,7 +2608,7 @@ a:hover {
 }
 
 .sol-floating-panel-option span {
-  font-size: 0.83rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.35;
 }
 
@@ -2621,7 +2647,7 @@ a:hover {
 .solicitacoes-page .solicitacoes-filtros select {
   min-height: 40px;
   padding: 8px 10px;
-  font-size: var(--sol-font-base);
+  font-size: var(--fonte-corpo);
   border: 1px solid var(--sol-border-color);
   background: var(--sol-surface);
 }
@@ -2634,17 +2660,17 @@ a:hover {
 }
 
 .solicitacoes-page .solicitacoes-filtros label {
-  font-size: var(--sol-font-small);
+  font-size: var(--fonte-detalhe);
 }
 
 .solicitacoes-page .solicitacoes-toolbar {
-  font-size: var(--sol-font-base);
+  font-size: var(--fonte-corpo);
   backdrop-filter: blur(4px);
 }
 
 .solicitacoes-page .solicitacoes-toolbar .btn {
   min-height: 40px;
-  font-size: var(--sol-font-base);
+  font-size: var(--fonte-corpo);
   font-weight: 600;
 }
 
@@ -2721,11 +2747,11 @@ a:hover {
 }
 
 .solicitacoes-page .solicitacoes-table-compact .solicitacoes-table {
-  font-size: var(--sol-font-base);
+  font-size: var(--fonte-detalhe);
 }
 
 .solicitacoes-page .solicitacoes-table-compact .solicitacoes-table thead th {
-  font-size: var(--sol-font-header) !important;
+  font-size: var(--fonte-detalhe) !important;
   letter-spacing: 0.03em;
   padding-top: 10px !important;
   padding-bottom: 10px !important;
@@ -2735,7 +2761,7 @@ a:hover {
 }
 
 .solicitacoes-page .solicitacoes-table-compact .solicitacoes-table tbody td {
-  font-size: var(--sol-font-base);
+  font-size: var(--fonte-detalhe);
   line-height: 1.25rem;
   padding-top: 8px !important;
   padding-bottom: 8px !important;
@@ -2763,7 +2789,7 @@ a:hover {
 }
 
 .solicitacao-acoes .acao-link {
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 500;
   line-height: 1;
   text-decoration: none;
@@ -2876,18 +2902,18 @@ a:hover {
 }
 
 .solicitacoes-page:not(.solicitacao-nova-page) form :is(label, .sol-filter-field, .app-filter-field) {
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.3;
 }
 
 .solicitacoes-page:not(.solicitacao-nova-page) form :is(.sol-filter-label, .app-filter-label) {
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
 
 .solicitacoes-page:not(.solicitacao-nova-page) form :is(.input, .form-control, select, textarea) {
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.35;
 }
 
@@ -2898,13 +2924,13 @@ a:hover {
 .solicitacoes-page:not(.solicitacao-nova-page) form .btn {
   min-height: 38px;
   padding: 0.42rem 0.9rem;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .solicitacoes-page:not(.solicitacao-nova-page) form .btn.btn-sm {
   min-height: 34px;
   padding: 0.28rem 0.7rem;
-  font-size: 0.77rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .solicitacoes-page:not(.solicitacao-nova-page) form :is(.app-page-actions, .sol-filtros-actions) {
@@ -2924,13 +2950,13 @@ a:hover {
 
 .solicitacao-nova-page .page-title {
   margin-bottom: -0.25rem;
-  font-size: clamp(1.55rem, 3vw, 1.8rem);
+  font-size: var(--fonte-pagina);
   letter-spacing: -0.02em;
 }
 
 .solicitacao-nova-page .page-subtitle {
   max-width: 48rem;
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.5;
   color: color-mix(in srgb, var(--premium-panel-muted) 88%, var(--c-text));
   text-align: center;
@@ -2949,7 +2975,7 @@ a:hover {
 
 .solicitacao-nova-page .nova-solicitacao-form label {
   gap: 0.35rem;
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--c-text);
   line-height: 1.3;
@@ -2970,7 +2996,7 @@ a:hover {
 .solicitacao-nova-page .nova-solicitacao-form .input,
 .solicitacao-nova-page .nova-solicitacao-form select,
 .solicitacao-nova-page .nova-solicitacao-form textarea {
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.35;
 }
 
@@ -3000,13 +3026,13 @@ a:hover {
 .solicitacao-nova-page .nova-solicitacao-inline-actions .btn {
   min-height: 32px;
   padding: 0.28rem 0.7rem;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .solicitacao-nova-page .nova-solicitacao-selection-card {
   border-radius: 12px;
   padding: 0.55rem 0.65rem;
-  font-size: 0.8125rem;
+  font-size: var(--fonte-corpo);
 }
 
 .solicitacao-nova-page .nova-solicitacao-results-list {
@@ -3092,7 +3118,7 @@ a:hover {
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-primary) 10%, #ffffff);
   color: color-mix(in srgb, var(--c-primary) 72%, #102544);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -3145,7 +3171,7 @@ a:hover {
 .solicitacao-nova-page .nova-solicitacao-file-item {
   border-radius: 10px;
   padding: 0.4rem 0.55rem;
-  font-size: 0.8125rem;
+  font-size: var(--fonte-corpo);
 }
 
 .solicitacao-nova-page .nova-solicitacao-footer {
@@ -3321,11 +3347,10 @@ a:hover {
     padding-inline: 8px;
   }
 
-  .solicitacoes-page {
-    --sol-font-base: 12px;
-    --sol-font-small: 11px;
-    --sol-font-header: 10px;
-  }
+  /* R30 (05/09): o segundo jogo da escala clandestina (12/11/10px) saiu
+     junto com o primeiro. O que ele fazia era baixar a tabela de
+     Solicitacoes ABAIXO do piso em notebook — 10px no cabecalho. O respiro
+     lateral acima (8px) ja e o que segura a densidade aqui. */
 
 }
 
@@ -3399,7 +3424,7 @@ a:hover {
 
   .solicitacoes-table--mobile tr > td::before {
     content: attr(data-label);
-    font-size: 11px;
+    font-size: var(--fonte-detalhe);
     line-height: 1.2;
     font-weight: 700;
     text-transform: uppercase;
@@ -3462,7 +3487,7 @@ a:hover {
   border: 1px solid var(--c-border);
   background: var(--c-surface);
   color: var(--c-text);
-  font-size: 0.88rem;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
 }
@@ -3489,7 +3514,7 @@ a:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
 }
 
@@ -3504,7 +3529,7 @@ a:hover {
 }
 
 .sol-detail-updated-at {
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
 }
 
@@ -3534,7 +3559,7 @@ a:hover {
   min-height: 28px;
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   color: var(--c-primary);
   background: color-mix(in srgb, var(--c-primary) 14%, transparent);
@@ -3543,7 +3568,7 @@ a:hover {
 
 .sol-detail-type {
   margin: 0.5rem 0 0;
-  font-size: 1.16rem;
+  font-size: var(--fonte-bloco);
   line-height: 1.3;
   color: var(--c-text);
 }
@@ -3551,7 +3576,7 @@ a:hover {
 .sol-detail-title-text {
   margin: 0.3rem 0 0;
   max-width: 72ch;
-  font-size: 0.98rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   line-height: 1.4;
   color: var(--c-text);
@@ -3559,7 +3584,7 @@ a:hover {
 
 .sol-detail-description {
   margin: 0.45rem 0 0;
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.45;
   color: var(--c-muted);
   max-width: 72ch;
@@ -3588,7 +3613,7 @@ a:hover {
 }
 
 .sol-detail-header-date-label {
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3597,7 +3622,7 @@ a:hover {
 
 .sol-detail-header-date-value {
   margin-top: 0.16rem;
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   color: var(--c-text);
 }
 
@@ -3631,7 +3656,7 @@ a:hover {
 
 .sol-detail-stat-label {
   display: block;
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3641,7 +3666,7 @@ a:hover {
 
 .sol-detail-stat-value {
   margin: 0;
-  font-size: 0.91rem;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   color: var(--c-text);
   word-break: break-word;
@@ -3653,7 +3678,7 @@ a:hover {
   border: none;
   background: none;
   padding: 0;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   color: var(--c-primary);
   cursor: pointer;
@@ -3675,7 +3700,7 @@ a:hover {
 
 .sol-detail-contract-editor-title {
   margin: 0 0 0.55rem;
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-text);
 }
@@ -3690,7 +3715,7 @@ a:hover {
 
 .sol-detail-card-title {
   margin: 0 0 0.8rem;
-  font-size: 1.02rem;
+  font-size: var(--fonte-bloco);
   font-weight: 700;
   color: var(--c-text);
 }
@@ -3717,7 +3742,7 @@ a:hover {
 .sol-detail-timeline-meta {
   display: inline-block;
   margin-top: 0.2rem;
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
 }
 
@@ -3801,7 +3826,7 @@ a:hover {
 
 .dashboard-hero-kicker,
 .dashboard-metric-label {
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -3810,7 +3835,7 @@ a:hover {
 
 .dashboard-hero-title {
   margin-top: 0.45rem;
-  font-size: clamp(1.8rem, 1.38rem + 1.35vw, 2.65rem);
+  font-size: var(--fonte-pagina);
   line-height: 1.05;
   font-weight: 800;
   letter-spacing: -0.035em;
@@ -3820,7 +3845,7 @@ a:hover {
 .dashboard-hero-copy {
   margin-top: 0.85rem;
   max-width: 42rem;
-  font-size: 0.92rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.65;
   color: var(--c-muted);
 }
@@ -3834,7 +3859,7 @@ a:hover {
   background: var(--premium-outline-bg);
   padding: 0.45rem 0.8rem;
   color: var(--premium-outline-text);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
 }
 
@@ -3894,7 +3919,7 @@ a:hover {
 .dashboard-metric-value {
   display: block;
   margin-top: 0.75rem;
-  font-size: clamp(1.45rem, 1.22rem + 0.7vw, 2rem);
+  font-size: var(--fonte-destaque);
   line-height: 1.08;
   font-weight: 800;
   letter-spacing: -0.035em;
@@ -3903,7 +3928,7 @@ a:hover {
 
 .dashboard-metric-detail {
   margin-top: 0.55rem;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.45;
   color: var(--c-muted);
 }
@@ -3944,7 +3969,7 @@ a:hover {
 }
 
 .dashboard-section-title {
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
   font-weight: 800;
   color: var(--c-text);
 }
@@ -3996,7 +4021,7 @@ a:hover {
   align-items: center;
   border-radius: 999px;
   padding: 0.18rem 0.5rem;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.12em;
 }
@@ -4005,7 +4030,7 @@ a:hover {
 .dashboard-list-amount {
   flex-shrink: 0;
   text-align: right;
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
   color: var(--dashboard-accent, var(--c-text));
 }
@@ -4140,7 +4165,7 @@ a:hover {
   border: 1px solid var(--status-pending-border);
   background: var(--status-pending-bg);
   color: var(--status-pending-text);
-  font-size: 0.83rem;
+  font-size: var(--fonte-corpo);
   font-weight: 500;
 }
 
@@ -4165,7 +4190,7 @@ a:hover {
 
 .cotacao-publica-summary-value {
   margin-top: 0.12rem;
-  font-size: 0.95rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-text);
   line-height: 1.28;
@@ -4182,7 +4207,7 @@ a:hover {
 
 .cotacao-publica-summary-hint {
   margin: 0.3rem 0 0;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
   line-height: 1.25;
 }
@@ -4210,14 +4235,14 @@ a:hover {
   display: inline-flex;
   align-items: center;
   min-height: 32px;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-text);
 }
 
 .cotacao-publica-cell-description strong {
   display: block;
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.3;
   color: var(--c-text);
   word-break: break-word;
@@ -4227,7 +4252,7 @@ a:hover {
   display: inline-flex;
   align-items: center;
   min-height: 32px;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   color: var(--c-muted);
 }
 
@@ -4243,13 +4268,13 @@ a:hover {
   min-height: 36px !important;
   padding-top: 0.34rem !important;
   padding-bottom: 0.34rem !important;
-  font-size: 0.82rem !important;
+  font-size: var(--fonte-corpo) !important;
 }
 
 .cotacao-publica-table-textarea {
   min-height: 58px !important;
   resize: vertical;
-  font-size: 0.82rem !important;
+  font-size: var(--fonte-corpo) !important;
   line-height: 1.35;
 }
 
@@ -4265,7 +4290,7 @@ a:hover {
   border: 1px solid var(--ui-border-strong);
   background: var(--ui-surface-soft);
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -4309,7 +4334,7 @@ a:hover {
   }
 
   .cotacao-publica-summary-value {
-    font-size: 0.93rem;
+    font-size: var(--fonte-corpo);
   }
 
   .cotacao-publica-summary-grid {
@@ -4468,7 +4493,7 @@ a:hover {
 
 .dash-kpi-title {
   margin-bottom: 0.35rem;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -4476,8 +4501,8 @@ a:hover {
 }
 
 .dash-kpi-value {
-  font-size: clamp(1.3rem, 1.05rem + 0.75vw, 1.8rem);
-  line-height: 1.1;
+  font-size: var(--fonte-destaque);
+  line-height: var(--lh-destaque);
   font-weight: 800;
   color: var(--c-text);
 }
@@ -4499,7 +4524,7 @@ a:hover {
   margin-top: 0.95rem;
   padding-top: 0.8rem;
   border-top: 1px solid color-mix(in srgb, var(--premium-glass-border) 78%, transparent);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.45;
   color: color-mix(in srgb, var(--premium-panel-muted) 88%, var(--c-text));
 }
@@ -4518,14 +4543,14 @@ a:hover {
 
 .dash-panel-head h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
   font-weight: 800;
   color: var(--c-text);
 }
 
 .dash-panel-head p {
   margin: 0.2rem 0 0;
-  font-size: 0.88rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.45;
   color: var(--premium-panel-muted);
 }
@@ -4536,7 +4561,7 @@ a:hover {
   border: 1px dashed color-mix(in srgb, var(--premium-panel-border) 88%, transparent);
   background: color-mix(in srgb, var(--premium-glass-bg) 90%, transparent);
   color: var(--premium-panel-muted);
-  font-size: 0.92rem;
+  font-size: var(--fonte-corpo);
 }
 
 .dash-bar-list {
@@ -4557,21 +4582,21 @@ a:hover {
 }
 
 .dash-bar-top strong {
-  font-size: 0.92rem;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
   color: var(--c-text);
   white-space: nowrap;
 }
 
 .dash-bar-label {
-  font-size: 0.92rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-text);
 }
 
 .dash-bar-meta {
   margin-top: 0.12rem;
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   color: var(--premium-panel-muted);
 }
 
@@ -4620,13 +4645,13 @@ a:hover {
 }
 
 .dash-alert-title {
-  font-size: 0.92rem;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
   color: var(--c-text);
 }
 
 .dash-alert-meta {
-  font-size: 0.83rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.45;
   color: var(--premium-panel-muted);
 }
@@ -4692,7 +4717,7 @@ a:hover {
   padding: 0.5rem 0.9rem;
   border-radius: 9999px;
   font-weight: 700;
-  font-size: 1.3rem;
+  font-size: var(--fonte-bloco);
   letter-spacing: -0.01em;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
@@ -4705,7 +4730,7 @@ a:hover {
   border-radius: 999px;
   background: #eef4ff;
   color: #1d3f6e;
-  font-size: 0.85rem;
+  font-size: var(--fonte-corpo);
   border: 1px solid #d2def0;
 }
 
@@ -4761,14 +4786,14 @@ a:hover {
 }
 
 .value-block strong {
-  font-size: 1.05rem;
+  font-size: var(--fonte-bloco);
 }
 
 .pill {
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   background: #edf4ff;
   color: #1a3d69;
 }
@@ -4894,7 +4919,20 @@ table th {
 :root {
   --ui-control-height: 40px;
   --ui-control-radius: 10px;
-  --ui-control-font: 0.84rem;
+  /*
+    R30 (05/09) — SEGUNDA ESCALA CLANDESTINA APOSENTADA.
+
+    `--ui-control-font: 0.84rem` (13,44px) governava o texto de TODO controle
+    do sistema: `.input`, `.form-control`, campo de arquivo e `.btn`. Um valor
+    so, fora dos degraus, aplicado nos tres controles mais repetidos da
+    interface — sozinho ele explicava boa parte da dispersao do "texto de
+    botao", que a medicao de 05/09 achou com 19 valores diferentes.
+
+    Os tres passaram para o D2 (`--fonte-corpo`, 14px), que e o degrau que a
+    R30 da a "corpo, celula, texto de botao, campo de formulario, item de
+    menu". As outras medidas do controle (altura, raio, respiro) continuam
+    aqui: o que saiu foi so a tipografia, que nao pertencia a este bloco.
+  */
   --ui-control-padding-y: 0.4rem;
   --ui-control-padding-x: 0.65rem;
 }
@@ -4904,7 +4942,7 @@ table th {
   min-height: var(--ui-control-height) !important;
   padding: var(--ui-control-padding-y) var(--ui-control-padding-x) !important;
   border-radius: var(--ui-control-radius) !important;
-  font-size: var(--ui-control-font);
+  font-size: var(--fonte-corpo);
   line-height: 1.25rem;
 }
 
@@ -4943,7 +4981,7 @@ input[type="file"]:not(.sr-only) {
   background-position: 9px center;
   background-size: 15px 15px;
   color: var(--c-text);
-  font-size: var(--ui-control-font);
+  font-size: var(--fonte-corpo);
   cursor: pointer;
   transition: border-color 0.16s ease, background-color 0.16s ease;
 }
@@ -4980,7 +5018,7 @@ input[type="file"]:disabled {
   min-height: var(--ui-control-height);
   padding: var(--ui-control-padding-y) calc(var(--ui-control-padding-x) + 0.1rem);
   border-radius: var(--ui-control-radius);
-  font-size: var(--ui-control-font);
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   border: 1px solid transparent;
 }
@@ -5053,7 +5091,7 @@ input[type="file"]:disabled {
 }
 
 .app-note {
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
   line-height: 1.45;
 }
@@ -5067,7 +5105,7 @@ input[type="file"]:disabled {
   border: 1px solid var(--sem-warning-border);
   background: var(--sem-warning-bg);
   color: var(--sem-warning);
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   font-weight: 500;
 }
 
@@ -5152,14 +5190,14 @@ input[type="file"]:disabled {
 
 .app-summary-grid--compact .app-summary-value {
   margin-top: 0.22rem;
-  font-size: 0.94rem;
+  font-size: var(--fonte-corpo);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
 .app-summary-grid--compact .app-summary-subvalue {
   margin-top: 0.08rem;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 :root:not(.dark) .app-summary-card {
@@ -5255,7 +5293,7 @@ input[type="file"]:disabled {
   padding: 0.62rem 0.75rem;
   border-bottom: 1px solid var(--ui-border);
   background: transparent;
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   vertical-align: middle;
 }
 
@@ -5318,7 +5356,7 @@ input[type="file"]:disabled {
 }
 
 .app-summary-label {
-  font-size: 0.71rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -5327,7 +5365,7 @@ input[type="file"]:disabled {
 
 .app-summary-value {
   margin-top: 0.35rem;
-  font-size: 1.1rem;
+  font-size: var(--fonte-bloco);
   font-weight: 700;
   color: var(--app-summary-value, var(--app-number-color, var(--c-text)));
   line-height: 1.2;
@@ -5335,7 +5373,7 @@ input[type="file"]:disabled {
 
 .app-summary-subvalue {
   margin-top: 0.18rem;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   color: var(--app-summary-subvalue, var(--c-muted));
 }
 
@@ -5368,7 +5406,7 @@ input[type="file"]:disabled {
 }
 
 .app-filter-label {
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--c-muted);
 }
@@ -5449,7 +5487,7 @@ input[type="file"]:disabled {
   align-items: center;
   border-radius: 999px;
   padding: 0.24rem 0.58rem;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -5510,7 +5548,7 @@ input[type="file"]:disabled {
   border-radius: 999px;
   background: transparent;
   color: var(--premium-outline-text);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -5551,14 +5589,14 @@ input[type="file"]:disabled {
 
 .finance-category-section-title {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-text);
 }
 
 .finance-category-section-subtitle {
   margin: 0.18rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
   line-height: 1.45;
 }
@@ -5568,7 +5606,7 @@ input[type="file"]:disabled {
   align-items: center;
   border-radius: 999px;
   padding: 0.2rem 0.5rem;
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -5634,7 +5672,7 @@ input[type="file"]:disabled {
   align-items: center;
   gap: 0.65rem;
   color: var(--c-muted);
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .finance-category-modal-table {
@@ -5657,7 +5695,7 @@ input[type="file"]:disabled {
   padding: 0.78rem 0.95rem;
   border-top: 1px solid var(--ui-border);
   background: color-mix(in srgb, var(--premium-glass-bg) 92%, transparent);
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
 }
 
 .finance-category-modal-row:first-child {
@@ -5670,7 +5708,7 @@ input[type="file"]:disabled {
   z-index: 1;
   background: color-mix(in srgb, var(--c-bg) 72%, var(--premium-glass-bg));
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -5686,7 +5724,7 @@ input[type="file"]:disabled {
   display: block;
   margin-top: 0.18rem;
   color: var(--c-muted);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
 }
 
@@ -5712,14 +5750,14 @@ input[type="file"]:disabled {
 .finance-cadastros-card > h2,
 .finance-cadastros-card > div:first-child h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
   line-height: 1.25;
 }
 
 .finance-cadastros-card > p,
 .finance-cadastros-card > div:first-child p {
   margin-top: 0.22rem;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.45;
 }
 
@@ -5730,7 +5768,7 @@ input[type="file"]:disabled {
 
 .finance-cadastros-card .btn:not(.btn-icon) {
   padding-inline: 0.85rem;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .finance-cadastros-card .app-list-card {
@@ -5745,7 +5783,7 @@ input[type="file"]:disabled {
 .finance-cadastros-card .input {
   min-height: 36px;
   border-radius: 11px;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .finance-cadastros-card textarea.input {
@@ -5763,7 +5801,7 @@ input[type="file"]:disabled {
 }
 
 .finance-cadastros-card :is(.sol-filter-label, .app-filter-label) {
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .finance-cadastros-card--contas-lista,
@@ -5907,7 +5945,7 @@ input[type="file"]:disabled {
 .finance-chart-card__title {
   margin: 0;
   color: var(--finance-chart-title);
-  font-size: 0.88rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -5915,7 +5953,7 @@ input[type="file"]:disabled {
 .finance-chart-card__subtitle {
   margin: 0.15rem 0 0;
   color: var(--finance-chart-subtitle);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.4;
 }
 
@@ -5947,7 +5985,7 @@ input[type="file"]:disabled {
   border-radius: 999px;
   background: transparent;
   color: var(--finance-chart-chip-text);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -5976,7 +6014,7 @@ input[type="file"]:disabled {
   align-items: center;
   gap: 0.38rem;
   color: var(--finance-chart-subtitle);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -6017,7 +6055,7 @@ input[type="file"]:disabled {
 .finance-chart-stat span {
   display: block;
   color: var(--finance-chart-stat-label);
-  font-size: 0.62rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -6027,7 +6065,7 @@ input[type="file"]:disabled {
   display: block;
   margin-top: 0.18rem;
   color: var(--finance-chart-stat-value);
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   line-height: 1.2;
 }
@@ -6071,7 +6109,7 @@ input[type="file"]:disabled {
   gap: 0.2rem 0.6rem;
   margin-top: 0.4rem;
   color: var(--finance-chart-axis);
-  font-size: 0.62rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -6084,7 +6122,7 @@ input[type="file"]:disabled {
   padding: 2.8rem 1rem;
   text-align: center;
   color: var(--finance-chart-empty-text);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
 }
 
 @media (max-width: 767px) {
@@ -6272,7 +6310,7 @@ input[type="file"]:disabled {
   border: 0;
   background: transparent;
   color: #2a3450;
-  font-size: clamp(0.94rem, 1.2vw, 1.02rem);
+  font-size: var(--fonte-corpo);
   line-height: 1.2;
   outline: none;
   padding: 0;
@@ -6332,7 +6370,7 @@ input[type="file"]:disabled {
   border: 0;
   background: transparent;
   color: #1c51bb;
-  font-size: clamp(0.8rem, 1.1vw, 0.96rem);
+  font-size: var(--fonte-corpo);
   font-weight: 500;
   line-height: 1;
   padding: 0;
@@ -6398,7 +6436,7 @@ input[type="file"]:disabled {
   justify-content: center;
   gap: 0.5rem;
   color: #ffffff;
-  font-size: clamp(1.05rem, 1.72vw, 1.38rem);
+  font-size: var(--fonte-bloco);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -6453,7 +6491,7 @@ input[type="file"]:disabled {
   border-radius: 999px;
   background: rgba(21, 69, 158, 0.08);
   color: #1b4e9c;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -6462,7 +6500,7 @@ input[type="file"]:disabled {
 .login-mfa-title {
   margin: 0.9rem 0 0;
   color: #0b2144;
-  font-size: clamp(1.6rem, 2.4vw, 2rem);
+  font-size: var(--fonte-pagina);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -6471,7 +6509,7 @@ input[type="file"]:disabled {
 .login-mfa-subtitle {
   margin: 0.65rem 0 0;
   color: #5f6f8d;
-  font-size: 0.96rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.55;
 }
 
@@ -6482,7 +6520,7 @@ input[type="file"]:disabled {
 
 .login-mfa-label {
   color: #213655;
-  font-size: 0.9rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
 }
 
@@ -6492,7 +6530,7 @@ input[type="file"]:disabled {
   border-color: rgba(170, 190, 219, 0.66) !important;
   background: #fdfefe !important;
   color: #1d2f4b !important;
-  font-size: 1rem !important;
+  font-size: var(--fonte-corpo) !important;
 }
 
 .login-mfa-actions {
@@ -6559,9 +6597,6 @@ input[type="file"]:disabled {
     top: 55.35%;
   }
 
-  .login-reference-input {
-    font-size: clamp(0.68rem, 1.7vw, 0.82rem);
-  }
 
   .login-reference-field-icon svg {
     width: 1rem;
@@ -6577,7 +6612,6 @@ input[type="file"]:disabled {
   .login-reference-forgot {
     right: 23.95%;
     top: 64%;
-    font-size: clamp(0.62rem, 1.5vw, 0.78rem);
   }
 
   .login-reference-submit {
@@ -6588,9 +6622,6 @@ input[type="file"]:disabled {
     border-radius: 0.7rem;
   }
 
-  .login-reference-submit-label {
-    font-size: clamp(0.82rem, 2.1vw, 1rem);
-  }
 
   .login-mfa-layer {
     padding: 0.75rem;
@@ -6602,13 +6633,7 @@ input[type="file"]:disabled {
     border-radius: 1.2rem;
   }
 
-  .login-mfa-title {
-    font-size: 1.38rem;
-  }
 
-  .login-mfa-subtitle {
-    font-size: 0.88rem;
-  }
 
 .login-mfa-submit,
 .login-mfa-secondary {
@@ -6780,7 +6805,7 @@ input[type="file"]:disabled {
 
 .login-fluxy-name {
   color: #102a52;
-  font-size: 2.2rem;
+  font-size: var(--fonte-destaque);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.05em;
@@ -6808,7 +6833,7 @@ input[type="file"]:disabled {
   border-radius: 999px;
   background: rgba(30, 88, 180, 0.1);
   color: #1d4faa;
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -6823,7 +6848,7 @@ input[type="file"]:disabled {
 .login-heading {
   margin: 0.95rem 0 0;
   color: #0c2548;
-  font-size: clamp(1.85rem, 3vw, 2.3rem);
+  font-size: var(--fonte-pagina);
   font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 1.02;
@@ -6833,7 +6858,7 @@ input[type="file"]:disabled {
   margin: 0.8rem 0 0;
   max-width: 32rem;
   color: #566b88;
-  font-size: 0.98rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.65;
 }
 
@@ -6879,7 +6904,7 @@ input[type="file"]:disabled {
 
 .login-card .alert-title {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
   line-height: 1.35;
 }
@@ -6887,7 +6912,7 @@ input[type="file"]:disabled {
 .login-card .alert-message {
   margin: 0;
   color: #17365f;
-  font-size: 0.94rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.5;
 }
 
@@ -6947,7 +6972,7 @@ input[type="file"]:disabled {
 
 .login-label {
   color: #28486f;
-  font-size: 0.73rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -6961,7 +6986,7 @@ input[type="file"]:disabled {
   border-color: rgba(183, 208, 235, 0.78) !important;
   box-shadow: inset 0 1px 2px rgba(0, 18, 55, 0.04), 0 8px 18px rgba(17, 42, 86, 0.04) !important;
   color: #0f2547 !important;
-  font-size: 0.97rem !important;
+  font-size: var(--fonte-corpo) !important;
   transition: border-color 0.18s, box-shadow 0.18s, background 0.18s !important;
 }
 
@@ -7041,7 +7066,7 @@ input[type="file"]:disabled {
   align-items: center;
   gap: 0.55rem;
   color: #506685;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.5;
 }
 
@@ -7060,7 +7085,7 @@ input[type="file"]:disabled {
   padding: 0;
   cursor: pointer;
   color: #1e56b7;
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   line-height: 1.4;
   transition: color 0.15s;
@@ -7152,7 +7177,7 @@ input[type="file"]:disabled {
 .login-btn {
   min-height: 56px;
   border-radius: 16px;
-  font-size: 1rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: none;
@@ -7234,17 +7259,10 @@ input[type="file"]:disabled {
     height: 42px;
   }
 
-  .login-fluxy-name {
-    font-size: 2.45rem;
-  }
 
-  .login-heading {
-    font-size: 1.8rem;
-  }
 
   .login-input {
     min-height: 52px !important;
-    font-size: 0.95rem !important;
   }
 
   .login-card .alert {
@@ -7253,7 +7271,6 @@ input[type="file"]:disabled {
   }
 
   .login-copy {
-    font-size: 0.94rem;
     line-height: 1.58;
   }
 
@@ -7396,7 +7413,7 @@ body {
 
 .brand-wordmark {
   margin: 0;
-  font-size: 1.12rem;
+  font-size: var(--fonte-bloco);
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -7458,7 +7475,7 @@ body {
   background: linear-gradient(135deg, #74b4ff 0%, #2463eb 100%);
   color: #ffffff;
   font-weight: 800;
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
   flex-shrink: 0;
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
 }
@@ -7473,7 +7490,7 @@ body {
 .sidebar-profile-name {
   margin: 0;
   color: #17325c;
-  font-size: 0.93rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -7488,7 +7505,7 @@ body {
 .sidebar-profile-email {
   margin: 0.18rem 0 0;
   color: #6b7fa0;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
@@ -7506,7 +7523,7 @@ body {
   align-self: flex-start;
   padding: 0.15rem 0.52rem;
   border-radius: 999px;
-  font-size: 0.6rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -7597,7 +7614,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -7623,7 +7640,7 @@ body {
   padding: 0 0.38rem;
   background: linear-gradient(135deg, #2563eb, #38bdf8);
   color: #fff;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   line-height: 1;
 }
@@ -7685,7 +7702,7 @@ body {
 .nav-btn-sub {
   min-height: 2.65rem;
   padding-left: 1rem;
-  font-size: 0.94rem;
+  font-size: var(--fonte-corpo);
 }
 
 .nav-btn-sub::before {
@@ -7734,7 +7751,7 @@ body {
   padding: 0.8rem 0.85rem;
   background: rgba(148, 163, 184, 0.08);
   color: var(--shell-muted);
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.5;
 }
 
@@ -7917,7 +7934,7 @@ body {
   border-radius: 999px;
   background: var(--sem-danger);
   color: #fff;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   box-shadow: 0 10px 20px rgba(239, 68, 68, 0.24);
 }
@@ -7932,7 +7949,7 @@ body {
   gap: 0.35rem;
   margin: 0 0 0.35rem;
   color: var(--shell-muted);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -7948,7 +7965,7 @@ body {
 .topbar-title {
   margin: 0;
   color: var(--shell-text);
-  font-size: clamp(1.35rem, 2vw, 1.85rem);
+  font-size: var(--fonte-pagina);
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -7956,7 +7973,7 @@ body {
 .topbar-subtitle {
   margin: 0.2rem 0 0;
   color: var(--shell-muted);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
 }
 
 .topbar-status-chip {
@@ -7967,7 +7984,7 @@ body {
   border-radius: 999px;
   background: rgba(14, 165, 233, 0.12);
   color: var(--shell-accent);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
 }
 
@@ -7988,7 +8005,7 @@ body {
   border: 0;
   background: transparent;
   color: var(--shell-text);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   outline: none;
 }
 
@@ -8005,7 +8022,7 @@ body {
   border: 1px solid var(--shell-border);
   background: rgba(255, 255, 255, 0.08);
   color: var(--shell-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
 }
 
@@ -8052,7 +8069,7 @@ body {
 .notification-panel-kicker {
   margin: 0;
   color: var(--shell-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -8061,14 +8078,14 @@ body {
 .notification-panel-title {
   margin: 0.25rem 0 0;
   color: var(--shell-text);
-  font-size: 1.08rem;
+  font-size: var(--fonte-bloco);
   font-weight: 800;
 }
 
 .notification-panel-subtitle {
   margin: 0.35rem 0 0;
   color: var(--shell-muted);
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.5;
 }
 
@@ -8127,7 +8144,7 @@ body {
 .notification-empty-copy {
   margin: 0.28rem 0 0;
   color: var(--shell-muted);
-  font-size: 0.85rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.55;
 }
 
@@ -8173,14 +8190,14 @@ body {
 .notification-item-message {
   margin: 0;
   color: var(--shell-text);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.55;
 }
 
 .notification-item-date {
   margin: 0.35rem 0 0;
   color: var(--shell-muted);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .notification-item.is-read {
@@ -8194,7 +8211,7 @@ body {
 .page-title {
   margin: 0;
   color: var(--app-heading-color, var(--shell-text));
-  font-size: clamp(1.7rem, 2.5vw, 2.35rem);
+  font-size: var(--fonte-pagina);
   font-weight: 800;
   letter-spacing: -0.04em;
 }
@@ -8202,7 +8219,7 @@ body {
   margin: 0.45rem 0 0;
   max-width: 68ch;
   color: var(--app-muted-color, var(--shell-muted));
-  font-size: 0.96rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.7;
 }
 .layout-shell .card,
@@ -8291,7 +8308,7 @@ body {
   border-radius: 1rem;
   border: 1px solid transparent;
   padding: 0 1rem;
-  font-size: 0.92rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   letter-spacing: 0.01em;
   transition: transform 0.18s ease, box-shadow 0.22s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
@@ -8360,7 +8377,7 @@ body {
   min-height: 2.35rem;
   padding: 0 0.85rem;
   border-radius: 0.85rem;
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
 }
 
 .layout-shell .btn-lg {
@@ -8381,13 +8398,13 @@ body {
 
 .layout-shell .input-label {
   color: var(--shell-text);
-  font-size: 0.85rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
 }
 
 .layout-shell .input-message {
   color: var(--shell-muted);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .layout-shell .input-message-error {
@@ -8460,7 +8477,7 @@ body {
 .layout-shell .table thead th {
   padding: 0 1rem 0.35rem;
   color: var(--shell-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -8778,7 +8795,7 @@ body {
   display: block;
   margin-bottom: 0.25rem;
   color: var(--shell-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -8788,7 +8805,7 @@ body {
   display: block;
   min-width: 0;
   color: var(--shell-text);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   font-weight: 750;
 }
 
@@ -8796,7 +8813,7 @@ body {
   display: block;
   margin-top: 0.15rem;
   color: var(--shell-muted);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .layout-shell .compra-detalhe-link-button {
@@ -8866,7 +8883,7 @@ body {
   overflow: hidden;
   color: var(--shell-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -8902,7 +8919,7 @@ body {
   min-height: 1.9rem;
   border-radius: 999px;
   padding: 0 0.75rem;
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
 }
 
@@ -8972,13 +8989,13 @@ body {
 
 .layout-shell .alert-title {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
 }
 
 .layout-shell .alert-message {
   margin: 0.16rem 0 0;
-  font-size: 0.86rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.6;
 }
 
@@ -9035,7 +9052,7 @@ body {
 .layout-shell .empty-state-title {
   margin: 0;
   color: var(--shell-text);
-  font-size: 0.96rem;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
 }
 
@@ -9087,7 +9104,7 @@ body {
 
 .spinner-label {
   color: var(--shell-muted);
-  font-size: 0.86rem;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
 }
 
@@ -9122,7 +9139,7 @@ body {
   border-radius: 999px;
   background: var(--sem-info-bg);
   color: var(--sem-info);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
 }
 
@@ -9221,7 +9238,7 @@ body {
 .dashboard-insight-copy {
   margin: 0.28rem 0 0;
   color: var(--shell-muted);
-  font-size: 0.86rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.65;
 }
 .config-summary-card {
@@ -9238,7 +9255,7 @@ body {
 .config-summary-kicker {
   margin: 0;
   color: var(--shell-muted);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -9247,7 +9264,7 @@ body {
 .config-summary-title {
   margin: 0.4rem 0 0;
   color: var(--shell-text);
-  font-size: 1.35rem;
+  font-size: var(--fonte-bloco);
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -9556,13 +9573,32 @@ body {
   min-width: 76rem;
 }
 
+/*
+  R30 / DECISAO 2 DO CLIENTE (05/09) — ESPACO LATERAL PRIMEIRO, TAMANHO DEPOIS.
+
+  O cabecalho desta tabela vivia entre 9,92px e 10,88px. O piso de 12px nao
+  se negocia, entao ele SUBIU — e subir o cabecalho alarga a coluna, porque
+  e o `th` (com `white-space: nowrap`) que decide a largura minima. Medido em
+  05/09: subir tudo sem mexer em mais nada alargaria a coluna em 12% a 21% e
+  criaria rolagem horizontal em tela de 1366px, que e a tela de trabalho de
+  Compras, Contratos, RH/DP e Custos e Recebiveis.
+
+  A ordem que o cliente decidiu: **reduzir o espaco lateral ANTES de mexer no
+  tamanho**. O respiro lateral cai de 0,65rem (10,4px) para 0,45rem (7,2px)
+  por lado — 6,4px devolvidos por coluna, ~64px numa tabela de 10 colunas —,
+  e a CELULA fica no D1 (12px) em vez do D2 (14px), como excecao declarada
+  para tabela densa. O cabecalho vai para 12px de qualquer forma.
+
+  O que NAO foi feito, de proposito: encolher a fonte de volta. Entre "cabe
+  mais" e "le-se melhor" vence a leitura (criterio de 02/09).
+*/
 .layout-shell .compras-data-table th {
   position: relative;
-  padding: 0.55rem 0.65rem;
+  padding: 0.55rem 0.45rem;
   border-bottom: 1px solid var(--shell-border, var(--ui-border));
   background: color-mix(in srgb, var(--shell-panel-strong, #fff) 88%, var(--shell-primary, #2563eb) 12%);
   color: var(--shell-muted, var(--c-muted));
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1rem;
@@ -9622,10 +9658,10 @@ body {
 }
 
 .layout-shell .compras-data-table td {
-  padding: 0.52rem 0.65rem;
+  padding: 0.52rem 0.45rem;
   border-bottom: 1px solid var(--shell-border, var(--ui-border));
   color: var(--shell-text, var(--c-text));
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.15rem;
   vertical-align: middle;
   background: transparent;
@@ -9663,7 +9699,7 @@ body {
 .layout-shell .compras-data-table .app-status-pill {
   min-height: 1.45rem;
   padding: 0 0.48rem;
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   white-space: nowrap;
 }
 
@@ -9763,12 +9799,10 @@ body {
 
   .layout-shell .compras-data-table th {
     padding: 0.5rem 0.55rem;
-    font-size: 0.64rem;
   }
 
   .layout-shell .compras-data-table td {
     padding: 0.48rem 0.55rem;
-    font-size: 0.76rem;
   }
 
   .layout-shell .compras-icon-action {
@@ -9912,13 +9946,13 @@ body {
   flex-direction: column;
   gap: 0.35rem;
   color: var(--shell-muted, var(--c-muted));
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
 }
 
 .layout-shell .rhdp-apuracao-field small {
   color: var(--shell-muted, var(--c-muted));
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 500;
   line-height: 1.25;
 }
@@ -9979,12 +10013,12 @@ body {
 }
 
 .layout-shell .rhdp-autocomplete-option strong {
-  font-size: 0.85rem;
+  font-size: var(--fonte-corpo);
 }
 
 .layout-shell .rhdp-autocomplete-option span {
   color: var(--shell-muted, var(--c-muted));
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .layout-shell .rhdp-apuracao-page .app-page-actions {
@@ -10060,7 +10094,7 @@ body {
 }
 
 .layout-shell .rhdp-apuracao-items-table th {
-  font-size: 0.62rem;
+  font-size: var(--fonte-detalhe);
   letter-spacing: 0.04em;
   line-height: 0.95rem;
   white-space: normal;
@@ -10076,7 +10110,7 @@ body {
   width: 100%;
   min-height: 2.35rem;
   padding: 0.5rem 0.65rem;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .layout-shell .rhdp-apuracao-items-table th,
@@ -10100,11 +10134,11 @@ body {
 }
 
 .layout-shell .app-dense-data-table th {
-  padding: 0.55rem 0.65rem;
+  padding: 0.55rem 0.45rem;
   border-bottom: 1px solid var(--shell-border, var(--ui-border));
   background: color-mix(in srgb, var(--shell-panel-strong, #fff) 88%, var(--shell-primary, #2563eb) 12%);
   color: var(--shell-muted, var(--c-muted));
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1rem;
@@ -10189,10 +10223,10 @@ body {
 }
 
 .layout-shell .app-dense-data-table td {
-  padding: 0.52rem 0.65rem;
+  padding: 0.52rem 0.45rem;
   border-bottom: 1px solid var(--shell-border, var(--ui-border));
   color: var(--shell-text, var(--c-text));
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.15rem;
   vertical-align: middle;
   background: transparent;
@@ -10252,7 +10286,7 @@ body {
 .layout-shell .rhdp-importacoes-lotes-table th,
 .layout-shell .rhdp-importacoes-lotes-table td {
   padding: 0.48rem 0.55rem;
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .layout-shell .rhdp-importacoes-lotes-table th:nth-child(1),
@@ -10285,7 +10319,7 @@ body {
   max-width: 100%;
   overflow: hidden;
   color: var(--shell-muted, var(--c-muted));
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   line-height: 0.95rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -10303,7 +10337,7 @@ body {
 }
 
 .layout-shell .rhdp-importacao-summary-grid > div > div:last-child {
-  font-size: 1.25rem;
+  font-size: var(--fonte-bloco);
   line-height: 1.6rem;
 }
 
@@ -10379,7 +10413,7 @@ body {
 .layout-shell .app-dense-data-table .badge {
   min-height: 1.45rem;
   padding: 0 0.5rem;
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   white-space: nowrap;
 }
 
@@ -10447,8 +10481,8 @@ body {
 }
 
 .layout-shell .contratos-data-table th {
-  padding: 0.65rem 0.75rem;
-  font-size: 0.67rem;
+  padding: 0.65rem 0.5rem;
+  font-size: var(--fonte-detalhe);
   letter-spacing: 0.06em;
   line-height: 1.25;
   white-space: normal;
@@ -10490,7 +10524,7 @@ body {
 
 .layout-shell .contratos-sort-indicator {
   flex: 0 0 auto;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1;
   opacity: 0.7;
 }
@@ -10507,8 +10541,8 @@ body {
 }
 
 .layout-shell .contratos-data-table td {
-  padding: 0.78rem 0.75rem;
-  font-size: 0.8rem;
+  padding: 0.78rem 0.5rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
   vertical-align: top;
   border-bottom: 1px solid color-mix(in srgb, var(--shell-border, var(--ui-border)) 72%, transparent);
@@ -10579,7 +10613,7 @@ body {
   min-width: 0;
   height: 2.25rem;
   padding: 0.45rem 0.6rem;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .layout-shell .contratos-table-number {
@@ -10685,7 +10719,7 @@ body {
 .layout-shell .contratos-selection-toolbar__title {
   flex: 0 0 auto;
   padding: 0 0.45rem;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
   color: var(--shell-text, var(--c-text));
 }
@@ -11154,7 +11188,7 @@ body {
   border-radius: 12px;
   padding: 0.375rem 0.875rem;
   /* Piso de leitura da escala: nada de conteúdo abaixo de 12px (R10). */
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -11270,7 +11304,7 @@ body {
 
 .modal-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
   font-weight: 700;
   color: var(--c-text);
   line-height: 1.3;
@@ -11278,7 +11312,7 @@ body {
 
 .modal-subtitle {
   margin: 0.15rem 0 0;
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
 }
 
@@ -11394,7 +11428,7 @@ body {
   border: 1px solid;
   border-radius: 0.75rem;
   padding: 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--fonte-corpo);
 }
 
 .finance-operation-notice--warning {
@@ -11500,7 +11534,7 @@ body {
   padding: 0.18rem 0.6rem;
   border-radius: 999px;
   border: 1px solid;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -11580,7 +11614,7 @@ body {
 .badge-status--md {
   min-height: 26px;
   padding: 0.25rem 0.75rem;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 /* ============================
@@ -11666,14 +11700,14 @@ body {
 
 .empty-state__title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-text);
 }
 
 .empty-state__description {
   margin: 0;
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   color: var(--c-muted);
   max-width: 36ch;
   line-height: 1.5;
@@ -11723,7 +11757,7 @@ body {
 }
 
 .form-label {
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--c-text);
   line-height: 1.3;
@@ -11736,14 +11770,14 @@ body {
 }
 
 .form-hint {
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-muted);
   line-height: 1.4;
   margin-top: 0.2rem;
 }
 
 .form-error {
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   color: var(--c-danger);
   font-weight: 600;
   line-height: 1.3;
@@ -11780,7 +11814,7 @@ body {
   border-radius: 8px;
   background: var(--c-text);
   color: var(--c-bg);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 500;
   line-height: 1.35;
   pointer-events: none;
@@ -11845,21 +11879,21 @@ body {
 }
 
 .rh-pessoal-alerta-numero {
-  font-size: 1.6rem;
+  font-size: var(--fonte-destaque);
   font-weight: 700;
-  line-height: 1.1;
+  line-height: var(--lh-destaque);
   font-variant-numeric: tabular-nums;
 }
 
 .rh-pessoal-alerta-texto {
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   opacity: 0.75;
 }
 
 /* --- chips de tipo de solicitacao --- */
 .rh-chip {
   display: inline-block;
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -11952,7 +11986,7 @@ body {
   border-radius: 999px;
   background: #2B5CE6;
   color: #fff;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-variant-numeric: tabular-nums;
 }
 
@@ -11963,7 +11997,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   border: 1px solid var(--border-color, #DDE1E8);
   border-radius: 8px;
   padding: 10px 14px;
@@ -11989,7 +12023,7 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: 0.86rem;
+  font-size: var(--fonte-corpo);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -12068,7 +12102,7 @@ body {
 /* Botao pequeno dentro de tabela: menos respiro lateral para caber mais por linha. */
 .rh-pessoal-page .app-dense-data-table .btn-sm {
   padding: 4px 9px;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .rh-pessoal-page .rh-chip,
@@ -12221,7 +12255,7 @@ body {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  font-size: 0.88rem;
+  font-size: var(--fonte-corpo);
 }
 
 .rh-troca-obra-origem { opacity: 0.7; }
@@ -12338,7 +12372,7 @@ body {
   padding: 0.75rem 0.9rem;
   background: color-mix(in srgb, var(--app-number-warning, #d97706) 10%, transparent);
   color: var(--app-body-color, inherit);
-  font-size: 0.86rem;
+  font-size: var(--fonte-corpo);
 }
 
 .rh-alerta-apontamentos ul {
@@ -12454,14 +12488,14 @@ body {
 }
 
 .sol-detail-bloco-arrastar {
-  font-size: 11px;
+  font-size: var(--fonte-detalhe);
   letter-spacing: -2px;
   color: var(--c-muted);
 }
 
 .sol-detail-bloco-nome {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -12476,7 +12510,7 @@ body {
   border-radius: 12px;
   background: none;
   text-align: left;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   color: var(--c-muted);
   cursor: pointer;
@@ -12518,7 +12552,7 @@ body {
   border-radius: 9px;
   background: none;
   text-align: left;
-  font-size: 13.5px;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   color: var(--c-text);
   cursor: pointer;
@@ -12557,7 +12591,7 @@ body {
   border: none;
   border-radius: 9px;
   background: none;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--c-muted);
   white-space: nowrap;
@@ -12588,7 +12622,7 @@ body {
   align-items: center;
   gap: 6px;
   margin: 0 0 0.4rem;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -12617,7 +12651,7 @@ body {
 .sol-detail-informados-par {
   display: flex;
   gap: 6px;
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .sol-detail-informados-par dt {
@@ -12650,7 +12684,7 @@ body {
   border-radius: 7px;
   background: var(--c-surface);
   color: var(--c-text);
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   padding: 2px 6px;
 }
@@ -12659,7 +12693,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--c-muted);
   white-space: nowrap;
@@ -12669,7 +12703,7 @@ body {
   border: none;
   background: none;
   padding: 0 4px;
-  font-size: 15px;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   line-height: 1;
   color: var(--c-muted);
@@ -12705,7 +12739,7 @@ body {
   border-radius: 9px;
   background: none;
   text-align: left;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   color: var(--c-text);
   cursor: pointer;

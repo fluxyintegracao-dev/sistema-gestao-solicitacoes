@@ -1,6 +1,19 @@
 /* =====================================================================
    LISTA AVANÇADA — estilos do componente reutilizável
    Usa apenas tokens do design system (docs/DESIGN-SYSTEM.md).
+   ---------------------------------------------------------------------
+   R30 (05/09) — A LINHA ACIMA ERA FALSA PARA TIPOGRAFIA.
+
+   O cabecalho dizia "usa apenas tokens", e usava — de cor, de borda, de
+   superficie. De TAMANHO nao: 27 das 28 declaracoes de `font-size` desta
+   folha escreviam o pixel a mao, em 8 tamanhos distintos (11px, 11,5px,
+   12px, 12,5px, 13px, 13,5px, 14px, 10px), e 6 delas ficavam abaixo do
+   piso de 12px. Um componente REUTILIZAVEL espalha o defeito por toda tela
+   que o importa, e por isso ele pesa mais que o mesmo erro numa tela so.
+
+   As 27 passaram aos degraus: D1 (12px) para rotulo, contador, cabecalho
+   de coluna e subtexto; D2 (14px) para corpo, celula e texto de botao.
+   Nao restou meio-degrau: 12,5px e 13,5px nao existem mais aqui.
    ===================================================================== */
 .la-root {
   display: flex;
@@ -33,7 +46,7 @@
 
 .la-busca-aviso {
   margin: 4px 2px 0;
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
   color: var(--c-muted, #64748b);
 }
@@ -65,7 +78,7 @@
   border-radius: 0;
   min-height: 0;
   padding: 0;
-  font-size: 14px;
+  font-size: var(--fonte-corpo);
   color: var(--input-text);
   min-width: 0;
 }
@@ -137,7 +150,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--app-muted-color);
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   cursor: pointer;
 }
@@ -165,7 +178,7 @@
   border-radius: 10px;
   background: var(--btn-outline-bg);
   color: var(--btn-outline-text);
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -192,7 +205,7 @@
   border: none;
   background: none;
   color: var(--app-link-color);
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   cursor: pointer;
   padding: 4px 6px;
@@ -226,7 +239,7 @@
   border-radius: 999px;
   background: var(--ui-surface);
   color: var(--btn-outline-text);
-  font-size: 13.5px;
+  font-size: var(--fonte-corpo);
   font-weight: 650;
   cursor: pointer;
   box-sizing: border-box;
@@ -247,7 +260,7 @@
   min-width: 23px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   background: var(--sem-neutral-bg);
@@ -276,7 +289,7 @@
 }
 
 .la-filtros-rotulo {
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -298,7 +311,7 @@
   border-radius: 8px;
   background: var(--ui-surface-soft);
   color: var(--app-body-color);
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -373,7 +386,7 @@
   gap: 8px;
   padding: 7px 8px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   color: var(--app-body-color);
   cursor: pointer;
 }
@@ -398,7 +411,7 @@
   border: none;
   background: none;
   padding: 6px 10px;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 650;
   color: var(--sem-info);
   cursor: pointer;
@@ -431,7 +444,7 @@
   background: var(--input-bg);
   color: var(--input-text);
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   width: 170px;
   box-shadow: none;
 }
@@ -453,7 +466,7 @@
   border: 1px solid var(--sem-info-border);
   background: var(--sem-info-bg);
   color: var(--sem-info);
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
 }
 
@@ -514,7 +527,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--sem-info);
 }
@@ -542,7 +555,7 @@
 .la-tabela {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
 }
 
 .la-tabela th {
@@ -552,7 +565,7 @@
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface-soft);
   color: var(--app-muted-color);
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   white-space: nowrap;
@@ -632,7 +645,7 @@
   padding: 8px 12px;
   background: var(--ui-surface-soft);
   border-bottom: 1px solid var(--ui-border);
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
   color: var(--app-muted-color);
   text-transform: uppercase;
@@ -643,7 +656,7 @@
 .la-cards { display: flex; flex-direction: column; gap: 12px; }
 .la-grupo-titulo {
   margin: 4px 0 0;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -755,14 +768,14 @@
   margin: 0;
   padding: 20px;
   text-align: center;
-  font-size: 13.5px;
+  font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
 }
 
 .la-carregando {
   padding: 14px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
 }
 
@@ -771,12 +784,12 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
 }
 
 .la-sentinela { min-height: 8px; text-align: center; }
-.la-fim { font-size: 12px; color: var(--app-subtle-color); }
+.la-fim { font-size: var(--fonte-detalhe); color: var(--app-subtle-color); }
 
 .la-avancados {
   border: 1px dashed var(--ui-border-strong);
@@ -801,7 +814,7 @@
 }
 
 .sol-card-compacto-codigo {
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
   letter-spacing: 0.02em;
   color: var(--app-heading-color);
@@ -815,7 +828,7 @@
 }
 
 .sol-card-compacto-obra {
-  font-size: 11px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.03em;
   color: var(--app-muted-color);
@@ -825,7 +838,7 @@
 }
 
 .sol-card-compacto-descricao {
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   color: var(--app-body-color);
   white-space: nowrap;
   overflow: hidden;
@@ -837,7 +850,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
 }
 
 .sol-card-compacto-valor {
@@ -859,7 +872,7 @@
 }
 
 .la-colunas-arrastar {
-  font-size: 10px;
+  font-size: var(--fonte-detalhe);
   letter-spacing: -2px;
   color: var(--c-muted);
   user-select: none;

@@ -49,6 +49,11 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const SUFIXO = `${process.pid}`;
 const ALVO = path.join(RAIZ, 'src', 'pages', `__ProvaDeRegra${SUFIXO}.jsx`);
 const ALVO_REL = `src/pages/__ProvaDeRegra${SUFIXO}.jsx`;
+/* A R30 mora no CSS, entao a fixture dela e uma FOLHA — mesmo sufixo por PID,
+   mesma limpeza no `finally`, e entra pela bandeira `--extra-css`, que a
+   declara como fixture DESTA corrida sem empurra-la para o manifesto. */
+const ALVO_CSS = path.join(RAIZ, 'src', 'styles', `__ProvaDeRegraR30${SUFIXO}.css`);
+const ALVO_CSS_REL = `src/styles/__ProvaDeRegraR30${SUFIXO}.css`;
 
 const CABECA = `import { Pagina, PageHeader, TabelaPadrao } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  return (\n    <Pagina>\n      <PageHeader titulo="Prova" contagem="1 item" />\n`;
 const RABO = `    </Pagina>\n  );\n}\n`;
@@ -166,6 +171,44 @@ function rodarValidador() {
   }
 }
 
+function rodarValidadorCss() {
+  try {
+    execFileSync('node', [path.join(RAIZ, 'scripts', 'validarLayout.mjs'), '--extra-css', ALVO_CSS_REL], { cwd: RAIZ, encoding: 'utf8' });
+    return '';
+  } catch (erro) {
+    return `${erro.stdout || ''}${erro.stderr || ''}`;
+  }
+}
+
+/*
+  A MORDIDA DA R30, NOS DOIS SENTIDOS (05/09).
+
+  Esta e a prova que o cliente pediu de forma explicita: mostrar o check
+  REPROVANDO um tamanho fora dos degraus e PASSANDO limpo depois. Ela nao e
+  cerimonia — e a diferenca entre "o CSS esta certo" e "o check nao olha o
+  CSS", que foi exatamente a confusao que deixou 88% da poluicao invisivel
+  por anos, com o portao verde o tempo todo.
+
+  Sao quatro formas do mesmo defeito, porque a pergunta que importa nunca e
+  "quantos casos existem?" e sim "de quantos jeitos isso e feito aqui?":
+  pixel cru, meio-degrau, rampa de clamp() e escala paralela em var().
+*/
+function provarCss(porque, corpo, deveReprovar = true) {
+  fs.writeFileSync(ALVO_CSS, corpo);
+  const saida = rodarValidadorCss();
+  const linhas = saida.split('\n').filter((l) => l.includes('[R30]') && l.includes(ALVO_CSS_REL) && !l.startsWith('AVISO'));
+  if (deveReprovar === (linhas.length > 0)) {
+    console.log(`  ok    R30 ${deveReprovar ? 'reprova' : 'NAO reprova'} ${porque}`);
+    return;
+  }
+  falhas += 1;
+  if (deveReprovar) console.log(`  FALHA R30 NAO reprovou ${porque} — o check nao morde essa forma`);
+  else {
+    console.log(`  FALHA R30 reprovou ${porque} — falso positivo:`);
+    linhas.slice(0, 3).forEach((l) => console.log(`          ${l.trim()}`));
+  }
+}
+
 /*
   QUANDO ESTA PROVA FALHA, ELA TEM DE DIZER POR QUÊ (05/09).
 
@@ -236,6 +279,26 @@ try {
     else provar(caso.regra, caso.porque, caso.arquivo);
   }
 
+  // R30 — a escala de fonte no CSS, nas quatro formas do defeito.
+  provarCss('pixel cru fora dos degraus', '.prova-r30 { font-size: 13px; }\n');
+  provarCss('meio-degrau abaixo do piso de 12px', '.prova-r30 { font-size: 10.5px; }\n');
+  provarCss('rampa de clamp() em texto', '.prova-r30 { font-size: clamp(0.8rem, 2vw, 1rem); }\n');
+  provarCss('escala paralela em var() propria', '.prova-r30 { font-size: var(--sol-font-base); }\n');
+  // E o sentido inverso, que e a outra metade da prova: os CINCO degraus
+  // escritos como token passam LIMPOS. Sem este caso o check poderia estar
+  // acusando tudo — inclusive o que a R30 manda escrever.
+  provarCss(
+    'os cinco degraus escritos como token',
+    ['.prova-r30-a { font-size: var(--fonte-detalhe); }',
+      '.prova-r30-b { font-size: var(--fonte-corpo); }',
+      '.prova-r30-c { font-size: var(--fonte-bloco); }',
+      '.prova-r30-d { font-size: var(--fonte-pagina); }',
+      '.prova-r30-e { font-size: var(--fonte-destaque); }',
+      '.prova-r30-f { font-size: inherit; }', ''].join('\n'),
+    false
+  );
+  if (fs.existsSync(ALVO_CSS)) fs.unlinkSync(ALVO_CSS);
+
   // E o sentido inverso: tela limpa NÃO pode reprovar.
   fs.writeFileSync(ALVO, CABECA + RABO);
   const saidaLimpa = rodarValidador();
@@ -256,6 +319,7 @@ try {
     conserto de corrida não é restaurar melhor — é não compartilhar.
   */
   if (fs.existsSync(ALVO)) fs.unlinkSync(ALVO);
+  if (fs.existsSync(ALVO_CSS)) fs.unlinkSync(ALVO_CSS);
 }
 
 console.log(`\n[provas] regras mordem: ${falhas === 0 ? 'ok' : `${falhas} regra(s) sem prova de reprovação`}`);

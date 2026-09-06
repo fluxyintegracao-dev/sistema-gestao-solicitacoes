@@ -350,7 +350,11 @@ export default function Layout() {
                       height: 22,
                       borderRadius: 999,
                       background: 'var(--ui-surface-soft)',
-                      fontSize: 11,
+                      // R30 (05/09): era 11px — abaixo do piso de 12. O círculo
+                      // tem 22px e a letra é uma só, então o degrau de apoio cabe
+                      // sem apertar. Escapou da varredura de CSS porque está
+                      // escrito no JSX; o check foi estendido para alcançar isto.
+                      fontSize: 'var(--fonte-detalhe)',
                       fontWeight: 700
                     }}
                   >

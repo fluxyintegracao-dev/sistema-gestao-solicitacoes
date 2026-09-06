@@ -61,7 +61,7 @@
 .compras-responsive-scope .topbar-title {
   overflow: hidden;
   color: var(--compras-ink);
-  font-size: clamp(1.15rem, 1.7vw, 1.55rem);
+  font-size: var(--fonte-pagina);
   line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -71,7 +71,7 @@
   max-width: 70ch;
   overflow: hidden;
   color: var(--compras-muted);
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -194,7 +194,7 @@
   max-width: 76ch;
   margin-top: 0.28rem;
   color: var(--compras-muted);
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.45;
 }
 
@@ -243,7 +243,7 @@
 .compras-responsive-scope :is(.sol-filtros-title, .compras-filter-title) {
   margin: 0;
   color: var(--compras-ink);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
   font-weight: 750;
 }
 
@@ -318,11 +318,23 @@
   text-transform: uppercase;
 }
 
+/*
+  R30 (05/09) — ESTA REGRA APAGAVA A HIERARQUIA QUE A ESCALA DECLARA.
+
+  Ela dava UM tamanho — e ainda por cima uma rampa, `clamp(1.02rem, 2vw,
+  1.32rem)` — a duas coisas de degraus diferentes: `.app-summary-value` é
+  título de valor de bloco (D3, 18px) e `.dashboard-metric-value` é o
+  número de destaque de painel (D5, 30px, o degrau que o cliente criou em
+  05/09 justamente para não achatar o painel para 22).
+
+  O `font-size` saiu da regra: o resto (margem, cor, tabular-nums) continua
+  valendo para os dois, e cada um volta a usar o degrau do seu papel.
+  Nenhuma capacidade some — some a sobrescrita que igualava os dois.
+*/
 .compras-responsive-scope :is(.app-summary-value, .dashboard-metric-value) {
   margin-top: 0.38rem;
   overflow-wrap: anywhere;
   color: var(--compras-ink);
-  font-size: clamp(1.02rem, 2vw, 1.32rem);
   font-variant-numeric: tabular-nums;
 }
 
@@ -411,7 +423,7 @@
 
 .compras-responsive-scope .compras-mobile-record-title > strong {
   color: var(--compras-ink);
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .compras-responsive-scope .compras-mobile-record-title > span {
@@ -612,7 +624,7 @@
   }
 
   .compras-responsive-scope .topbar-title {
-    font-size: 1rem;
+    font-size: var(--fonte-bloco);
   }
 
   .compras-responsive-scope :is(.topbar-subtitle, .topbar-status-chip) {
@@ -899,7 +911,7 @@
   padding: 0.7rem 0.8rem;
   background: var(--c-surface-muted);
   color: var(--c-text);
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compra-item-cataloged-banner {
@@ -922,7 +934,7 @@
   margin-top: 0.9rem;
   padding: 0.8rem;
   color: var(--c-muted);
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compra-item-tratamento-head {
@@ -934,13 +946,13 @@
 
 .compras-responsive-scope .compra-item-tratamento-head h4 {
   margin: 0.12rem 0;
-  font-size: 0.98rem;
+  font-size: var(--fonte-corpo);
 }
 
 .compras-responsive-scope .compra-item-tratamento-head p {
   margin: 0;
   color: var(--c-muted);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compra-item-tratamento-choice {
@@ -1145,7 +1157,7 @@
 }
 
 .compras-responsive-scope .compra-item-autocomplete-options strong {
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compra-item-autocomplete-options small,
@@ -1157,7 +1169,7 @@
 .compras-responsive-scope .compra-item-autocomplete-empty {
   padding: 0.85rem;
   color: var(--c-muted);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   text-align: center;
 }
 
@@ -1190,7 +1202,7 @@
 .compras-responsive-scope .compra-item-feedback {
   padding: 0.65rem 0.75rem;
   border-radius: 0.45rem;
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 650;
 }
 
@@ -1258,7 +1270,7 @@
   border-collapse: separate;
   table-layout: fixed;
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .compras-responsive-scope .compra-itens-tabela th {
@@ -1327,7 +1339,7 @@
 }
 
 .compras-responsive-scope .compra-item-cell-main strong {
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
 }
 
@@ -1407,7 +1419,7 @@
 }
 
 .compras-responsive-scope .compra-item-expanded-spec > strong {
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 650;
 }
 
@@ -1426,7 +1438,7 @@
   padding: 1rem;
   border: 1px dashed var(--c-border);
   color: var(--c-muted);
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   text-align: center;
 }
 

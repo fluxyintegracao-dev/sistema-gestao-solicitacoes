@@ -154,7 +154,7 @@ export default function ApropriacaoAutocomplete({
               >
                 {option.codigo && (
                   <span
-                    className={`block font-mono text-[11px] ${
+                    className={`block font-mono text-xs ${
                       i === activeIndex ? 'text-white/70' : 'text-[var(--c-muted)]'
                     }`}
                   >

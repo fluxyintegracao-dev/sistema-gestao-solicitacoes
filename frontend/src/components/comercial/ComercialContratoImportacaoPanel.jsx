@@ -142,7 +142,7 @@ export default function ComercialContratoImportacaoPanel({ onImported }) {
               ['Saldo atual', currency(preview.valor_saldo)]
             ].map(([label, value]) => (
               <div key={label} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2">
-                <div className="text-[11px] uppercase tracking-wide text-[var(--c-muted)]">{label}</div>
+                <div className="text-xs uppercase tracking-wide text-[var(--c-muted)]">{label}</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--c-text)]">{value ?? 0}</div>
               </div>
             ))}

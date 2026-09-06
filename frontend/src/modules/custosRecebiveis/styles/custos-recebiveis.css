@@ -35,7 +35,7 @@
 
 .cr-page-header > div > span {
   color: var(--cr-accent);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -44,7 +44,7 @@
 .cr-page-header h1 {
   margin: 3px 0 0;
   color: var(--c-text);
-  font-size: clamp(1.45rem, 2vw, 2rem);
+  font-size: var(--fonte-pagina);
   font-weight: 800;
   line-height: 1.1;
 }
@@ -53,7 +53,7 @@
   max-width: 780px;
   margin: 6px 0 0;
   color: var(--c-muted);
-  font-size: 0.86rem;
+  font-size: var(--fonte-corpo);
   line-height: 1.45;
 }
 
@@ -106,9 +106,14 @@
 }
 
 .cr-obligation-counter svg { grid-row: 1 / span 2; color: var(--cr-accent); }
-.cr-obligation-counter span { font-size: 0.63rem; font-weight: 800; text-transform: uppercase; }
-.cr-obligation-counter strong { font-size: 0.7rem; }
-.cr-obligation-counter small { grid-column: 2 / span 2; color: var(--cr-muted); font-size: 0.61rem; }
+/* R30 (05/09) — os TRES textos deste botao caiam abaixo do piso (10,08 ·
+   11,20 · 9,76px) e a hierarquia era feita SO por tamanho. No degrau unico
+   de 12px ela passa a ser feita por peso, caixa e cor, que e o que a R30
+   manda: rotulo = versal + 800 + apagado; numero = negrito, cor plena (ou
+   a cor de vencido); contexto = peso normal, apagado. Nada saiu. */
+.cr-obligation-counter span { color: var(--cr-muted); font-size: var(--fonte-detalhe); font-weight: 800; text-transform: uppercase; }
+.cr-obligation-counter strong { font-size: var(--fonte-detalhe); }
+.cr-obligation-counter small { grid-column: 2 / span 2; color: var(--cr-muted); font-size: var(--fonte-detalhe); }
 .cr-obligation-counter[data-overdue="true"] { border-color: color-mix(in srgb, var(--cr-danger) 44%, var(--cr-border)); }
 .cr-obligation-counter[data-overdue="true"] strong,
 .cr-obligation-counter[data-overdue="true"] svg { color: var(--cr-danger); }
@@ -134,7 +139,7 @@
   border: 0;
   background: transparent;
   color: var(--c-muted);
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   cursor: pointer;
 }
@@ -219,7 +224,7 @@
 
 .cr-competence-filter > .cr-competence-filter__resumo strong {
   overflow: hidden;
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -260,7 +265,7 @@
   background: var(--ui-canvas);
   color: var(--cr-accent);
   font: inherit;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   cursor: pointer;
 }
@@ -288,7 +293,7 @@
   padding: 5px 8px;
   border-bottom: 1px solid var(--ui-border);
   color: var(--c-text);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   cursor: pointer;
 }
 
@@ -330,7 +335,7 @@
 
 .cr-field > span {
   color: var(--c-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -365,7 +370,7 @@
 
 .cr-field small {
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-input-icon {
@@ -397,7 +402,7 @@
 
 .cr-context-summary span {
   color: var(--c-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -412,12 +417,12 @@
 
 .cr-context-summary strong {
   color: var(--c-text);
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
 }
 
 .cr-context-summary small {
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-section,
@@ -459,11 +464,11 @@
 
 .cr-section-heading h2,
 .cr-workspace-heading h2 {
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
 }
 
 .cr-block-heading h3 {
-  font-size: 0.88rem;
+  font-size: var(--fonte-corpo);
 }
 
 .cr-section-heading p,
@@ -471,7 +476,7 @@
 .cr-block-heading p {
   margin: 3px 0 0;
   color: var(--c-muted);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.4;
 }
 
@@ -494,14 +499,14 @@
   min-width: 960px;
   border-collapse: collapse;
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-table-shell th {
   padding: 9px 11px;
   background: var(--ui-canvas);
   color: var(--c-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.045em;
   text-align: left;
@@ -524,17 +529,36 @@
   display: block;
 }
 
+/*
+  R30 (05/09) — O CASO EM QUE A REGRA MAIS DESTROI INFORMACAO, E COMO ELE FOI
+  RESOLVIDO SEM PERDER NENHUM DOS TRES NIVEIS.
+
+  Dentro do `td` havia TRES niveis distinguidos SO por tamanho: o valor
+  (`strong`, 12,48px), o complemento (`span`, 11,52px) e o rodape da celula
+  (`small`, 10,56px). Os dois ultimos estao abaixo do piso, entao os dois vao
+  para 12px — e ai, com a mesma cor apagada e o mesmo peso, eles viravam UM
+  nivel so.
+
+  O que separa os tres agora, sem tamanho: `strong` e negrito na cor plena;
+  `span` e peso 600 na cor apagada; `small` e peso normal, apagado e um passo
+  mais discreto ainda (opacidade). Sao tres degraus de PESO dentro de um
+  degrau de tamanho — que e exatamente o que a R30 pede quando diz que a
+  escala e a hierarquia e que peso e cor fazem o resto do trabalho.
+*/
 .cr-table-shell td > span {
   margin-top: 2px;
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
+  font-weight: 600;
 }
 
 .cr-table-shell td > small {
   display: block;
   margin-top: 3px;
   color: var(--c-muted);
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
+  font-weight: 400;
+  opacity: 0.85;
 }
 
 .cr-table-shell tr[data-sum="true"] {
@@ -548,7 +572,7 @@
   min-height: 24px;
   padding: 3px 8px;
   border-radius: 999px;
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   line-height: 1;
   white-space: nowrap;
@@ -592,7 +616,7 @@
 .cr-result-count {
   padding: 9px 2px 0;
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   text-align: right;
 }
 
@@ -623,7 +647,7 @@
 .cr-mobile-record-grid dt,
 .cr-mobile-macro span {
   color: var(--c-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -634,7 +658,7 @@
   margin: 2px 0 0;
   overflow-wrap: anywhere;
   color: var(--c-text);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 650;
 }
 
@@ -653,7 +677,7 @@
   gap: 7px;
   padding: 22px;
   color: var(--c-muted);
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   text-align: center;
 }
 
@@ -664,7 +688,7 @@
 
 .cr-empty-state strong {
   color: var(--c-text);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
 }
 
 .cr-feedback {
@@ -677,7 +701,7 @@
   border-radius: 9px;
   background: var(--ui-canvas);
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-feedback > div {
@@ -715,7 +739,7 @@
 
 .cr-workspace-heading > div:first-child > span {
   color: var(--cr-accent);
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -734,7 +758,7 @@
   align-items: center;
   gap: 5px;
   color: var(--cr-success);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 680;
 }
 
@@ -755,7 +779,7 @@
   border: 0;
   background: transparent;
   color: var(--c-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 680;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -800,7 +824,7 @@
 
 .cr-plan-state > span {
   color: var(--c-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -808,7 +832,7 @@
 
 .cr-plan-state > strong {
   color: var(--c-text);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-plan-metrics {
@@ -828,7 +852,7 @@
 
 .cr-plan-metric > span {
   color: var(--c-muted);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -836,12 +860,12 @@
 
 .cr-plan-metric > strong {
   color: var(--c-text);
-  font-size: 1.03rem;
+  font-size: var(--fonte-bloco);
 }
 
 .cr-plan-metric > small {
   color: var(--c-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-plan-metric[data-tone="warning"] > strong {
@@ -887,12 +911,12 @@
 
 .cr-publish-strip strong {
   color: var(--c-text);
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-publish-strip span {
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
 }
 
@@ -950,19 +974,23 @@
 }
 
 .cr-macro-row strong {
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-row span {
   overflow: hidden;
   color: var(--c-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   text-overflow: ellipsis;
 }
 
+/* R30 (05/09): `strong` (codigo) e `b` (valor) ficaram no mesmo degrau de
+   12px. O que os separa nao e tamanho — e coluna e forma: o valor e numero
+   tabular, alinhado, e o codigo e texto. */
 .cr-macro-row b {
   flex: 0 0 auto;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -1041,12 +1069,12 @@
 
 .cr-preview-heading strong {
   color: var(--c-text);
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .cr-preview-heading span {
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-preview-metrics {
@@ -1068,14 +1096,14 @@
 
 .cr-preview-metrics span {
   color: var(--c-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   text-transform: uppercase;
 }
 
 .cr-preview-metrics strong {
   color: var(--c-text);
-  font-size: 0.9rem;
+  font-size: var(--fonte-corpo);
 }
 
 .cr-validation-errors {
@@ -1093,7 +1121,7 @@
   gap: 10px;
   padding: 7px 9px;
   border-bottom: 1px solid var(--ui-border);
-  font-size: 0.71rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-validation-errors-heading {
@@ -1114,7 +1142,7 @@
   display: flex;
   gap: 8px;
   color: var(--cr-warning);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-validation-warnings span {
@@ -1158,7 +1186,7 @@
 .cr-kpi-strip span,
 .cr-review-summary span {
   color: var(--c-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -1167,7 +1195,7 @@
 .cr-kpi-strip strong,
 .cr-review-summary strong {
   color: var(--c-text);
-  font-size: 1.05rem;
+  font-size: var(--fonte-bloco);
 }
 
 .cr-kpi-strip--receivables {
@@ -1213,17 +1241,17 @@
 
 .cr-macro-progress-row strong {
   color: var(--c-text);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-progress-row span {
   color: var(--c-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-progress-row b {
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   text-align: right;
 }
 
@@ -1278,14 +1306,14 @@
 
 .cr-stage-row strong {
   overflow: hidden;
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .cr-stage-row > div > span {
   color: var(--c-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-summary-inline {
@@ -1293,7 +1321,7 @@
   flex-wrap: wrap;
   gap: 7px 14px;
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-summary-inline strong {
@@ -1314,7 +1342,7 @@
   display: block;
   margin-bottom: 3px;
   color: var(--cr-accent);
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -1343,7 +1371,7 @@
   padding: 8px 11px;
   border-bottom: 1px solid var(--ui-border);
   color: var(--c-text);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
 }
 
@@ -1371,7 +1399,7 @@
 
 .cr-ops-metric > span {
   color: var(--c-muted);
-  font-size: 0.63rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 780;
   letter-spacing: 0.035em;
   text-transform: uppercase;
@@ -1380,7 +1408,7 @@
 .cr-ops-metric > strong {
   max-width: 100%;
   color: var(--c-text);
-  font-size: clamp(0.82rem, 1.05vw, 1.04rem);
+  font-size: var(--fonte-bloco);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   overflow-wrap: normal;
@@ -1390,7 +1418,7 @@
 
 .cr-ops-metric > small {
   color: var(--c-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-ops-metric[data-tone="actual"] > strong,
@@ -1430,7 +1458,7 @@
   align-items: center;
   gap: 7px;
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-trend-heading svg {
@@ -1449,7 +1477,7 @@
   align-items: center;
   gap: 4px;
   color: var(--c-muted);
-  font-size: 0.62rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-trend-legend span::before {
@@ -1479,14 +1507,14 @@
 
 .cr-trend-row > span {
   color: var(--c-muted);
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 720;
   text-transform: capitalize;
 }
 
 .cr-trend-row > strong {
   color: var(--c-text);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   text-align: right;
 }
 
@@ -1516,7 +1544,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--cr-warning) 13%, transparent);
   color: var(--cr-warning);
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 780;
 }
 
@@ -1570,13 +1598,13 @@
 }
 
 .cr-attention-row strong {
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-attention-row span,
 .cr-attention-row small {
   color: var(--c-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-empty-state--positive {
@@ -1609,12 +1637,12 @@
 
 .cr-macro-ops-row__name strong {
   color: var(--c-text);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-ops-row__name span {
   color: var(--c-muted);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-ops-row__numbers {
@@ -1627,12 +1655,12 @@
   display: grid;
   gap: 2px;
   color: var(--c-muted);
-  font-size: 0.62rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-ops-row__numbers strong {
   color: var(--c-text);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-ops-row__numbers strong[data-negative="true"] {
@@ -1648,7 +1676,7 @@
 
 .cr-macro-ops-row__progress b {
   color: var(--c-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
   text-align: right;
 }
 
@@ -1708,12 +1736,12 @@
 
 .cr-lock-banner strong {
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-lock-banner span {
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-stepper {
@@ -1750,7 +1778,7 @@
   place-items: center;
   border-radius: 999px;
   background: color-mix(in srgb, var(--c-muted) 12%, transparent);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-stepper button.is-active b {
@@ -1760,7 +1788,7 @@
 
 .cr-stepper span {
   overflow: hidden;
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 720;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1804,12 +1832,12 @@
 .cr-panel-actions {
   padding-top: 2px;
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-panel-actions strong {
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-step-actions {
@@ -1820,12 +1848,12 @@
 
 .cr-step-actions > span {
   color: var(--c-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-automatic-source {
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 650;
   text-align: right;
 }
@@ -1856,7 +1884,7 @@
   padding: 11px 12px;
   background: var(--ui-canvas);
   color: var(--c-text);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 740;
   cursor: pointer;
 }
@@ -1893,12 +1921,12 @@
 
 .cr-review-checklist strong {
   color: var(--c-text);
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-review-checklist span {
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.4;
 }
 
@@ -1940,12 +1968,12 @@
 
 .cr-reopening-row strong {
   color: var(--c-text);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-reopening-row span {
   color: var(--c-muted);
-  font-size: 0.69rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-reopening-row > div:last-child {
@@ -1975,7 +2003,7 @@
 .cr-section-header > span,
 .cr-section-header > div > span {
   color: var(--cr-accent);
-  font-size: 0.66rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -1984,7 +2012,7 @@
 .cr-section-header h2 {
   margin: 1px 0 0;
   color: var(--c-text);
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
   font-weight: 760;
 }
 
@@ -1992,7 +2020,7 @@
   max-width: 840px;
   margin: 3px 0 0;
   color: var(--c-muted);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.4;
 }
 
@@ -2020,7 +2048,7 @@
 
 .cr-summary-grid article > span {
   color: var(--c-muted);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -2029,14 +2057,14 @@
 .cr-summary-grid article > strong {
   overflow: hidden;
   color: var(--c-text);
-  font-size: 1.05rem;
+  font-size: var(--fonte-bloco);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .cr-summary-grid article > small {
   color: var(--c-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-table-wrap {
@@ -2051,14 +2079,14 @@
   min-width: 980px;
   border-collapse: collapse;
   color: var(--c-text);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-table th {
   padding: 9px 10px;
   background: var(--ui-canvas);
   color: var(--c-muted);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.04em;
   text-align: left;
@@ -2082,7 +2110,7 @@
   margin-top: 2px;
   overflow: hidden;
   color: var(--c-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2131,7 +2159,7 @@
   gap: 7px;
   margin-top: 10px;
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.4;
 }
 
@@ -2192,12 +2220,12 @@
 }
 
 .cr-report-list strong {
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-report-list small {
   color: var(--c-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
 }
 
@@ -2232,7 +2260,7 @@
 
 .cr-modal > header span {
   color: var(--cr-accent);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2241,13 +2269,13 @@
 .cr-modal > header h2 {
   margin: 2px 0 0;
   color: var(--c-text);
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
 }
 
 .cr-modal > header p {
   margin: 3px 0 0;
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-modal form {
@@ -2307,7 +2335,7 @@
 
 .cr-obligation-summary span {
   color: var(--c-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -2316,7 +2344,7 @@
 .cr-obligation-summary strong {
   overflow: hidden;
   color: var(--c-text);
-  font-size: 0.88rem;
+  font-size: var(--fonte-corpo);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2385,13 +2413,13 @@
 .cr-obligation-card__title strong,
 .cr-bypass-record strong {
   color: var(--c-text);
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .cr-obligation-card__body > span,
 .cr-bypass-record span {
   color: var(--c-text);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-obligation-card__body small,
@@ -2399,7 +2427,7 @@
 .cr-server-time,
 .cr-helper-copy {
   color: var(--c-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.4;
 }
 
@@ -2411,7 +2439,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--cr-warning) 14%, transparent);
   color: var(--cr-warning);
-  font-size: 0.63rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 780;
 }
 
@@ -2515,13 +2543,13 @@
 .cr-governance-form__title strong,
 .cr-governance-register__heading strong {
   color: var(--c-text);
-  font-size: 0.86rem;
+  font-size: var(--fonte-corpo);
 }
 
 .cr-governance-form__title span,
 .cr-governance-register__heading span {
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-form-pair {
@@ -2576,7 +2604,7 @@
 .cr-governance-warning strong,
 .cr-responsibility-row strong {
   color: var(--c-text);
-  font-size: 0.82rem;
+  font-size: var(--fonte-corpo);
 }
 
 .cr-governance-warning span,
@@ -2584,7 +2612,7 @@
 .cr-responsibility-row small {
   overflow-wrap: anywhere;
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-governance-history {
@@ -2596,7 +2624,7 @@
 .cr-governance-history summary {
   padding: 12px 0 4px;
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   cursor: pointer;
 }
@@ -2614,7 +2642,7 @@
   padding: 8px 10px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--ui-border) 28%, transparent);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-audit-search {
@@ -2640,7 +2668,7 @@
 
 .cr-audit-row time {
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2652,13 +2680,13 @@
 
 .cr-audit-row strong {
   color: var(--c-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-audit-row span {
   overflow-wrap: anywhere;
   color: var(--c-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 @media (max-width: 1100px) {
@@ -2898,7 +2926,7 @@
   .cr-table--realized td::before {
     color: var(--c-muted);
     content: attr(data-label);
-    font-size: 0.62rem;
+    font-size: var(--fonte-detalhe);
     font-weight: 760;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -3086,7 +3114,7 @@
   border-radius: 0.5rem;
   background: transparent;
   color: var(--cr-muted);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   white-space: nowrap;
   cursor: pointer;
@@ -3146,7 +3174,7 @@
   border-radius: 999px;
   color: var(--cr-primary);
   background: color-mix(in srgb, var(--cr-primary) 9%, transparent);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 780;
   white-space: nowrap;
 }
@@ -3183,7 +3211,7 @@
 
 .cr-period-card__header span:not(.cr-status-pill) {
   color: var(--cr-muted);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 780;
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -3193,7 +3221,7 @@
   margin: 0;
   overflow: hidden;
   color: var(--cr-text);
-  font-size: 0.94rem;
+  font-size: var(--fonte-corpo);
   font-weight: 850;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -3222,7 +3250,7 @@
 
 .cr-period-card__metric dt {
   color: var(--cr-muted);
-  font-size: 0.64rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   line-height: 1.25;
 }
@@ -3231,7 +3259,7 @@
   margin: 4px 0 0;
   overflow: hidden;
   color: var(--cr-text);
-  font-size: clamp(0.8rem, 1.8cqi, 0.94rem);
+  font-size: var(--fonte-corpo);
   font-weight: 850;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -3277,7 +3305,7 @@
   border-radius: 999px;
   color: var(--cr-muted);
   background: color-mix(in srgb, var(--cr-muted) 10%, transparent);
-  font-size: 0.61rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 740;
 }
 
@@ -3397,7 +3425,7 @@
 .cr-item-picker-feedback {
   padding: 0.8rem;
   color: var(--cr-muted);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   text-align: left;
 }
 
@@ -3578,7 +3606,7 @@
 
 .cr-cost-ledger__summary span {
   margin-bottom: 5px;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.045em;
   text-transform: uppercase;
@@ -3587,13 +3615,13 @@
 .cr-cost-ledger__summary strong {
   display: block;
   color: var(--cr-ink);
-  font-size: clamp(1rem, 1.45vw, 1.28rem);
+  font-size: var(--fonte-bloco);
   line-height: 1.2;
 }
 
 .cr-cost-ledger__summary small {
   margin-top: 5px;
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   line-height: 1.35;
 }
 
@@ -3642,7 +3670,7 @@
   color: var(--cr-muted);
   background: transparent;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
   cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
@@ -3659,7 +3687,7 @@
   border-radius: 999px;
   color: inherit;
   background: color-mix(in srgb, currentColor 9%, transparent);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   text-align: center;
 }
 
@@ -3723,7 +3751,7 @@
   gap: 12px;
   min-height: 22px;
   color: var(--cr-muted);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-cost-ledger__result span {
@@ -3752,7 +3780,7 @@
 
 .cr-cost-ledger__macro-title > small {
   color: var(--cr-muted);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
   margin: 0;
 }
 
@@ -3763,7 +3791,7 @@
   display: block;
   margin-top: 3px;
   color: var(--cr-muted);
-  font-size: 0.67rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-status-pill[data-status="ABERTO"],
@@ -3825,20 +3853,20 @@
 }
 
 .cr-cost-ledger__technical > summary span {
-  font-size: 0.84rem;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
 }
 
 .cr-cost-ledger__technical > summary small {
   margin-top: 2px;
   color: var(--cr-muted);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 500;
 }
 
 .cr-cost-ledger__technical > summary > strong {
   color: var(--cr-warning);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-cost-ledger__technical-body {
@@ -3860,7 +3888,7 @@
 .cr-cost-ledger__technical-actions p {
   margin: 0;
   color: var(--cr-muted);
-  font-size: 0.76rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-cost-ledger__mapping-list {
@@ -3891,13 +3919,13 @@
 .cr-cost-ledger__mapping-list small {
   margin-top: 2px;
   color: var(--cr-muted);
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-cost-ledger__technical-empty {
   padding: 12px;
   color: var(--cr-muted);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   text-align: center;
 }
 
@@ -3987,15 +4015,15 @@
 
 .cr-planning-total-banner > span {
   color: var(--cr-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
 }
 
-.cr-planning-total-banner > strong { color: var(--cr-text); font-size: 1.15rem; }
+.cr-planning-total-banner > strong { color: var(--cr-text); font-size: var(--fonte-bloco); }
 .cr-planning-total-banner > small {
   grid-column: 1 / -1;
   color: var(--cr-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-planning-list { display: grid; gap: 0.85rem; }
@@ -4033,23 +4061,23 @@
   border: 1px solid color-mix(in srgb, var(--cr-accent) 24%, var(--cr-border));
   border-radius: 999px;
   color: var(--cr-accent);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-planning-heading > div > div { display: grid; min-width: 0; gap: 0.1rem; }
 .cr-macro-planning-heading strong {
   overflow: hidden;
   color: var(--cr-text);
-  font-size: 0.78rem;
+  font-size: var(--fonte-detalhe);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cr-macro-planning-heading span { color: var(--cr-muted); font-size: 0.66rem; }
+.cr-macro-planning-heading span { color: var(--cr-muted); font-size: var(--fonte-detalhe); }
 .cr-macro-planning-heading .btn {
   min-height: 2rem;
   flex: 0 0 auto;
   padding: 0.4rem 0.65rem;
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-macro-subitems-table,
@@ -4058,7 +4086,7 @@
 .cr-macro-subitems-table th:first-child,
 .cr-macro-subitems-table td:first-child { width: 42%; }
 .cr-macro-subitems-table tr[data-invalid="true"] { background: color-mix(in srgb, var(--cr-danger) 6%, var(--cr-surface)); }
-.cr-macro-subitems-table td small { display: block; max-width: 28rem; margin-top: 0.25rem; color: var(--cr-danger); font-size: 0.62rem; }
+.cr-macro-subitems-table td small { display: block; max-width: 28rem; margin-top: 0.25rem; color: var(--cr-danger); font-size: var(--fonte-detalhe); }
 .cr-forecast-measurement-table table { min-width: 1180px; }
 .cr-forecast-measurement-table th:first-child,
 .cr-forecast-measurement-table td:first-child { min-width: 15rem; }
@@ -4071,9 +4099,9 @@
   padding: 0.55rem 0.85rem;
   background: color-mix(in srgb, var(--cr-text) 92%, var(--cr-accent));
   color: var(--cr-surface);
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
 }
-.cr-macro-total strong { font-size: 0.76rem; }
+.cr-macro-total strong { font-size: var(--fonte-detalhe); }
 
 .cr-macro-subitem-picker {
   display: grid;
@@ -4085,7 +4113,7 @@
 .cr-macro-subitem-picker > strong {
   padding: 0.15rem 0 0.55rem;
   color: var(--cr-muted);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   letter-spacing: 0.045em;
   text-transform: uppercase;
 }
@@ -4109,7 +4137,7 @@
   border-radius: 0.5rem;
   background: var(--cr-surface);
   color: var(--cr-text);
-  font-size: 0.75rem;
+  font-size: var(--fonte-detalhe);
 }
 .cr-macro-picker-search input:focus {
   border-color: var(--cr-accent);
@@ -4142,9 +4170,9 @@
   background: color-mix(in srgb, var(--cr-accent) 6%, var(--cr-surface));
   outline: none;
 }
-.cr-macro-picker-results button span { font-size: 0.74rem; font-weight: 720; }
+.cr-macro-picker-results button span { font-size: var(--fonte-detalhe); font-weight: 720; }
 .cr-macro-picker-results button small,
-.cr-macro-picker-empty { color: var(--cr-muted); font-size: 0.66rem; }
+.cr-macro-picker-empty { color: var(--cr-muted); font-size: var(--fonte-detalhe); }
 .cr-macro-picker-results button svg {
   grid-row: 1 / span 2;
   grid-column: 2;
@@ -4172,7 +4200,7 @@
 .cr-planning-sheet-actions .btn {
   min-height: 2.15rem;
   padding: 0.42rem 0.68rem;
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-import-modal-backdrop {
@@ -4217,7 +4245,7 @@
 
 .cr-import-modal__header span {
   color: var(--cr-accent);
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.055em;
   text-transform: uppercase;
@@ -4230,12 +4258,12 @@
 
 .cr-import-modal__header h2 {
   color: var(--cr-text);
-  font-size: 1rem;
+  font-size: var(--fonte-bloco);
 }
 
 .cr-import-modal__header p {
   color: var(--cr-muted);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 
 .cr-import-modal__metrics {
@@ -4253,8 +4281,8 @@
 }
 
 .cr-import-modal__metrics > div:last-child { border-right: 0; }
-.cr-import-modal__metrics span { color: var(--cr-muted); font-size: 0.65rem; font-weight: 750; text-transform: uppercase; }
-.cr-import-modal__metrics strong { color: var(--cr-text); font-size: 0.9rem; }
+.cr-import-modal__metrics span { color: var(--cr-muted); font-size: var(--fonte-detalhe); font-weight: 750; text-transform: uppercase; }
+.cr-import-modal__metrics strong { color: var(--cr-text); font-size: var(--fonte-corpo); }
 .cr-import-modal__metrics [data-tone="error"] strong { color: var(--cr-danger); }
 .cr-import-modal__metrics [data-tone="success"] strong { color: var(--cr-success); }
 
@@ -4269,7 +4297,7 @@
 }
 
 .cr-import-modal__add label { gap: 0.3rem; }
-.cr-import-modal__add label > span { color: var(--cr-muted); font-size: 0.66rem; font-weight: 750; text-transform: uppercase; }
+.cr-import-modal__add label > span { color: var(--cr-muted); font-size: var(--fonte-detalhe); font-weight: 750; text-transform: uppercase; }
 .cr-import-modal__add label > div { position: relative; grid-template-columns: auto 1fr; align-items: center; }
 .cr-import-modal__add label svg { position: absolute; left: 0.7rem; color: var(--cr-muted); }
 .cr-import-modal__add input {
@@ -4309,10 +4337,10 @@
 }
 
 .cr-import-modal__catalog button:hover { background: color-mix(in srgb, var(--cr-accent) 6%, var(--cr-surface)); }
-.cr-import-modal__catalog button span { font-size: 0.73rem; font-weight: 750; }
-.cr-import-modal__catalog button small { color: var(--cr-muted); font-size: 0.65rem; }
+.cr-import-modal__catalog button span { font-size: var(--fonte-detalhe); font-weight: 750; }
+.cr-import-modal__catalog button small { color: var(--cr-muted); font-size: var(--fonte-detalhe); }
 .cr-import-modal__catalog button svg { grid-row: 1 / span 2; grid-column: 2; align-self: center; color: var(--cr-accent); }
-.cr-import-modal__catalog > span { padding: 0.65rem; color: var(--cr-muted); font-size: 0.7rem; }
+.cr-import-modal__catalog > span { padding: 0.65rem; color: var(--cr-muted); font-size: var(--fonte-detalhe); }
 
 .cr-import-modal > .cr-feedback { margin: 0.7rem 1rem 0; }
 
@@ -4329,13 +4357,13 @@
   gap: 0.4rem;
   padding: 0.55rem 0.7rem;
   color: var(--cr-danger);
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 750;
   cursor: pointer;
 }
 
 .cr-import-modal__errors > div { display: grid; max-height: 6rem; overflow-y: auto; padding: 0 0.7rem 0.6rem; }
-.cr-import-modal__errors span { color: var(--cr-muted); font-size: 0.68rem; }
+.cr-import-modal__errors span { color: var(--cr-muted); font-size: var(--fonte-detalhe); }
 
 .cr-import-modal__table {
   flex: 1 1 auto;
@@ -4351,8 +4379,8 @@
 .cr-import-modal__table td > strong,
 .cr-import-modal__table td > span,
 .cr-import-modal__table td > small { display: block; }
-.cr-import-modal__table td > span { margin-top: 0.15rem; color: var(--cr-muted); font-size: 0.66rem; }
-.cr-import-modal__table td > small { max-width: 15rem; margin-top: 0.25rem; color: var(--cr-danger); font-size: 0.63rem; }
+.cr-import-modal__table td > span { margin-top: 0.15rem; color: var(--cr-muted); font-size: var(--fonte-detalhe); }
+.cr-import-modal__table td > small { max-width: 15rem; margin-top: 0.25rem; color: var(--cr-danger); font-size: var(--fonte-detalhe); }
 .cr-import-modal__table input { min-width: 7rem; }
 
 .cr-import-modal__footer {
@@ -4368,7 +4396,7 @@
   gap: 0.5rem;
 }
 
-.cr-import-modal__footer > div:first-child { color: var(--cr-warning); font-size: 0.72rem; }
+.cr-import-modal__footer > div:first-child { color: var(--cr-warning); font-size: var(--fonte-detalhe); }
 .cr-import-modal__footer > div:first-child[data-state="valid"] { color: var(--cr-success); }
 
 @media (max-width: 760px) {
@@ -4422,8 +4450,8 @@
 
 .cr-planning-deadline > svg { color: var(--cr-accent); }
 .cr-planning-deadline > div { display: grid; min-width: 0; gap: 2px; }
-.cr-planning-deadline strong { font-size: 0.78rem; }
-.cr-planning-deadline span { color: var(--cr-muted); font-size: 0.69rem; }
+.cr-planning-deadline strong { font-size: var(--fonte-detalhe); }
+.cr-planning-deadline span { color: var(--cr-muted); font-size: var(--fonte-detalhe); }
 .cr-planning-deadline[data-overdue="true"] {
   border-color: color-mix(in srgb, var(--cr-danger) 35%, var(--cr-border));
   background: color-mix(in srgb, var(--cr-danger) 5%, var(--cr-surface));
@@ -4458,13 +4486,13 @@
 .cr-month-detail-surface__header span {
   overflow: hidden;
   color: var(--cr-muted);
-  font-size: 0.65rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
 }
-.cr-month-detail-surface__header h2 { margin: 0; color: var(--cr-text); font-size: 1rem; }
+.cr-month-detail-surface__header h2 { margin: 0; color: var(--cr-text); font-size: var(--fonte-bloco); }
 .cr-month-detail-surface__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 
 .cr-month-detail-tabs {
@@ -4486,7 +4514,7 @@
   background: transparent;
   color: var(--cr-muted);
   font: inherit;
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
   font-weight: 760;
   white-space: nowrap;
   cursor: pointer;
@@ -4505,7 +4533,7 @@
   padding: 9px 12px;
   color: var(--cr-text);
   background: color-mix(in srgb, var(--cr-primary) 5%, var(--cr-surface));
-  font-size: 0.72rem;
+  font-size: var(--fonte-detalhe);
 }
 .cr-month-read-group > header span { color: var(--cr-primary); font-weight: 820; font-variant-numeric: tabular-nums; }
 .cr-month-read-group .cr-table-shell { border: 0; border-radius: 0; }

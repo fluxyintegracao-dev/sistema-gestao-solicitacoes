@@ -149,7 +149,7 @@ export default function ModalConferenciaCredores({
     <OverlayModal aberto={aberto} rotulo="Conferir cadastro dos contratados" largura="960px">
       <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
         <div>
-          <h3 className="text-base font-semibold text-[var(--c-text)]">Conferir dados do contratado</h3>
+          <h3 className="text-lg font-semibold text-[var(--c-text)]">Conferir dados do contratado</h3>
           <p className="text-xs text-[var(--c-muted)]">
             Acima do limite o contrato vai ao Juridico. Confira endereco e CPF/CNPJ antes de criar.
           </p>

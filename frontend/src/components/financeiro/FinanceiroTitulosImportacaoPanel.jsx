@@ -96,7 +96,7 @@ export default function FinanceiroTitulosImportacaoPanel({ onClose, onConfirmed 
     <section className="card sol-surface-card mb-4 overflow-hidden" aria-label="Importacao de contas a pagar">
       <div className="flex flex-col gap-3 border-b border-[var(--c-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-[var(--c-text)]">Importar contas a pagar</h2>
+          <h2 className="text-lg font-semibold text-[var(--c-text)]">Importar contas a pagar</h2>
           <p className="text-xs text-[var(--c-muted)]">Envie o modelo preenchido. Nenhuma baixa e criada nesta etapa.</p>
         </div>
         <button type="button" className="btn btn-ghost btn-sm self-start" onClick={onClose} disabled={loadingPreview || confirming}>

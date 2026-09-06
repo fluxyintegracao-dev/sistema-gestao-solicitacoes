@@ -156,7 +156,7 @@ export default function ParceiroAutocomplete({
             >
               <span className="block truncate font-medium">{option.nome}</span>
               {option.cpf_cnpj ? (
-                <span className={`block truncate text-[11px] ${index === activeIndex ? 'text-white/80' : 'text-[var(--c-muted)]'}`}>
+                <span className={`block truncate text-xs ${index === activeIndex ? 'text-white/80' : 'text-[var(--c-muted)]'}`}>
                   {option.cpf_cnpj}
                 </span>
               ) : null}

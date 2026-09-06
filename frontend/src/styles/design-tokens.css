@@ -123,7 +123,7 @@
   border: 1px solid var(--sem-neutral-border);
   background: var(--sem-neutral-bg);
   color: var(--sem-neutral);
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   line-height: 1.5;
   white-space: nowrap;
@@ -246,7 +246,7 @@
 }
 
 .hub-subtitle {
-  font-size: 14px;
+  font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
   margin: 4px 0 0;
 }
@@ -338,7 +338,7 @@
 
 .hub-card-label {
   display: block;
-  font-size: 14.5px;
+  font-size: var(--fonte-corpo);
   font-weight: 650;
   color: var(--card-text);
   margin: 2px 0 3px;
@@ -349,7 +349,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   line-height: 1.4;
   color: var(--card-muted);
 }
@@ -365,7 +365,7 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   background: var(--sem-warning-bg);
   border: 1px solid var(--sem-warning-border);
@@ -430,7 +430,7 @@
   border: 1px solid var(--sem-warning-border);
   background: var(--sem-warning-bg);
   color: var(--sem-warning);
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   text-decoration: none;
   transition: filter 0.15s ease, transform 0.15s ease;
@@ -459,7 +459,7 @@
 }
 
 .hub-pendencia-count {
-  font-size: 15px;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -500,7 +500,7 @@
   border: 1px solid var(--btn-outline-border);
   background: var(--btn-outline-bg);
   color: var(--btn-outline-text);
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -520,7 +520,7 @@
 }
 
 .fx-search-kbd {
-  font-size: 10.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 5px;
@@ -536,7 +536,7 @@
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
 }
 
@@ -618,7 +618,7 @@
   border: none;
   outline: none;
   background: transparent;
-  font-size: 15px;
+  font-size: var(--fonte-corpo);
   color: var(--app-body-color);
 }
 
@@ -641,7 +641,7 @@
   border-radius: 10px;
   background: transparent;
   color: var(--app-body-color);
-  font-size: 14px;
+  font-size: var(--fonte-corpo);
   text-align: left;
   cursor: pointer;
 }
@@ -661,7 +661,7 @@
 
 .fx-cmdk-item-module {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-muted-color);
   white-space: nowrap;
 }
@@ -669,7 +669,7 @@
 .fx-cmdk-empty {
   padding: 22px 16px;
   text-align: center;
-  font-size: 13.5px;
+  font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
 }
 
@@ -678,7 +678,7 @@
   gap: 14px;
   padding: 9px 16px;
   border-top: 1px solid var(--ui-border);
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-subtle-color);
 }
 
@@ -731,9 +731,24 @@
   outline-offset: 2px;
 }
 
+/*
+  R30 / DECISAO 1 DO CLIENTE (05/09) — O QUINTO DEGRAU, E POR QUE ELE EXISTE.
+
+  Este numero tinha 24px; `.hub-gasto-valor` tinha 20px; `.dash-kpi-value`,
+  `.dashboard-metric-value` e `.rh-pessoal-alerta-numero` andavam entre 20,8px
+  e 32px, cada um com o seu. Cinco numeros grandes, cinco tamanhos, nenhum
+  degrau — e a saida obvia (achatar todos para o 22 do titulo de tela) foi
+  RECUSADA pelo cliente: o painel perderia o unico elemento que ele existe
+  para mostrar, e o 22 deixaria de significar "titulo desta tela".
+
+  A saida foi criar o degrau que faltava: D5 = 30px, para o numero grande de
+  painel, e so para ele. CONTE O DEGRAU, NAO O VALOR — os cinco no D5 sao UM
+  degrau, nao cinco tamanhos, e a Home pode encher a tela de numeros de 30px
+  sem violar nada.
+*/
 .hub-pendencia-cartao-numero {
-  font-size: 24px;
-  line-height: 1.1;
+  font-size: var(--fonte-destaque);
+  line-height: var(--lh-destaque);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--sem-warning);
@@ -747,7 +762,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--app-muted-color);
 }
@@ -921,7 +936,7 @@
   gap: 9px;
   padding: 8px 10px;
   border-radius: 9px;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   color: var(--app-text-color, var(--c-text));
   text-decoration: none;
@@ -950,7 +965,7 @@
   margin-top: 4px;
   padding: 8px 10px;
   border-top: 1px solid var(--ui-border);
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   color: var(--c-primary);
   text-decoration: none;
@@ -985,7 +1000,7 @@
   border: none;
   background: none;
   padding: 0;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   color: var(--c-primary);
   cursor: pointer;
@@ -1046,7 +1061,7 @@
 }
 
 .hub-atalho-rotulo {
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   line-height: 1.25;
   overflow: hidden;
@@ -1112,7 +1127,7 @@
   min-height: 50px;
   border: none;
   background: none;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   color: var(--app-muted-color);
   cursor: pointer;
@@ -1181,7 +1196,7 @@
   border: none;
   outline: none;
   background: transparent;
-  font-size: 14px;
+  font-size: var(--fonte-corpo);
   color: var(--app-text-color, var(--c-text));
 }
 
@@ -1194,7 +1209,7 @@
 
 .hub-atalhos-modal-vazio {
   padding: 14px 10px;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
 }
 
@@ -1208,7 +1223,7 @@
   border-radius: 9px;
   background: none;
   text-align: left;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 600;
   color: var(--app-text-color, var(--c-text));
   cursor: pointer;
@@ -1231,7 +1246,7 @@
 }
 
 .hub-atalhos-modal-item-modulo {
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--app-muted-color);
   white-space: nowrap;
@@ -1242,7 +1257,7 @@
    ===================================================================== */
 .fx-cmdk-grupo-titulo {
   margin: 8px 6px 3px;
-  font-size: 11px;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1300,7 +1315,7 @@
   border-radius: 999px;
   background: var(--ui-surface);
   padding: 3px 9px;
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   color: var(--c-primary);
   cursor: pointer;
@@ -1320,7 +1335,7 @@
   background: none;
   padding: 7px 10px;
   border-radius: 9px;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   color: var(--c-primary);
   cursor: pointer;
@@ -1354,7 +1369,7 @@
   border: 1px solid var(--sem-neutral-border);
   background: var(--sem-neutral-bg);
   color: var(--sem-neutral);
-  font-size: 10.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1390,7 +1405,7 @@
 }
 
 .fx-brand-nome {
-  font-size: 16px;
+  font-size: var(--fonte-bloco);
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--app-heading-color);
@@ -1467,13 +1482,13 @@
 }
 
 .hub-resolver-id strong {
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   font-weight: 800;
   letter-spacing: 0.01em;
 }
 
 .hub-resolver-contexto {
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--app-muted-color);
   text-transform: uppercase;
@@ -1484,7 +1499,7 @@
 
 .hub-resolver-oque {
   min-width: 0;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   color: var(--card-text);
   white-space: nowrap;
   overflow: hidden;
@@ -1499,13 +1514,13 @@
 }
 
 .hub-resolver-valor {
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .hub-resolver-prazo {
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   color: var(--sem-warning);
   white-space: nowrap;
@@ -1565,7 +1580,7 @@
 }
 
 .hub-obras-resumo-nome {
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1574,13 +1589,13 @@
 }
 
 .hub-obras-resumo-total {
-  font-size: 17px;
+  font-size: var(--fonte-bloco);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .hub-obras-resumo-qtd {
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-muted-color);
 }
 
@@ -1597,7 +1612,7 @@
 
 .hub-extra-estado {
   margin: 2px 0 0;
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
 }
 
@@ -1619,7 +1634,7 @@
   border: 1px solid transparent;
   text-decoration: none;
   color: var(--app-text-color);
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
 }
 
 .hub-extra-item:hover {
@@ -1635,12 +1650,12 @@
 }
 
 .hub-extra-item-id strong {
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-heading-color);
 }
 
 .hub-extra-item-contexto {
-  font-size: 10.5px;
+  font-size: var(--fonte-detalhe);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--app-muted-color);
@@ -1656,7 +1671,7 @@
 
 .hub-extra-item-fim {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-muted-color);
 }
 
@@ -1676,7 +1691,7 @@
   border: 1px solid var(--sem-success-border, var(--ui-border));
   background: var(--sem-success-bg, var(--ui-surface-soft));
   color: var(--sem-success, var(--app-muted-color));
-  font-size: 10.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
 }
 
@@ -1708,7 +1723,7 @@
   padding: 4px 8px;
   border-radius: 8px;
   text-decoration: none;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-text-color);
 }
 
@@ -1742,7 +1757,7 @@
 
 .hub-grafico-valor {
   font-weight: 700;
-  font-size: 12px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-heading-color);
 }
 
@@ -1780,24 +1795,24 @@
 }
 
 .hub-calendario-semana {
-  font-size: 10px;
+  font-size: var(--fonte-detalhe);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .hub-calendario-numero {
-  font-size: 15px;
+  font-size: var(--fonte-corpo);
   font-weight: 700;
   color: var(--app-heading-color);
 }
 
 .hub-calendario-qtd {
-  font-size: 11px;
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
 }
 
 .hub-calendario-total {
-  font-size: 9.5px;
+  font-size: var(--fonte-detalhe);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1819,7 +1834,7 @@
 }
 
 .hub-gasto-rotulo {
-  font-size: 11px;
+  font-size: var(--fonte-detalhe);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--app-muted-color);
@@ -1827,7 +1842,7 @@
 }
 
 .hub-gasto-valor {
-  font-size: 20px;
+  font-size: var(--fonte-destaque);
   font-weight: 800;
   color: var(--app-heading-color);
 }
@@ -1838,14 +1853,14 @@
 }
 
 .hub-gasto-qtd {
-  font-size: 11.5px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-muted-color);
 }
 
 .hub-gasto-variacao {
   padding: 3px 10px;
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
 }
 
@@ -1871,7 +1886,7 @@
   padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid var(--ui-border);
-  font-size: 12.5px;
+  font-size: var(--fonte-detalhe);
   color: var(--app-text-color);
   text-decoration: none;
 }
@@ -1906,7 +1921,7 @@
 }
 
 .hub-indicador-rotulo {
-  font-size: 10.5px;
+  font-size: var(--fonte-detalhe);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--app-muted-color);
@@ -1914,7 +1929,7 @@
 }
 
 .hub-indicador-valor {
-  font-size: 16px;
+  font-size: var(--fonte-bloco);
   font-weight: 800;
   color: var(--app-heading-color);
 }
@@ -1977,7 +1992,7 @@
   background: none;
   box-shadow: none;
   color: var(--app-muted-color);
-  font-size: 14px;
+  font-size: var(--fonte-corpo);
   line-height: 1;
   cursor: pointer;
 }
@@ -2026,7 +2041,7 @@
 
 .hub-adicionar-grupo-titulo {
   padding: 4px 10px 2px;
-  font-size: 10.5px;
+  font-size: var(--fonte-detalhe);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2048,7 +2063,7 @@
   border-radius: 12px;
   background: var(--app-heading-color);
   color: var(--ui-surface);
-  font-size: 13px;
+  font-size: var(--fonte-corpo);
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
 }
 
@@ -2062,7 +2077,7 @@
   border: none;
   background: none;
   color: inherit;
-  font-size: 16px;
+  font-size: var(--fonte-bloco);
   cursor: pointer;
   opacity: 0.8;
 }

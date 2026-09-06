@@ -88,7 +88,7 @@ export default function CadastroRapidoFavorecidoButton({
         <form onSubmit={salvar}>
           <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-5 py-4">
             <div>
-              <h2 className="text-base font-semibold text-[var(--c-text)]">Cadastrar favorecido</h2>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Cadastrar favorecido</h2>
               <p className="mt-1 text-xs text-[var(--c-muted)]">
                 O cadastro ficará disponível junto com os parceiros existentes.
               </p>

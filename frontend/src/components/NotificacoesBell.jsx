@@ -252,7 +252,7 @@ export default function NotificacoesBell() {
 
                   <div className="notification-item-body">
                     {item.tipo === 'RETORNO_SOLICITADO' && !item.lida_em && (
-                      <span className="mb-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                      <span className="mb-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-800">
                         Acao necessaria
                       </span>
                     )}

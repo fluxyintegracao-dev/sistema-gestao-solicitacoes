@@ -105,7 +105,35 @@ export function telasExtraDaLinhaDeComando(argv = process.argv) {
   tenha sido passado de propósito por `--extra`, que é exatamente como a prova
   o entrega.
 */
-const EXTRAS_DECLARADOS = new Set(telasExtraDaLinhaDeComando());
+/*
+  `--extra-css` (05/09) — a mesma porta, para a fixture de CSS.
+
+  A R30 mora no CSS, entao a prova de mordida dela planta uma FOLHA
+  (`__ProvaDeRegraR30<PID>.css`), nao uma tela. Ela nao pode entrar por
+  `--extra`: aquele caminho tambem empurra o arquivo para dentro do
+  `manifesto.telas`, e uma folha de CSS listada como tela seria lida por
+  todos os checks que esperam JSX.
+
+  Esta bandeira faz so a metade que a prova precisa: declara o arquivo como
+  fixture DESTA corrida, para que a varredura o inclua aqui e continue
+  ignorando o de qualquer corrida paralela.
+*/
+function cssExtraDaLinhaDeComando(argv = process.argv) {
+  const extras = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] !== '--extra-css') continue;
+    let j = i + 1;
+    while (j < argv.length && !String(argv[j]).startsWith('--')) {
+      String(argv[j]).split(',').map((c) => c.trim()).filter(Boolean)
+        .forEach((caminho) => extras.push(caminho.replace(/\\/g, '/')));
+      j += 1;
+    }
+    i = j - 1;
+  }
+  return extras;
+}
+
+const EXTRAS_DECLARADOS = new Set([...telasExtraDaLinhaDeComando(), ...cssExtraDaLinhaDeComando()]);
 function ehFixtureDeOutraProva(nomeDoArquivo, caminhoRelativo) {
   if (!nomeDoArquivo.startsWith('__ProvaDeRegra')) return false;
   return !EXTRAS_DECLARADOS.has(caminhoRelativo);
@@ -492,10 +520,19 @@ export function validarLayout() {
         }
       }
 
-      // Tamanho de fonte fora dos papéis 12/14/18 (page-title = 22 é do Pagina).
-      const fonteFora = linha.match(/\btext-(base|xl|2xl|3xl|4xl|5xl)\b/);
+      /*
+        Tamanho de fonte fora dos degraus. O `text-3xl` SAIU da lista de
+        proibidos em 05/09: ele vale 30px, que passou a ser o D5 da R30 — o
+        degrau que o cliente criou para o numero grande de painel, depois de
+        a medicao achar cinco numeros de destaque com cinco tamanhos
+        diferentes (20 a 32px) e nenhum degrau onde pousar. Os outros
+        continuam fora: `text-base` (16) e `text-xl` (20) nao sao degrau
+        nenhum, e `text-2xl` (24), `text-4xl` (36) e `text-5xl` (48) sao
+        tamanho de cartaz.
+      */
+      const fonteFora = linha.match(/\btext-(base|xl|2xl|4xl|5xl)\b/);
       if (fonteFora) {
-        apontaMedida(i, `tamanho de fonte fora da escala ("text-${fonteFora[1]}") — papéis: text-xs (detalhe 12), text-sm (corpo 14), text-lg (título de bloco 18), título de página no Pagina/PageHeader (22).`);
+        apontaMedida(i, `tamanho de fonte fora da escala ("text-${fonteFora[1]}") — os cinco degraus da R30: text-xs (apoio 12), text-sm (corpo 14), text-lg (título de bloco 18), título de página no Pagina/PageHeader (22), text-3xl (número de destaque de painel 30).`);
       }
     });
 
@@ -597,6 +634,17 @@ export function validarLayout() {
   falhas.push(...validarOverflowEmClasse(manifesto.telas).falhas);
   falhas.push(...validarTokensFantasma(manifesto.telas).falhas);
 
+  /*
+    R30 — a escala de fonte no CSS (05/09). O check que faltava: a R10 conferia
+    a classe do Tailwind no JSX e mais nada, e o JSX estava em 96,6% de
+    conformidade enquanto o CSS renderizava 92 tamanhos distintos com 88% das
+    declarações escrevendo o pixel cru. Sem portão do lado onde o defeito mora,
+    a regra é intenção.
+  */
+  const r30 = validarEscalaDeFonteCss();
+  falhas.push(...r30.falhas);
+  avisos.push(...r30.avisos);
+
   // R17 — declaração obrigatória de colunas (decisão do cliente, 02/09):
   // vale para TODO arquivo que usa TabelaPadrao, não só o manifesto — a
   // lacuna reprova ANTES de chegar ao preview.
@@ -623,6 +671,12 @@ export function validarLayout() {
   // (React #310) quando a condição vira. Meu defeito de 05/09 na TabelaPadrao.
   const r29 = validarHooksDepoisDeRetorno();
   falhas.push(...r29.falhas);
+
+  // R31 — a casca e os componentes compartilhados, que o manifesto de TELAS
+  // nunca alcançou. Foi por aí que passou um fontSize abaixo do piso.
+  const r31 = validarMedidaNaCasca();
+  falhas.push(...r31.falhas);
+  avisos.push(...r31.avisos);
 
   // R25 — cor fora do sistema de tokens (decisão do cliente, 03/09).
   const r25 = validarCoresForaDoToken();
@@ -988,6 +1042,91 @@ function validarImportesDeHooks() {
   };
   varrer(path.join(frontendRoot, 'src'));
   return { falhas };
+}
+
+/**
+ * R31 — A CASCA E OS COMPONENTES COMPARTILHADOS TAMBÉM SÃO CONFERIDOS (05/09).
+ *
+ * Descoberto ao medir o resultado da limpeza tipográfica: `Layout.jsx` tinha
+ * `fontSize: 11` — abaixo do piso de 12px — e sobreviveu a uma varredura que
+ * zerou 213 violações no CSS.
+ *
+ * A razão é estrutural, não um descuido: o manifesto `telas-reformadas.json`
+ * lista **205 telas e ZERO arquivos de `src/layout` ou `src/components`**. Todo
+ * check que roda "por tela" nunca olhou para a casca que envolve todas elas nem
+ * para os componentes que aparecem em todas — justamente o código de maior
+ * alcance do sistema.
+ *
+ * É a mesma família do buraco anterior: o validador só olhava JSX e a poluição
+ * morava no CSS. Aqui ele só olhava TELA, e o mais compartilhado não é tela.
+ *
+ * Medido ao nascer: 35 ocorrências em 9 arquivos. Boa parte é GEOMETRIA
+ * legítima — o diâmetro de um círculo, o desenho do skyline da tela de login —
+ * e não medida de layout. Por isso o passivo nasce CONGELADO e só desce, em vez
+ * de reprovar em massa uma coisa que em maioria está certa. O que a regra
+ * impede é o número 36.
+ */
+function lerJsonDoDisco(relativo, padrao) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(frontendRoot, relativo), 'utf8'));
+  } catch { return padrao; }
+}
+
+function validarMedidaNaCasca() {
+  const falhas = [];
+  const avisos = [];
+  const trinco = lerJsonDoDisco('scripts/trinco-medida-casca.json', { nomes: {} });
+  const PROP = /\b(minWidth|maxWidth|width|minHeight|maxHeight|height|padding(?:Top|Bottom|Left|Right)?|margin(?:Top|Bottom|Left|Right)?|gap|fontSize)\s*:\s*['"]?(\d+)(?:px)?['"]?\s*[,}]/g;
+
+  const varrer = (dir, saida) => {
+    if (!fs.existsSync(dir)) return saida;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) { varrer(caminho, saida); continue; }
+      if (!item.name.endsWith('.jsx')) continue;
+      if (ehFixtureDeOutraProva(item.name,
+        path.relative(frontendRoot, caminho).split(path.sep).join('/'))) continue;
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      const codigo = fs.readFileSync(caminho, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, (t) => t.replace(/[^\n]/g, ' '))
+        .replace(/^\s*\/\/.*$/gm, '');
+      const linhas = codigo.split('\n');
+      let total = 0;
+      const ondes = [];
+      linhas.forEach((linha, i) => {
+        for (const m of linha.matchAll(PROP)) {
+          total += 1;
+          ondes.push(`${rel}:${i + 1} ${m[1]}: ${m[2]}`);
+        }
+      });
+      if (total) saida.push({ rel, total, ondes });
+    }
+    return saida;
+  };
+
+  const medidos = [
+    ...varrer(path.join(frontendRoot, 'src', 'layout'), []),
+    ...varrer(path.join(frontendRoot, 'src', 'components'), [])
+  ];
+
+  for (const { rel, total, ondes } of medidos) {
+    const congelado = Number(trinco.nomes?.[rel] || 0);
+    if (total > congelado) {
+      falhas.push(
+        `${rel} [R31] ${total} medida(s) à mão na casca/componente compartilhado, `
+        + `contra ${congelado} congelada(s) no trinco. O número SÓ DESCE. `
+        + `Ex.: ${ondes.slice(congelado, congelado + 2).join(' · ')}`
+      );
+    } else if (total < congelado) {
+      avisos.push(`[R31] ${rel} desceu de ${congelado} para ${total} — atualize scripts/trinco-medida-casca.json.`);
+    }
+  }
+  for (const rel of Object.keys(trinco.nomes || {})) {
+    if (!medidos.some((m) => m.rel === rel)) {
+      avisos.push(`[R31] ${rel} zerou — remova a linha de scripts/trinco-medida-casca.json.`);
+    }
+  }
+  return { falhas, avisos };
 }
 
 /**
@@ -1658,6 +1797,191 @@ function validarOverflow() {
       avisos.push(`AVISO [R18] "${seletor}" saiu do index.css — remova a linha de scripts/trinco-overflow-css.json.`);
     }
   }
+  return { falhas, avisos };
+}
+
+/**
+ * R30 — CINCO DEGRAUS DE FONTE, E O CSS TAMBÉM RESPONDE (05/09).
+ *
+ * O PONTO CEGO QUE ESTE CHECK FECHA. Até hoje a escala de tipografia era
+ * conferida em UM lugar só: as classes Tailwind do JSX (R10, no bloco
+ * `text-(base|xl|2xl|…)` lá em cima). O CSS — que é onde a tipografia deste
+ * sistema de fato mora — nunca foi olhado. O resultado, medido em 05/09:
+ *
+ *   - a escala declarava 4 degraus e o sistema renderizava **92 tamanhos
+ *     distintos**, com só 76% das ocorrências caindo nos degraus;
+ *   - **88% das declarações de CSS escreviam o valor cru** em vez do token;
+ *   - **213 ocorrências abaixo do piso de 12px**, em 21 tamanhos, a menor
+ *     com 9px;
+ *   - e o JSX, o único lado que tinha portão, estava em 96,6% de
+ *     conformidade. A poluição inteira estava do lado sem verificador.
+ *
+ * É a mesma lição da R18 e do piso de 12px: **regra sem portão é intenção**,
+ * e o portão só vale onde ele olha. Um check que conhece UMA forma que a
+ * coisa assume (aqui: a classe do Tailwind) e ignora a outra (a folha de
+ * CSS) não é meio portão — é um portão que dá a impressão de cobertura
+ * enquanto o defeito entra pela porta que ele não vigia, por anos.
+ *
+ * O QUE ESTE CHECK EXIGE, e por que exige as duas coisas:
+ *
+ *   1. o tamanho tem de ser um dos CINCO degraus — 12 apoio, 14 corpo,
+ *      18 título de bloco, 22 título de tela, 30 número de destaque;
+ *   2. e tem de estar escrito como **token** (`var(--fonte-*)`), não como
+ *      pixel.
+ *
+ * A segunda não é preciosismo. `font-size: 12px` renderiza igualzinho a
+ * `var(--fonte-detalhe)` — a diferença aparece no dia em que o degrau muda,
+ * e aparece como 300 lugares que não mudaram. Foi assim que nasceram as
+ * duas escalas clandestinas que este trabalho aposentou (`--sol-font-*`,
+ * com 13/12/11px e um segundo jogo de 12/11/10px em notebook, e
+ * `--ui-control-font: 0.84rem`, governando o texto de todo controle do
+ * sistema): cada uma começou como um valor local que ninguém tinha como ver.
+ *
+ * RAMPA NÃO É DEGRAU. `clamp()` em texto reprova, e essa é a parte da regra
+ * que mais surpreende. Uma rampa contínua produz um tamanho DIFERENTE em
+ * cada largura de viewport — ela não é um tamanho, é uma família infinita
+ * deles, e sozinha respondia por 26 declarações da medição de 05/09. Onde o
+ * texto precisa encolher, o jeito declarado é `@media` caindo UM DEGRAU
+ * inteiro (ver `.page-title` em `src/styles/escala.css`).
+ *
+ * O QUE ELE NÃO CHECA, declarado em vez de silenciado: a regra de
+ * convivência "no máximo 4 degraus por TELA". Este check é por ARQUIVO de
+ * CSS, e uma folha global (`index.css` tem ~12.000 linhas) atende dezenas de
+ * telas — não há como atribuir um seletor a uma tela a partir do CSS com
+ * honestidade. Contar degraus por tela precisa do DOM renderizado, e é
+ * medição de preview, não estática. Fica como lacuna declarada.
+ *
+ * TRINCO E EXCEÇÃO, que são coisas opostas e por isso convivem:
+ *   - o TRINCO congela o passivo por arquivo e só deixa DESCER; arquivo
+ *     fora do trinco reprova na primeira ocorrência.
+ *   - a EXCEÇÃO é dívida declarada com autor e motivo, e precisa PROVAR que
+ *     cobre uma violação real (regra do mecanismo de exceção, 04/09):
+ *     exceção que não cobre nada reprova pedindo a própria remoção.
+ */
+function validarEscalaDeFonteCss() {
+  const falhas = [];
+  const avisos = [];
+
+  const DEGRAUS = new Map([
+    ['--fonte-detalhe', 12],
+    ['--fonte-corpo', 14],
+    ['--fonte-bloco', 18],
+    ['--fonte-pagina', 22],
+    ['--fonte-destaque', 30],
+  ]);
+
+  const caminhoTrinco = path.join(frontendRoot, 'scripts', 'trinco-escala-fonte.json');
+  const trinco = fs.existsSync(caminhoTrinco)
+    ? JSON.parse(fs.readFileSync(caminhoTrinco, 'utf8'))
+    : { arquivos: {}, excecoes: [] };
+  const congelado = trinco.arquivos || {};
+  const excecoes = trinco.excecoes || [];
+  const excecoesQueCobriram = new Set();
+  const vistosPorArquivo = new Map();
+
+  /*
+    A varredura tem de conhecer TODO CSS de `src` — foi conhecer um módulo
+    só que deixou a R18 cega por semanas (05/09). E tem de ignorar a
+    fixture de OUTRA corrida da prova de mordida, senão duas medições em
+    paralelo se acusam (o defeito de paralelismo consertado em 05/09).
+  */
+  const alvos = [];
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      if (item.isFile() && ehFixtureDeOutraProva(item.name, rel)) continue;
+      if (item.isDirectory()) varrer(caminho);
+      else if (item.name.endsWith('.css')) alvos.push(rel);
+    }
+  };
+  varrer(path.join(frontendRoot, 'src'));
+  /*
+    Varredura que não varre devolve zero igualzinho a varredura limpa — o
+    engano de 04/09, que me fez ligar um check afirmando passivo zero
+    quando o passivo era 196. Aqui ela tem de ter lido arquivo.
+  */
+  if (alvos.length === 0) {
+    throw new Error('[R30] a varredura de CSS nao leu nenhuma folha — o caminho mudou e o check estaria abonando tudo.');
+  }
+
+  // Palavras-chave e formas relativas não fixam tamanho: herdam. Não são
+  // medida à mão e não entram na conta.
+  const HERDA = /^(inherit|initial|unset|revert|revert-layer|medium|smaller|larger|1em|100%)$/i;
+
+  for (const rel of alvos) {
+    const codigo = fs.readFileSync(path.join(frontendRoot, rel), 'utf8');
+    // Comentário que registra "era 9px" não renderiza nada; contá-lo faria o
+    // check acusar justamente o registro da correção.
+    const limpo = codigo.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+
+    for (const bloco of limpo.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const seletor = bloco[1].trim().split('\n').pop().trim().slice(0, 70);
+      for (const decl of bloco[2].matchAll(/font-size\s*:\s*([^;}]+)/g)) {
+        const valor = decl[1].replace(/!important/, '').trim();
+        if (HERDA.test(valor)) continue;
+
+        const linha = limpo.slice(0, bloco.index + bloco[0].indexOf(decl[0])).split('\n').length;
+        let motivo = null;
+
+        const token = valor.match(/^var\(\s*(--[\w-]+)/);
+        if (token && DEGRAUS.has(token[1])) continue;              // conforme
+        if (token) {
+          motivo = `escala PARALELA ("${valor}") — "${token[1]}" não é degrau do sistema. Foi assim que nasceram --sol-font-* (13/12/11px, e 12/11/10px em notebook) e --ui-control-font (0.84rem): a folha parece usar token, e usa — o de outra escala.`;
+        } else if (/\b(clamp|min|max|calc)\s*\(/.test(valor)) {
+          motivo = `RAMPA, não degrau ("${valor}") — texto em clamp()/calc() rende um tamanho diferente por largura de viewport, o que é uma família infinita de tamanhos, não um degrau. Onde precisa encolher, use @media caindo um degrau inteiro (ver .page-title em src/styles/escala.css).`;
+        } else {
+          const px = valor.match(/^([\d.]+)(px|rem|em|pt|%)?$/);
+          const emPx = px ? parseFloat(px[1]) * (px[2] === 'rem' ? 16 : px[2] === 'pt' ? 4 / 3 : 1) : null;
+          const sugestao = emPx === null ? '' : ` O degrau mais próximo é ${
+            emPx < 13 ? '12px (var(--fonte-detalhe))'
+              : emPx < 16 ? '14px (var(--fonte-corpo))'
+                : emPx < 26 ? '18px (var(--fonte-bloco))'
+                  : '30px (var(--fonte-destaque))'}.`;
+          motivo = `valor CRU ("${valor}") — o tamanho vem do token do degrau, nunca do pixel: var(--fonte-detalhe) 12 apoio, var(--fonte-corpo) 14 corpo, var(--fonte-bloco) 18 título de bloco, var(--fonte-pagina) 22 título de tela, var(--fonte-destaque) 30 número de destaque.${sugestao}`;
+        }
+
+        const mensagem = `${rel}:${linha} [R30] font-size ${motivo} (em "${seletor}")`;
+
+        const excecao = excecoes.find((e) => e.arquivo === rel
+          && valor === e.valor
+          && seletor.includes(e.seletor));
+        if (excecao) {
+          excecoesQueCobriram.add(`${excecao.arquivo}|${excecao.seletor}|${excecao.valor}`);
+          avisos.push(`AVISO ${mensagem} [EXCECAO DECLARADA: ${excecao.motivo}]`);
+          continue;
+        }
+
+        vistosPorArquivo.set(rel, (vistosPorArquivo.get(rel) || 0) + 1);
+        if (!congelado[rel]) falhas.push(`${mensagem} [NOVO — arquivo fora do trinco]`);
+        else avisos.push(`AVISO ${mensagem} (congelado no trinco)`);
+      }
+    }
+  }
+
+  // O trinco SÓ DESCE.
+  for (const [rel, limite] of Object.entries(congelado)) {
+    const agora = vistosPorArquivo.get(rel) || 0;
+    if (agora > limite) {
+      falhas.push(`${rel}:0 [R30] o passivo de fonte fora do degrau SUBIU de ${limite} para ${agora} — o trinco só desce.`);
+    } else if (agora < limite) {
+      avisos.push(`AVISO [R30] "${rel}" caiu de ${limite} para ${agora} declaração(ões) fora do degrau — aperte scripts/trinco-escala-fonte.json.`);
+    }
+  }
+
+  /*
+    EXCEÇÃO QUE NÃO COBRE NADA É LICENÇA EM BRANCO (regra do mecanismo de
+    exceção, 04/09). O trinco congela o passivo e só deixa descer; a exceção
+    órfã faz o contrário — abre crédito para o futuro, e a violação que
+    nascer amanhã já nasce rebaixada a aviso.
+  */
+  for (const e of excecoes) {
+    if (!excecoesQueCobriram.has(`${e.arquivo}|${e.seletor}|${e.valor}`)) {
+      falhas.push(`${e.arquivo}:0 [EXCECAO] exceção de R30 registrada ("${e.motivo}") não cobre nenhuma declaração — remova a linha de excecoes em scripts/trinco-escala-fonte.json; exceção em branco rebaixa a violação futura para aviso.`);
+    }
+  }
+
   return { falhas, avisos };
 }
 
