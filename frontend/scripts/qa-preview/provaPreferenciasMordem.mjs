@@ -146,6 +146,17 @@ const CASOS = [
     ramo: 'voltou ABERTO'
   },
   {
+    /*
+      O SENTIDO DE VOLTA, DO LADO DEFEITUOSO (06/09): o registro é apagado e
+      o apagamento NÃO é lido — na recarga o bloco volta aberto. É o irmão do
+      `p3NaoLe`, no sentido que a fixture não desenhava, e sem ele o braço da
+      recarga ficaria provado só na ida.
+    */
+    item: 'P3', caso: 'blocos', d: 'p3ResetNaoLe',
+    planta: 'bloco cujo padrão é recolhido, aberto por desvio salvo: recolher APAGA o registro (DELETE) e a recarga NÃO lê o apagamento — o bloco volta aberto',
+    ramo: 'voltou ABERTO'
+  },
+  {
     item: 'P3', caso: 'blocos', d: 'p3NaoGrava', declara: true,
     planta: 'recolhimento que não grava NADA, numa tela cujo arquivo DECLARA chavePreferencia — o silêncio que, sem este braço, sairia como N/A cinza',
     ramo: 'NENHUMA gravação de preferência'
@@ -237,6 +248,27 @@ const NEGATIVOS = [
     */
     item: 'P3', caso: 'blocos', d: '',
     planta: 'bloco que obedece, com a faixa de ações e a seta dentro dela: o clique no centro do botão recolhe, grava e continua recolhido depois da recarga',
+    estados: ['PASSOU']
+  },
+  {
+    /*
+      O CASO QUE REPROVOU 4 TELAS CERTAS (06/09), e o motivo de ele estar
+      entre os NEGATIVOS: aqui nada está quebrado.
+
+      Bloco com `recolhidoPadrao`, aberto por um desvio já salvo. Recolher
+      devolve o bloco ao PADRÃO, e o componente grava DESVIO e nunca estado:
+      voltar ao padrão APAGA o registro. Sai um DELETE, e o DELETE é a
+      escolha indo para o banco tanto quanto o PUT.
+
+      O check só contava PUT/POST, então dizia "NENHUMA gravação saiu" e
+      reprovava financeiro-diagnostico-dre, crm-dashboard-distribuicao,
+      sst-rel-operacional e governanca-auditoria — as quatro medidas no
+      preview, as quatro mandando DELETE, as quatro certas. Este caso é a
+      trava: se alguém estreitar o espião de novo, ele reprova aqui antes de
+      reprovar tela nenhuma.
+    */
+    item: 'P3', caso: 'blocos', d: 'p3VoltaAoPadrao', declara: true,
+    planta: 'bloco cujo padrão é recolhido, aberto por desvio salvo: recolher devolve ao padrão e APAGA o registro (DELETE) — é o contrato do componente, não defeito',
     estados: ['PASSOU']
   },
   {

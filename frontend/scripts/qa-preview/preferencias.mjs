@@ -136,12 +136,37 @@ export function criarEspiaDePreferencias(page) {
     /** Marca d'água: tudo que interessa a um check é o que veio DEPOIS dela. */
     marcar: () => eventos.length,
     desde: (marca) => eventos.slice(marca),
-    /** Espera até `ms` por uma gravação de preferência do tipo pedido. */
-    async esperarGravacao(marca, tipo, ms = 4000) {
+    /**
+     * Espera até `ms` por uma gravação de preferência do tipo pedido.
+     *
+     * `aceitaReset` — O DELETE TAMBÉM É GRAVAÇÃO, E IGNORÁ-LO REPROVOU 4
+     * TELAS CERTAS (06/09).
+     *
+     * Medido no preview (build 5fbcd89), nas quatro telas que sobraram do
+     * P3: o bloco tem `recolhidoPadrao` (padrão = recolhido) e estava
+     * ABERTO por um `{desvio:true}` gravado. Recolher devolve o bloco ao
+     * PADRÃO — e o `BlocoConteudo` grava DESVIO, nunca estado, então voltar
+     * ao padrão APAGA o registro: sai um `DELETE /listas/:lista/
+     * preferencias/blocos`, não um PUT. É o contrato do componente, escrito
+     * por extenso lá dentro, e é a coisa certa (bloco novo acompanha a
+     * mudança do padrão no código em vez de ficar preso ao estado antigo).
+     *
+     * Este espião só contava PUT/POST. Resultado: quatro telas corretas
+     * reprovando com "NENHUMA gravação saiu", e o defeito era do
+     * instrumento. Pior: o check reabria o bloco no fim, o que REGRAVA o
+     * desvio — então a corrida seguinte encontrava o mesmo estado e
+     * reprovava de novo, para sempre.
+     *
+     * O DELETE não entra por padrão: quem mede o P1 usa o mesmo espião e
+     * tem um braço próprio para "Restaurar padrão". Ampliar em silêncio
+     * mudaria o significado daquele braço sem ninguém pedir.
+     */
+    async esperarGravacao(marca, tipo, ms = 4000, { aceitaReset = false } = {}) {
       const limite = Date.now() + ms;
       for (;;) {
         const achado = eventos.slice(marca).find((e) => e.tipo === tipo
-          && (e.metodo === 'PUT' || e.metodo === 'POST'));
+          && (e.metodo === 'PUT' || e.metodo === 'POST'
+            || (aceitaReset && e.metodo === 'DELETE')));
         if (achado) return achado;
         if (Date.now() > limite) return null;
         await page.waitForTimeout(200);
@@ -1048,7 +1073,13 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
         return;
       }
       recolhidoAgora = { titulo, gravou: false };
-      const gravacao = await espia.esperarGravacao(marca, 'blocos', 3500);
+      /*
+        `aceitaReset`: recolher pode ser a IDA (desvio → PUT) ou a VOLTA ao
+        padrão (registro apagado → DELETE). As duas são a escolha indo para
+        o banco; contar só a ida reprovou 4 telas certas em 06/09. O porquê
+        está inteiro no `esperarGravacao`.
+      */
+      const gravacao = await espia.esperarGravacao(marca, 'blocos', 3500, { aceitaReset: true });
       if (gravacao) recolhidoAgora.gravou = true;
       if (!gravacao) {
         semGravacao.push(titulo || `bloco ${i + 1}`);
@@ -1071,17 +1102,27 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
         };
         return;
       }
+      /*
+        O RASTRO DIZ O SENTIDO, e o relatório tem de dizer qual foi: `PUT`
+        é o desvio gravado; `DELETE` é o registro APAGADO porque o clique
+        devolveu o bloco ao `recolhidoPadrao`. Escrever "PUT" nos dois casos
+        seria o relatório afirmando uma chamada que não aconteceu.
+      */
+      const rastro = `${gravacao.metodo} ${new URL(gravacao.url).pathname}`;
+      const sentido = gravacao.metodo === 'DELETE'
+        ? ' — recolher devolveu o bloco ao padrão da tela, e o componente grava DESVIO e não estado: voltar ao padrão APAGA o registro'
+        : '';
       const estado = await depois.getAttribute('aria-expanded');
       if (estado !== 'false') {
         resultado.P3 = {
           estado: 'FALHOU',
-          motivo: `recolhi "${titulo}", a preferência FOI GRAVADA (PUT ${new URL(gravacao.url).pathname}) e depois da recarga o bloco voltou ABERTO (aria-expanded="${estado}") — grava e não lê é a mesma coisa que não guardar`
+          motivo: `recolhi "${titulo}", a preferência FOI GRAVADA (${rastro}) e depois da recarga o bloco voltou ABERTO (aria-expanded="${estado}") — grava e não lê é a mesma coisa que não guardar`
         };
         return;
       }
       resultado.P3 = {
         estado: 'PASSOU',
-        motivo: `recolhi "${titulo}", a escolha foi para o banco (PUT ${new URL(gravacao.url).pathname}) e depois da recarga o bloco continua recolhido`
+        motivo: `recolhi "${titulo}", a escolha foi para o banco (${rastro})${sentido} e depois da recarga o bloco continua recolhido`
       };
       return;
     }
@@ -1090,7 +1131,7 @@ export async function checarRecolhimentoPersiste(page, tela, resultado, ctx) {
     if (declara) {
       resultado.P3 = {
         estado: 'FALHOU',
-        motivo: `recolhi ${semGravacao.length} bloco(s) (${semGravacao.join(', ')}) e NENHUMA gravação de preferência do tipo "blocos" saiu — e o arquivo da tela declara chavePreferencia. A tela diz que ligou a persistência e o recolhimento não guarda nada: no F5 volta tudo aberto`
+        motivo: `recolhi ${semGravacao.length} bloco(s) (${semGravacao.join(', ')}) e NENHUMA gravação de preferência do tipo "blocos" saiu (nem PUT do desvio, nem DELETE da volta ao padrão) — e o arquivo da tela declara chavePreferencia. A tela diz que ligou a persistência e o recolhimento não guarda nada: no F5 volta tudo aberto`
       };
       return;
     }

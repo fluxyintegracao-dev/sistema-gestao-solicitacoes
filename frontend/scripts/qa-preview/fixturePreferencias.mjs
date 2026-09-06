@@ -568,6 +568,84 @@ async function montarBlocos() {
   }
   const dados = await carga();
   const salvo = lido(dados, 'blocos') || {};
+
+  /*
+    O SENTIDO DE VOLTA — recolher que devolve o bloco ao PADRÃO (06/09).
+
+    Esta fixture só sabia desenhar o sentido de IDA: bloco cujo padrão é
+    ABERTO, que o clique recolhe, gravando o desvio com um PUT. Só que o
+    componente grava DESVIO e nunca estado, então existe um segundo sentido,
+    e ele é metade das telas reais: bloco com recolhidoPadrao (padrão =
+    recolhido) que está ABERTO por um desvio já salvo. Recolher ali devolve
+    o bloco ao padrão, e voltar ao padrão APAGA o registro — sai um DELETE,
+    não um PUT.
+
+    Medido no preview em 06/09 (build 5fbcd89), nas quatro telas que o P3
+    ainda reprovava: as quatro mandavam DELETE, as quatro estavam CERTAS, e
+    quem errava era o check, que só contava PUT/POST como gravação. A
+    fixture não tinha como pegar isso porque não desenhava este sentido.
+
+    Um bloco só, e não dois, porque no sistema real cada bloco é uma LISTA
+    própria: apagar o desvio apaga a entrada inteira, e é isso que vira
+    DELETE. Com dois blocos na mesma lista sobraria a chave do outro e o
+    caminho seria um PUT — a fixture estaria desenhando outra coisa.
+  */
+  if (D === 'p3VoltaAoPadrao' || D === 'p3ResetNaoLe') {
+    const titulo = 'Histórico';
+    const chave = 'b0';
+    const PADRAO_RECOLHIDO = true;
+
+    /*
+      A SEMENTE, UMA VEZ SÓ. O estado que o check encontra nas telas reais é
+      "já tem desvio salvo", e é ele que precisa existir aqui antes do
+      primeiro clique. A marca vive no sessionStorage porque ela tem de
+      sobreviver ao page.reload() do check e NÃO pode sobreviver ao apagar:
+      se a semente olhasse o banco, ela renasceria logo depois do DELETE e a
+      recarga mostraria o bloco aberto de novo — a fixture plantando um
+      defeito que ninguém pediu.
+    */
+    let jaSemeado = false;
+    try { jaSemeado = sessionStorage.getItem('prova:blocos:semeado') === '1'; } catch { jaSemeado = false; }
+    if (!jaSemeado) {
+      try { sessionStorage.setItem('prova:blocos:semeado', '1'); } catch { /* sem sessionStorage: segue sem marca */ }
+      salvo[chave] = true;
+      gravar('blocos', { ...salvo });
+    }
+    const desvio = Boolean(salvo[chave]);
+    // p3ResetNaoLe: apaga o registro e NAO le o apagamento — na recarga o
+    // bloco volta aberto, que é "grava e não lê" no sentido de volta.
+    let recolhido = D === 'p3ResetNaoLe' ? false : (desvio ? !PADRAO_RECOLHIDO : PADRAO_RECOLHIDO);
+
+    const bloco = el('section', 'app-bloco');
+    const botao = el('button', 'app-bloco-recolher');
+    botao.type = 'button';
+    botao.appendChild(el('h2', 'app-bloco-titulo', titulo));
+    const acoes = el('span', 'app-bloco-acoes');
+    acoes.appendChild(el('span', 'app-bloco-recolher-seta'));
+    botao.appendChild(acoes);
+    const corpo = el('div', 'app-bloco-corpo', 'Conteúdo de ' + titulo);
+    const pintar = () => {
+      botao.setAttribute('aria-expanded', String(!recolhido));
+      bloco.classList.toggle('app-bloco--recolhido', recolhido);
+    };
+    botao.addEventListener('click', () => {
+      recolhido = !recolhido;
+      pintar();
+      if (recolhido !== PADRAO_RECOLHIDO) {
+        salvo[chave] = true;
+        gravar('blocos', { ...salvo });      // desvio: PUT
+      } else {
+        delete salvo[chave];
+        resetar('blocos');                    // de volta ao padrão: DELETE
+      }
+    });
+    pintar();
+    bloco.appendChild(botao);
+    bloco.appendChild(corpo);
+    raiz.appendChild(bloco);
+    return;
+  }
+
   ['Histórico', 'Auditoria'].forEach((titulo, i) => {
     const chave = 'b' + i;
     let recolhido = D === 'p3NaoLe' ? false : Boolean(salvo[chave]);
