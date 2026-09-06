@@ -1048,8 +1048,9 @@ function validarImportesDeHooks() {
  * R31 — A CASCA E OS COMPONENTES COMPARTILHADOS TAMBÉM SÃO CONFERIDOS (05/09).
  *
  * Descoberto ao medir o resultado da limpeza tipográfica: `Layout.jsx` tinha
- * `fontSize: 11` — abaixo do piso de 12px — e sobreviveu a uma varredura que
- * zerou 213 violações no CSS.
+ * `fontSize: 11`, abaixo do piso de 12px. Ele FOI corrigido na mesma leva —
+ * mas por engenharia humana, não pelo portão: eu apontei o agente para o JSX
+ * à mão. O portão não teria pego, e não pegaria o próximo.
  *
  * A razão é estrutural, não um descuido: o manifesto `telas-reformadas.json`
  * lista **205 telas e ZERO arquivos de `src/layout` ou `src/components`**. Todo
