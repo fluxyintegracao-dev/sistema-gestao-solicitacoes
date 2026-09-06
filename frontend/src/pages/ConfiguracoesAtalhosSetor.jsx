@@ -259,6 +259,7 @@ export default function ConfiguracoesAtalhosSetor() {
             },
             {
               id: 'obrigatorio',
+              sempreVisivel: true,
               titulo: 'Obrigatório',
               tipo: 'status',
               render: (item) => (
@@ -274,6 +275,7 @@ export default function ConfiguracoesAtalhosSetor() {
             },
             {
               id: 'ativo',
+              sempreVisivel: true,
               titulo: 'Ativo',
               tipo: 'status',
               render: (item) => (

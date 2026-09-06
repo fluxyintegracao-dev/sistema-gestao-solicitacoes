@@ -77,6 +77,7 @@ export default function UsuariosAcessoFinanceiro() {
   const colunas = [
     {
       id: 'extra',
+      sempreVisivel: true,
       titulo: 'Acesso extra',
       tipo: 'status',
       render: (usuario) => (

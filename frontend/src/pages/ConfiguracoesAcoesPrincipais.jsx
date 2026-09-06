@@ -279,6 +279,7 @@ export default function ConfiguracoesAcoesPrincipais() {
             },
             {
               id: 'ativo',
+              sempreVisivel: true,
               titulo: 'Ativo',
               tipo: 'status',
               render: (item) => (

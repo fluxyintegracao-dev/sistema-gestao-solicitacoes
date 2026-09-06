@@ -1396,6 +1396,7 @@ export default function CrPlanejamentoView({
               },
               {
                 id: 'quantidade_prevista',
+                sempreVisivel: true,
                 titulo: 'Qtd. medida',
                 tipo: 'numero',
                 // Edição inline: o controle mora no render da coluna.
@@ -1518,6 +1519,7 @@ export default function CrPlanejamentoView({
                 },
                 {
                   id: 'quantidade_prevista',
+                  sempreVisivel: true,
                   titulo: 'Nesta medição',
                   tipo: 'numero',
                   // Edição inline: o controle mora no render da coluna.
@@ -1687,6 +1689,7 @@ export default function CrPlanejamentoView({
                   },
                   {
                     id: 'quantidade_medida',
+                    sempreVisivel: true,
                     titulo: 'Qtd. aprovada',
                     tipo: 'numero',
                     // Edição inline: o controle mora no render da coluna.
@@ -1721,6 +1724,7 @@ export default function CrPlanejamentoView({
                   },
                   {
                     id: 'boletim',
+                    sempreVisivel: true,
                     titulo: 'Data / boletim',
                     tipo: 'texto',
                     render: (item) => (item.__vazio ? null : (

@@ -517,6 +517,7 @@ export default function ContratoFluxoNovo() {
               },
               {
                 id: 'valor',
+                sempreVisivel: true,
                 titulo: 'Valor',
                 tipo: 'valor',
                 /* R6 — dinheiro editavel tambem e campo de dinheiro: `.input-moeda`

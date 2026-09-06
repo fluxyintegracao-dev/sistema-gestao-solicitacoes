@@ -204,6 +204,9 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
     },
     {
       id: 'escopo',
+      // TRAVADAS (05/09): escopo e diretorias SAO a concessao de acesso; fora do
+      // modo "Diretorias especificas" a segunda nem mostra dado, so um traco.
+      sempreVisivel: true,
       titulo: 'Escopo',
       tipo: 'texto',
       flex: false,
@@ -227,6 +230,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
     },
     {
       id: 'diretorias',
+      sempreVisivel: true,
       titulo: 'Diretorias',
       tipo: 'texto',
       flex: false,

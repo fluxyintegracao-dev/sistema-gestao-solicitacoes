@@ -2260,6 +2260,7 @@ export default function Solicitacoes({ arquivadas = false }) {
               colunas={[
                 {
                   id: 'selecionar',
+                  sempreVisivel: true,
                   titulo: 'Selecionar',
                   tipo: 'status',
                   render: (titulo) => (

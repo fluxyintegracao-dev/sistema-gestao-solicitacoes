@@ -234,6 +234,9 @@ export default function GestaoCategoriasMacro() {
             },
             {
               id: 'descricao',
+              // TRAVADAS (05/09): fora do modo de edicao mostram texto, mas e aqui que o
+              // campo vira editavel — esconder tira o editar, nao o dado.
+              sempreVisivel: true,
               titulo: 'Descricao',
               tipo: 'texto',
               render: (categoria) => (editId === categoria.id ? (
@@ -250,6 +253,7 @@ export default function GestaoCategoriasMacro() {
             },
             {
               id: 'ordem',
+              sempreVisivel: true,
               titulo: 'Ordem',
               tipo: 'numero',
               render: (categoria) => (editId === categoria.id ? (

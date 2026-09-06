@@ -100,6 +100,7 @@ export default function ComportamentoRecebimentoSetor() {
             },
             {
               id: 'comportamento',
+              sempreVisivel: true,
               titulo: 'Comportamento no recebimento',
               tipo: 'texto',
               flex: true,

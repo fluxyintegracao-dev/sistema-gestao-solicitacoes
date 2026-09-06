@@ -333,6 +333,9 @@ export default function BlocoMedicaoContrato({
           colunas={[
             {
               id: 'selecao',
+              // TRAVADA (05/09): marcar, valor e vencimento SAO a medicao. Sem elas a
+              // tabela vira extrato e nao sobra caminho para medir a parcela.
+              sempreVisivel: true,
               titulo: 'Medir',
               tipo: 'status',
               // `medivel` e nao `editavel`: parcela ja medida segue com o titulo ABERTO ate o
@@ -365,6 +368,7 @@ export default function BlocoMedicaoContrato({
             },
             {
               id: 'valor',
+              sempreVisivel: true,
               titulo: 'Valor',
               tipo: 'valor',
               render: (p) => {
@@ -391,6 +395,7 @@ export default function BlocoMedicaoContrato({
             },
             {
               id: 'vencimento',
+              sempreVisivel: true,
               titulo: 'Vencimento',
               tipo: 'data',
               render: (p) => {

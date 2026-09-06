@@ -171,6 +171,7 @@ export default function SolicitacoesSlaSetor() {
             },
             {
               id: 'dias',
+              sempreVisivel: true,
               titulo: 'SLA em dias',
               tipo: 'numero',
               render: (setor) => {
@@ -191,6 +192,7 @@ export default function SolicitacoesSlaSetor() {
             },
             {
               id: 'ativo',
+              sempreVisivel: true,
               titulo: 'Ativo',
               tipo: 'status',
               render: (setor) => {

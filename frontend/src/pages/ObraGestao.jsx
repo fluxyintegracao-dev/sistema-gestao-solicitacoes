@@ -453,6 +453,9 @@ export default function ObraGestao() {
                     },
                     {
                       id: 'valor_orcado',
+                      // TRAVADA (05/09): com permissao de editar, este e o unico campo do
+                      // orcamento macro — esconder a coluna tira o editar junto com o valor.
+                      sempreVisivel: true,
                       titulo: 'Valor orcado (R$)',
                       tipo: 'valor',
                       render: (item) => (

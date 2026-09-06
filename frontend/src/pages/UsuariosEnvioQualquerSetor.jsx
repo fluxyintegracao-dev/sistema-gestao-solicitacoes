@@ -107,6 +107,7 @@ export default function UsuariosEnvioQualquerSetor() {
   const colunas = [
     {
       id: 'liberado',
+      sempreVisivel: true,
       titulo: 'Liberado',
       tipo: 'status',
       render: (usuario) => (

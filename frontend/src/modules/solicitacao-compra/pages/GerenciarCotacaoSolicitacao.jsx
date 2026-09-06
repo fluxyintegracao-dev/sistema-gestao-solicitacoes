@@ -1398,6 +1398,9 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                   },
                   {
                     id: 'quantidade',
+                    // TRAVADA (05/09): a quantidade e dado, mas o campo do remanejamento mora
+                    // dentro dela — escondida, nao sobra onde digitar a quantidade a remanejar.
+                    sempreVisivel: true,
                     titulo: 'Qtd',
                     tipo: 'numero',
                     render: (it) => (

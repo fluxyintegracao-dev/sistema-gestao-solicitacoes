@@ -148,6 +148,9 @@ export default function Setores() {
     },
     {
       id: 'codigo',
+      // TRAVADAS (05/09): em edicao, codigo e capacidades sao os campos do
+      // formulario da linha — sem elas o setor nao tem como ser editado.
+      sempreVisivel: true,
       titulo: 'Codigo',
       tipo: 'codigo',
       render: (s) => (
@@ -165,6 +168,7 @@ export default function Setores() {
     },
     {
       id: 'capacidades',
+      sempreVisivel: true,
       titulo: 'Capacidades',
       tipo: 'badge',
       render: (s) => (

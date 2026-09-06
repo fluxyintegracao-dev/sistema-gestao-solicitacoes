@@ -276,6 +276,9 @@ export default function TiposSubContrato() {
     },
     {
       id: 'tipo_macro',
+      // TRAVADA (05/09): em edicao esta coluna e o select do tipo macro — o
+      // unico caminho de trocar o macro do subtipo.
+      sempreVisivel: true,
       titulo: 'Tipo macro',
       tipo: 'texto',
       render: (t) => (

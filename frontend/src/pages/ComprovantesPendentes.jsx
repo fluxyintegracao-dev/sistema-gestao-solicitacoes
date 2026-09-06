@@ -246,6 +246,9 @@ export default function ComprovantesPendentes() {
             },
             {
               id: 'vincular',
+              // TRAVADAS (05/09): o select vincula o comprovante e os botoes abrem/baixam
+              // o arquivo. Nenhuma das duas carrega dado — sao so o caminho de agir.
+              sempreVisivel: true,
               titulo: 'Vincular a solicitacao',
               tipo: 'texto',
               // R12: select de FORMULÁRIO (entrada de dado da linha), não de
@@ -270,6 +273,7 @@ export default function ComprovantesPendentes() {
             },
             {
               id: 'arquivo_acoes',
+              sempreVisivel: true,
               titulo: 'Arquivo',
               tipo: 'texto',
               render: (item) => (

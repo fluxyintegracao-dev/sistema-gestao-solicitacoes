@@ -287,6 +287,9 @@ export default function StatusSetor() {
           colunas={[
             {
               id: 'ordem',
+              // TRAVADA (05/09): em edicao esta coluna e o campo da ordem; escondida,
+              // nao sobra onde reordenar o status.
+              sempreVisivel: true,
               titulo: 'Ordem',
               tipo: 'numero',
               render: s => (

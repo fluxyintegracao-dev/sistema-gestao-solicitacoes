@@ -476,6 +476,7 @@ export default function NovaSolicitacaoCamposConfig() {
               },
               {
                 id: 'visivel',
+                sempreVisivel: true,
                 titulo: 'Aparece',
                 tipo: 'status',
                 render: (campo) => {
@@ -493,6 +494,7 @@ export default function NovaSolicitacaoCamposConfig() {
               },
               {
                 id: 'obrigatorio',
+                sempreVisivel: true,
                 titulo: 'Obrigatorio',
                 tipo: 'status',
                 render: (campo) => {

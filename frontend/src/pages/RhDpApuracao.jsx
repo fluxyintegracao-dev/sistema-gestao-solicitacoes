@@ -916,6 +916,7 @@ export default function RhDpApuracao() {
               },
               {
                 id: 'pix',
+                sempreVisivel: true,
                 titulo: 'PIX do titulo',
                 tipo: 'texto',
                 // Edicao inline: o controle mora no render da coluna.
@@ -954,6 +955,7 @@ export default function RhDpApuracao() {
               },
               {
                 id: 'ajuste_credito',
+                sempreVisivel: true,
                 titulo: 'Ajuste credito',
                 tipo: 'texto',
                 render: (item) => (
@@ -976,6 +978,7 @@ export default function RhDpApuracao() {
               },
               {
                 id: 'ajuste_debito',
+                sempreVisivel: true,
                 titulo: 'Ajuste debito',
                 tipo: 'texto',
                 render: (item) => (
@@ -998,6 +1001,7 @@ export default function RhDpApuracao() {
               },
               {
                 id: 'status',
+                sempreVisivel: true,
                 titulo: 'Status',
                 tipo: 'badge',
                 render: (item) => (
@@ -1022,6 +1026,7 @@ export default function RhDpApuracao() {
               },
               {
                 id: 'observacoes',
+                sempreVisivel: true,
                 titulo: 'Observacoes',
                 tipo: 'texto',
                 render: (item) => (

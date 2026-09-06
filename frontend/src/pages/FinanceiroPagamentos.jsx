@@ -1175,6 +1175,7 @@ export default function FinanceiroPagamentos() {
                       colunas={[
                         {
                           id: 'selecao',
+                          sempreVisivel: true,
                           titulo: 'Sel.',
                           // Seleção em lote: coluna de marcação com render próprio.
                           tipo: 'status',

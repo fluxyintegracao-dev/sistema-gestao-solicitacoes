@@ -279,6 +279,9 @@ export default function TiposSolicitacao() {
     },
     {
       id: 'codigo_interno',
+      // TRAVADAS (05/09): em edicao, codigo interno e regras sao os campos do
+      // formulario da linha — sem elas o tipo nao tem como ser editado.
+      sempreVisivel: true,
       titulo: 'Codigo interno',
       // Codigo interno é longo (ex: SOLICITACAO_DE_COMPRA) — não cabe nos
       // 130px do tipo 'codigo'; 'texto' dá a medida de leitura.
@@ -298,6 +301,7 @@ export default function TiposSolicitacao() {
     },
     {
       id: 'regras',
+      sempreVisivel: true,
       titulo: 'Regras',
       tipo: 'badge',
       render: (t) => (

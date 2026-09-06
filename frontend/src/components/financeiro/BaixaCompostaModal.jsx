@@ -258,6 +258,7 @@ export default function BaixaCompostaModal({
                   },
                   {
                     id: 'valor_fonte',
+                    sempreVisivel: true,
                     titulo: 'Valor nesta fonte',
                     tipo: 'valor',
                     render: (titulo) => (
