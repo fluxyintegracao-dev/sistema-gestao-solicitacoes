@@ -55,11 +55,6 @@ import {
 
    ---------------------------------------------------------------------
    O QUE NÃO ENTRA AQUI.
-     - LARGURA DE COLUNA. Continua no localStorage, em pixel, por
-       navegador — ver o comentário datado em `ResizableTable.jsx`. Pixel
-       absoluto por USUÁRIO faz o monitor de 1920 estragar o notebook de
-       1366, e a forma de guardar (faixa de janela · proporção · pixel com
-       teto) é decisão do cliente, ainda em aberto.
      - A tela pública de cotação do fornecedor (`/cotacao/:token`): não tem
        usuário logado, não há onde indexar. Ela cai sozinha no caminho
        local — sem sessão, este contexto nunca carrega nem grava.
@@ -67,9 +62,8 @@ import {
        sobrevive (aba fechada, queda de rede). Não é preferência.
    ===================================================================== */
 
-/* Os dois tipos que esta migração usa, do conjunto fechado do backend
-   (`colunas | larguras | filtros | blocos | visual | geral`).
-   `larguras` está de fora de propósito — ver acima. */
+/* Os tipos que esta migração usa, do conjunto fechado do backend
+   (`colunas | larguras | filtros | blocos | visual | geral`). */
 export const TIPO_COLUNAS = 'colunas';
 export const TIPO_VISUAL = 'visual';
 /*
@@ -98,6 +92,27 @@ export const TIPO_BLOCOS = 'blocos';
   campos preenchidos, ler números diferentes em máquinas diferentes.
 */
 export const TIPO_FILTROS = 'filtros';
+
+/*
+  `larguras` ENTRA NA MIGRAÇÃO (06/09, decisão do cliente) — o tipo já
+  existia no conjunto fechado do backend (`listaPreferenciasValidators.js`,
+  teto de 8KB) e era o único sem dono no frontend. Passa a ter um: a
+  LARGURA DE COLUNA da `ResizableTable`.
+
+  ELE SÓ PODE ENTRAR PORQUE O QUE SE GUARDA MUDOU. Enquanto a largura era
+  PIXEL ABSOLUTO, levá-la ao banco por usuário fazia o monitor de 1920
+  estragar o notebook de 1366 — defeito medido neste projeto em 03/09
+  (1805px num contêiner de 1239px, quatro colunas fora da borda do cartão).
+  O cliente escolheu hoje a opção (b) do comentário datado de
+  `ResizableTable.jsx`: guardar a PROPORÇÃO da largura disponível, não o
+  pixel. Proporção significa a mesma coisa em qualquer tela, e é isso que
+  torna o banco um lugar seguro para ela.
+
+  O VALOR GUARDADO É `{ <colunaId>: fração }` — e nada mais. Pixel não sobe
+  para o banco em hipótese nenhuma: é justamente o que a decisão do cliente
+  proíbe.
+*/
+export const TIPO_LARGURAS = 'larguras';
 
 /*
   TIPO `geral` — O ÚLTIMO FILTRO CONSULTADO (06/09, decisão do cliente).
@@ -184,9 +199,12 @@ function ehObjeto(valor) {
   navegador. Ele é o ponto que torna o rollback seguro, então mantém o
   formato exatamente como o build anterior grava e lê:
 
-    tipo `colunas` -> `<storageKey>:colunas`     { ordem, visiveis, ocultas }
-    tipo `visual`  -> `<storageKey>:alinhar`     { <colunaId>: 'left'|'center'|'right' }
-                   +  `<storageKey>:modo-lista`  { numerada: boolean }
+    tipo `colunas`  -> `<storageKey>:colunas`     { ordem, visiveis, ocultas }
+    tipo `visual`   -> `<storageKey>:alinhar`     { <colunaId>: 'left'|'center'|'right' }
+                    +  `<storageKey>:modo-lista`  { numerada: boolean }
+    tipo `larguras` -> `<storageKey>:v3`          { <colunaId>: pixels }
+                       — em PIXEL, escrito pela ResizableTable; ver o
+                         comentário longo na entrada do tipo, abaixo.
 
   `alinhar` e `modo-lista` viram UM registro `visual` no banco porque os
   dois respondem à mesma pergunta ("como esta tabela se parece para mim") e
@@ -257,6 +275,49 @@ const ESPELHO = {
     },
     remover(base) {
       removerChave(`${base}:filtros`);
+    }
+  },
+  /*
+    O ESPELHO DE `larguras` É O ÚNICO QUE NÃO ESPELHA O VALOR DO BANCO — e
+    isso é deliberado (06/09).
+
+    No banco o tipo `larguras` guarda PROPORÇÃO (`{coluna: fração}`), que é
+    o que significa a mesma coisa em qualquer tela. No navegador, a chave de
+    sempre (`<base>:v3`) continua guardando PIXEL, no formato exato que o
+    build anterior lê e escreve. As duas pontas da mesma informação, em
+    unidades diferentes, cada uma pelo motivo dela:
+
+      - o BANCO precisa de proporção, senão o monitor de 1920 estraga o
+        notebook de 1366 (o defeito medido em 03/09, e a razão da decisão
+        do cliente);
+      - o ESPELHO precisa de pixel. Gravar fração em `<base>:v3` entregaria
+        `0,42` a um build revertido que lê aquele número como PIXEL: toda
+        coluna do usuário desabaria para o mínimo. E pixel medido nesta
+        máquina ainda é a melhor semente síncrona possível para esta
+        máquina, porque proporção só vira pixel depois que o contêiner é
+        medido.
+
+    Quem escreve o pixel é a `ResizableTable`, que é o único lugar do
+    sistema que conhece a largura do contêiner — sem ela não há conversão
+    possível, nos dois sentidos. Por isso `ler` e `gravar` aqui são inertes:
+    não é esquecimento, é a divisão de trabalho. `remover` continua sendo
+    daqui porque reset é ato do usuário e apaga as duas pontas.
+
+    A ADOÇÃO EM LOTE TAMBÉM NÃO PEGA ESTA CHAVE, e não é omissão:
+    `varrerLocalStorage` sobe para o banco o que está no navegador COMO
+    ESTÁ, e o que está em `<base>:v3` é pixel. Subir pixel é exatamente o
+    que a decisão proíbe. A migração do pixel guardado acontece na
+    `ResizableTable`, uma vez, convertida com o contêiner medido.
+  */
+  [TIPO_LARGURAS]: {
+    ler() {
+      return null;
+    },
+    gravar() {
+      /* o espelho em pixel é escrito pela ResizableTable */
+    },
+    remover(base) {
+      removerChave(`${base}:v3`);
     }
   },
   [TIPO_VISUAL]: {

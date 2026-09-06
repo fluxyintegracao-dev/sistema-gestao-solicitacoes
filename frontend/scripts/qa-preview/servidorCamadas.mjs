@@ -58,9 +58,21 @@ const HTML = `<!doctype html>
 <script src="/prova-bundle.js"></script>
 </body></html>`;
 
-export async function criarServidorDeCamadas() {
+/*
+  UM SERVIDOR, VÁRIAS FIXTURES (06/09).
+
+  A prova da largura de coluna precisa da mesma coisa que esta: componentes
+  REAIS numa página local, com o CSS real e na ordem real da cascata. Um
+  segundo servidor idêntico seria a terceira maneira de fazer a mesma coisa
+  no repositório — o que este arquivo já dizia, no topo, para evitar.
+
+  Então o que muda entre uma fixture e outra é o que sempre foi: a ENTRADA e
+  o punhado de regras de layout que só aquela prova precisa. O resto (a
+  lista de CSS, a ordem, o esbuild, o `define` do ambiente) é comum.
+*/
+export async function criarServidorDeFixture({ entrada, cssExtra = '', caminho = 'fixture' }) {
   const pacote = await esbuild.build({
-    entryPoints: [path.join(AQUI, 'fixtureCamadas.jsx')],
+    entryPoints: [path.join(AQUI, entrada)],
     bundle: true,
     write: false,
     format: 'iife',
@@ -80,7 +92,7 @@ export async function criarServidorDeCamadas() {
   });
   const js = pacote.outputFiles[0].text;
   const css = CSS.map((rel) => fs.readFileSync(path.join(RAIZ_FRONT, rel), 'utf8')).join('\n\n')
-    + '\n\n' + CSS_FIXTURE;
+    + '\n\n' + cssExtra;
 
   const servidor = http.createServer((req, res) => {
     const rota = req.url.split('?')[0];
@@ -101,7 +113,22 @@ export async function criarServidorDeCamadas() {
   const porta = servidor.address().port;
 
   return {
-    rota: (defeito = '') => `http://127.0.0.1:${porta}/camadas${defeito ? `?d=${defeito}` : ''}`,
+    rota: (busca = '') => {
+      const cru = String(busca || '');
+      if (!cru) return `http://127.0.0.1:${porta}/${caminho}`;
+      /* Compatibilidade com quem chama passando só o nome do defeito
+         (`rota('semPosicao')`), que é como a prova das camadas chama. */
+      const query = cru.startsWith('?') ? cru : `?d=${cru}`;
+      return `http://127.0.0.1:${porta}/${caminho}${query}`;
+    },
     fechar: () => servidor.close()
   };
+}
+
+export function criarServidorDeCamadas() {
+  return criarServidorDeFixture({
+    entrada: 'fixtureCamadas.jsx',
+    cssExtra: CSS_FIXTURE,
+    caminho: 'camadas'
+  });
 }

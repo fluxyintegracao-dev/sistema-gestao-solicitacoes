@@ -1456,12 +1456,93 @@ async function checarRedimensionamento(page, tela, resultado) {
     próprio harness. Check que mede o estado que ele mesmo criou, e não diz
     isso, é pior que check nenhum — ele acusa a tela de um defeito do
     verificador.
+
+    O QUE ESTA LIMPEZA NÃO ALCANÇA (06/09, escrito para não virar surpresa):
+    desde que a largura virou preferência de USUÁRIO (tipo `larguras`, em
+    proporção), o arrasto deste check também vai para o BANCO, e apagar
+    `:v3` limpa só o espelho do navegador — a cópia do servidor sobrevive à
+    rodada. O efeito é menor do que era o do localStorage puro: a largura
+    guardada agora é fração e o teto de restauração devolve o excesso
+    quando a janela encolhe, que é justamente a situação que o T4 mede. Mas
+    quem reescrever isto precisa saber que a limpeza é do ESPELHO, não da
+    preferência. O mesmo já valia para o alinhamento (`visual`) desde
+    05/09.
   */
-  await page.evaluate(() => {
-    Object.keys(window.localStorage)
-      .filter((chave) => chave.includes(':v3'))
-      .forEach((chave) => window.localStorage.removeItem(chave));
-  });
+  const restauracaoDeLargura = await page.evaluate(async () => {
+    const chaves = Object.keys(window.localStorage).filter((c) => c.includes(':v3'));
+    chaves.forEach((c) => window.localStorage.removeItem(c));
+
+    /*
+      A LIMPEZA PRECISA ALCANCAR O BANCO, NAO SO O ESPELHO (06/09).
+
+      Desde que a largura virou preferencia de usuario, o arrasto deste
+      check tambem GRAVA no servidor. Apagar `:v3` limpava so o espelho do
+      navegador, e a copia do banco sobrevivia a rodada — a corrida
+      seguinte comecaria medindo uma tabela que o proprio harness ajustou.
+      E o mesmo defeito que ja foi achado nos blocos hoje: o verificador
+      alterando o sistema que observa.
+
+      O cliente autorizou o harness a escrever na linha de preferencia do
+      usuario de QA (decisao D4) sob UMA condicao — restauracao obrigatoria.
+      Isto e o cumprimento dessa condicao.
+
+      Reproduz `authHeaders()` do app: token em sessionStorage e CSRF no
+      cookie. Se nao houver token, devolve o motivo em vez de fingir que
+      limpou — restauracao que falha calada e o defeito, nao o conserto.
+    */
+    /*
+      SEM TOKEN NAO E FALHA DE RESTAURACAO — e ausencia de gravacao.
+
+      Peguei este erro no proprio portao: a fixture da prova de mordida do
+      runner roda SEM login, e a primeira versao disto reprovava ali por
+      "sem token", derrubando ate o controle positivo ("tabela que
+      obedece"). A semantica estava errada: se nao ha sessao, o app
+      tampouco conseguiu gravar no banco — nao existe o que desfazer.
+      Reprovacao de restauracao vale para "gravei e nao consegui apagar",
+      nunca para "nunca gravei".
+    */
+    const token = sessionStorage.getItem('fluxy_auth_session_token');
+    if (!token) return { ok: true, semBanco: true, motivo: 'sem sessao: o app nao gravou no banco, nao ha o que restaurar' };
+
+    const csrf = (document.cookie.match(/(?:^|;\s*)(?:XSRF-TOKEN|csrfToken)=([^;]+)/) || [])[1];
+    const listas = chaves.map((c) => c.replace(/:v3$/, ''));
+    const base = window.__FLUXY_API_URL__ || '';
+    const falhas = [];
+    for (const lista of listas) {
+      try {
+        const r = await fetch(`${base}/listas/${encodeURIComponent(lista)}/preferencias/larguras`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(csrf ? { 'X-CSRF-Token': decodeURIComponent(csrf) } : {})
+          }
+        });
+        if (!r.ok && r.status !== 404) falhas.push(`${lista}: HTTP ${r.status}`);
+      } catch (e) { falhas.push(`${lista}: ${e.message}`); }
+    }
+    return { ok: falhas.length === 0, listas: listas.length, falhas };
+  }).catch((e) => ({ ok: false, motivo: e.message }));
+
+  /*
+    RESTAURACAO QUE FALHA REPROVA O ITEM — nao passa calada.
+
+    E a mesma regra que os quatro itens da leva de preferencias ja seguem:
+    "Restaurar padrao" que nao restaura e defeito da capacidade, nao do
+    teste. Aqui vale duplo, porque a autorizacao do cliente para o harness
+    escrever no banco (D4) foi dada SOB a condicao da restauracao. Deixar
+    isso silencioso transformaria a condicao dele em texto morto, e a
+    proxima corrida mediria uma tabela que este check ajustou.
+  */
+  if (restauracaoDeLargura && restauracaoDeLargura.ok === false) {
+    const porque = restauracaoDeLargura.motivo
+      || `nao consegui apagar em ${(restauracaoDeLargura.falhas || []).length} lista(s): ${(restauracaoDeLargura.falhas || []).join(', ')}`;
+    const antes = resultado.T3 || {};
+    resultado.T3 = {
+      estado: 'FALHOU',
+      motivo: `${antes.motivo ? `${antes.motivo}; ` : ''}a largura que este check gravou NAO foi desfeita no banco (${porque}) — a proxima corrida comecaria medindo uma tabela ajustada pelo proprio harness`
+    };
+  }
   await page.reload({ waitUntil: 'domcontentloaded' });
   await esperarCarregar(page);
   await page.evaluate(() => {

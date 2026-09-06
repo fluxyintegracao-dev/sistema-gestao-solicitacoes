@@ -194,9 +194,10 @@ function normalizarColuna(coluna) {
   alinhamento (`:alinhar`) e modo de lista (`:modo-lista`) viram os dois
   campos do tipo `visual`.
 
-  A LARGURA (`:v3`) NÃO veio junto, de propósito — ela está em pixel
-  absoluto e a forma de guardá-la por usuário ainda é decisão do cliente.
-  O comentário datado está em `ResizableTable.jsx`.
+  A LARGURA veio junto em 06/09, quando o cliente escolheu como guardá-la:
+  PROPORÇÃO da largura disponível, não pixel absoluto (tipo `larguras`). O
+  espelho em pixel continua em `<storageKey>:v3`, por navegador, e quem o
+  escreve é a `ResizableTable` — o comentário datado está lá.
 */
 
 /* Referência estável para "nenhum alinhamento salvo": objeto literal novo a
@@ -1428,18 +1429,31 @@ export default function TabelaPadrao({
           minWidth: c.minWidth || 90
         }))}
         /*
-          ":v3" — a chave TEM de virar quando a REGRA DE LEITURA do que está
-          guardado muda, não só quando o valor muda.
+          A CHAVE QUE DESCE AQUI É A DA TABELA, SEM SUFIXO (06/09).
 
-          O ":v2" guardava o MAPA INTEIRO de larguras. A regra nova lê
-          "chave presente = largura escolhida pelo usuário". Lendo um mapa
-          v2 com a regra v3, TODAS as colunas viram "do usuário" e a tabela
-          congela para sempre — medido em 03/09: 1805px num contêiner de
-          1239px, 566px fora, sem nunca remedir. E isso não aconteceria em
-          nenhum harness: ele nasce com localStorage limpo. Só quem usou o
-          build anterior é atingido, que é justamente quem não pode ser.
+          Até hoje descia `<storageKey>:v3`, porque o único destino da
+          largura era o localStorage e ":v3" É o nome daquela chave. Agora a
+          largura também vai para o banco, pelo `PreferenciasContext`, e lá
+          a identidade da lista é a TABELA — a mesma linha que já guarda
+          `colunas` e `visual`, com o TIPO separando o que é o quê. Descer
+          `:v3` criaria uma segunda lista, `tabela:...:v3`, para a mesma
+          tabela.
+
+          O sufixo não sumiu: ele passou a ser responsabilidade da
+          `ResizableTable`, que monta `<storageKey>:v3` para o espelho local
+          em pixel. A chave do navegador é exatamente a mesma de antes.
+
+          E ela continua sendo ":v3" pelo motivo de 03/09, que segue de pé:
+          a versão TEM de virar quando a REGRA DE LEITURA do que está
+          guardado muda, não só quando o valor muda. O ":v2" guardava o MAPA
+          INTEIRO de larguras; lido com a regra v3 ("chave presente =
+          largura do usuário"), TODAS as colunas viravam "do usuário" e a
+          tabela congelava — 1805px num contêiner de 1239px, 566px fora, sem
+          nunca remedir. A regra de leitura de hoje é a mesma do v3 (chave
+          presente = do usuário; o que muda é a unidade guardada no banco),
+          e o pixel do espelho continua sendo lido como pixel.
         */
-        storageKey={storageKey ? `${storageKey}:v3` : undefined}
+        storageKey={storageKey || undefined}
         aoMudarLarguras={receberLarguras}
         scrollLabel={rotuloRolagem}
       >

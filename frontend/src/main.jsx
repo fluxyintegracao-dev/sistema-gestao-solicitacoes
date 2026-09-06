@@ -16,6 +16,7 @@ import './styles/escala.css';
 import './styles/componentes-padrao.css';
 import './modules/solicitacao-compra/compras-responsive.css';
 import './styles/responsive-system.css';
+import { API_URL } from './services/api';
 
 applyNativeDocumentAttributes();
 installFetchSecurityDefaults();
@@ -24,6 +25,12 @@ installFetchSecurityDefaults();
 // do commit que gerou este bundle, injetado pelo vite.config (define).
 // eslint-disable-next-line no-undef
 window.__FLUXY_BUILD__ = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : '';
+/* Endereço da API, pelo mesmo motivo do SHA acima: o harness de QA precisa
+   DESFAZER no banco o que os checks gravam (decisão D4 do cliente — escrever
+   na preferência do usuário de QA só vale com restauração obrigatória), e
+   sem a base ele mandaria o DELETE para a origem errada. Leitura pura; a
+   URL já viaja no bundle desde sempre. */
+window.__FLUXY_API_URL__ = API_URL;
 
 function AppShell() {
   const location = useLocation();
