@@ -118,6 +118,52 @@ verificada só à mão, por você, no caderno de teste.
 
 ---
 
+## D5 — Três listas que não fecham ao clicar fora, e converter muda o que você vê
+
+**Motivo:** muda comportamento percebido.
+
+A auditoria das camadas flutuantes fechou 35 pontos: todos fecham ao clicar
+fora, ao tocar fora e no Esc. **Zero** ainda fecham só por perda de foco.
+
+Sobraram **três de fronteira**, e elas são diferentes: são listas de resultado
+**em fluxo** — sem `position`, sem `z-index`. Elas **empurram** o formulário
+para baixo em vez de cobrir o conteúdo. Por isso não se comportam como camada:
+
+1. **Lista de favorecidos da medição** — `BlocoMedicaoContrato.jsx`
+2. **Dois seletores de subitem** (previsto e aprovado) — `CrPlanejamentoView.jsx`
+3. **Lista de credores do contrato** — `GestaoContratos.jsx` (aparece duas
+   vezes: no novo e na edição)
+
+Hoje elas não fecham ao clicar fora nem no Esc. Converter tem preço medido:
+nas três, **clicar em outro campo do mesmo formulário passaria a sumir com a
+lista** — e no caso dos credores, a lista é o **único caminho** para vincular
+um credor ao contrato. Fechá-la por engano no meio do preenchimento é pior que
+deixá-la aberta.
+
+**O que decidir:** deixar as três como estão (elas não cobrem nada, então não
+"prendem" a tela), ou acrescentar **só o Esc** — mudança menor, mas ainda
+visível. Não converti nenhuma das duas formas sem sua palavra.
+
+---
+
+## D6 — Nenhuma regra estática pega a armadilha que mata a seleção
+
+**Motivo:** não é decisão sua, é aviso — mas você precisa saber, porque muda o
+quanto o portão verde vale.
+
+A prova de mordida mediu isto: removendo o `ref` de cima do painel e o
+`preventDefault` da opção, **a seleção morre** (o clique fecha a camada no
+`mousedown` e nunca chega ao `onClick`) e **o portão inteiro passa verde** —
+validador de layout, varredura de alcance e testes responsivos, todos em 0.
+
+O que segura hoje é a **contenção**: o `ref` cobrir o painel. Isso foi
+conferido **uma a uma** nas 10 camadas dessa família, e em todas o painel está
+dentro do `ref` e a opção tem `preventDefault`. Mas é conferência humana, não
+regra — se alguém quebrar amanhã, nada avisa.
+
+Registro como lacuna declarada em vez de deixar o verde parecer mais forte do
+que é.
+
 ## Onde estas decisões moram no código
 
 Quando qualquer uma vier, o ponto de corte já está marcado com comentário
@@ -129,3 +175,5 @@ datado, para não virar caça ao tesouro:
   CONTINUA NO localStorage — E ISSO É DELIBERADO"
 - **D3** — `docs/PROPOSTA-FILTROS-INICIAIS.md`
 - **D4** — `frontend/scripts/qa-preview/preferencias.mjs`, cabeçalho
+- **D5** — os três arquivos citados acima
+- **D6** — nada a cortar: é lacuna do verificador, registrada no commit `a2861cc`
