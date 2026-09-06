@@ -164,7 +164,7 @@ export default function ParceiroAutocomplete({
       />
 
       {open && !disabled ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-dropdown max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
           {filteredOptions.length ? filteredOptions.map((option, index) => (
             <button
               key={option.id}

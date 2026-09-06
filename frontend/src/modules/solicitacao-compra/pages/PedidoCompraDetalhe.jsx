@@ -534,7 +534,7 @@ export default function PedidoCompraDetalhe() {
     Não havia estado de aberta: a camada existia sempre que
     `fornecedoresFrete.length` fosse maior que zero e o credor ainda não
     tivesse sido escolhido. Ou seja, só saía da tela ao SELECIONAR alguém
-    ou ao apagar a busca abaixo de dois caracteres. Como é `absolute z-20`
+    ou ao apagar a busca abaixo de dois caracteres. Como é `absolute z-dropdown`
     dentro do modal de frete, ela cobria o bloco de "Cadastro rápido do
     credor/transportador" logo abaixo — quem quisesse cadastrar um credor
     novo tinha de apagar o que digitou para enxergar o formulário.
@@ -2683,7 +2683,7 @@ export default function PedidoCompraDetalhe() {
                     ) : null}
 
                     {!credorFreteSelecionado && listaCredorFreteAberta && fornecedoresFrete.length ? (
-                      <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface)] shadow-xl">
+                      <div className="absolute left-0 right-0 top-full z-dropdown mt-2 max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface)] shadow-xl">
                         {fornecedoresFrete.map((credor) => (
                           <button
                             key={`${credor.origem_frete || 'credor'}:${credor.id}`}

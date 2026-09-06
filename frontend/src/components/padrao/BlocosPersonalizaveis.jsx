@@ -1,6 +1,7 @@
 import { Children, isValidElement, useEffect, useMemo, useRef, useState } from 'react';
 import BlocoConteudo from './BlocoConteudo';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
+import { usePosicaoFlutuante } from '../../hooks/usePosicaoFlutuante';
 import { TIPO_BLOCOS, usePreferenciaDeLista } from '../../contexts/PreferenciasContext';
 import {
   larguraPadraoDoBloco,
@@ -146,6 +147,18 @@ export default function BlocosPersonalizaveis({
   }, []);
 
   useFecharAoSair(adicionarRef, adicionarAberto, () => setAdicionarAberto(false));
+  /*
+    O catálogo "Adicionar bloco" é `absolute; left: 0` com `min-width:
+    230px` e teto de 420px. Numa barra de personalização o botão fica à
+    DIREITA: a 390px de janela o catálogo saía pela borda direita, e é a
+    mesma família do defeito do painel "Filtros visíveis" — só que para o
+    outro lado. Alinhar pela esquerda do botão continua sendo a
+    preferência; o hook só vira quando esse lado não cabe.
+    R29: hook no topo, acima de qualquer saída antecipada.
+  */
+  const botaoAdicionarRef = useRef(null);
+  const menuAdicionarRef = useRef(null);
+  const posicaoAdicionar = usePosicaoFlutuante(botaoAdicionarRef, menuAdicionarRef, adicionarAberto);
 
   // Quem controla o arranjo de fora também grava de fora: a chave só
   // registra entrada no armazém quando ela é MESMO a dona da gravação.
@@ -432,14 +445,21 @@ export default function BlocosPersonalizaveis({
       <button
         type="button"
         className="btn btn-outline btn-sm"
+        ref={botaoAdicionarRef}
         onClick={() => setAdicionarAberto((aberto) => !aberto)}
         aria-expanded={adicionarAberto}
         disabled={disponiveis.length === 0}
       >
         Adicionar bloco{disponiveis.length > 0 ? ` (${disponiveis.length})` : ''}
       </button>
-      {adicionarAberto && disponiveis.length > 0 && (
-        <div className="app-blocos-adicionar-pop" role="menu" aria-label="Blocos disponíveis">
+      {adicionarAberto && disponiveis.length > 0 && posicaoAdicionar && (
+        <div
+          className="app-blocos-adicionar-pop"
+          role="menu"
+          aria-label="Blocos disponíveis"
+          ref={menuAdicionarRef}
+          style={posicaoAdicionar.estilo}
+        >
           {grupos
             ? grupos.map(({ grupo, blocos: doGrupo }) => (
               <div key={grupo || 'sem-grupo'} className="app-blocos-adicionar-grupo">

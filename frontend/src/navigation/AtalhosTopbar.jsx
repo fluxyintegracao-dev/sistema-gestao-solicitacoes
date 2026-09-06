@@ -13,6 +13,7 @@ import { findFixableByPath, resolveLabel } from './navigationConfig';
 import { useAtalhos } from './AtalhosContext';
 import { definirTelaInicial, limparTelaInicial } from '../services/telaInicial';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
+import { usePosicaoFlutuante } from '../hooks/usePosicaoFlutuante';
 
 // =====================================================================
 // BARRA DO TOPO — estrela de fixar a tela atual + botão de tela
@@ -97,6 +98,22 @@ export default function AtalhosTopbar() {
   // Painel fecha com clique fora e Esc — hook compartilhado.
   useFecharAoSair(painelRef, painelAberto, () => setPainelAberto(false));
 
+  /*
+    O painel "mais atalhos" é `absolute; left: 0` com 240px de largura
+    mínima, e o botão dele vive ENCOSTADO NA DIREITA da barra do topo: a
+    borda direita do painel caía fora da janela em toda largura, e a 390px
+    ele saía inteiro. Mesma família do "Filtros visíveis", espelhada.
+    Alinhar pela esquerda do botão segue sendo a preferência — o hook só
+    troca de lado quando esse lado não cabe.
+
+    R29 — este hook fica ACIMA do `if (carregando) return` de baixo. Ele e o
+    `useFecharAoSair` são os dois hooks que a barra do topo chama depois do
+    carregamento, e a barra passa por `carregando` em toda navegação.
+  */
+  const botaoMaisRef = useRef(null);
+  const painelMenuRef = useRef(null);
+  const posicaoPainel = usePosicaoFlutuante(botaoMaisRef, painelMenuRef, painelAberto);
+
   useEffect(() => {
     setPainelAberto(false);
   }, [location.pathname]);
@@ -175,6 +192,7 @@ export default function AtalhosTopbar() {
           <button
             type="button"
             className="fx-atalhos-mais"
+            ref={botaoMaisRef}
             onClick={() => setPainelAberto((aberto) => !aberto)}
             aria-expanded={painelAberto}
             aria-haspopup="menu"
@@ -183,8 +201,14 @@ export default function AtalhosTopbar() {
           >
             <HiOutlineChevronDoubleRight size={15} aria-hidden="true" />
           </button>
-          {painelAberto && (
-            <div className="fx-atalhos-painel" role="menu" aria-label="Todos os seus atalhos">
+          {painelAberto && posicaoPainel && (
+            <div
+              className="fx-atalhos-painel"
+              role="menu"
+              aria-label="Todos os seus atalhos"
+              ref={painelMenuRef}
+              style={posicaoPainel.estilo}
+            >
               <ul>
                 {excedentes.map((item) => {
                   const Icone = item.icon;

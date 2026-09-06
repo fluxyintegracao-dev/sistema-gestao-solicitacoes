@@ -1138,7 +1138,7 @@
 
 .compras-responsive-scope .compra-item-autocomplete-options > button:focus-visible {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-conteudo);
   outline: 2px solid var(--c-primary);
   outline-offset: -2px;
 }

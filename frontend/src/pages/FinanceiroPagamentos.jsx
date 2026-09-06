@@ -334,7 +334,7 @@ export default function FinanceiroPagamentos() {
     desligava sem consumir a busca: só `handleSelectObra` (escolher uma
     obra) e `handleClearObra` (o botão "Limpar") o punham em falso. Não
     havia caminho para apenas DISPENSAR a camada — e ela é `absolute
-    z-20` sobre a faixa de filtros, tapando "Origem" e "Conta pagadora"
+    z-dropdown` sobre a faixa de filtros, tapando "Origem" e "Conta pagadora"
     logo abaixo. Clicar fora não fazia nada; `Esc` não fazia nada.
 
     Faltava só o gancho: o estado já estava pronto, o hook agora o
@@ -1036,7 +1036,7 @@ export default function FinanceiroPagamentos() {
                       )}
                     </div>
                     {obraSuggestionsOpen && (
-                      <div className="absolute left-3 right-3 top-[calc(100%-0.5rem)] z-20 max-h-64 overflow-y-auto rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface)] p-2 shadow-xl">
+                      <div className="absolute left-3 right-3 top-[calc(100%-0.5rem)] z-dropdown max-h-64 overflow-y-auto rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface)] p-2 shadow-xl">
                         {obrasFiltradas.length > 0 ? (
                           obrasFiltradas.map((obra) => (
                             <button

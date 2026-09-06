@@ -432,7 +432,7 @@ export default function FinanceiroTituloEditar() {
     JEITO NENHUM (05/09).
 
     Nenhuma das duas tinha estado de aberta: existiam enquanto houvesse
-    texto digitado e nenhum item escolhido. Como são `absolute z-20`,
+    texto digitado e nenhum item escolhido. Como são `absolute z-dropdown`,
     ficavam pousadas sobre os campos seguintes ("Apropriação", "Número do
     documento") e a única saída era escolher um item ou APAGAR a busca.
     Clicar fora não fazia nada; `Esc` não fazia nada.
@@ -1016,7 +1016,7 @@ export default function FinanceiroTituloEditar() {
                   </div>
                   <input type="hidden" value={form.parceiro_id} required />
                   {mostrarListaParceiros && (
-                    <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-dropdown mt-2 max-h-56 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-lg">
                       {parceirosAutocomplete.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
                           Nenhum parceiro encontrado.
@@ -1094,7 +1094,7 @@ export default function FinanceiroTituloEditar() {
                     </div>
                   )}
                   {mostrarListaCategorias && (
-                    <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-dropdown mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-lg">
                       {categoriasAutocomplete.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
                           Nenhuma categoria encontrada.

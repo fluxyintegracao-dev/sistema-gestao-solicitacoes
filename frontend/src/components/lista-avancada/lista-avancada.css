@@ -368,7 +368,7 @@
   /* O menu tem 8px de recuo interno: colando em `top: 0` sobraria uma fresta
      por onde as opções passariam por cima ao rolar. Sobe o recuo. */
   top: calc(var(--esp-2) * -1);
-  z-index: 1;
+  z-index: var(--z-conteudo);
   width: 100%;
   margin-bottom: var(--esp-1);
   padding: var(--esp-2);
@@ -597,7 +597,7 @@
   width: 9px;
   height: 100%;
   cursor: col-resize;
-  z-index: 2;
+  z-index: var(--z-alca);
   touch-action: none;
 }
 
@@ -760,7 +760,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  z-index: 1;
+  z-index: var(--z-conteudo);
 }
 
 /* ---------- estados/rodapé ---------- */

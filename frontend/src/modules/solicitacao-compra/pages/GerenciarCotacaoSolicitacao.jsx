@@ -1629,7 +1629,7 @@ function SecaoEnvioFornecedores({
 
     Ela não tinha estado de aberta: aparecia por `texto digitado > 0` e só
     sumia quando a pessoa APAGAVA o que digitou ou escolhia uma categoria.
-    Como é `absolute z-20`, ficava pousada sobre o seletor de categoria e
+    Como é `absolute z-dropdown`, ficava pousada sobre o seletor de categoria e
     o botão "Buscar" logo abaixo — e não havia como dispensá-la sem perder
     o termo buscado. Clicar fora não fazia nada; `Esc` não fazia nada.
 
@@ -1859,7 +1859,7 @@ function SecaoEnvioFornecedores({
                     />
                     {deveMostrarAutocomplete && autocompleteFornecedorAberto && (
                       <div
-                        className="cotacao-fornecedores-autocomplete absolute left-0 right-0 z-20 mt-1 rounded-xl border"
+                        className="cotacao-fornecedores-autocomplete absolute left-0 right-0 z-dropdown mt-1 rounded-xl border"
                         style={{ top: '100%', borderColor: 'var(--c-border)', background: 'var(--c-surface)', boxShadow: 'var(--ui-shadow-lg)' }}
                       >
                         {buscandoFornecedores ? (
@@ -2112,7 +2112,7 @@ function SecaoEnvioFornecedores({
                 <table className="w-max min-w-[980px] text-left text-xs">
                   <thead className="uppercase tracking-wide" style={{ background: 'var(--ui-surface-2)', color: 'var(--c-muted)' }}>
                     <tr>
-                      <th className="sticky left-0 z-10 min-w-[260px] px-3 py-2" style={{ background: 'var(--ui-surface-2)' }}>Item</th>
+                      <th className="sticky left-0 z-celula-cabecalho min-w-[260px] px-3 py-2" style={{ background: 'var(--ui-surface-2)' }}>Item</th>
                       <th className="min-w-[95px] px-3 py-2">Qtd.</th>
                       <th className="min-w-[180px] px-3 py-2">Especificacao</th>
                       <th className="min-w-[115px] px-3 py-2">Necessario</th>
@@ -2148,7 +2148,7 @@ function SecaoEnvioFornecedores({
                         && fornecedoresSelecionadosDetalhes.every((fornecedor) => Boolean(itensSelecionadosEnvio?.[fornecedorSelectionKey(fornecedor)]?.[itemKey]));
                       return (
                         <tr key={itemKey} className="border-t align-top" style={{ borderColor: 'var(--c-border)' }}>
-                          <td className="sticky left-0 z-[1] px-3 py-2" style={{ background: 'var(--c-surface)' }}>
+                          <td className="sticky left-0 z-celula px-3 py-2" style={{ background: 'var(--c-surface)' }}>
                             <label className="flex items-start gap-2">
                               <input
                                 className="mt-1"
@@ -2539,8 +2539,8 @@ function SecaoComparativo({
                 <table className="table min-w-[1420px] text-xs">
                   <thead>
                     <tr>
-                      <th className="sticky left-0 z-20 min-w-[260px]" style={{ background: 'var(--ui-surface-2)' }}>Item</th>
-                      <th className="sticky left-[260px] z-20 min-w-[110px] text-right" style={{ background: 'var(--ui-surface-2)' }}>Qtd.</th>
+                      <th className="sticky left-0 z-celula-cabecalho min-w-[260px]" style={{ background: 'var(--ui-surface-2)' }}>Item</th>
+                      <th className="sticky left-[260px] z-celula-cabecalho min-w-[110px] text-right" style={{ background: 'var(--ui-surface-2)' }}>Qtd.</th>
                       {fornecedoresMapaVisiveis.map((fornecedor) => (
                         <th
                           key={fornecedor.fornecedor_id}
@@ -2582,7 +2582,7 @@ function SecaoComparativo({
                       const excedeu = totalAlocadoItem > saldoDisponivel + 0.0001;
                       return (
                         <tr key={buildItemKey(item)}>
-                          <td className="sticky left-0 z-10 min-w-[260px] px-3 py-2 align-top" style={{ background: 'var(--c-surface)' }}>
+                          <td className="sticky left-0 z-celula min-w-[260px] px-3 py-2 align-top" style={{ background: 'var(--c-surface)' }}>
                             <div className="font-semibold" style={{ color: 'var(--c-text)' }}>{item.nome}</div>
                             <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
                               {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
@@ -2597,7 +2597,7 @@ function SecaoComparativo({
                               </div>
                             ) : null}
                           </td>
-                          <td className="sticky left-[260px] z-10 min-w-[110px] px-3 py-2 text-right align-top font-semibold" style={{ background: 'var(--c-surface)' }}>
+                          <td className="sticky left-[260px] z-celula min-w-[110px] px-3 py-2 text-right align-top font-semibold" style={{ background: 'var(--c-surface)' }}>
                             {formatNumeroCompra(quantidadeItem)} {item.unidade || ''}
                           </td>
                           {fornecedoresMapaVisiveis.map((fornecedor) => renderCelulaFornecedorMapa(item, fornecedor))}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
+import { usePosicaoFlutuante } from '../../hooks/usePosicaoFlutuante';
 
 function normalize(v) {
   return String(v || '')
@@ -39,23 +40,26 @@ export default function ApropriacaoAutocomplete({
   // outro lugar que ponha o campo dentro de uma area com rolagem.
   const campoRef = useRef(null);
   const painelRef = useRef(null);
-  const [caixa, setCaixa] = useState(null);
+  /*
+    A MEDICAO ESCRITA A MAO SAIU DAQUI EM 06/09 — e este era o SEGUNDO jeito
+    de posicionar camada medida no sistema.
 
-  useEffect(() => {
-    if (!open || !campoRef.current) return undefined;
-    const medir = () => {
-      const r = campoRef.current?.getBoundingClientRect();
-      if (r) setCaixa({ left: r.left, top: r.bottom + 4, width: r.width });
-    };
-    medir();
-    window.addEventListener('resize', medir);
-    // `true` para capturar rolagem de QUALQUER ancestral, nao so da janela.
-    window.addEventListener('scroll', medir, true);
-    return () => {
-      window.removeEventListener('resize', medir);
-      window.removeEventListener('scroll', medir, true);
-    };
-  }, [open]);
+    Ela media (`left`, `bottom + 4`, `width`) e NAO PRENDIA NADA na janela:
+    com o campo perto do rodape, a lista de 240px caia inteira abaixo da
+    borda de baixo, e como o painel e `fixed` rolar nao o traz de volta. Era
+    o mesmo defeito que o menu de coluna da TabelaPadrao ja tinha pago em
+    05/09, com a mesma causa e um cálculo separado.
+
+    O `usePosicaoFlutuante` faz o que ela fazia e mais tres coisas: vira
+    para CIMA quando nao cabe embaixo, encosta na borda quando nao cabe de
+    nenhum lado, e poe rolagem interna quando nem assim cabe. A largura
+    continua sendo a do CAMPO — e isso agora e uma opcao do hook
+    (`larguraDaAncora`), nao uma conta local: a lista com a largura do campo
+    e o que diz, sem texto nenhum, que aquelas opcoes sao daquele campo.
+  */
+  const caixa = usePosicaoFlutuante(campoRef, painelRef, open && !disabled, {
+    larguraDaAncora: true
+  });
 
   const selectedOption = useMemo(
     () => options.find((item) => String(item.id) === String(value || '')),
@@ -162,8 +166,8 @@ export default function ApropriacaoAutocomplete({
       {open && !disabled && caixa && typeof document !== 'undefined' && createPortal((
         <div
           ref={painelRef}
-          className="fixed max-h-60 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
-          style={{ left: caixa.left, top: caixa.top, width: caixa.width, zIndex: 'var(--z-dropdown-portal, 90)' }}
+          className="max-h-60 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+          style={{ ...caixa.estilo, zIndex: 'var(--z-dropdown-portal)' }}
         >
           {filteredOptions.length ? (
             filteredOptions.map((option, i) => (

@@ -718,7 +718,7 @@ export default function FinanceiroTituloNovo() {
     A LISTA DE CATEGORIAS NÃO FECHAVA DE JEITO NENHUM (05/09).
 
     `mostrarListaCategorias` era só "tem texto digitado e ainda não há
-    categoria escolhida": a camada (`absolute z-20`) ficava pousada sobre
+    categoria escolhida": a camada (`absolute z-dropdown`) ficava pousada sobre
     a "Descrição" e o "Número do documento" logo abaixo, e a única saída
     era escolher uma categoria ou APAGAR a busca — quem digitasse e
     quisesse conferir um campo abaixo perdia o termo para conseguir ver.
@@ -1746,7 +1746,7 @@ export default function FinanceiroTituloNovo() {
                       </div>
                     )}
                     {mostrarListaCategorias && (
-                      <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
+                      <div className="absolute left-0 right-0 top-full z-dropdown mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
                         {categoriasAutocomplete.length === 0 ? (
                           <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
                             Nenhuma categoria encontrada. Apague parte do texto ou abra a lupa para ver a lista inteira.

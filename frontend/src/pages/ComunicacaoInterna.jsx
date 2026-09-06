@@ -1128,7 +1128,7 @@ export default function ComunicacaoInterna() {
                     {menuMsgId && (
                       <div
                         aria-hidden="true"
-                        style={{ position: 'fixed', inset: 0, zIndex: 19 }}
+                        style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-conteudo)' }}
                         onClick={() => setMenuMsgId(null)}
                       />
                     )}
@@ -1164,7 +1164,7 @@ export default function ComunicacaoInterna() {
                                 position: 'absolute',
                                 top: 0,
                                 right: 0,
-                                zIndex: 20,
+                                zIndex: 'var(--z-conteudo-acima)',
                                 width: 'var(--alvo-clique)',
                                 height: 'var(--alvo-clique)',
                                 borderRadius: '50%',
@@ -1188,7 +1188,7 @@ export default function ComunicacaoInterna() {
                                   ? { bottom: '100%', marginBlockEnd: 'var(--esp-1)' }
                                   : { top: '100%', marginBlockStart: 'var(--esp-1)' }),
                                 right: 0,
-                                zIndex: 30,
+                                zIndex: 'var(--z-conteudo-topo)',
                                 background: 'var(--ui-surface)',
                                 border: '1px solid var(--ui-border)',
                                 borderRadius: 'var(--raio-1)',

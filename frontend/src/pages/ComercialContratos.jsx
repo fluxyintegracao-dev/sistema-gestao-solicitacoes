@@ -3630,7 +3630,7 @@ export default function ComercialContratos() {
       )}
 
       {pessoaRapidaModal && (
-        <div className="quick-person-overlay fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="quick-person-overlay fixed inset-0 z-modal flex items-center justify-center p-4">
           <div className="quick-person-dialog w-full">
             <div className="quick-person-header">
               <div>

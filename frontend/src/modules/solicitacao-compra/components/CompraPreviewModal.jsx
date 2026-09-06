@@ -65,7 +65,7 @@ export default function CompraPreviewModal({ preview, onClose }) {
       <div
         className="fixed inset-0 flex items-center justify-center p-4"
         style={{
-          zIndex: 'var(--z-modal, 50)',
+          zIndex: 'var(--z-modal)',
           background: 'var(--modal-overlay, rgba(15, 23, 42, 0.48))'
         }}
         role="dialog"

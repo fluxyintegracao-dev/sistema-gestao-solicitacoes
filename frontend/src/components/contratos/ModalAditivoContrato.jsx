@@ -369,7 +369,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
     <div
       className="fixed inset-0 flex items-center justify-center py-6"
       style={{
-        zIndex: 'var(--z-modal, 50)',
+        zIndex: 'var(--z-modal)',
         background: 'var(--modal-overlay, rgba(15, 23, 42, 0.48))',
         // O recuo do menu entra como padding: o overlay segue cobrindo tudo, mas a centralizacao
         // do flex passa a valer sobre a area de conteudo. Com o menu recolhido ou em gaveta o

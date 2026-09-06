@@ -1082,26 +1082,39 @@ function lerJsonDoDisco(relativo, padrao) {
  * R32 — CAMADA FORA DA ESCALA (06/09).
  *
  * O cliente viu botão e bloco passando POR CIMA da barra do topo ao rolar.
- * A causa não é uma tela: a escala de camadas EXISTE em `index.css`
- * (--z-sticky 20, --z-dropdown 25, --z-sidebar 30, --z-dropdown-portal 90,
- * --z-modal 100, --z-toast 120) e é CONTORNADA em 131 lugares — 72 `z-index`
- * crus em CSS com mais de 20 valores distintos, 59 classes `z-*` do Tailwind
- * e 3 `zIndex` inline. Entre elas, 11 usos de `z-50` contra uma barra fixa que
- * vale 20: conteúdo em 50 passa por cima de barra em 20, e é exatamente isso
- * que aparece na captura.
+ * A causa não era uma tela: a escala de camadas EXISTIA em `index.css` e era
+ * CONTORNADA em 110 lugares, em 29 arquivos — `z-index` cru em CSS, classe
+ * `z-*` do Tailwind e `zIndex` inline. Entre elas, 11 usos de `z-50` contra
+ * uma barra fixa que valia 20: conteúdo em 50 passa por cima de barra em 20,
+ * e é exatamente isso que aparecia na captura.
+ *
+ * TROCAR NÚMERO POR TOKEN NÃO BASTAVA, e é a lição desta regra: as classes
+ * `z-*` do Tailwind vão de `z-0` a `z-50` por padrão, então uma barra fixa em
+ * 20 SEMPRE poderá ser vencida por um `z-50` que alguém escreva amanhã. A
+ * escala inteira subiu acima dessa faixa (o andar global começa em 180) na
+ * MESMA mudança em que os 110 números crus foram convertidos — separar as
+ * duas coisas faria sumir atrás da barra o que hoje aparece.
  *
  * A regra não tenta adivinhar a ordem certa — ela proíbe o NÚMERO SOLTO, que
- * é o que permite a qualquer tela furar a fila. Camada se declara pelo token.
+ * é o que permite a qualquer tela furar a fila. Camada se declara pelo token,
+ * e no JSX pela classe que carrega o token (`z-modal`, `z-sticky`,
+ * `z-dropdown`…), declarada em `tailwind.config.js` — mesmo jeito de sempre,
+ * mesmo valor de sempre, um lugar só para mudar a fila.
  *
- * TRINCO, e não falha imediata: são 131 lugares, e derrubar o portão hoje
- * pararia todo o resto da leva. O número congelado SÓ DESCE. Quem converter,
- * atualiza o trinco; quem acrescentar número novo, reprova na hora.
+ * TRINCO, e não falha imediata: eram 110 lugares. Hoje restam os de
+ * `src/styles/componentes-padrao.css`, em escrita por outro agente nesta
+ * leva. O número congelado SÓ DESCE. Quem converter, atualiza o trinco; quem
+ * acrescentar número novo, reprova na hora.
  *
  * O QUE ESTA REGRA NÃO PEGA, e precisa ficar dito: `z-index` só compara
  * dentro do mesmo CONTEXTO DE EMPILHAMENTO. Um ancestral com `transform`,
- * `filter`, `opacity < 1`, `will-change` ou `contain` cria contexto novo, e
- * ali o filho com valor maior não vence a barra de fora — trocar número por
- * token sem conferir isso conserta a metade fácil e deixa a difícil de pé.
+ * `filter`, `opacity < 1`, `will-change`, `contain`, `isolation` ou
+ * `backdrop-filter` cria contexto novo, e ali o filho com valor maior não
+ * vence a barra de fora — trocar número por token sem conferir isso conserta
+ * a metade fácil e deixa a difícil de pé. Medido em 06/09: 124 declarações
+ * desse tipo no CSS do sistema, e `.app-filter-field` (108 usos no JSX) é
+ * uma delas — por isso o campo de filtro sobe a coluna INTEIRA ao abrir, em
+ * vez de subir a lista, que ficaria presa dentro dele.
  */
 function validarCamadaForaDaEscala() {
   const falhas = [];
@@ -1153,8 +1166,11 @@ function validarCamadaForaDaEscala() {
       falhas.push(
         `${rel} [R32] ${total} camada(s) com número solto, contra ${congelado} `
         + `congelada(s) no trinco. O número SÓ DESCE — camada se declara pelo `
-        + `token (--z-sticky, --z-dropdown, --z-sidebar, --z-dropdown-portal, `
-        + `--z-modal, --z-toast), nunca pelo valor. `
+        + `token da escala em src/index.css (local: --z-conteudo, --z-celula-fixa, `
+        + `--z-alca, --z-presa-no-bloco; global: --z-faixa-presa, --z-sticky, `
+        + `--z-dropdown, --z-sidebar, --z-dropdown-portal, --z-modal, `
+        + `--z-modal-acima, --z-toast), nunca pelo valor. No JSX, pela classe `
+        + `que carrega o token: z-modal, z-sticky, z-dropdown, z-celula… `
         + `Ex.: ${ondes.slice(congelado, congelado + 2).join(' · ')}`
       );
     } else if (total < congelado) {

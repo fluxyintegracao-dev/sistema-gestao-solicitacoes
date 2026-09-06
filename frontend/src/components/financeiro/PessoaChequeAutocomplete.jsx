@@ -55,7 +55,7 @@ function ModalShell({ title, subtitle, children, onClose, maxWidth = 'max-w-3xl'
   if (typeof document === 'undefined') return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-[170] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5"
+      className="fixed inset-0 z-modal-acima flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5"
       role="dialog"
       aria-modal="true"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
@@ -225,7 +225,7 @@ export default function PessoaChequeAutocomplete({
   }
 
   const autocomplete = open && query.trim().length >= 2 ? (
-    <div className="absolute inset-x-0 top-[calc(100%+6px)] z-[145] max-h-64 overflow-y-auto rounded-xl border border-[var(--modal-border)] bg-[var(--modal-bg)] p-1 shadow-xl">
+    <div className="absolute inset-x-0 top-[calc(100%+6px)] z-dropdown max-h-64 overflow-y-auto rounded-xl border border-[var(--modal-border)] bg-[var(--modal-bg)] p-1 shadow-xl">
       {loading ? <div className="px-3 py-3 text-sm text-[var(--c-muted)]">Consultando pessoas...</div> : null}
       {!loading && results.length ? results.map((person) => <PersonOption key={person.id} person={person} onSelect={selectPerson} />) : null}
       {!loading && !results.length ? (

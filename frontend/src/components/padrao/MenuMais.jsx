@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
+import { usePosicaoFlutuante } from '../../hooks/usePosicaoFlutuante';
 
 /**
  * MENU "⋯" — o destino das ações raras. A regra do padrão: todo botão é
@@ -10,7 +11,19 @@ import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 export default function MenuMais({ itens = [], rotulo = 'Mais ações' }) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef(null);
+  const botaoRef = useRef(null);
+  const menuRef = useRef(null);
   useFecharAoSair(ref, aberto, () => setAberto(false));
+  /*
+    R29 — hook ANTES do `return null` de baixo (menu sem item nenhum não
+    desenha). O `.app-mais-menu` traz `right: 0` e `min-width: 220px`: numa
+    barra estreita, ou com o botão à esquerda, a borda esquerda do menu cai
+    fora da janela — o mesmo defeito do painel "Filtros visíveis". Alinhar
+    pela direita continua sendo a preferência (é de lá que este menu nasce,
+    encostado à direita da barra de ações); o hook só troca de lado quando
+    esse lado NÃO CABE.
+  */
+  const posicao = usePosicaoFlutuante(botaoRef, menuRef, aberto, { ancorarADireita: true });
 
   const visiveis = itens.filter(Boolean);
   if (visiveis.length === 0) return null;
@@ -22,6 +35,7 @@ export default function MenuMais({ itens = [], rotulo = 'Mais ações' }) {
       <button
         type="button"
         className="btn btn-outline"
+        ref={botaoRef}
         aria-haspopup="menu"
         aria-expanded={aberto}
         aria-label={rotulo}
@@ -30,8 +44,8 @@ export default function MenuMais({ itens = [], rotulo = 'Mais ações' }) {
       >
         ⋯
       </button>
-      {aberto && (
-        <div className="app-mais-menu" role="menu">
+      {aberto && posicao && (
+        <div className="app-mais-menu" role="menu" ref={menuRef} style={posicao.estilo}>
           {[...comuns, ...perigosas].map((item) => (
             <button
               key={item.rotulo}

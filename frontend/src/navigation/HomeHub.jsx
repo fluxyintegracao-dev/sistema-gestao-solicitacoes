@@ -8,6 +8,7 @@ import { getListaPreferencias, salvarListaPreferencias } from '../services/lista
 import { blocosPermitidos, resolverLayoutHome } from './blocosHome';
 import { COMPONENTE_BLOCO_EXTRA } from './BlocosHomeExtras';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
+import { usePosicaoFlutuante } from '../hooks/usePosicaoFlutuante';
 import { Pagina, PageHeader, BlocoConteudo, BlocosPersonalizaveis } from '../components/padrao';
 import NavCard from './NavCard';
 import SeusAtalhos from './SeusAtalhos';
@@ -83,6 +84,14 @@ export default function HomeHub() {
   ));
 
   useFecharAoSair(adicionarModuloRef, adicionarModuloAberto, () => setAdicionarModuloAberto(false));
+  /* Mesma classe `.app-blocos-adicionar-pop` e mesmo risco do painel de
+     blocos: `left: 0` com 230px de largura mínima, num botão que vive à
+     direita da barra de personalização. R29: hook no topo. */
+  const botaoAdicionarModuloRef = useRef(null);
+  const menuAdicionarModuloRef = useRef(null);
+  const posicaoAdicionarModulo = usePosicaoFlutuante(
+    botaoAdicionarModuloRef, menuAdicionarModuloRef, adicionarModuloAberto
+  );
 
   const modules = useMemo(() => getVisibleModules(user), [user]);
   const catalogoPermitido = useMemo(() => blocosPermitidos(user), [user]);
@@ -378,14 +387,21 @@ export default function HomeHub() {
               <button
                 type="button"
                 className="btn btn-outline btn-sm"
+                ref={botaoAdicionarModuloRef}
                 onClick={() => setAdicionarModuloAberto((aberto) => !aberto)}
                 aria-expanded={adicionarModuloAberto}
                 disabled={modulosOcultaveis.length === 0}
               >
                 Adicionar módulo{modulosOcultaveis.length > 0 ? ` (${modulosOcultaveis.length})` : ''}
               </button>
-              {adicionarModuloAberto && modulosOcultaveis.length > 0 && (
-                <div className="app-blocos-adicionar-pop" role="menu" aria-label="Módulos ocultos">
+              {adicionarModuloAberto && modulosOcultaveis.length > 0 && posicaoAdicionarModulo && (
+                <div
+                  className="app-blocos-adicionar-pop"
+                  role="menu"
+                  aria-label="Módulos ocultos"
+                  ref={menuAdicionarModuloRef}
+                  style={posicaoAdicionarModulo.estilo}
+                >
                   {modulosOcultaveis.map((mod) => (
                     <button
                       key={mod.id}

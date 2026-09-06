@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ResizableTable, ResizableTh } from '../ResizableTable';
 import { createPortal } from 'react-dom';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
+import { usePosicaoFlutuante } from '../../hooks/usePosicaoFlutuante';
 import { TIPO_COLUNAS, TIPO_VISUAL, usePreferenciaDeLista } from '../../contexts/PreferenciasContext';
 import EmptyState from '../ui/EmptyState';
 
@@ -237,89 +238,19 @@ function IconeSeta({ aberta }) {
 }
 
 /*
-  POSIÇÃO DE CAMADA FLUTUANTE, MEDIDA — UM CÁLCULO SÓ PARA OS DOIS MENUS
-  (05/09).
+  O CÁLCULO DE POSIÇÃO SAIU DAQUI EM 06/09 — para `src/hooks/usePosicaoFlutuante.js`.
 
-  Este cálculo nasceu dentro do `CabecalhoColuna`, para o menu de
-  alinhamento. Hoje o PAINEL DE COLUNAS precisa exatamente do mesmo, e pelo
-  mesmo motivo (ver o comentário do `PainelColunas`). A lição do
-  `useFecharAoSair`, escrita neste arquivo em 05/09, é que contorno copiado
-  é como o defeito volta — então ele vira hook em vez de virar cópia.
+  Ele nasceu neste arquivo, no menu de alinhamento, e virou hook quando o
+  painel de colunas passou a precisar do mesmo. O terceiro caso apareceu
+  fora da `TabelaPadrao`: o painel "Filtros visíveis" abria para FORA da
+  borda esquerda da janela. Um cálculo que serve três componentes em dois
+  arquivos não mora dentro de um deles — a lição do `useFecharAoSair`, que
+  fez o mesmo caminho por isto mesmo.
 
-  O que ele faz: decide a posição com o TAMANHO REAL do menu, não com uma
-  estimativa. Se não cabe embaixo do botão, vira para cima; se não cabe de
-  nenhum dos dois lados (janela baixa), encosta na borda com folga. A
-  horizontal recebe o mesmo tratamento. A primeira medição roda antes de o
-  menu existir no DOM e posiciona embaixo; o `useLayoutEffect` remede com o
-  menu montado e corrige ANTES da pintura — o usuário não vê o salto.
-
-  `ancorarADireita`: o menu de alinhamento alinha a borda ESQUERDA ao botão
-  (é estreito e nasce de um ícone dentro do `th`); o painel de colunas
-  alinha a borda DIREITA, porque nasce de um botão encostado à direita da
-  barra e tem 260px de largura mínima — alinhar pela esquerda o empurraria
-  para fora da janela em toda tabela.
+  O que os dois menus daqui GANHARAM na mudança, sem pedir nada: virar de
+  lado na horizontal (antes só recuavam para caber) e rolar por dentro
+  quando não cabem na janela inteira (antes eram cortados).
 */
-const FOLGA_JANELA = 8;
-
-function usePosicaoFlutuante(ancoraRef, menuRef, aberto, { ancorarADireita = false } = {}) {
-  const [caixa, setCaixa] = useState(null);
-
-  const medir = useCallback(() => {
-    const r = ancoraRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const menu = menuRef.current?.getBoundingClientRect();
-    const alturaMenu = menu?.height || 0;
-    const larguraMenu = menu?.width || 0;
-    const alturaJanela = window.innerHeight;
-    const larguraJanela = window.innerWidth;
-
-    let topo = r.bottom + 4;
-    if (alturaMenu && topo + alturaMenu > alturaJanela - FOLGA_JANELA) {
-      const acima = r.top - 4 - alturaMenu;
-      topo = acima >= FOLGA_JANELA
-        ? acima                                                        // vira para cima
-        : Math.max(FOLGA_JANELA, alturaJanela - alturaMenu - FOLGA_JANELA); // encosta
-    }
-
-    let esquerda = (ancorarADireita && larguraMenu) ? r.right - larguraMenu : r.left;
-    if (larguraMenu && esquerda + larguraMenu > larguraJanela - FOLGA_JANELA) {
-      esquerda = larguraJanela - larguraMenu - FOLGA_JANELA;
-    }
-    esquerda = Math.max(FOLGA_JANELA, esquerda);
-
-    // Mesma posição = mesmo objeto: sem isto a remedição do scroll pediria
-    // um render novo a cada evento, com a caixa parada no mesmo lugar.
-    setCaixa((atual) => (atual && atual.esquerda === esquerda && atual.topo === topo
-      ? atual
-      : { esquerda, topo }));
-  }, [ancoraRef, menuRef, ancorarADireita]);
-
-  // Abrir, rolar e redimensionar: o menu é `fixed` e não acompanha sozinho.
-  useEffect(() => {
-    if (!aberto) {
-      setCaixa(null);
-      return undefined;
-    }
-    medir();
-    window.addEventListener('scroll', medir, true);
-    window.addEventListener('resize', medir);
-    return () => {
-      window.removeEventListener('scroll', medir, true);
-      window.removeEventListener('resize', medir);
-    };
-  }, [aberto, medir]);
-
-  // Segunda medição, com o menu já no DOM: é esta que sabe se ele cabe.
-  useLayoutEffect(() => {
-    if (aberto && caixa && menuRef.current) medir();
-    // `caixa` fora das dependências de propósito: ela é o RESULTADO desta
-    // medição, e realimentá-la aqui criaria laço. O que precisa disparar a
-    // remedição é o menu passar a existir.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aberto, Boolean(menuRef.current), medir]);
-
-  return caixa;
-}
 
 /**
  * CABEÇALHO DE COLUNA.
@@ -436,7 +367,7 @@ function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
           className="app-mais-menu app-th-menu"
           role="menu"
           ref={menuRef}
-          style={{ left: caixaDoBotao.esquerda, top: caixaDoBotao.topo }}
+          style={caixaDoBotao.estilo}
         >
           {OPCOES_ALINHAMENTO.map(([valor, rotulo]) => (
             <button
@@ -519,7 +450,7 @@ function colunaTravada(coluna) {
  *
  * E ele NÃO sai por `createPortal`, ao contrário do menu de alinhamento:
  * o portal manda o nó para o `body`, onde ele precisa de um z-index
- * próprio — e o nosso é `--z-dropdown-portal: 90`, ABAIXO de
+ * próprio — e o nosso é `--z-dropdown-portal` (900), ABAIXO de
  * `--z-modal: 100`. Dentro de um modal o painel portado ficaria ATRÁS
  * dele. Renderizado no lugar, o painel herda o contexto de empilhamento do
  * modal e fica por cima do conteúdo dele, que é onde ele tem de estar.
@@ -558,7 +489,7 @@ function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoReorde
           className="app-mais-menu app-colunas-menu"
           role="menu"
           ref={menuRef}
-          style={{ left: posicao.esquerda, top: posicao.topo }}
+          style={posicao.estilo}
         >
           {ordenadas.map((coluna, indice) => {
             const travada = colunaTravada(coluna);

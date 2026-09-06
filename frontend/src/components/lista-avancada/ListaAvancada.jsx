@@ -3,11 +3,36 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
 } from 'react';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
+import { usePosicaoFlutuante } from '../../hooks/usePosicaoFlutuante';
+
+/*
+  AS TRÊS CAMADAS DESTA BARRA SÓ FLUTUAM QUANDO ESTÃO FLUTUANDO (06/09).
+
+  `.la-colunas-pop` e `.la-rapido-pop` são `absolute` na barra do desktop —
+  e DENTRO do painel "Filtrar"/"Exibir" do mobile o CSS as vira
+  `position: static`, empilhadas no corpo do painel. Isso não é detalhe: no
+  toque a lista aparece dentro do painel, não sobre ele.
+
+  Um `style` inline vence a folha, então prender a posição sem perguntar
+  transformaria a lista do mobile numa camada solta sobre a tela — trocar o
+  defeito de lugar. Este hook responde a pergunta pelo DOM, no momento em
+  que a camada abre: se ela nasceu dentro de um `.la-mobile-painel`, o
+  posicionamento não se aplica e o CSS do mobile continua mandando.
+*/
+function useFlutuaMesmo(wrapRef, aberto) {
+  const [flutua, setFlutua] = useState(true);
+  useLayoutEffect(() => {
+    if (!aberto) return;
+    setFlutua(!wrapRef.current?.closest('.la-mobile-painel'));
+  }, [aberto, wrapRef]);
+  return aberto && flutua;
+}
 
 /*
   Busca sem acento e sem caixa: quem procura "jose" tem de achar "José".
@@ -211,11 +236,26 @@ const ListaAvancada = forwardRef(function ListaAvancada({
   const colunasWrapRef = useRef(null);
   const fecharSeletorColunas = useCallback(() => setSeletorColunasAberto(false), []);
   useFecharAoSair(colunasWrapRef, seletorColunasAberto, fecharSeletorColunas);
+  /* `.la-colunas-pop` é `right: 0` com 220px de largura mínima: com o botão
+     "Colunas" à esquerda da barra, a borda esquerda cai fora da janela — o
+     mesmo defeito do painel "Filtros visíveis". R29: hooks no topo. */
+  const colunasBotaoRef = useRef(null);
+  const colunasPopRef = useRef(null);
+  const colunasFlutua = useFlutuaMesmo(colunasWrapRef, seletorColunasAberto);
+  const posicaoColunas = usePosicaoFlutuante(colunasBotaoRef, colunasPopRef, colunasFlutua, {
+    ancorarADireita: true
+  });
   // "Agrupar" virou botão com painel (antes era um <select> solto).
   const [agruparAberto, setAgruparAberto] = useState(false);
   const agruparWrapRef = useRef(null);
   const fecharAgrupar = useCallback(() => setAgruparAberto(false), []);
   useFecharAoSair(agruparWrapRef, agruparAberto, fecharAgrupar);
+  const agruparBotaoRef = useRef(null);
+  const agruparPopRef = useRef(null);
+  const agruparFlutua = useFlutuaMesmo(agruparWrapRef, agruparAberto);
+  const posicaoAgrupar = usePosicaoFlutuante(agruparBotaoRef, agruparPopRef, agruparFlutua, {
+    ancorarADireita: true
+  });
   // Painéis do mobile ("Filtrar" e "Exibir") — mesmo hook de fechar.
   const [painelFiltrarAberto, setPainelFiltrarAberto] = useState(false);
   const painelFiltrarRef = useRef(null);
@@ -582,6 +622,7 @@ const ListaAvancada = forwardRef(function ListaAvancada({
           <button
             type="button"
             className="la-btn"
+            ref={colunasBotaoRef}
             onClick={() => setSeletorColunasAberto((v) => !v)}
             aria-expanded={seletorColunasAberto}
             title="Escolher colunas"
@@ -590,7 +631,12 @@ const ListaAvancada = forwardRef(function ListaAvancada({
             <span>Colunas</span>
           </button>
           {seletorColunasAberto && (
-            <div className="la-colunas-pop" role="menu">
+            <div
+              className="la-colunas-pop"
+              role="menu"
+              ref={colunasPopRef}
+              style={posicaoColunas ? posicaoColunas.estilo : undefined}
+            >
               {/* Itens na ordem de exibição; arrastar reordena (útil no
                   toque, onde não dá para arrastar o cabeçalho). */}
               {ordemCatalogo
@@ -639,6 +685,7 @@ const ListaAvancada = forwardRef(function ListaAvancada({
           <button
             type="button"
             className={`la-btn ${agrupamento ? 'ativo' : ''}`}
+            ref={agruparBotaoRef}
             onClick={() => setAgruparAberto((v) => !v)}
             aria-expanded={agruparAberto}
             title="Agrupar registros por um critério"
@@ -647,7 +694,13 @@ const ListaAvancada = forwardRef(function ListaAvancada({
             <span>Agrupar{agrupamentoAtivo ? `: ${agrupamentoAtivo.rotulo}` : ''}</span>
           </button>
           {agruparAberto && (
-            <div className="la-colunas-pop" role="menu" aria-label="Agrupar por">
+            <div
+              className="la-colunas-pop"
+              role="menu"
+              aria-label="Agrupar por"
+              ref={agruparPopRef}
+              style={posicaoAgrupar ? posicaoAgrupar.estilo : undefined}
+            >
               <label>
                 <input
                   type="radio"
@@ -1099,6 +1152,14 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
   const wrapRef = useRef(null);
   const fechar = useCallback(() => setAberto(false), []);
   useFecharAoSair(wrapRef, aberto, fechar);
+  /* `.la-rapido-pop` é `left: 0` com 220px de largura mínima. Numa faixa
+     com várias dimensões os últimos botões ficam encostados à direita e o
+     menu saía pela borda; no mobile ele vira `static` dentro do painel
+     "Filtrar" e não pode ser prendido (ver `useFlutuaMesmo`). */
+  const botaoRef = useRef(null);
+  const popRef = useRef(null);
+  const flutua = useFlutuaMesmo(wrapRef, aberto);
+  const posicao = usePosicaoFlutuante(botaoRef, popRef, flutua);
 
   /*
     BUSCA DENTRO DO MENU (05/09).
@@ -1125,6 +1186,7 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
       <button
         type="button"
         className={`la-filtro-btn ${n > 0 ? 'ativo' : ''}`}
+        ref={botaoRef}
         onClick={() => setAberto((v) => !v)}
         aria-expanded={aberto}
       >
@@ -1132,7 +1194,12 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
         <HiOutlineChevronDown aria-hidden="true" />
       </button>
       {aberto && (
-        <div className="la-rapido-pop" role="menu">
+        <div
+          className="la-rapido-pop"
+          role="menu"
+          ref={popRef}
+          style={posicao ? posicao.estilo : undefined}
+        >
           {/*
               Filtro sem opção é um beco: a pessoa clica em "Empreendimento",
               lê "Sem opções" e não sabe se o filtro quebrou, se ela não tem

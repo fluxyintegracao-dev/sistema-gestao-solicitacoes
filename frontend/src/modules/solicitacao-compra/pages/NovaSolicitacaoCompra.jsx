@@ -251,7 +251,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     (05/09) — mesmo defeito das "Competências dos cards" do custosRecebiveis,
     e pela mesma causa: era um `<details>` NATIVO. `<details>` não oferece
     fechar ao clicar fora e ignora `Esc`, então a lista de marcação ficava
-    aberta por cima do formulário (é `absolute`, `z-[110]`) tapando o campo
+    aberta por cima do formulário (é `absolute`, `z-dropdown`) tapando o campo
     de credor logo abaixo enquanto a pessoa preenchia o resto.
 
     Sem estado em React, `<details>` também não tinha onde receber o
@@ -1695,7 +1695,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                   </svg>
                 </button>
                 {formasPagamentoAberto && (
-                <div className="absolute left-0 right-0 top-full z-[110] mt-1 max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
+                <div className="absolute left-0 right-0 top-full z-dropdown mt-1 max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
                   {formasPagamento.map((forma) => {
                     const selecionada = formaPagamentoIds.includes(String(forma.id));
                     const boleto = formaPagamentoEhBoleto(forma);
@@ -1761,7 +1761,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                   {autocompleteCredorAberto && !parceiroId && String(parceiroBusca || '').trim().length >= 2 && (
                     <div
                       id="compra-direta-credores-opcoes"
-                      className="absolute left-0 right-0 top-full z-[90] mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+                      className="absolute left-0 right-0 top-full z-dropdown mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
                       role="listbox"
                     >
                       {buscandoParceiros && (
@@ -1944,7 +1944,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     {autocompleteFreteAberto && !freteParceiroId && String(freteParceiroBusca || '').trim().length >= 2 && (
                       <div
                         id="compra-direta-frete-credores-opcoes"
-                        className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+                        className="absolute left-0 right-0 top-full z-dropdown mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
                         role="listbox"
                       >
                         {buscandoCredoresFrete && <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Buscando credores...</div>}

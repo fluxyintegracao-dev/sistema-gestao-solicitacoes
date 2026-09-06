@@ -82,7 +82,7 @@ export default function CartoesRecarga() {
     Ela não tinha estado de aberta: existia enquanto `fornecedores.length`
     fosse maior que zero, e o único jeito de esvaziar essa lista era
     ESCOLHER um fornecedor (o `onMouseDown` da opção chama
-    `setFornecedores([])`) ou apagar a busca. Como é `absolute z-20`, ela
+    `setFornecedores([])`) ou apagar a busca. Como é `absolute z-dropdown`, ela
     ficava sobre a seção "Usuários vinculados" logo abaixo — quem
     desistisse da troca não tinha como dispensá-la. Clicar fora não fazia
     nada; `Esc` não fazia nada.
@@ -355,7 +355,7 @@ export default function CartoesRecarga() {
                   autoComplete="off"
                 />
                 {sugestoesFornecedorAbertas && fornecedores.length ? (
-                  <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--ui-surface)] p-1 shadow-lg">
+                  <div className="absolute left-0 right-0 top-full z-dropdown mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--ui-surface)] p-1 shadow-lg">
                     {fornecedores.map((item) => (
                       <button
                         key={item.id}

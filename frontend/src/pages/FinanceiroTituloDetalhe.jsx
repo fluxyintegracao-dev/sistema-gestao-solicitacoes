@@ -1276,7 +1276,7 @@ export default function FinanceiroTituloDetalhe() {
       </Pagina>
 
       {modalBaixaOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-4">
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 px-4 py-4">
           <div className="card flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden p-0">
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--c-border)] px-6 py-4">
               <div>

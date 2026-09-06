@@ -167,7 +167,7 @@
 
 .cr-context-bar {
   position: sticky;
-  z-index: 8;
+  z-index: var(--z-presa-no-bloco);
   top: 8px;
   display: grid;
   grid-template-columns: minmax(280px, 1.5fr) minmax(190px, 0.65fr) minmax(240px, 0.85fr);
@@ -239,7 +239,7 @@
 
 .cr-competence-filter__panel {
   position: absolute;
-  z-index: 40;
+  z-index: var(--z-dropdown);
   top: calc(100% + 6px);
   right: 0;
   display: grid;
@@ -2231,7 +2231,7 @@
 
 .cr-modal-backdrop {
   position: fixed;
-  z-index: 80;
+  z-index: var(--z-modal);
   inset: 0;
   display: grid;
   place-items: center;
@@ -3382,7 +3382,7 @@
 
 .cr-item-picker-results {
   position: absolute;
-  z-index: 30;
+  z-index: var(--z-dropdown);
   top: calc(100% - 0.35rem);
   left: 1rem;
   width: min(52rem, calc(100% - 2rem));
@@ -4205,7 +4205,7 @@
 
 .cr-import-modal-backdrop {
   position: fixed;
-  z-index: 1100;
+  z-index: var(--z-modal-acima);
   inset: 0;
   display: grid;
   place-items: center;
@@ -4311,7 +4311,7 @@
 
 .cr-import-modal__catalog {
   position: absolute;
-  z-index: 2;
+  z-index: var(--z-conteudo-acima);
   right: 1rem;
   left: 1rem;
   display: grid;
@@ -4385,7 +4385,7 @@
 
 .cr-import-modal__footer {
   position: relative;
-  z-index: 3;
+  z-index: var(--z-conteudo-topo);
   border-top: 1px solid var(--cr-border);
   background: color-mix(in srgb, var(--cr-text) 2.5%, var(--cr-surface));
 }
@@ -4470,7 +4470,7 @@
 
 .cr-month-detail-surface__header {
   position: sticky;
-  z-index: 6;
+  z-index: var(--z-presa-no-bloco);
   top: 0;
   display: flex;
   align-items: center;

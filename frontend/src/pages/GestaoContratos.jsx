@@ -1814,7 +1814,7 @@ export default function GestaoContratos() {
       </BlocoConteudo>
 
       {contratoSelecionado && (
-        <div className="contratos-selection-toolbar fixed left-1/2 -translate-x-1/2 bottom-4 z-40">
+        <div className="contratos-selection-toolbar fixed left-1/2 -translate-x-1/2 bottom-4 z-faixa-presa-acima">
           <span className="contratos-selection-toolbar__title">
             {contratoSelecionado.codigo}
           </span>
@@ -1874,7 +1874,7 @@ export default function GestaoContratos() {
       )}
 
       {contratoEmEdicao && (
-        <div className="contratos-edit-modal fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+        <div className="contratos-edit-modal fixed inset-0 z-modal flex items-center justify-center bg-black/45 px-4 py-6">
           <div className="contratos-edit-modal__panel card w-full overflow-hidden">
             <div className="contratos-edit-modal__header">
               <div>

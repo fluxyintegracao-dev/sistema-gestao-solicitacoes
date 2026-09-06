@@ -798,7 +798,7 @@ export default function ObraGestao() {
 
       {novoItemModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-modal flex items-center justify-center p-4"
           /* R25: o fundo escurecido do modal vem do token do sistema
              (--modal-overlay), o mesmo do OverlayModal e da paleta de
              comandos. `bg-slate-950/45` era cor crua: não muda no tema

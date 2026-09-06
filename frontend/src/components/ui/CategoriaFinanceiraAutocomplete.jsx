@@ -152,7 +152,7 @@ export default function CategoriaFinanceiraAutocomplete({
           <div
             id={listboxId}
             role="listbox"
-            className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+            className="absolute left-0 right-0 top-[calc(100%+6px)] z-dropdown max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
           >
             {filteredOptions.length ? filteredOptions.map((categoria, index) => (
               <button

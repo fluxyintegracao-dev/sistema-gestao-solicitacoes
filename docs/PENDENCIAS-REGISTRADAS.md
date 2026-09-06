@@ -3200,3 +3200,44 @@ Para conferir uma a uma, com medição:
 `carregando=true`; a que espera a pessoa consultar nasce `false` E diz isso
 na frase do vazio. As duas são corretas — o que não pode existir é a
 terceira, que busca sozinha e afirma "nenhum" no caminho.
+
+---
+
+## A faixa fixa ainda vale 15, e é uma linha em arquivo de outro agente (06/09)
+
+Medido na conversão da R32, e registrado aqui porque **não pude consertar**:
+`src/styles/componentes-padrao.css` estava em escrita por outro agente
+nesta leva, e é lá que mora a única camada do sistema que continua com
+número solto.
+
+```
+.layout-main .app-page-header { … z-index: 15; }
+```
+
+A escala inteira subiu acima da faixa que o Tailwind ocupa (`z-0`…`z-50`):
+a barra do topo vale **200**, painel **210**, modal **1000**. A faixa fixa
+ficou para trás, em 15 — e 15 perde para qualquer `z-50` escrito à mão.
+
+**Medido no navegador, não afirmado.** Com o CSS compilado do build e a
+casca real (`.layout-shell > .fx-topbar + .app-page-header`), rolando até
+um bloco com `z-index: 50` cruzar cada barra, `elementFromPoint` devolve:
+
+| cruzamento | antes | depois |
+|---|---|---|
+| barra do topo × bloco `z-index: 50` | bloco por cima | **barra por cima** |
+| faixa fixa × bloco `z-index: 50` | bloco por cima | **bloco por cima** ← este |
+
+A correção é uma linha, e o token já está declarado:
+
+```
+-  z-index: 15;
++  z-index: var(--z-faixa-presa);   /* 180: acima do conteúdo, abaixo da barra */
+```
+
+Quem fizer, roda `node scripts/validarLayout.mjs` e regrava o trinco por
+medição — `scripts/trinco-camadas.json` cai de 4 para 3.
+
+As outras três de `componentes-padrao.css` (`z-index: 2` no botão de
+limpar, `3` e `4` na célula fixa da tabela) são empilhamento **local** e
+seguem corretas onde estão: `--z-conteudo-acima`, `--z-celula-fixa` e
+`--z-celula-fixa-cabecalho` existem para elas.

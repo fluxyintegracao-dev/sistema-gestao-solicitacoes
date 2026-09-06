@@ -2214,7 +2214,7 @@ export default function NovaSolicitacao() {
               </div>
 
               {credorContratoSugestoesAbertas && !parceiroSelecionado && !inputCredorContratoDesabilitado && (
-                <div className="nova-solicitacao-results-list absolute left-0 right-0 z-20 mt-1 max-h-48 overflow-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-lg">
+                <div className="nova-solicitacao-results-list absolute left-0 right-0 z-dropdown mt-1 max-h-48 overflow-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-lg">
                   {credoresContratoSugestoes.length > 0 ? (
                     credoresContratoSugestoes.map((credor) => (
                       <button

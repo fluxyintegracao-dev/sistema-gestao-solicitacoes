@@ -469,7 +469,7 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
     Não havia estado de aberta: a camada existia sempre que `options`
     tivesse itens, e essa lista só era esvaziada ao ESCOLHER um parceiro
     ou ao apagar a busca abaixo de dois caracteres. Como é `absolute
-    z-20` e este campo se repete por pagamento, a lista de um pagamento
+    z-dropdown` e este campo se repete por pagamento, a lista de um pagamento
     cobria o pagamento seguinte. Clicar fora não fazia nada; `Esc` não
     fazia nada.
 
@@ -541,7 +541,7 @@ function ParceiroPagamentoField({ pagamento, pagamentoIndex, tipo, onSelect }) {
         <div className="mt-1 text-xs text-[var(--c-muted)]">Buscando parceiros...</div>
       )}
       {listaAberta && options.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-52 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-dropdown mt-2 max-h-52 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg">
           {options.map((partner) => (
             <button
               key={partner.id}
@@ -2429,7 +2429,7 @@ export default function FinanceiroCard({
                   </div>
 
                   {listaCategoriasAberta && categoriasAutocomplete.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full z-10 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-dropdown mt-2 max-h-56 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg">
                       {categoriasAutocomplete.map((categoria) => (
                         <button
                           key={categoria.id}
@@ -2448,7 +2448,7 @@ export default function FinanceiroCard({
                   )}
 
                   {listaCategoriasAberta && categoriaSearch.trim() && !selectedCategory && !loadingCategorias && categoriasAutocomplete.length === 0 && (
-                    <div className="absolute left-0 right-0 top-full z-10 mt-2 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-3 text-sm text-[var(--c-muted)] shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-dropdown mt-2 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-3 text-sm text-[var(--c-muted)] shadow-lg">
                       Nenhuma categoria encontrada. Use a lupa para pesquisar com mais detalhes.
                     </div>
                   )}
@@ -3155,7 +3155,7 @@ export default function FinanceiroCard({
       {/*
         Modal de escolha DENTRO do modal de gerar conta: o `ModalPortal`
         empilha por ordem de montagem, entao este fica por cima e o Escape
-        fecha so ele. O `fixed inset-0` com `z-[60]` a mao ficava fora dessa
+        fecha so ele. O `fixed inset-0` com camada a mao ficava fora dessa
         pilha — e o `overflow-hidden` do painel matava o sticky de qualquer
         coisa dentro (R18).
       */}

@@ -91,7 +91,7 @@ export default function ContratoFluxoNovo() {
     Não havia estado de aberta: a camada existia enquanto
     `credorResultados` tivesse itens, e essa lista só era esvaziada ao
     ESCOLHER um credor ou ao digitar menos de dois caracteres. Como é
-    `absolute z-20`, ficava pousada sobre "Referência" e "Categoria
+    `absolute z-dropdown`, ficava pousada sobre "Referência" e "Categoria
     financeira" logo abaixo. Clicar fora não fazia nada; `Esc` não fazia
     nada.
 
@@ -388,7 +388,7 @@ export default function ContratoFluxoNovo() {
                 }}
               />
               {listaCredorAberta && credorResultados.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1 shadow-lg">
+                <div className="absolute left-0 right-0 top-full z-dropdown mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1 shadow-lg">
                   {credorResultados.map((pRes) => (
                     <button
                       key={pRes.id}

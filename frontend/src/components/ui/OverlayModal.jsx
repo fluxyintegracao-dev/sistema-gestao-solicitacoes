@@ -65,7 +65,7 @@ export default function OverlayModal({
       <div
         className="fixed inset-0 flex items-center justify-center py-6"
         style={{
-          zIndex: 'var(--z-modal, 50)',
+          zIndex: 'var(--z-modal)',
           background: 'var(--modal-overlay, rgba(15, 23, 42, 0.48))',
           paddingLeft: `calc(${recuoConteudo}px + 1rem)`,
           paddingRight: '1rem'

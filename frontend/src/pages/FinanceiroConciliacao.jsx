@@ -249,7 +249,7 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
   const creditoRotativoKey = `credito-rotativo-${item?.id}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+    <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 px-4 py-6">
       <div className="w-full max-w-xl rounded-2xl bg-[var(--c-surface)] p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
           <div>
@@ -669,9 +669,9 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+    <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 px-4 py-6">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] shadow-2xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--c-border)] bg-[var(--c-surface)] px-6 py-4">
+        <div className="sticky top-0 z-presa-no-bloco flex items-center justify-between border-b border-[var(--c-border)] bg-[var(--c-surface)] px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-[var(--c-text)]">Novo título + baixa</h2>
             <p className="text-xs text-[var(--c-muted)]">Cria o título, registra o pagamento e concilia automaticamente.</p>
@@ -1451,7 +1451,7 @@ function BaixaExtratosTituloModal({ itens, onClose, onConfirmar }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+    <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 px-4 py-6">
       <form onSubmit={submit} className="w-full max-w-4xl overflow-hidden rounded-2xl bg-[var(--c-surface)] shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-6 py-4">
           <div>
@@ -2726,7 +2726,7 @@ export default function FinanceiroConciliacao() {
       </form>
 
       {importResults.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-2xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-2xl">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -3098,7 +3098,7 @@ export default function FinanceiroConciliacao() {
       )}
 
       {estornoTransferenciaModal.open && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4 py-6">
+        <div className="fixed inset-0 z-modal-acima flex items-center justify-center bg-black/40 px-4 py-6">
           <form
             className="w-full max-w-xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-6 shadow-2xl"
             onSubmit={handleEstornarTransferencia}
@@ -3186,7 +3186,7 @@ export default function FinanceiroConciliacao() {
 
       {/* Modal: Transferencia entre contas */}
       {transferenciaModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 px-4 py-6">
           <div className="w-full max-w-xl rounded-2xl bg-[var(--c-surface)] p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
               <div>
@@ -3304,7 +3304,7 @@ export default function FinanceiroConciliacao() {
 
       {/* Modal: Associação manual */}
       {associacaoModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 px-4 py-6">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
               <div>
@@ -3417,7 +3417,7 @@ export default function FinanceiroConciliacao() {
 
       {/* Modal: Associar fatura */}
       {faturaModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 px-4 py-6">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
               <div>

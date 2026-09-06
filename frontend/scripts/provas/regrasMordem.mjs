@@ -84,6 +84,29 @@ const CASOS = [
     regra: 'R25',
     porque: 'cor fora do sistema de tokens',
     corpo: '      <span className="text-slate-500" style={{ color: \'#ff0000\' }} />\n'
+  },
+  /*
+    R32 NAS TRES FORMAS EM QUE CAMADA E FEITA AQUI (06/09).
+
+    A pergunta antes de escrever o caso foi a de sempre: de quantos jeitos
+    isso e feito neste repositorio? Sao tres — `z-index` cru no CSS, classe
+    `z-*` do Tailwind e `zIndex` no `style` inline —, e a R32 so vale se
+    morder os tres. Um caso so provaria a regra na forma que eu acabei de
+    converter e deixaria as outras duas sem rede, que e exatamente o buraco
+    que a R29 teve de tapar depois.
+
+    `z-50` nao e exemplo escolhido a esmo: era a classe com 11 usos, e uma
+    barra fixa que valesse 20 perderia para ela. E o que o cliente viu.
+  */
+  {
+    regra: 'R32',
+    porque: 'camada como classe do Tailwind (z-50 vence barra fixa)',
+    corpo: '      <div className="fixed inset-0 z-50" />\n'
+  },
+  {
+    regra: 'R32',
+    porque: 'camada como numero no style inline',
+    corpo: '      <div style={{ position: \'fixed\', zIndex: 60 }} />\n'
   }
 ];
 
@@ -134,6 +157,17 @@ const CASOS_ARQUIVO_INTEIRO = [
     porque: 'NEGATIVO: hooks ANTES das três saídas — não pode reprovar',
     naoPodeReprovar: true,
     arquivo: `import { useState } from 'react';\nimport { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra({ carregando, itens }) {\n  const [n] = useState(0);\n  if (carregando) return <Pagina>Carregando</Pagina>;\n  if (!itens.length)\n    return <Pagina>Vazio</Pagina>;\n  if (n > 9) {\n    return <Pagina>Muito</Pagina>;\n  }\n  return <Pagina>{n}</Pagina>;\n}\n`
+  },
+  /*
+    E o sentido inverso da R32: camada declarada PELO TOKEN, nas tres
+    formas, nao pode ser acusada. Sem este caso a regra passaria acusando
+    tambem o jeito certo — e o jeito certo e o que ela existe para exigir.
+  */
+  {
+    regra: 'R32',
+    porque: 'NEGATIVO: camada pelo token nas tres formas — nao pode reprovar',
+    naoPodeReprovar: true,
+    arquivo: `import { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  return (\n    <Pagina>\n      <div className="fixed inset-0 z-modal" />\n      <div style={{ position: 'fixed', zIndex: 'var(--z-toast)' }} />\n    </Pagina>\n  );\n}\n`
   },
   {
     regra: 'R22',
@@ -193,18 +227,18 @@ function rodarValidadorCss() {
   "quantos casos existem?" e sim "de quantos jeitos isso e feito aqui?":
   pixel cru, meio-degrau, rampa de clamp() e escala paralela em var().
 */
-function provarCss(porque, corpo, deveReprovar = true) {
+function provarCss(porque, corpo, deveReprovar = true, regra = 'R30') {
   fs.writeFileSync(ALVO_CSS, corpo);
   const saida = rodarValidadorCss();
-  const linhas = saida.split('\n').filter((l) => l.includes('[R30]') && l.includes(ALVO_CSS_REL) && !l.startsWith('AVISO'));
+  const linhas = saida.split('\n').filter((l) => l.includes(`[${regra}]`) && l.includes(ALVO_CSS_REL) && !l.startsWith('AVISO'));
   if (deveReprovar === (linhas.length > 0)) {
-    console.log(`  ok    R30 ${deveReprovar ? 'reprova' : 'NAO reprova'} ${porque}`);
+    console.log(`  ok    ${regra} ${deveReprovar ? 'reprova' : 'NAO reprova'} ${porque}`);
     return;
   }
   falhas += 1;
-  if (deveReprovar) console.log(`  FALHA R30 NAO reprovou ${porque} — o check nao morde essa forma`);
+  if (deveReprovar) console.log(`  FALHA ${regra} NAO reprovou ${porque} — o check nao morde essa forma`);
   else {
-    console.log(`  FALHA R30 reprovou ${porque} — falso positivo:`);
+    console.log(`  FALHA ${regra} reprovou ${porque} — falso positivo:`);
     linhas.slice(0, 3).forEach((l) => console.log(`          ${l.trim()}`));
   }
 }
@@ -296,6 +330,20 @@ try {
       '.prova-r30-e { font-size: var(--fonte-destaque); }',
       '.prova-r30-f { font-size: inherit; }', ''].join('\n'),
     false
+  );
+
+  /*
+    R32 NO CSS — a terceira forma, e a que mais pesava: 72 dos 110 numeros
+    soltos eram `z-index` cru em folha de estilo, 35 deles no proprio
+    arquivo que DECLARA a escala.
+  */
+  provarCss('z-index cru em folha de estilo', '.prova-r32 { z-index: 7; }\n', true, 'R32');
+  provarCss(
+    'camada declarada pelo token, no CSS',
+    ['.prova-r32-a { z-index: var(--z-sticky); }',
+      '.prova-r32-b { z-index: var(--z-modal); }', ''].join('\n'),
+    false,
+    'R32'
   );
   if (fs.existsSync(ALVO_CSS)) fs.unlinkSync(ALVO_CSS);
 

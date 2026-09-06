@@ -135,7 +135,19 @@
   margin-top: var(--respiro-topbar);
   position: sticky;
   top: var(--pos-cabecalho-fixo, 96px);
-  z-index: 15;
+  /*
+    A FAIXA PRESA PRECISA ESTAR FORA DO ALCANCE DO TAILWIND (06/09).
+
+    Era `z-index: 15`. Com a escala antiga (--z-sticky: 20) isso ja perdia
+    para qualquer `z-50` escrito a mao — e era exatamente o que o cliente
+    via na captura: bloco e botao passando POR CIMA do cabecalho fixo ao
+    rolar. Medido na prova de empilhamento: no cruzamento "faixa fixa x
+    bloco com z-index 50", quem o navegador devolvia era o BLOCO.
+
+    `--z-faixa-presa` vale 180, acima da faixa 0-50 que as classes do
+    Tailwind ocupam. Agora a faixa presa nao pode ser vencida por engano.
+  */
+  z-index: var(--z-faixa-presa);
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--raio-3);
@@ -978,7 +990,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
-  z-index: 2;
+  z-index: var(--z-conteudo-acima);
 }
 
 .resizable-th:hover .app-th-alinhar,
@@ -1316,12 +1328,14 @@ fieldset.form-section {
 .app-tabela td.celula-fixa {
   position: sticky;
   left: 0;
-  z-index: 3;
+  /* Empilhamento LOCAL, de proposito abaixo de 50: celula presa disputa
+     com a linha ao lado, nunca com a barra do topo. */
+  z-index: var(--z-celula-fixa);
   background: var(--ui-surface);
   box-shadow: 1px 0 0 var(--ui-border);
 }
 
-.app-tabela thead th.celula-fixa { z-index: 4; }
+.app-tabela thead th.celula-fixa { z-index: var(--z-celula-fixa-cabecalho); }
 
 .app-tabela .app-tabela-linha:hover td.celula-fixa {
   background: var(--ui-surface-2);
