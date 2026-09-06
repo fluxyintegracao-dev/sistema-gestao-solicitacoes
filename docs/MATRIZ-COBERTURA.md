@@ -6,314 +6,15 @@
 > capacidade, a base do preview não deu registro para exercitá-la — NÃO PROVADA)
 > · — N/A (a regra não se aplica; motivo registrado).
 
-- Verificação: **2026-09-06 14:17** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `bd0a2eed41950f317f54d0677d9cf4cdd6e70be6`
+- Verificação: **2026-09-06 17:12** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `aa8ff810edfe747d20ea486b617ae8af9dac8f0c`
 - Telas verificadas: 189 · Itens: C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, T8, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1, P1, P2, P3, P4
-- **TELAS QUE NÃO ABRIRAM: 8** — nada nelas foi medido, e rodada com tela que não abre NÃO fecha:
-  - `rhdp-relatorio-operacional` — locator.click: Timeout 10000ms exceeded.
-Call log:
-[2m  - waiting for locator('button[title="Escolher quais filtros aparecem nesta tela"]').first()[22m
-[2m    - locator resolved to <button type="button" aria-haspopup="menu" aria-expanded="false" class="btn btn-outline btn-sm" title="Escolher quais filtros aparecem nesta tela">…</button>[22m
-[2m  - attempting click action[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is not stable[22m
-[2m    - retrying click action[22m
-[2m    - waiting 20ms[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is not stable[22m
-[2m    - retrying click action[22m
-[2m      - waiting 100ms[22m
-[2m    18 × waiting for element to be visible, enabled and stable[22m
-[2m       - element is not stable[22m
-[2m     - retrying click action[22m
-[2m       - waiting 500ms[22m
-
+- **TELAS QUE NÃO ABRIRAM: 1** — nada nelas foi medido, e rodada com tela que não abre NÃO fecha:
   - `financeiro-titulo-editar` — locator.waitFor: Timeout 30000ms exceeded.
 Call log:
 [2m  - waiting for locator('a[href^="/financeiro/titulos/"]:not([href*="novo"])').first() to be visible[22m
 
-  - `financeiro-caixas` — locator.click: Timeout 10000ms exceeded.
-Call log:
-[2m  - waiting for locator('.app-colunas-menu').first().locator('input[type="checkbox"]:not([disabled]), input[type="radio"]:not([disabled])').first()[22m
-[2m    - locator resolved to <input checked type="checkbox"/>[22m
-[2m  - attempting click action[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <section class="app-bloco app-bloco--primario">…</section> intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m    - waiting 20ms[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <section class="app-bloco app-bloco--primario">…</section> intercepts pointer events[22m
-[2m  2 × retrying click action[22m
-[2m      - waiting 100ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="page solicitacoes-page app-pagina">…</div> intercepts pointer events[22m
-[2m  4 × retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <section class="app-bloco app-bloco--primario">…</section> intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <section class="app-bloco app-bloco--primario">…</section> intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="page solicitacoes-page app-pagina">…</div> intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="page solicitacoes-page app-pagina">…</div> intercepts pointer events[22m
-[2m  2 × retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <section class="app-bloco app-bloco--primario">…</section> intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 500ms[22m
-
-  - `financeiro-fatura-cartao-detalhe` — locator.click: Timeout 10000ms exceeded.
-Call log:
-[2m  - waiting for locator('.app-colunas-menu').first().locator('input[type="checkbox"]:not([disabled]), input[type="radio"]:not([disabled])').first()[22m
-[2m    - locator resolved to <input checked type="checkbox"/>[22m
-[2m  - attempting click action[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <input type="date" required="" class="input" value="2026-09-06"/> from <section class="app-bloco app-bloco--primario">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m    - waiting 20ms[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <input type="date" required="" class="input" value="2026-09-06"/> from <section class="app-bloco app-bloco--primario">…</section> subtree intercepts pointer events[22m
-[2m  2 × retrying click action[22m
-[2m      - waiting 100ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <span class="form-label form-label--required">Data de pagamento</span> from <section class="app-bloco app-bloco--primario">…</section> subtree intercepts pointer events[22m
-[2m  4 × retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <input type="date" required="" class="input" value="2026-09-06"/> from <section class="app-bloco app-bloco--primario">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <input type="date" required="" class="input" value="2026-09-06"/> from <section class="app-bloco app-bloco--primario">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <span class="form-label form-label--required">Data de pagamento</span> from <section class="app-bloco app-bloco--primario">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <span class="form-label form-label--required">Data de pagamento</span> from <section class="app-bloco app-bloco--primario">…</section> subtree intercepts pointer events[22m
-[2m  2 × retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <input type="date" required="" class="input" value="2026-09-06"/> from <section class="app-bloco app-bloco--primario">…</section> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 500ms[22m
-
-  - `config-cartoes-recarga` — locator.click: Timeout 10000ms exceeded.
-Call log:
-[2m  - waiting for locator('.app-colunas-menu').first().locator('input[type="checkbox"]:not([disabled]), input[type="radio"]:not([disabled])').first()[22m
-[2m    - locator resolved to <input checked type="checkbox"/>[22m
-[2m  - attempting click action[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="app-actionbar">…</div> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m    - waiting 20ms[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <fieldset class="form-section">…</fieldset> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m  2 × retrying click action[22m
-[2m      - waiting 100ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="app-actionbar">…</div> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m  4 × retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="app-actionbar">…</div> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <fieldset class="form-section">…</fieldset> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="app-actionbar">…</div> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <div class="app-actionbar">…</div> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 500ms[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <div class="app-actionbar">…</div> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 500ms[22m
-[2m    - waiting for element to be visible, enabled and stable[22m
-[2m    - element is visible, enabled and stable[22m
-[2m    - scrolling into view if needed[22m
-[2m    - done scrolling[22m
-[2m    - <fieldset class="form-section">…</fieldset> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m  - retrying click action[22m
-[2m    - waiting 500ms[22m
-
-  - `comercial-empreendimentos` — locator.click: Timeout 10000ms exceeded.
-Call log:
-[2m  - waiting for locator('.app-colunas-menu').first().locator('input[type="checkbox"]:not([disabled]), input[type="radio"]:not([disabled])').first()[22m
-[2m    - locator resolved to <input checked type="checkbox"/>[22m
-[2m  - attempting click action[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <form class="space-y-4">…</form> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m    - waiting 20ms[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is not stable[22m
-[2m    - retrying click action[22m
-[2m      - waiting 100ms[22m
-[2m    3 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <input value="" placeholder="CEP" class="input w-full"/> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m    4 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <form class="space-y-4">…</form> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <form class="space-y-4">…</form> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <form class="space-y-4">…</form> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-[2m      - waiting for element to be visible, enabled and stable[22m
-[2m      - element is visible, enabled and stable[22m
-[2m      - scrolling into view if needed[22m
-[2m      - done scrolling[22m
-[2m      - <input value="" placeholder="CEP" class="input w-full"/> from <section class="app-bloco">…</section> subtree intercepts pointer events[22m
-[2m    - retrying click action[22m
-[2m      - waiting 500ms[22m
-
-  - `compras-rel-economia-cotacoes` — locator.click: Timeout 10000ms exceeded.
-Call log:
-[2m  - waiting for locator('button[title="Escolher quais filtros aparecem nesta tela"]').first()[22m
-[2m    - locator resolved to <button type="button" aria-haspopup="menu" aria-expanded="false" class="btn btn-outline btn-sm" title="Escolher quais filtros aparecem nesta tela">…</button>[22m
-[2m  - attempting click action[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is not stable[22m
-[2m    - retrying click action[22m
-[2m    - waiting 20ms[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is not stable[22m
-[2m    - retrying click action[22m
-[2m      - waiting 100ms[22m
-[2m    19 × waiting for element to be visible, enabled and stable[22m
-[2m       - element is not stable[22m
-[2m     - retrying click action[22m
-[2m       - waiting 500ms[22m
-
-  - `contratos-rel-operacional` — locator.click: Timeout 10000ms exceeded.
-Call log:
-[2m  - waiting for locator('button[title="Escolher quais filtros aparecem nesta tela"]').first()[22m
-[2m    - locator resolved to <button type="button" aria-haspopup="menu" aria-expanded="false" class="btn btn-outline btn-sm" title="Escolher quais filtros aparecem nesta tela">…</button>[22m
-[2m  - attempting click action[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is not stable[22m
-[2m    - retrying click action[22m
-[2m    - waiting 20ms[22m
-[2m    2 × waiting for element to be visible, enabled and stable[22m
-[2m      - element is not stable[22m
-[2m    - retrying click action[22m
-[2m      - waiting 100ms[22m
-[2m    18 × waiting for element to be visible, enabled and stable[22m
-[2m       - element is not stable[22m
-[2m     - retrying click action[22m
-[2m       - waiting 500ms[22m
-
-- **Células FALHOU: 14** (justificativas abaixo)
-- **Células SEM DADO: 407** — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)
+- **Células FALHOU: 5** (justificativas abaixo)
+- **Células SEM DADO: 409** — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)
 
 | Tela | C1 | C2 | C3 | C4 | C5 | C6 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | F1 | F2 | F3 | F4 | B1 | B2 | B3 | B4 | B5 | M1 | M2 | M3 | M4 | R1 | R2 | R3 | X1 | X2 | X3 | R18 | A1 | P1 | P2 | P3 | P4 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -342,9 +43,9 @@ Call log:
 | rhdp-pessoal | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | — | ✅ | ❌ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
 | rhdp-colaboradores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | rhdp-documentos | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
-| rhdp-importacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ❌ | ⚠ | — | ✅ |
+| rhdp-importacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | rhdp-fechamentos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
-| rhdp-relatorio-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | 🚫 | 🚫 | 🚫 | ❌ |
+| rhdp-relatorio-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | modulo-relatorios | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | relatorios-administrativos | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | comunicacao-interna | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
@@ -359,12 +60,12 @@ Call log:
 | financeiro-bancos | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
 | financeiro-boletos | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | ❌ | — | ✅ |
 | financeiro-cadastros | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
-| financeiro-caixas | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | 🚫 | 🚫 | 🚫 | 🚫 |
+| financeiro-caixas | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
 | financeiro-cheques-terceiros | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
 | financeiro-conciliacao | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | financeiro-dda | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
 | financeiro-faturas-cartao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
-| financeiro-fatura-cartao-detalhe | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | 🚫 | 🚫 | 🚫 | 🚫 |
+| financeiro-fatura-cartao-detalhe | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
 | financeiro-financiamentos-bancarios | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
 | financeiro-pagamentos | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | financeiro-relatorios | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
@@ -385,7 +86,7 @@ Call log:
 | definir-senha | — | — | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ⚠ | ⚠ | ✅ | — | — | ✅ | — | ⚠ | — | — | — | — |
 | cotacao-publica | — | — | — | — | ✅ | ✅ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | — | — | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — | ⚠ | ⚠ | ✅ | ⚠ | — | ✅ | — | ⚠ | — | — | — | — |
 | config-hub-status-setor | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — |
-| config-permissoes-setor | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ❌ | — | — | — |
+| config-permissoes-setor | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — |
 | config-cores-sistema | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | config-contrato-obra-categorias | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | config-areas-por-setor-origem | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
@@ -410,10 +111,10 @@ Call log:
 | config-permissoes-areas-padroes | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | config-permissoes-areas | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | config-hub | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
-| config-cartoes-recarga | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | 🚫 | 🚫 | 🚫 | 🚫 |
+| config-cartoes-recarga | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
 | contratos-gestao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
 | comercial-contratos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
-| comercial-empreendimentos | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 🚫 | 🚫 | 🚫 | 🚫 |
+| comercial-empreendimentos | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
 | comercial-unidades | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | — | ⚠ |
 | comercial-modelos-contrato | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | comercial-tabelas-preco | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
@@ -421,7 +122,7 @@ Call log:
 | contratos-novo | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | crm-dashboard | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — |
 | crm-dashboard-gerencial | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
-| crm-dashboard-sla | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ❌ | ⚠ | — | ✅ |
+| crm-dashboard-sla | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | crm-dashboard-distribuicao | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | ✅ | — |
 | crm-relatorio-executivo | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
 | crm-leads | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ | — | ✅ |
@@ -440,7 +141,7 @@ Call log:
 | compras-rel-compras-diretas | ✅ | ✅ | ✅ | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
 | compras-rel-compras-fornecedor | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ |
 | compras-rel-demanda-pedidos | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ |
-| compras-rel-economia-cotacoes | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | 🚫 | 🚫 | 🚫 | ❌ |
+| compras-rel-economia-cotacoes | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ |
 | compras-rel-evolucao | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | compras-rel-fornecedores | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | compras-rel-pendencias-cotacoes | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ |
@@ -460,9 +161,9 @@ Call log:
 | sst-esocial | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | — | — |
 | sst-configuracoes | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | sst-crud | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
-| solicitacoes | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | ❌ |
+| solicitacoes | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
 | nova-solicitacao | ✅ | ✅ | ✅ | — | — | ✅ | — | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
-| fiscal-dashboard | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ❌ | — | ✅ | ✅ |
+| fiscal-dashboard | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ |
 | fiscal-documentos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | fiscal-documento-detalhe | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | — | — |
 | fiscal-divergencias | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
@@ -488,11 +189,11 @@ Call log:
 | perfil | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | arquivos-modelos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
 | solicitacoes-rel-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
-| contratos-rel-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | 🚫 | 🚫 | 🚫 | ❌ |
+| contratos-rel-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | comercial-rel-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
 | solicitacoes-compra | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | cotacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
-| pedidos-compra | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ❌ | ⚠ | — | ✅ |
+| pedidos-compra | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | compras-delegacao | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
 | gestao-fornecedores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠ | — | ✅ |
 | gestao-insumos | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
@@ -511,21 +212,12 @@ Call log:
 
 - **rhdp-pessoal · B1**: [?aba=jornada] nenhum bloco na tela
 - **rhdp-pessoal · M1**: [?aba=jornada] 2 alvo(s) < 32px; primeiro: div.min-h-screen.bg-[var(--c-bg)] > section.mx-auto.flex > div.rounded-[28px].border > div.mt-6.flex > button.btn-primary (93×24px)
-- **rhdp-importacoes · P1**: passo 1 (abrir o painel): o painel de colunas ABRIU e o ponto central dele entrega "app-bloco" — está RECORTADO ou COBERTO, e ninguém consegue marcar nada nele
-- **rhdp-relatorio-operacional · P4**: passo 1 (abrir): o abridor da painel de colunas recebeu o clique e nenhuma camada (.app-colunas-menu) entrou no DOM
-- **financeiro-titulos · P1**: passo 1 (abrir o painel): o painel de colunas ABRIU e o ponto central dele entrega "app-stat-valor" — está RECORTADO ou COBERTO, e ninguém consegue marcar nada nele
+- **financeiro-titulos · P1**: passo 5 (persistência): depois de recarregar, a tabela não voltou a aparecer em 20s — a persistência de "Status" NÃO FOI PROVADA; "Restaurar padrão" NÃO devolveu a coluna: o cabeçalho tinha 13 colunas e ficou com ? — a preferência do usuário de QA fica suja para a próxima corrida
 - **financeiro-titulo-editar · C1**: a tela NÃO ABRIU: locator.waitFor: Timeout 30000ms exceeded.
 Call log:
 [2m  - waiting for locator('a[href^="/financeiro/titulos/"]:not([href*="novo"])').first() to be visible[22m
 
 - **financeiro-boletos · P2**: passo 4 (esconder limpa e refaz): a consulta NÃO foi refeita: com o filtro aplicado a lista era 0 linha(s), total 0 e depois de esconder continua 0 linha(s), total 0 — o filtro invisível segue recortando a lista, e quem lê o número não tem como saber (é o achado N53 inteiro)
-- **config-permissoes-setor · P1**: a tabela mostra 3 colunas de conteúdo (SETOR, USUARIO PODE ASSUMIR, USUARIO PODE ATRIBUIR…) e NÃO oferece o painel "Colunas", com 2 coluna(s) ocultáve(is) declarada(s) pela própria tabela — havendo 2 ou mais, o painel tinha de estar lá. Se esta tela recusa a escolha de propósito, a recusa se declara no manifesto (naoAplica.P1) ou travando as colunas com `sempreVisivel`, não se deduz do silêncio
-- **crm-dashboard-sla · P1**: passo 1 (abrir o painel): o painel de colunas ABRIU e o ponto central dele entrega "app-stat-grid" — está RECORTADO ou COBERTO, e ninguém consegue marcar nada nele
-- **compras-rel-economia-cotacoes · P4**: passo 3 (Esc): a painel de colunas fechou no clique fora e NÃO REABRIU no clique seguinte (existe=false, visível=undefined) — camada que fecha e não volta troca um defeito por outro
-- **solicitacoes · P4**: passo 2 (clique fora): cliquei em (1660, 450), sobre "la-resize", a 200px+ da camada, e a menu de marcação de filtro CONTINUA aberta e visível (343×300px)
-- **fiscal-dashboard · P1**: passo 3 (esconder): desmarquei "Status" no painel e a coluna CONTINUA no cabeçalho (2 colunas, as mesmas 2 de antes) — o painel marca e não faz nada
-- **contratos-rel-operacional · P4**: passo 1 (abrir): o abridor da painel de colunas recebeu o clique e nenhuma camada (.app-colunas-menu) entrou no DOM
-- **pedidos-compra · P1**: passo 3 (esconder): desmarquei "Pedido" no painel e a coluna CONTINUA no cabeçalho (7 colunas, as mesmas 8 de antes) — o painel marca e não faz nada
 
 ## SEM DADO — capacidades que NÃO foram provadas
 
@@ -540,6 +232,7 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **rhdp-documentos** — T1, T2, T4, T5, T6, T7, T8, X1, P2: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum documento localizado") — capacidade NÃO PROVADA
 - **rhdp-importacoes** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — Competência="zzqxjw" (o resultado não mudou: 13 linha(s), 1ª "#13 · JORNADA Formulario de jornada 2026"); Tipo (campo não encontrado na faixa); Empresa do grupo (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **rhdp-fechamentos** — P2: a tela TEM o seletor de filtros, e nenhum dos 4 filtros escondíveis mudou o resultado da consulta na base do preview — Competência="zzqxjw" (o resultado não mudou: 6 linha(s), 1ª "2026-03 - ED. PEDRA MENINA 31/03/2026 1 "); Empresa do grupo (campo não encontrado na faixa); Obra (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
+- **rhdp-relatorio-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — Data inicial="2099-12-31" (o resultado não mudou: 50 linha(s), 1ª "ADAILTON FARIAS MACHADO Construtora Tali"); Data final="2099-12-31" (o resultado não mudou: 50 linha(s), 1ª "ADAILTON FARIAS MACHADO Construtora Tali"); Período (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **relatorios-administrativos** — P2: a tela TEM o seletor de filtros, e nenhum dos 4 filtros escondíveis mudou o resultado da consulta na base do preview — Pedido="999999999" (o resultado não mudou: 50 linha(s), total 76, 1ª "22/07/2026, 13:24:57 Gerado da cotacao P"); Item="999999999" (o resultado não mudou: 50 linha(s), total 76, 1ª "22/07/2026, 13:24:57 Gerado da cotacao P"); Obra (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **financeiro-titulos** — T1, T2, T4, T5, T6, T7, T8, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum filtro aplicado A tabela fica vazia ate voce consultar os titul") — capacidade NÃO PROVADA
 - **financeiro-cheques-terceiros** — T1, T2, T4, T5, T6, T7, T8, X1, P2: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum cheque encontrado para os filtros.") — capacidade NÃO PROVADA
@@ -584,10 +277,11 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **provisoes-rel-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — Data inicial="2099-12-31" (o resultado não mudou: 10 linha(s), 1ª "11111 - OBRA MODELO 2 R$ 35.475,00 100,0"); Data final="2099-12-31" (o resultado não mudou: 10 linha(s), 1ª "11111 - OBRA MODELO 2 R$ 35.475,00 100,0"); Obra/Centro (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **provisao-detalhe** — T1, T2, T4, T5, T6, T7, T8, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum anexo registrado.") — capacidade NÃO PROVADA
 - **governanca-sistema** — P4: a menu de ações "⋯" fecha ao clicar fora e com Esc, mas ela não tem opção de MARCAÇÃO para exercitar a seleção com segurança (só ações, que o harness não clica no ambiente compartilhado) — a terceira parte do item NÃO FOI PROVADA, e sem ela o fechamento sozinho não é aprovação: quebrar a seleção é o atalho para fazer uma camada fechar
-- **governanca-auditoria** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — De="2099-12-31" (o resultado não mudou: 30 linha(s), 1ª "06/09/2026 11:07 local ADMINISTRATIVO Ac"); Ate="2099-12-31" (o resultado não mudou: 30 linha(s), 1ª "06/09/2026 11:07 local ADMINISTRATIVO Ac"); Usuario (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
+- **governanca-auditoria** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — De="2099-12-31" (o resultado não mudou: 30 linha(s), 1ª "06/09/2026 14:02 local ADMINISTRATIVO Ac"); Ate="2099-12-31" (o resultado não mudou: 30 linha(s), 1ª "06/09/2026 14:02 local ADMINISTRATIVO Ac"); Usuario (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **solicitacao-detalhe** — T1, T2, T4, T5, T6, T7, T8, P4: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum titulo financeiro foi gerado para esta solicitacao.") — capacidade NÃO PROVADA
 - **treinamento** — T1, T2, T4, T5, T6, T7, T8, X1, P2: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum conteudo encontrado Nenhum conteudo para os filtros atuais. Lim") — capacidade NÃO PROVADA
-- **solicitacoes-rel-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 4 filtros escondíveis mudou o resultado da consulta na base do preview — Data inicial="2099-12-31" (o resultado não mudou: 62 linha(s), 1ª "CRIACAO ATE ASSUNCAO/ATRIBUICAO 113 4,9 "); Data final="2099-12-31" (o resultado não mudou: 62 linha(s), 1ª "CRIACAO ATE ASSUNCAO/ATRIBUICAO 113 4,9 "); Período (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
+- **solicitacoes-rel-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 4 filtros escondíveis mudou o resultado da consulta na base do preview — Data inicial="2099-12-31" (o resultado não mudou: 62 linha(s), 1ª "CRIACAO ATE ASSUNCAO/ATRIBUICAO 113 5,0 "); Data final="2099-12-31" (o resultado não mudou: 62 linha(s), 1ª "CRIACAO ATE ASSUNCAO/ATRIBUICAO 113 5,0 "); Período (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
+- **contratos-rel-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — Código="zzqxjw" (o resultado não mudou: 132 linha(s), 1ª "SEM EMPRESA VINCULADA 198 198 150 R$ 519"); Referência="zzqxjw" (o resultado não mudou: 132 linha(s), 1ª "SEM EMPRESA VINCULADA 198 198 150 R$ 519"); Data inicial="2099-12-31" (o resultado não mudou: 132 linha(s), 1ª "SEM EMPRESA VINCULADA 198 198 150 R$ 519"). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **comercial-rel-operacional** — T1, T2, T4, T5, T6, T7, T8, X1, P2: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum contrato encontrado no período.") — capacidade NÃO PROVADA
 - **solicitacoes-compra** — P2: a tela TEM o seletor de filtros, e nenhum dos 2 filtros escondíveis mudou o resultado da consulta na base do preview — Obra (campo não encontrado na faixa); Status (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **cotacoes** — P2: a tela TEM o seletor de filtros, e nenhum dos 2 filtros escondíveis mudou o resultado da consulta na base do preview — Status (campo não encontrado na faixa); Obra (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
@@ -627,7 +321,7 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **rhdp-documentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T3 (tabela com menos de 2 colunas); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **rhdp-importacoes**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Selecionar planilha")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **rhdp-fechamentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
-- **rhdp-relatorio-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório"))
+- **rhdp-relatorio-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **modulo-relatorios**: C3 (hub de entrada do módulo, não é tela de detalhe); C4 (idem C3); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (hub de cartões: não há listagem com recorte); F2 (idem F1); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **relatorios-administrativos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Buscar")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **comunicacao-interna**: C3 (painel de trabalho em duas colunas, não é tela de detalhe com retorno hierárquico); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); X1 (tela sem tabela/lista tabular); P2 (tela com faixa de filtros e SEM o seletor "Filtros visíveis" — a capacidade não foi ligada aqui (item 2 do plano de preferências)); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
@@ -641,12 +335,12 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **financeiro-bancos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); P2 (tela sem faixa de filtros — não há filtro a esconder); P3 (a tela tem 4 bloco(s) recolhível(is), nenhum ligado à preferência do usuário (abrir 3 deles não gravou nada e src/pages/FinanceiroBancos.jsx não passa chavePreferencia) — o recolhimento aqui é de sessão, por decisão da tela)
 - **financeiro-boletos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (a tela tem 1 bloco(s) recolhível(is), nenhum ligado à preferência do usuário (recolher 1 deles não gravou nada e src/pages/FinanceiroBoletos.jsx não passa chavePreferencia) — o recolhimento aqui é de sessão, por decisão da tela)
 - **financeiro-cadastros**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); P2 (tela com faixa de filtros e SEM o seletor "Filtros visíveis" — a capacidade não foi ligada aqui (item 2 do plano de preferências)); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
-- **financeiro-caixas**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro)
+- **financeiro-caixas**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); P2 (tela com faixa de filtros e SEM o seletor "Filtros visíveis" — a capacidade não foi ligada aqui (item 2 do plano de preferências)); P3 (a tela tem 1 bloco(s) recolhível(is), nenhum ligado à preferência do usuário (recolher 1 deles não gravou nada e src/pages/FinanceiroCaixas.jsx não passa chavePreferencia) — o recolhimento aqui é de sessão, por decisão da tela)
 - **financeiro-cheques-terceiros**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T3 (tabela com menos de 2 colunas); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Cadastrar cheque")); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **financeiro-conciliacao**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **financeiro-dda**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T3 (tabela com menos de 2 colunas); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Sincronizar BB")); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **financeiro-faturas-cartao**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
-- **financeiro-fatura-cartao-detalhe**: C5 (tela sem ações no cabeçalho); F1 (tela sem busca); F4 (tela sem linha de filtros); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro)
+- **financeiro-fatura-cartao-detalhe**: C5 (tela sem ações no cabeçalho); F1 (tela sem busca); F4 (tela sem linha de filtros); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); P2 (tela sem faixa de filtros — não há filtro a esconder); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **financeiro-financiamentos-bancarios**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T3 (tabela com menos de 2 colunas); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); P2 (tela com faixa de filtros e SEM o seletor "Filtros visíveis" — a capacidade não foi ligada aqui (item 2 do plano de preferências)); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **financeiro-pagamentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Atualizar")); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **financeiro-relatorios**: C3 (hub de entrada dos relatórios do módulo, não é tela de detalhe); C4 (idem C3); C5 (tela sem ações no cabeçalho); T5 (tela sem coluna de identificação); F4 (tela sem linha de filtros); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); P2 (tela sem faixa de filtros — não há filtro a esconder); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
@@ -667,7 +361,7 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **definir-senha**: C2 (idem C1); C3 (não é tela de detalhe); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (não há listagem); F2 (não há listagem); F4 (não há listagem); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); C1 (fora do shell: não há topbar para a faixa grudar); F3 (não há listagem); X1 (tela sem tabela/lista tabular); X2 (idem C1); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **cotacao-publica**: C2 (idem C1); C3 (não é tela de detalhe); C4 (idem C3); F1 (não há listagem com recorte); F2 (idem F1); F4 (idem F1); M4 (tela sem comparação previsto × realizado); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); C1 (fora do shell: não há topbar para a faixa grudar); F3 (idem F1); X2 (idem C1); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **config-hub-status-setor**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); T7 (nenhum valor monetário na tela); F1 (tela de configuração sem caixa de busca — não há duas a conciliar); F2 (idem F1: não há recorte de lista por filtro); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (idem F1); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (a tabela declara 3 coluna(s) e só 1 é ocultável — as demais são de identidade ou `sempreVisivel` (campo do formulário de edição na linha, por exemplo). Abaixo do mínimo de 2, não há escolha a oferecer, e a ausência do painel é a decisão certa do componente); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
-- **config-permissoes-setor**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); C5 (tela sem ações no cabeçalho); T7 (nenhum valor monetário na tela); F1 (tela de configuração sem caixa de busca — não há duas a conciliar); F2 (idem F1: não há recorte de lista por filtro); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
+- **config-permissoes-setor**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); C5 (tela sem ações no cabeçalho); T7 (nenhum valor monetário na tela); F1 (tela de configuração sem caixa de busca — não há duas a conciliar); F2 (idem F1: não há recorte de lista por filtro); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (grade de LANÇAMENTO: 2 das 3 colunas são campos de digitação que gravam permissão, e a tela recusa a escolha em `colunasConfiguraveis={false}` (motivo escrito em PermissoesSetor.jsx, 05/09) — esconder coluna aqui é esconder o campo que a pessoa precisa preencher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **config-cores-sistema**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (tela de configuração sem caixa de busca — não há duas a conciliar); F2 (idem F1: não há recorte de lista por filtro); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (ação principal não é cadastro ("Salvar cores")); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **config-contrato-obra-categorias**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Salvar")); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **config-areas-por-setor-origem**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (tela de configuração sem caixa de busca — não há duas a conciliar); F2 (idem F1: não há recorte de lista por filtro); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (ação principal não é cadastro ("Salvar")); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
@@ -692,10 +386,10 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **config-permissoes-areas-padroes**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (tela de configuração sem caixa de busca — não há duas a conciliar); F2 (idem F1: não há recorte de lista por filtro); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (ação principal não é cadastro ("Salvar padroes")); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **config-permissoes-areas**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Salvar permissoes")); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela com faixa de filtros e SEM o seletor "Filtros visíveis" — a capacidade não foi ligada aqui (item 2 do plano de preferências)); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (a tela tem 1 bloco(s) recolhível(is), nenhum ligado à preferência do usuário (recolher 1 deles não gravou nada e src/pages/PermissoesAreas.jsx não passa chavePreferencia) — o recolhimento aqui é de sessão, por decisão da tela)
 - **config-hub**: C3 (hub de entrada, não é tela de detalhe de registro); C4 (idem C3); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (hub de cartões: não há listagem com recorte nem caixa de busca); F2 (idem F1); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
-- **config-cartoes-recarga**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis)
+- **config-cartoes-recarga**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); T7 (nenhum valor monetário na tela); F1 (tela de configuração sem caixa de busca — não há duas a conciliar); F2 (idem F1: não há recorte de lista por filtro); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (idem F1); P2 (tela sem faixa de filtros — não há filtro a esconder); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **contratos-gestao**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); T3 (tabela com menos de 2 colunas); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **comercial-contratos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); P2 (tela com faixa de filtros e SEM o seletor "Filtros visíveis" — a capacidade não foi ligada aqui (item 2 do plano de preferências)); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
-- **comercial-empreendimentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); F3 (tela sem filtros marcáveis)
+- **comercial-empreendimentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); F3 (tela sem filtros marcáveis); P2 (tela sem faixa de filtros — não há filtro a esconder); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **comercial-unidades**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T3 (tabela com menos de 2 colunas); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); P2 (tela com faixa de filtros e SEM o seletor "Filtros visíveis" — a capacidade não foi ligada aqui (item 2 do plano de preferências)); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **comercial-modelos-contrato**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **comercial-tabelas-preco**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T3 (tabela com menos de 2 colunas); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
@@ -722,7 +416,7 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **compras-rel-compras-diretas**: C4 (não é tela de detalhe); T3 (tabela com menos de 2 colunas); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatorio")); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **compras-rel-compras-fornecedor**: C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatorio")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **compras-rel-demanda-pedidos**: C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatorio")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
-- **compras-rel-economia-cotacoes**: C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatorio"))
+- **compras-rel-economia-cotacoes**: C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatorio")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **compras-rel-evolucao**: C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatorio")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **compras-rel-fornecedores**: C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatorio")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **compras-rel-pendencias-cotacoes**: C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatorio")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
@@ -770,7 +464,7 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **perfil**: C3 (tela do proprio usuario, alcancada pelo menu de qualquer lugar — nao ha registro-pai a que voltar); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); T8 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); P4 (tela sem camada flutuante conhecida (painel de colunas, seletor de filtros, menu de marcação ou menu de ações)); P2 (tela sem faixa de filtros — não há filtro a esconder); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **arquivos-modelos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T5 (tela sem coluna de identificação); T7 (nenhum valor monetário na tela); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); P2 (tela sem faixa de filtros — não há filtro a esconder); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **solicitacoes-rel-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
-- **contratos-rel-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório"))
+- **contratos-rel-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório")); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **comercial-rel-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T3 (tabela com menos de 2 colunas); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório")); P1 (tela sem tabela padrão (.resizable-table) — não há coluna a escolher); P3 (tela sem bloco recolhível (nenhum .app-bloco-recolher) — não há recolhimento a guardar)
 - **solicitacoes-compra**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (cadastro em página própria (rota dedicada)); P3 (a tela tem 1 bloco(s) recolhível(is), nenhum ligado à preferência do usuário (recolher 1 deles não gravou nada e src/modules/solicitacao-compra/pages/SolicitacoesCompra.jsx não passa chavePreferencia) — o recolhimento aqui é de sessão, por decisão da tela)
 - **cotacoes**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); P3 (a tela tem 1 bloco(s) recolhível(is), nenhum ligado à preferência do usuário (recolher 1 deles não gravou nada e src/modules/solicitacao-compra/pages/ListaCotacoes.jsx não passa chavePreferencia) — o recolhimento aqui é de sessão, por decisão da tela)
