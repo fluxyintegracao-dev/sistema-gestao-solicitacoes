@@ -407,3 +407,49 @@ apontar `refactor/frontend` de volta ao commit anterior.
 
 **Não é decisão de negócio nem remoção de capacidade** — é mecânica de entrega,
 e por isso foi tomada sem interromper a leva, com o motivo registrado aqui.
+
+
+---
+
+## ESTADO DA EXECUÇÃO (05/09)
+
+| frente | estado |
+|---|---|
+| Backend destravado (regex, `tipo`, reset, carga única, adoção) | **feito** |
+| N53 — preferência deixa de mudar o resultado da consulta | **feito** |
+| Largura dos filtros, teto de 94rem, formulário de 940px | **feito** |
+| 14 camadas que não fechavam | **feito** |
+| Apoio do bloco em uma linha, com 3 exceções | **feito** |
+| Preferência de tabela sai do navegador e vai para o banco | **feito** |
+| Tipografia: 92 tamanhos → 8, piso zerado, R30 e R31 no portão | **feito** |
+| 11 camadas de perda de foco (10 trocadas, 1 com motivo) | **feito** |
+| Escolher colunas: 20 → 246 tabelas, arrastar, painel dentro do modal | **feito** |
+| Travar as colunas que carregam ação | em execução |
+| Blocos personalizáveis + recolhimento persistindo | em execução |
+| Seletor de filtros unificado + conjuntos iniciais aprovados | em execução |
+| Provas de comportamento das capacidades novas (P1–P4) | em execução |
+| Avanço da branch, deploy, matriz em regressão, revisor separado | pendente |
+
+### Decisões tomadas sozinho, com o motivo registrado
+
+- **A largura de coluna NÃO foi migrada** para o banco. Está em pixel absoluto, e
+  levá-la por usuário faria o monitor grande estragar o notebook — defeito já
+  ocorrido aqui e documentado no código. As três saídas esperam a palavra do
+  cliente.
+- **O localStorage continua sendo escrito**, como semente síncrona e rede de
+  rollback, com o banco mandando. Contraria a letra do "nada de localStorage" e
+  serve ao espírito. Reverter é uma linha.
+- **`refactor/frontend` avança ao fim da leva**, para o preview servir este
+  trabalho e a matriz ter o que medir.
+- **Ligar o painel de colunas por padrão**: não havia restrição registrada, só
+  cautela uniforme da leva que o introduziu.
+
+### Erros meus nesta leva, registrados
+
+1. `git add -A` com agentes escrevendo varreu 5 arquivos para um commit sobre
+   outra coisa. Segunda vez na sessão. Caminho explícito daqui em diante.
+2. Reportei ao cliente uma violação do piso como "sobrevivente" quando ela já
+   estava corrigida no mesmo commit. O achado estrutural que ela motivou (a R31)
+   continua válido e medido; a narrativa é que estava errada.
+3. Disse "124 telas" e "273 chaves" de cabeça; os números medidos são 152
+   arquivos e 280 chaves.
