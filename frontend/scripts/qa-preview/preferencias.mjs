@@ -330,18 +330,58 @@ export async function checarColunasEscolhiveis(page, tela, resultado, ctx) {
       menos de 2 ocultáveis). Nas duas primeiras a decisão é da tela e se
       registra no manifesto (`naoAplica`), que sempre vence este check.
 
-      A terceira dá para MEDIR: se o cabeçalho mostra 3 ou mais colunas de
-      conteúdo, então há 3 ou mais declaradas, e como a única travada hoje é
-      a de identidade, há pelo menos 2 ocultáveis — o painel TINHA de estar
-      lá. Devolver N/A aqui seria a cegueira do T2 outra vez, agora ao
-      contrário: em vez de aprovar por presença de ícone, absolver por
-      ausência de painel. Uma regressão que apagasse o painel de todas as
-      tabelas do sistema sairia como 189 células cinzas e ninguém veria.
+      A terceira dá para MEDIR — e ATÉ 06/09 ELA NÃO ERA MEDIDA, ERA
+      DEDUZIDA. A versão anterior deste comentário dizia "como a única
+      travada hoje é a de identidade, há pelo menos 2 ocultáveis". Isso
+      era falso: 24 telas declaram `sempreVisivel`. Na Setores, `codigo` e
+      `capacidades` são travadas porque são os campos do formulário de
+      edição na linha — sem elas o registro não tem como ser editado. Com
+      a identidade, são três travadas de quatro colunas: sobra UMA
+      ocultável, o componente corretamente não oferece o painel, e este
+      check reprovava a tela por um defeito que não existia. Era o
+      verificador afirmando o que não tinha como medir.
+
+      Agora a tabela DIZ o número (`data-colunas-ocultaveis` e
+      `data-colunas-declaradas`, em `TabelaPadrao`), e aqui se LÊ. Sem
+      esses atributos (build antigo servido no preview) o check não
+      inventa: reprova pedindo o build novo, porque um N/A silencioso aqui
+      é exatamente o buraco que este item existe para fechar.
+
+      O que NÃO muda: ausência de painel com 2+ ocultáveis continua
+      FALHOU. Devolver N/A nesse caso seria a cegueira do T2 ao contrário
+      — em vez de aprovar por presença de ícone, absolver por ausência de
+      painel —, e uma regressão que apagasse o painel de todas as tabelas
+      sairia como 189 células cinzas sem ninguém ver.
     */
+    const medida = await page.evaluate(() => {
+      const casca = document.querySelector('.app-table-shell[data-colunas-declaradas]');
+      if (!casca) return null;
+      return {
+        declaradas: Number(casca.getAttribute('data-colunas-declaradas')),
+        ocultaveis: Number(casca.getAttribute('data-colunas-ocultaveis'))
+      };
+    });
+
+    if (medida && medida.ocultaveis < 2) {
+      resultado.P1 = {
+        estado: 'N/A',
+        motivo: `a tabela declara ${medida.declaradas} coluna(s) e só ${medida.ocultaveis} é ocultável — as demais são de identidade ou \`sempreVisivel\` (campo do formulário de edição na linha, por exemplo). Abaixo do mínimo de 2, não há escolha a oferecer, e a ausência do painel é a decisão certa do componente`
+      };
+      return;
+    }
+
+    if (!medida && antes.titulos.length >= 3) {
+      resultado.P1 = {
+        estado: 'FALHOU',
+        motivo: `a tabela mostra ${antes.titulos.length} colunas de conteúdo e não oferece o painel "Colunas", e a casca NÃO publica \`data-colunas-ocultaveis\` — o preview está servindo build anterior a 06/09. Sem esse número não dá para distinguir recusa legítima (colunas travadas) de painel que sumiu, e adivinhar é o defeito que este item existe para não repetir: republique e rode de novo`
+      };
+      return;
+    }
+
     if (antes.titulos.length >= 3) {
       resultado.P1 = {
         estado: 'FALHOU',
-        motivo: `a tabela mostra ${antes.titulos.length} colunas de conteúdo (${antes.titulos.slice(0, 4).join(', ')}…) e NÃO oferece o painel "Colunas" — com 3+ declaradas e só a de identidade travada, o componente deveria oferecê-lo. Se esta tela recusa a escolha de propósito, a recusa se declara no manifesto (naoAplica.P1), não se deduz do silêncio`
+        motivo: `a tabela mostra ${antes.titulos.length} colunas de conteúdo (${antes.titulos.slice(0, 4).join(', ')}…) e NÃO oferece o painel "Colunas", com ${medida.ocultaveis} coluna(s) ocultáve(is) declarada(s) pela própria tabela — havendo 2 ou mais, o painel tinha de estar lá. Se esta tela recusa a escolha de propósito, a recusa se declara no manifesto (naoAplica.P1) ou travando as colunas com \`sempreVisivel\`, não se deduz do silêncio`
       };
       return;
     }

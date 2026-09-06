@@ -1430,8 +1430,35 @@ export default function TabelaPadrao({
     ];
   };
 
+  /*
+    O PAINEL AUSENTE PRECISA DIZER POR QUE (06/09).
+
+    A prova P1 do verificador reprova tabela com 3+ colunas que nao
+    oferece o painel "Colunas". Ela le o DOM, e o DOM nao contava
+    quantas colunas sao TRAVADAS — entao ela acusava "so a de
+    identidade travada" sem ter como medir isso. Na Setores, por
+    exemplo, `codigo` e `capacidades` sao `sempreVisivel` porque sao os
+    campos do formulario de edicao na linha: sem elas o registro nao
+    tem como ser editado. Sobra UMA coluna escondivel, abaixo do minimo
+    de duas, e o componente corretamente nao oferece o painel.
+
+    Sao 24 telas com `sempreVisivel` hoje. Em vez de declarar excecao
+    tela a tela num manifesto (que envelhece calado quando a coluna
+    deixa de ser travada), a tabela passa a DIZER o numero, e a prova
+    MEDE em vez de deduzir. Recusa de propriedade continua sendo
+    recusa; o que muda e que ela para de ser silenciosa.
+
+    Sao atributos de leitura, sem efeito nenhum sobre o que se ve.
+  */
   return (
-    <div className="app-table-shell app-tabela" ref={shellRef} data-piso-largura={pisoDaTabela}>
+    <div
+      className="app-table-shell app-tabela"
+      ref={shellRef}
+      data-piso-largura={pisoDaTabela}
+      data-colunas-declaradas={colunasDeclaradas.length}
+      data-colunas-ocultaveis={colunasOcultaveis}
+      data-painel-colunas={painelDeColunas ? 'sim' : 'nao'}
+    >
       {(painelDeColunas || acoesTabela) ? (
         <div className="app-tabela-barra">
           {acoesTabela}

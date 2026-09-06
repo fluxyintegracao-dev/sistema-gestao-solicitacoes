@@ -1155,10 +1155,26 @@ function validarMedidaNaCasca() {
  * nível de indentação 2, que é como todo componente daqui é escrito. Ela
  * ACUSA a versão quebrada (5 achados em TabelaPadrao.jsx) e LIBERA a
  * corrigida — medido antes de entrar, não suposto.
+ *
+ * BURACO FECHADO EM 06/09, MEDIDO ANTES DE FECHAR: a lista de hooks era a dos
+ * hooks NATIVOS do React, e hook do projeto não entrava nela. O
+ * `useFecharAoSair` — que chama `useEffect` por dentro e portanto quebra
+ * exatamente igual — já é chamado em 35 lugares depois das duas levas de
+ * camadas flutuantes. Prova do buraco, feita neste arquivo antes da correção:
+ * pondo `if (disabled) return null;` ANTES do `useFecharAoSair` do
+ * `ParceiroAutocomplete`, e com nenhum hook nativo abaixo dele, o portão
+ * passava VERDE numa tela que some com React #310 no primeiro `disabled`.
+ * Com `use[A-Z]` no lugar da lista fixa, a mesma quebra reprova.
+ *
+ * O preço de ampliar: linha de COMENTÁRIO que cita um hook passa a casar. Por
+ * isso o teste de comentário deixou de ser só `//` e passou a cobrir também
+ * `{/*` e `*` — sem isso, um comentário JSX do `FinanceiroTituloEditar` virava
+ * falha inventada. Medido na árvore limpa depois da troca: 0 achados.
  */
 function validarHooksDepoisDeRetorno() {
   const falhas = [];
-  const HOOK = /^\s{2}(?:const|let|var)?\s*.*\buse(?:State|Effect|Memo|Callback|Ref|Context|LayoutEffect|Reducer|ImperativeHandle|Id|Transition|DeferredValue|SyncExternalStore)\s*\(/;
+  const HOOK = /^\s{2}(?:const|let|var)?\s*.*\buse[A-Z]\w*\s*\(/;
+  const COMENTARIO = /^(?:\/\/|\*|\{\/\*|\/\*)/;
 
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -1217,7 +1233,7 @@ function validarHooksDepoisDeRetorno() {
           if (temReturn) fimDoRetornoCondicional = i + 1;
           dentroDeBloco = false; temReturn = false;
         }
-        if (fimDoRetornoCondicional && HOOK.test(linha) && !linha.trim().startsWith('//')) {
+        if (fimDoRetornoCondicional && HOOK.test(linha) && !COMENTARIO.test(linha.trim())) {
           falhas.push(
             `${rel}:${i + 1} [R29] hook chamado DEPOIS do return condicional da linha `
             + `${fimDoRetornoCondicional} — a tela some com React #310 assim que a `
