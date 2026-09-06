@@ -735,7 +735,30 @@ porque cada colaborador tem exatamente uma pendência crítica.
 Fica registrado porque a suspeita era razoável e a resposta é verificável —
 se alguém a levantar de novo, o caminho já está andado.
 
-### N53. [CRÍTICO] A mesma consulta devolve resultados diferentes em máquinas diferentes, e a tela não avisa
+### N53. [RESOLVIDO em 06/09] A mesma consulta devolve resultados diferentes em máquinas diferentes, e a tela não avisa
+
+> **FECHADO por decisão do cliente em 06/09.** A caixa "Salvar filtro neste
+> navegador" foi **removida** e o último filtro consultado passou para o banco,
+> por usuário, como todo o resto da leva de preferências. Palavras dele:
+> *"não é escolha que o usuário precise fazer: ele espera que a configuração
+> dele acompanhe"*.
+>
+> O que o conserto reconhece, e que o achado original já dizia: o defeito não
+> era só onde a preferência morava — era **transformar um defeito em pergunta
+> ao usuário**. O rótulo dizia "neste navegador", mas quem marca aquela caixa
+> espera o contrário, que a configuração o acompanhe. Perguntar não corrigia
+> nada; só transferia a culpa.
+>
+> Onde: tipo `geral` do `PreferenciasContext` (o backend já o tinha no conjunto
+> fechado, com teto de 32KB, sem dono no frontend). A migração é automática — o
+> espelho local ficou na chave antiga, então quem já tinha filtro guardado
+> naquela máquina o encontra na primeira abertura, e a partir dali ele viaja.
+> Commit `4c09a29`.
+>
+> Efeito colateral medido, e era o outro motivo do cliente: sem a caixa, o
+> cabeçalho da consulta fecha em **quatro linhas** em 1366px — era ela que
+> custava a quinta.
+
 
 > **Classificado CRÍTICO por decisão do cliente em 05/09.** O argumento é dele e
 > eu assino: usuário obtendo resultado diferente da mesma consulta, em máquinas

@@ -678,6 +678,11 @@ export function validarLayout() {
   falhas.push(...r31.falhas);
   avisos.push(...r31.avisos);
 
+  // R33 — camada posicionada à mão, sem o hook que mede se cabe na janela.
+  const r33 = validarCamadaPosicionadaAMao();
+  falhas.push(...r33.falhas);
+  avisos.push(...r33.avisos);
+
   // R32 — camada fora da escala: o conteúdo passando por cima da barra fixa.
   const r32 = validarCamadaForaDaEscala();
   falhas.push(...r32.falhas);
@@ -1116,6 +1121,86 @@ function lerJsonDoDisco(relativo, padrao) {
  * uma delas — por isso o campo de filtro sobe a coluna INTEIRA ao abrir, em
  * vez de subir a lista, que ficaria presa dentro dele.
  */
+/**
+ * R33 — CAMADA POSICIONADA A MAO (06/09).
+ *
+ * Nasceu de um defeito medido, nao de gosto. O painel de filtros visiveis
+ * abria 305px FORA da janela porque trazia `position:absolute; right:0`
+ * escrito inline — `right:0` ancora a borda DIREITA da caixa no botao, e com
+ * o botao a esquerda da faixa a borda esquerda cai em x negativo.
+ *
+ * Pior: quando fomos ver, havia TRES jeitos de posicionar camada no sistema
+ * (o hook, um `medir()` escrito a mao que media e nao prendia, e um
+ * `rect.top > 200` que era chute). O hook proprio, escrito em 05/09, NUNCA
+ * MEDIU NADA — a dependencia do efeito era lida durante o render, quando o
+ * ref ainda esta vazio, entao ele so via tamanho zero.
+ *
+ * A regra existe para que o QUARTO jeito nao nasca calado: arquivo que tem
+ * camada (`useFecharAoSair`) e posiciona a mao sem passar pelo
+ * `usePosicaoFlutuante` reprova.
+ *
+ * TRINCO, porque nem toda camada precisa do hook: as que tem a largura do
+ * proprio campo (`left:0; right:0` juntos) nao podem vazar na horizontal.
+ * Essas ficam congeladas com o numero medido, e o numero SO DESCE.
+ */
+function validarCamadaPosicionadaAMao() {
+  const falhas = [];
+  const avisos = [];
+  const trinco = lerJsonDoDisco('scripts/trinco-posicao-camada.json', { nomes: {} });
+  /* Ancoragem por UMA borda so: e a que desloca a caixa e pode jogar fora da
+     janela. `left` e `right` juntos dao a largura do ancora — nao desloca. */
+  const ANCORA = /(?:^|[\s"'`{;])(?:(?:position\s*:\s*(?:absolute|fixed))|(?:\babsolute\b|\bfixed\b))/;
+  const BORDA = /(?:\bright\s*:\s*0|\bleft\s*:\s*0|\bright-0\b|\bleft-0\b)/;
+
+  const varrer = (dir, saida) => {
+    if (!fs.existsSync(dir)) return saida;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) { varrer(caminho, saida); continue; }
+      if (!item.name.endsWith('.jsx')) continue;
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      if (ehFixtureDeOutraProva(item.name, rel)) continue;
+      const codigo = fs.readFileSync(caminho, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, (t) => t.replace(/[^\n]/g, ' '))
+        .replace(/^\s*\/\/.*$/gm, '');
+      if (!/useFecharAoSair\s*\(/.test(codigo)) continue;
+      if (/usePosicaoFlutuante\s*\(/.test(codigo)) continue;
+      const ondes = [];
+      codigo.split('\n').forEach((linha, i) => {
+        if (!ANCORA.test(linha) || !BORDA.test(linha)) return;
+        /* largura do ancora: as duas bordas na mesma linha nao deslocam */
+        const duasBordas = /(?:\bleft\s*:\s*0[\s\S]*\bright\s*:\s*0)|(?:\bright\s*:\s*0[\s\S]*\bleft\s*:\s*0)|(?:left-0[\s\S]*right-0)|(?:right-0[\s\S]*left-0)|inset-x-0/.test(linha);
+        if (duasBordas) return;
+        ondes.push(`${rel}:${i + 1}`);
+      });
+      if (ondes.length) saida.push({ rel, total: ondes.length, ondes });
+    }
+    return saida;
+  };
+
+  const medidos = varrer(path.join(frontendRoot, 'src'), []);
+  for (const { rel, total, ondes } of medidos) {
+    const congelado = Number(trinco.nomes?.[rel] || 0);
+    if (total > congelado) {
+      falhas.push(
+        `${rel} [R33] ${total} camada(s) ancorada(s) a mao por UMA borda, contra `
+        + `${congelado} congelada(s) no trinco, e o arquivo NAO usa `
+        + `usePosicaoFlutuante. Ancorar so por uma borda desloca a caixa e pode `
+        + `joga-la para fora da janela — foi assim que o painel de filtros abriu `
+        + `305px fora. O numero SO DESCE. Ex.: ${ondes.slice(congelado, congelado + 2).join(' · ')}`
+      );
+    } else if (total < congelado) {
+      avisos.push(`[R33] ${rel} desceu de ${congelado} para ${total} — atualize scripts/trinco-posicao-camada.json.`);
+    }
+  }
+  for (const rel of Object.keys(trinco.nomes || {})) {
+    if (!medidos.some((m) => m.rel === rel)) {
+      avisos.push(`[R33] ${rel} zerou — remova a linha de scripts/trinco-posicao-camada.json.`);
+    }
+  }
+  return { falhas, avisos };
+}
+
 function validarCamadaForaDaEscala() {
   const falhas = [];
   const avisos = [];
