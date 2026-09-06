@@ -201,8 +201,35 @@ function Linha({ lado }) {
     return proximo;
   });
 
+  /*
+    O CARTÃO DO SISTEMA À VOLTA DAS ÂNCORAS (06/09, tarde) — e ele é o motivo
+    pelo qual esta prova passava verde enquanto a matriz reprovava 43 células.
+
+    Ela montava os componentes SOLTOS na página. No sistema de verdade toda
+    camada nasce dentro de um cartão: `.app-table-shell` (a `TabelaPadrao`),
+    `.card`, `.app-toolbar-card`, `.dashboard-hero-card`… — e `index.css`
+    (regra em `.layout-shell .card, … , .layout-shell .app-table-shell, …`)
+    dá `backdrop-filter: blur(16px)` a essa família inteira.
+
+    `backdrop-filter` diferente de `none` faz o elemento virar BLOCO
+    CONTINENTE de descendente `position: fixed`: o `top`/`left` da camada
+    deixa de contar a partir da janela e passa a contar a partir do canto do
+    cartão. Enquanto o cartão começa em (0,0) os dois zeros coincidem e o
+    defeito não aparece — que era exatamente a página desta fixture.
+
+    Medido no preview publicado (tela `parceiros`, build 5fbcd89): o hook
+    escreveu `top: 531,5px` e a caixa foi parar em y=1006, porque o
+    `.app-table-shell` começava em y=473. As contas estavam certas; o zero
+    é que era outro.
+
+    As classes são as REAIS e o CSS é o real — `.layout-shell` porque a regra
+    do `index.css` a exige no ancestral, e `.app-table-shell` porque é o
+    cartão em que o painel de colunas de fato mora. O `.prova-cartao` só
+    empurra o canto para longe de (0,0), que é o que torna o defeito visível.
+  */
   return (
-    <div className="prova-linha">
+    <div className="layout-shell prova-linha">
+      <div className="app-table-shell prova-cartao">
       <Ancora lado={lado}>
         <span data-camada="filtros-visiveis">
           <PainelFiltrosVisiveis visibilidade={visibilidade} />
@@ -237,6 +264,7 @@ function Linha({ lado }) {
           ) : null}
         </span>
       </Ancora>
+      </div>
     </div>
   );
 }

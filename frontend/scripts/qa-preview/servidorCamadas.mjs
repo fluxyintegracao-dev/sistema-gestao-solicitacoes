@@ -41,7 +41,8 @@ const CSS = [
 const CSS_FIXTURE = `
   body { margin: 0; }
   .prova-pagina { padding: 24px 0; min-height: 100vh; }
-  .prova-linha { display: flex; flex-direction: column; gap: 40px; margin-bottom: 40px; }
+  .prova-linha { margin-bottom: 40px; }
+  .prova-cartao > .prova-ancora { margin-bottom: 40px; }
   .prova-ancora { display: flex; }
   .prova-ancora--esq { justify-content: flex-start; padding-left: 0; }
   .prova-ancora--dir { justify-content: flex-end; padding-right: 0; }
@@ -51,6 +52,21 @@ const CSS_FIXTURE = `
      botão encostado na borda DE BAIXO. É a posição das 39 telas. */
   .prova-ancora--topo, .prova-ancora--rodape { justify-content: flex-start; }
   .prova-vao { height: 100vh; }
+  /*
+    O CARTÃO NÃO COMEÇA NO CANTO DA JANELA — se começasse, o zero dele
+    coincidiria com o da janela e o defeito do bloco continente não
+    apareceria (foi assim que esta prova passou verde por uma leva inteira).
+
+    O recuo LATERAL é o real: 1rem, o mesmo do .layout-content-shell. Não é
+    detalhe — com um recuo inventado de 40px a 390 de janela o cartão fica
+    mais estreito que a camada e a RECORTA, o que é um segundo defeito, de
+    CSS, e não o que esta prova está medindo.
+
+    O recuo VERTICAL não é escrito aqui: ele nasce sozinho, porque a segunda
+    linha de âncoras cai ~500px abaixo da primeira. No preview medido o
+    cartão da tela parceiros começava em y 473 — mesma ordem de grandeza.
+  */
+  .prova-cartao { margin: 0 0 0 1rem; padding: 16px 0; }
   .prova-vazio { height: 900px; }
 `;
 

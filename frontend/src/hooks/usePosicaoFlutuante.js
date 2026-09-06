@@ -111,6 +111,11 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
     ninguém vê o canto.
   */
   const natural = useRef({ altura: 0, largura: 0, medido: false });
+  /*
+    O ÚLTIMO PAR QUE O HOOK MANDOU PINTAR — e é ele que revela onde começa o
+    bloco continente. Ver a nota "`FIXED` NEM SEMPRE É A JANELA", logo abaixo.
+  */
+  const escrito = useRef(null);
 
   const medir = useCallback(() => {
     const ancora = ancoraRef.current?.getBoundingClientRect();
@@ -129,10 +134,75 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
     const tetoLargura = Math.max(0, larguraJanela - folga * 2);
 
     /* ---- a medição, uma vez por abertura ------------------------------- */
+    /*
+      =====================================================================
+      `FIXED` NEM SEMPRE É A JANELA — e foi isto, e só isto, que reprovou as
+      43 telas do passo 1b. Medido no preview publicado (06/09, tarde), na
+      tela `parceiros`, build 5fbcd89:
+
+        botão            x 1771..1856   y 489..527
+        o que o hook ESCREVEU   left: 1596.41px   top: 531.547px
+        onde a caixa FOI PARAR  x 1636..1896      y 1006..1326
+
+      As contas do hook estavam CERTAS: `1856 - 260 = 1596` é a borda direita
+      do botão menos a largura, e `527 + 4 = 531` é logo abaixo dele. O que
+      não era certo era o SISTEMA DE COORDENADAS: a caixa apareceu 39,6px à
+      direita e 474,5px abaixo do que foi pedido.
+
+      A diferença é exatamente o canto de `.app-table-shell.app-tabela`, que
+      estava em x 39, y 473 — e ele é o BLOCO CONTINENTE do `position: fixed`
+      porque `index.css` dá `backdrop-filter: blur(16px)` a
+      `.layout-shell .app-table-shell` (e a `.card`, `.app-toolbar-card`,
+      `.dashboard-hero-card`, `.dashboard-section-card`, `.config-summary-card`
+      e `.sol-surface-card`, na mesma regra). `backdrop-filter` diferente de
+      `none` faz o elemento virar bloco continente para descendente `fixed` —
+      a mesma família de `transform` e `filter`, que a nota de escala do
+      `index.css` já registra para z-index e que vale igual para POSIÇÃO.
+
+      Ou seja: o hook vinha calculando coordenada de JANELA e entregando para
+      um elemento cujo zero é o canto de um cartão. Enquanto o cartão começa
+      em (0,0) as duas coisas coincidem — e foi por isso que a fixture local,
+      que montava os componentes soltos na página, passou verde nas três
+      larguras enquanto a matriz reprovava 43 células.
+
+      COMO O DESVIO É DESCOBERTO, sem lista de propriedades para envelhecer:
+      o hook SABE que par ele mandou pintar (`escrito`), e `getBoundingClientRect`
+      diz onde a caixa está de verdade. A diferença entre os dois É o canto do
+      bloco continente. Nada de percorrer ancestrais procurando `transform`,
+      `filter`, `backdrop-filter`, `contain`, `will-change`, `perspective` e
+      `container-type` — essa lista cresce a cada versão de CSS e uma entrada
+      esquecida é este mesmo defeito de volta, calado.
+
+      E NÃO É LAÇO: escrever `left` move a caixa junto, então o desvio medido
+      no evento seguinte continua sendo o mesmo canto. É a diferença para o
+      React #185 registrado acima, que era realimentação de LARGURA.
+      =====================================================================
+    */
+    /*
+      SÓ SE MEDE O QUE O HOOK MESMO COLOCOU. As duas leituras daqui — o
+      tamanho natural e o desvio — só valem se a caixa estiver na POSIÇÃO DE
+      MEDIÇÃO, e quem garante isso é `escrito.current`.
+
+      Não é zelo: a `FiltroRapido` desenha o `.la-rapido-pop` com `aberto &&`,
+      não com `posicao &&` (as outras camadas usam `aberto && posicao &&`).
+      O nó existe no DOM ANTES de o hook escrever qualquer coisa — e na
+      primeira passagem ele estava sendo medido onde o CSS o tinha posto,
+      com `escrito` ainda vazio: desvio ZERO, `medido` já verdadeiro, e o
+      cálculo final saía em coordenada de janela para um elemento cujo zero
+      era o canto do cartão. Medido na prova: escreveu `top: 729px`, foi
+      parar em y=1233, vazando 391px pela base — a mesma assinatura do
+      preview, agora numa única camada das cinco.
+    */
     const no = camadaRef.current;
-    if (no && !natural.current.medido) {
+    let desvioX = 0;
+    let desvioY = 0;
+    if (no && escrito.current) {
       const r = no.getBoundingClientRect();
-      natural.current = { altura: r.height, largura: r.width, medido: true };
+      desvioX = r.left - escrito.current.left;
+      desvioY = r.top - escrito.current.top;
+      if (!natural.current.medido) {
+        natural.current = { altura: r.height, largura: r.width, medido: true };
+      }
     }
     /*
       A LARGURA JÁ VALE NA MEDIÇÃO, e não só no fim — corrigido em 06/09
@@ -151,10 +221,11 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
     */
     const larguraNaMedicao = larguraDaAncora ? Math.min(ancora.width, tetoLargura) : null;
 
-    if (!natural.current.medido) {
-      /* A camada ainda não existe no DOM (primeiro render) OU acabou de
-         entrar. Devolve a POSIÇÃO DE MEDIÇÃO para que ela seja desenhada e
-         possa ser medida no efeito de layout seguinte, antes da pintura. */
+    if (!natural.current.medido || !escrito.current) {
+      /* A camada ainda não existe no DOM (primeiro render), acabou de entrar,
+         ou já existia mas nunca foi posta por este hook. Devolve a POSIÇÃO DE
+         MEDIÇÃO para que ela seja desenhada ali e possa ser medida no efeito
+         de layout seguinte, antes da pintura. */
       /*
         A POSIÇÃO DE MEDIÇÃO NÃO IMPÕE TETO DE ALTURA (06/09, tarde) — e o
         `maxWidth` continua aqui, porque os dois tetos existem por motivos
@@ -182,6 +253,9 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
         por `rolaV`, comparando o natural com o teto da janela — e agora
         compara um natural que não foi cortado por esse mesmo teto.
       */
+      /* A posição de medição é o par CONHECIDO de onde sai o desvio: pedimos
+         (folga, folga) e a medição seguinte diz onde a caixa foi parar. */
+      escrito.current = { left: folga, top: folga };
       setCaixa((atual) => (atual && atual.medindo && atual.largura === larguraNaMedicao ? atual : {
         medindo: true,
         esquerda: folga,
@@ -287,12 +361,31 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
     const rolaH = largura >= tetoLargura - 1;
     const larguraImposta = larguraDaAncora ? largura : null;
 
+    /*
+      DAQUI PARA BAIXO, DUAS COORDENADAS DIFERENTES, e confundi-las é o
+      defeito das 43 telas:
+
+        `esquerda`/`topo`          onde a caixa tem de APARECER, na janela;
+        `escritoX`/`escritoY`      o que vai no `style`, já descontado o canto
+                                   do bloco continente.
+
+      Quando o bloco continente É a janela — que é o caso da maioria das
+      camadas e de toda a fixture antiga — os dois pares são iguais e nada
+      muda. A conferência de "mesma posição = mesmo objeto" tem de olhar o
+      par ESCRITO: a página pode rolar e deixar o alvo na janela igual
+      enquanto o canto do cartão andou, e comparar só o alvo congelaria a
+      caixa no lugar errado.
+    */
+    const escritoX = esquerda - desvioX;
+    const escritoY = topo - desvioY;
+
     /* Mesma posição = mesmo objeto: sem isto a remedição do scroll pediria
        um render novo a cada evento, com a caixa parada no mesmo lugar. */
+    escrito.current = { left: escritoX, top: escritoY };
     setCaixa((atual) => (atual
       && !atual.medindo
-      && atual.esquerda === esquerda
-      && atual.topo === topo
+      && atual.estilo.left === escritoX
+      && atual.estilo.top === escritoY
       && atual.largura === larguraImposta
       && atual.alturaMaxima === (rolaV ? tetoAltura : null)
       && atual.larguraMaxima === (rolaH ? tetoLargura : null)
@@ -314,8 +407,8 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
         */
         estilo: {
           position: 'fixed',
-          left: esquerda,
-          top: topo,
+          left: escritoX,
+          top: escritoY,
           right: 'auto',
           bottom: 'auto',
           ...(larguraImposta === null ? {} : { width: larguraImposta }),
@@ -330,6 +423,9 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
     if (!aberto) {
       setCaixa(null);
       natural.current = { altura: 0, largura: 0, medido: false };
+      /* O canto do bloco continente é redescoberto a cada abertura: o par
+         escrito da abertura anterior é de uma caixa que não existe mais. */
+      escrito.current = null;
       return undefined;
     }
     medir();
@@ -383,7 +479,13 @@ export function usePosicaoFlutuante(ancoraRef, camadaRef, aberto, opcoes = {}) {
     o ciclo não fecha. Está medido, com a mensagem inteira, em 06/09.
   */
   useLayoutEffect(() => {
-    if (aberto && camadaRef.current && !natural.current.medido) medir();
+    /* `caixa.medindo` entra na condição junto com `!medido` porque a segunda
+       passagem — a que descobre o desvio do bloco continente — acontece
+       DEPOIS de a caixa ir para a posição de medição, e nessa hora `medido`
+       pode já ser verdadeiro (camada que estava no DOM antes do hook). Sem
+       ela o hook fica parado no canto de medição. O portão continua fechando
+       sozinho: no render seguinte `medindo` é falso e a corrente para. */
+    if (aberto && camadaRef.current && (!natural.current.medido || caixa?.medindo)) medir();
   }, [aberto, caixa, camadaRef, medir]);
 
   return caixa;
