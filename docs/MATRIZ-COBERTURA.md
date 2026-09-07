@@ -6,14 +6,14 @@
 > capacidade, a base do preview não deu registro para exercitá-la — NÃO PROVADA)
 > · — N/A (a regra não se aplica; motivo registrado).
 
-- Verificação: **2026-09-07 02:10** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `06a5beb175d2dcddf148690e2fa1f1a107eaaab3`
+- Verificação: **2026-09-07 03:50** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `916890ff493fc0426bdbc21d4e525e5252f4bc2b`
 - Telas verificadas: 189 · Itens: C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, T8, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1, P1, P2, P3, P4
 - **TELAS QUE NÃO ABRIRAM: 1** — nada nelas foi medido, e rodada com tela que não abre NÃO fecha:
   - `financeiro-titulo-editar` — locator.waitFor: Timeout 30000ms exceeded.
 Call log:
 [2m  - waiting for locator('a[href^="/financeiro/titulos/"]:not([href*="novo"])').first() to be visible[22m
 
-- **Células FALHOU: 5** (justificativas abaixo)
+- **Células FALHOU: 3** (justificativas abaixo)
 - **Células SEM DADO: 416** — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)
 
 | Tela | C1 | C2 | C3 | C4 | C5 | C6 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | F1 | F2 | F3 | F4 | B1 | B2 | B3 | B4 | B5 | M1 | M2 | M3 | M4 | R1 | R2 | R3 | X1 | X2 | X3 | R18 | A1 | P1 | P2 | P3 | P4 |
@@ -40,7 +40,7 @@ Call log:
 | usuarios-acesso-financeiro | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
 | usuarios-acesso-prioridade-diretoria | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | — | ✅ |
 | usuarios-permissoes-rh-dp | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — | — | — | — | — |
-| rhdp-pessoal | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | — | ✅ | ❌ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
+| rhdp-pessoal | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | — | — | ✅ |
 | rhdp-colaboradores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
 | rhdp-documentos | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — | — | ⚠ | — | ✅ |
 | rhdp-importacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ⚠ | — | ✅ |
@@ -210,8 +210,6 @@ Call log:
 
 ## FALHOU — cada célula, justificada
 
-- **rhdp-pessoal · B1**: [?aba=jornada] nenhum bloco na tela
-- **rhdp-pessoal · M1**: [?aba=jornada] 2 alvo(s) < 32px; primeiro: div.min-h-screen.bg-[var(--c-bg)] > section.mx-auto.flex > div.rounded-[28px].border > div.mt-6.flex > button.btn-primary (93×24px)
 - **financeiro-titulos · P1**: passo 5 (persistência): depois de recarregar, a tabela não voltou a aparecer em 20s — a persistência de "Status" NÃO FOI PROVADA; "Restaurar padrão" NÃO devolveu a coluna: o cabeçalho tinha 13 colunas e ficou com ? — a preferência do usuário de QA fica suja para a próxima corrida
 - **financeiro-titulo-editar · C1**: a tela NÃO ABRIU: locator.waitFor: Timeout 30000ms exceeded.
 Call log:
@@ -284,10 +282,10 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **provisoes-rel-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — Data inicial="zzqxjw" (o resultado não mudou: 10 linha(s), 1ª "11111 - OBRA MODELO 2 R$ 35.475,00 100,0"); Data final="zzqxjw" (o resultado não mudou: 10 linha(s), 1ª "11111 - OBRA MODELO 2 R$ 35.475,00 100,0"); Obra/Centro (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **provisao-detalhe** — T1, T2, T4, T5, T6, T7, T8, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum anexo registrado.") — capacidade NÃO PROVADA
 - **governanca-sistema** — P4: a menu de ações "⋯" fecha ao clicar fora e com Esc, mas ela não tem opção de MARCAÇÃO para exercitar a seleção com segurança (só ações, que o harness não clica no ambiente compartilhado) — a terceira parte do item NÃO FOI PROVADA, e sem ela o fechamento sozinho não é aprovação: quebrar a seleção é o atalho para fazer uma camada fechar
-- **governanca-auditoria** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — De="zzqxjw" (o resultado não mudou: 30 linha(s), 1ª "06/09/2026 20:07 local ADMINISTRATIVO Ac"); Até="zzqxjw" (o resultado não mudou: 30 linha(s), 1ª "06/09/2026 20:07 local ADMINISTRATIVO Ac"); Usuário (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
+- **governanca-auditoria** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — De="zzqxjw" (o resultado não mudou: 30 linha(s), 1ª "07/09/2026 00:40 local ADMINISTRATIVO Ac"); Até="zzqxjw" (o resultado não mudou: 30 linha(s), 1ª "07/09/2026 00:40 local ADMINISTRATIVO Ac"); Usuário (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **solicitacao-detalhe** — T1, T2, T4, T5, T6, T7, T8, P4: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum título financeiro foi gerado para esta solicitação.") — capacidade NÃO PROVADA
 - **treinamento** — T1, T2, T4, T5, T6, T7, T8, X1, P2: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum conteudo encontrado Nenhum conteudo para os filtros atuais. Lim") — capacidade NÃO PROVADA
-- **solicitacoes-rel-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 4 filtros escondíveis mudou o resultado da consulta na base do preview — Data inicial="zzqxjw" (o resultado não mudou: 62 linha(s), 1ª "CRIACAO ATE ASSUNCAO/ATRIBUICAO 113 5,4 "); Data final="zzqxjw" (o resultado não mudou: 62 linha(s), 1ª "CRIACAO ATE ASSUNCAO/ATRIBUICAO 113 5,4 "); Período (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
+- **solicitacoes-rel-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 4 filtros escondíveis mudou o resultado da consulta na base do preview — Data inicial="zzqxjw" (o resultado não mudou: 62 linha(s), 1ª "CRIACAO ATE ASSUNCAO/ATRIBUICAO 113 5,5 "); Data final="zzqxjw" (o resultado não mudou: 62 linha(s), 1ª "CRIACAO ATE ASSUNCAO/ATRIBUICAO 113 5,5 "); Período (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **contratos-rel-operacional** — P2: a tela TEM o seletor de filtros, e nenhum dos 5 filtros escondíveis mudou o resultado da consulta na base do preview — Código="zzqxjw" (o resultado não mudou: 132 linha(s), 1ª "SEM EMPRESA VINCULADA 198 198 150 R$ 519"); Referência="zzqxjw" (o resultado não mudou: 132 linha(s), 1ª "SEM EMPRESA VINCULADA 198 198 150 R$ 519"); Data inicial="zzqxjw" (o resultado não mudou: 132 linha(s), 1ª "SEM EMPRESA VINCULADA 198 198 150 R$ 519"). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
 - **comercial-rel-operacional** — T1, T2, T4, T5, T6, T7, T8, X1, P2: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum contrato encontrado no período.") — capacidade NÃO PROVADA
 - **solicitacoes-compra** — P2: a tela TEM o seletor de filtros, e nenhum dos 2 filtros escondíveis mudou o resultado da consulta na base do preview — Obra (campo não encontrado na faixa); Status (campo não encontrado na faixa). Sem um recorte que corte, esconder não teria o que limpar: a capacidade NÃO FOI PROVADA
