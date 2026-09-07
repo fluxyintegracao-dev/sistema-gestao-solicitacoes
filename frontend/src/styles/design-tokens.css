@@ -126,14 +126,47 @@
   font-size: var(--fonte-detalhe);
   font-weight: 600;
   line-height: 1.5;
-  white-space: nowrap;
   max-width: 100%;
-  /* Sem isto o texto VAZAVA para fora da pílula colorida e era cortado a
-     seco pela borda da coluna: "FECHADO" virava "FECHADC" e "ESTORNADO"
-     virava "ESTORNA" — status truncado vira OUTRA palavra, que é pior que
-     status ilegível. O recorte agora acontece dentro da pílula (e o `title`
-     da célula, posto pelo T6, carrega o texto inteiro).
-     `overflow: clip` e não `hidden`: R18 — não criar scrollport à toa. */
+  /*
+    A ETIQUETA QUEBRA EM LINHAS — ela não pode CORTAR (06/09).
+
+    Aqui havia `white-space: nowrap` com `overflow: clip`, e a justificativa
+    escrita era que o recorte "acontece dentro da pílula (e o `title` da
+    célula, posto pelo T6, carrega o texto inteiro)". As duas metades dessa
+    justificativa caíram:
+
+    1. O RECORTE NÃO DÁ SINAL. A pílula tem borda arredondada e fecha
+       normalmente no ponto do corte — não há reticência, não há borda
+       cortada, não há nada. Em `pedidos-compra` TODO pedido lia "Fechado
+       com" (o status é "Fechado com o fornecedor") e em
+       `solicitacao-compra-detalhe`, a 390, o cartão STATUS lia "LIBERADO
+       PARA C". O texto parece completo e não é: mente sem avisar, que é
+       pior que ilegível.
+
+    2. O `title` NÃO EXISTE NO TOQUE. É a mesma lição que o
+       `.app-bloco-lead` já registrou nesta leva ("no toque não há hover, e
+       `title` não abre: a metade que tornava a reticência honesta some").
+       A resposta lá foi QUEBRAR EM LINHAS; é a mesma resposta aqui, e por
+       isso não é um quarto jeito de resolver — é o jeito que a folha já
+       escolheu.
+
+    O QUE A MEDIÇÃO MOSTROU (06/09, `provaEtiquetaCabe.mjs`): o corpo de
+    status do sistema tem 95 rótulos; a coluna de 132px comportava a MEDIANA
+    deles. Metade do vocabulário era cortada em silêncio, e não só o de
+    compras. Nenhuma largura fixa resolve — o rótulo mais largo do sistema
+    ("AGUARDANDO CONFIRMACAO BAIXA") pede 264px, e o administrador pode
+    cadastrar um nome maior ainda em Configurações. Então a largura da
+    coluna cobre o vocabulário que o sistema INSTALA (ver `TIPOS_COLUNA` na
+    `TabelaPadrao`) e a quebra cobre o resto, sem teto.
+
+    `overflow-wrap: break-word` para o rótulo que é um token só (código de
+    status sem espaço): quebrado em duas linhas ele continua inteiro na
+    tela; cortado, não.
+
+    `overflow: clip` fica de guarda — R18, não criar scrollport à toa.
+  */
+  white-space: normal;
+  overflow-wrap: break-word;
   overflow: clip;
 }
 
@@ -485,11 +518,78 @@
   border-bottom: 1px solid var(--ui-border);
 }
 
+/*
+  A NAVEGAÇÃO DECLARA A LARGURA DE QUE PRECISA — base 52rem, não zero.
+  ---------------------------------------------------------------------
+  O DEFEITO QUE ISTO FECHA (medido em 06/09, `provaBarraDoTopo.mjs`): a
+  390px os botões redondos da barra se atravessavam — a casinha sobre a
+  lua, a lupa sobre o suporte, a estrela sobre o balão, o sino sobre a
+  casinha e sobre o "»" — e a trilha sumia inteira (0px de largura útil).
+
+  A CAUSA, e ela é uma linha de CSS: `flex: 1` é `flex: 1 1 0%`, base
+  ZERO. Com `min-width: 0` por cima, o tamanho hipotético desta caixa
+  para efeito de QUEBRA DE LINHA também é zero — então a barra nunca
+  quebrava por causa da navegação. A bandeja cabia sozinha, a barra
+  ficava numa linha só, e a navegação recebia apenas a sobra (67px
+  medidos a 390 nas rotas de Compras) enquanto os filhos dela — marca,
+  Início, Buscar, estrela, casinha, "»" — somam ~250px e NÃO encolhem.
+  O excedente não empurra nada: ele transborda e é PINTADO POR CIMA da
+  bandeja, que começa logo ali. Daí "os botões se atravessam".
+
+  E foi por isso que o defeito parecia ser "das telas de Compras": não
+  é. A barra é UMA SÓ (`.fx-topbar`, no `Layout.jsx`). O que muda é a
+  LARGURA DA BANDEJA — `compras-responsive.css` encolhe `.theme-toggle`
+  para 2,35rem dentro do escopo do módulo, a bandeja cai de 340px para
+  264px e passa a caber na mesma linha. Nas outras rotas ela não cabe,
+  quebra para a segunda linha e a colisão não acontece — mas ali a
+  estrela, a casinha e o "»" saíam PELA DIREITA da janela (medidos em
+  x 366..470 numa janela de 390) e o `overflow-x: clip` do shell os
+  comia. Mesmo defeito, dois sintomas.
+
+  A CORREÇÃO É A BASE: uma base DECLARADA no lugar de `flex: 1`, que é
+  `flex: 1 1 0%`. É a base que entra na decisão de quebra — então,
+  quando a navegação não cabe ao lado da bandeja, quem quebra é a
+  BANDEJA. É o que esta barra já sabia fazer (`flex-wrap: wrap`, logo
+  acima) e o que ela já fazia em 165 das 193 telas, por acidente da
+  largura da bandeja delas. Agora faz sempre, por declaração.
+
+  `min-width: 0` FICA. Ele não é o defeito: depois da quebra a navegação
+  tem a fileira inteira, e aí encolher a trilha (a única caixa da barra
+  que encolhe, e que tem rolagem própria) é o comportamento certo.
+
+  E A BASE É 52rem, NÃO `auto`. Com `auto` a base é o conteúdo INTEIRO,
+  trilha completa incluída, e aí a barra quebra cedo demais: a 1366px
+  (o notebook) as 16 telas medidas passavam de uma fileira para duas,
+  quando bastava a trilha andar ~77px e usar a rolagem que ela já tem.
+
+  832px é o degrau MEDIDO, não escolhido: a 1366px a barra tem 1267px
+  úteis e a bandeja ocupa 408px, então a navegação cabe ao lado dela até
+  849px. 832 passa com 17px de folga; 864 e 880 não passavam, e a barra
+  do notebook virava duas fileiras nas 16 telas medidas. Acima (1440,
+  1920) nada muda; abaixo (1280, 1024, 768, 390) a bandeja quebra, que é
+  o que tem de acontecer.
+
+  O número vem com uma garantia junto, e é ela que o torna seguro: o
+  conteúdo INCOMPRESSÍVEL da navegação (marca 141 + divisor 9 + Início
+  86 + Buscar 159 + os três botões de tela 105, mais os vãos) soma
+  ~642px. Como a barra só fica numa fileira quando a navegação recebe
+  pelo menos a base, nessa situação ela nunca recebe menos de 832px —
+  190px de folga sobre o que não encolhe, e é essa folga que vira
+  trilha. Quem absorve a diferença é a trilha, que tem rolagem própria;
+  quando nem isso basta, a bandeja quebra.
+
+  NÃO use `min-width: min-content` aqui — foi a primeira tentativa e ela
+  mede errado: o `min-content` da navegação inclui o da TRILHA, que é a
+  soma dos degraus dela (~306px, cada um `white-space: nowrap`), e o
+  `min-width: 0` da trilha não abaixa isso (mínimo é piso, não teto).
+  Medido a 390px: a navegação ficava com 559px de largura numa barra de
+  341px e os três botões de tela saíam pela direita da janela.
+*/
 .fx-topbar-nav {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  flex: 1 1 52rem;
   min-width: 0;
 }
 
@@ -533,6 +633,24 @@
   color: var(--app-muted-color);
 }
 
+/*
+  A TRILHA TEM PISO TAMBÉM. Ela é a única caixa da barra que pode
+  encolher (as outras são botões que não encolhem), então TODA a
+  diferença cai nela — e a 1024px ela chegava a 10px de largura, que é
+  o mesmo que sumir. O piso a impede de desaparecer e, por tabela,
+  obriga a barra a quebrar mais cedo, que é o comportamento certo: uma
+  segunda fileira lê-se; uma trilha de 10px não.
+
+  SEM PISO EM PIXEL, e isso foi medido antes de ser escrito. Um piso
+  (`min-width: 120px`) parecia proteger a trilha, mas ele briga com a
+  quebra: em telas de trilha curta (a Home, com só "Início") ele reserva
+  espaço que o conteúdo não usa e empurra o botão "»" para fora da
+  janela — medido a 1024px, "Mais 3 atalhos" sobrando 0×32 de 32×32.
+  Com a base `auto` da navegação a trilha já está protegida por
+  construção: a barra quebra ANTES de espremê-la, e depois da quebra ela
+  fica com o que sobra da fileira (87px a 390px, 182px a 768px), sempre
+  com rolagem própria para o resto do caminho.
+*/
 .fx-breadcrumb {
   display: flex;
   align-items: center;
@@ -582,7 +700,12 @@
   align-items: center;
   gap: 8px;
   margin-left: auto;
+  /* A bandeja também quebra por dentro: seis botões a 50px não cabem em
+     uma fileira de 341px, e sem isto o último saía pela direita. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
+
 
 /* =====================================================================
    BUSCA GLOBAL (Ctrl+K)
@@ -791,11 +914,23 @@
 /* =====================================================================
    ATALHOS — barra do topo (estrela, fileira de ícones, painel »)
    ===================================================================== */
+/*
+  A ÁREA DE ATALHOS RESERVA O QUE É FIXO. Era `flex: 1` (base ZERO) com
+  `min-width: 0`: os três botões de tela (estrela, casinha, "»") não
+  encolhem, então com a área espremida a zero eles simplesmente saíam
+  para fora dela — por cima da bandeja numa linha só, ou para fora da
+  janela quando a bandeja quebrava.
+
+  `flex: 1 0 auto` diz as duas coisas de uma vez: a base é o conteúdo
+  FIXO (a fileira tem base zero e não entra nela), e a área não encolhe
+  abaixo disso. Continua crescendo com a sobra — é dessa sobra que a
+  fileira de ícones tira quantos cabem.
+*/
 .fx-atalhos-area {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex: 1;
+  flex: 1 0 auto;
   min-width: 0;
   overflow: visible;
 }
@@ -851,10 +986,17 @@
   margin: 0 4px;
 }
 
+/*
+  A FILEIRA É O ITEM FLEXÍVEL DA ÁREA — base zero, e é a largura dela
+  que o `AtalhosTopbar` mede para saber quantos ícones cabem. Base zero
+  também é o que mantém a conta sem laço: o tamanho da área não depende
+  de quantos ícones a fileira mostra.
+*/
 .fx-atalhos-fileira {
   display: flex;
   align-items: center;
   gap: 2px;
+  flex: 1 1 0;
   min-width: 0;
   overflow: clip;
 }
