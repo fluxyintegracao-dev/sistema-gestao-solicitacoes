@@ -940,8 +940,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
   const serializedCosts = costs
     .map((value) => serializeMonthlyCost(value, itemById.get(Number(value.plano_item_id))))
     .sort((a, b) => (
-      String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
-      || a.ordem - b.ordem
+      a.ordem - b.ordem
       || a.id - b.id
     ));
   const costById = new Map(serializedCosts.map((value) => [Number(value.id), value]));
@@ -1067,7 +1066,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
   };
 }
 
-function validateCostRows(rows, allowedItems, allowedMacros) {
+function validateCostRows(rows, allowedItems) {
   if (!Array.isArray(rows)) {
     throw createBusinessError(400, 'CR_CUSTOS_INVALIDOS', 'Informe a lista de custos planejados.');
   }
@@ -1078,8 +1077,11 @@ function validateCostRows(rows, allowedItems, allowedMacros) {
       ? positiveId(row.plano_item_id, `Item da linha ${index + 1}`)
       : null;
     const planItem = itemId ? allowedItems.get(itemId) : null;
+    // Custos mensais novos sao linhas gerais e nao dependem da estrutura macro.
+    // O codigo antigo e preservado somente ao editar um registro legado ou um
+    // item explicitamente vinculado ao plano, evitando apagar historico.
     const macroCode = normalizeText(
-      row?.etapa_macro_codigo || planItem?.etapa_macro_codigo,
+      planItem?.etapa_macro_codigo || (recordId ? row?.etapa_macro_codigo : null),
       80
     );
     const localKey = normalizeText(row?.chave_local, 80);
@@ -1088,7 +1090,7 @@ function validateCostRows(rows, allowedItems, allowedMacros) {
       : (itemId ? `plano:${itemId}` : `chave:${localKey}`);
     if (
       (itemId && !planItem)
-      || (!itemId && (!localKey || !allowedMacros.has(macroCode)))
+      || (!itemId && !recordId && !localKey)
       || seen.has(identity)
     ) {
       throw createBusinessError(
@@ -1148,8 +1150,7 @@ async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, o
     const allowed = new Map(
       structure.filter(isLeaf).map((item) => [Number(item.id), plain(item)])
     );
-    const allowedMacros = new Set(buildPlanMacros(structure).map((item) => item.codigo));
-    const rows = validateCostRows(payload.itens, allowed, allowedMacros);
+    const rows = validateCostRows(payload.itens, allowed);
     const competencia = saved
       || await getOrCreateCompetencia(obraId, competenciaCode, deps, transaction);
     await assertEditable(competencia, deps, transaction);

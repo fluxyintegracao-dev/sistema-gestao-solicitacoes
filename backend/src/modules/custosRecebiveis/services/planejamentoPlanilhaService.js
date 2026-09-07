@@ -56,6 +56,17 @@ async function resolveContext(obraIdValue, competenciaValue, typeValue) {
     attributes: ['id', 'codigo', 'nome', 'classificacao']
   });
   if (!obra) throw createBusinessError(404, 'CR_OBRA_NOT_FOUND', 'Obra nao encontrada.');
+  if (type === TYPES.CUSTOS) {
+    return {
+      obra: obra.toJSON(),
+      competencia,
+      type,
+      saved: null,
+      plan: null,
+      macros: [],
+      items: []
+    };
+  }
   if (MEASUREMENT_TYPES.has(type) && String(obra.classificacao).toUpperCase() !== 'PUBLICA') {
     throw createBusinessError(
       409,
@@ -187,28 +198,15 @@ async function gerarModeloPlanejamento(obraId, competencia, type) {
 
   if (context.type === TYPES.CUSTOS) {
     sheet.columns = [
-      { header: 'etapa_macro_codigo', key: 'etapa_macro_codigo', width: 21 },
-      { header: 'etapa_macro_descricao', key: 'etapa_macro_descricao', width: 42 },
       { header: 'descricao_servico', key: 'descricao_servico', width: 52 },
       { header: 'unidade', key: 'unidade', width: 14 },
-      { header: 'valor_unitario', key: 'valor_unitario', width: 18 },
-      { header: 'quantidade', key: 'quantidade', width: 16 }
+      { header: 'quantidade', key: 'quantidade', width: 16 },
+      { header: 'valor_unitario', key: 'valor_unitario', width: 18 }
     ];
-    context.macros.forEach((macro) => {
-      for (let index = 0; index < 8; index += 1) {
-        sheet.addRow({
-          etapa_macro_codigo: macro.codigo,
-          etapa_macro_descricao: macro.descricao,
-          descricao_servico: '',
-          unidade: '',
-          valor_unitario: '',
-          quantidade: ''
-        });
-      }
-    });
-    styleWorksheet(sheet, [3, 4, 5, 6]);
-    sheet.getColumn(5).numFmt = '#,##0.0000';
-    sheet.getColumn(6).numFmt = '#,##0.0000';
+    for (let index = 0; index < 200; index += 1) sheet.addRow({});
+    styleWorksheet(sheet, [1, 2, 3, 4]);
+    sheet.getColumn(3).numFmt = '#,##0.0000';
+    sheet.getColumn(4).numFmt = 'R$ #,##0.0000';
   } else {
     sheet.columns = [
       { header: 'etapa_macro_codigo', key: 'etapa_macro_codigo', width: 21 },
@@ -232,7 +230,11 @@ async function gerarModeloPlanejamento(obraId, competencia, type) {
   await protectWorksheet(sheet);
 
   const metadata = workbook.addWorksheet('_METADADOS');
-  metadata.addRows([
+  metadata.addRows(context.type === TYPES.CUSTOS ? [
+    ['tipo', context.type],
+    ['escopo', 'UNIVERSAL'],
+    ['versao_modelo', 2]
+  ] : [
     ['obra_id', Number(context.obra.id)],
     ['competencia', context.competencia],
     ['tipo', context.type],
@@ -244,17 +246,23 @@ async function gerarModeloPlanejamento(obraId, competencia, type) {
 
   const instructions = workbook.addWorksheet('INSTRUCOES');
   instructions.columns = [{ width: 110 }];
-  [
+  const instructionRows = context.type === TYPES.CUSTOS ? [
+    ['MODELO FLUXY - CUSTOS PLANEJADOS MENSAIS'],
+    ['Modelo universal: pode ser utilizado para qualquer obra e competencia.'],
+    ['Informe descricao, unidade, quantidade e valor unitario nas celulas amarelas.'],
+    ['Linhas zeradas ou vazias serao ignoradas. O valor total sera calculado pelo sistema.'],
+    ['A importacao gera uma previa editavel e nao grava dados ate a confirmacao na tela.'],
+    ['Nao renomeie a aba PREENCHIMENTO nem altere os cabecalhos.']
+  ] : [
     ['MODELO FLUXY - PLANEJAMENTO MENSAL'],
     [`Obra: ${context.obra.codigo || context.obra.id} - ${context.obra.nome}`],
     [`Competencia: ${context.competencia} | Plano: v${context.plan.versao}`],
     ['Preencha apenas linhas com quantidade maior que zero. Linhas zeradas ou vazias serao ignoradas.'],
-    [context.type === TYPES.CUSTOS
-      ? 'Custos sao livres: selecione a etapa macro ja posicionada e informe descricao, unidade, valor unitario e quantidade nas celulas amarelas.'
-      : 'Codigos, descricoes, unidade, quantidade orcada, quantidade ja medida e saldo sao protegidos. Informe somente a quantidade nas celulas amarelas.'],
+    ['Codigos, descricoes, unidade, quantidade orcada, quantidade ja medida e saldo sao protegidos. Informe somente a quantidade nas celulas amarelas.'],
     ['A importacao gera uma previa editavel e nao grava dados ate a confirmacao na tela.'],
     ['Nao renomeie a aba PREENCHIMENTO nem altere os cabecalhos.']
-  ].forEach((row, index) => {
+  ];
+  instructionRows.forEach((row, index) => {
     const excelRow = instructions.addRow(row);
     excelRow.height = index === 0 ? 28 : 22;
     if (index === 0) excelRow.font = { bold: true, size: 14, color: { argb: 'FF173A69' } };
@@ -262,8 +270,10 @@ async function gerarModeloPlanejamento(obraId, competencia, type) {
   await protectWorksheet(instructions);
   return {
     buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
-    filename: `modelo-${context.type}-${text(context.obra.codigo || context.obra.id, 40)}-${context.competencia}.xlsx`
-      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    filename: context.type === TYPES.CUSTOS
+      ? 'modelo-custos-planejados-geral.xlsx'
+      : `modelo-${context.type}-${text(context.obra.codigo || context.obra.id, 40)}-${context.competencia}.xlsx`
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
   };
 }
 
@@ -320,7 +330,7 @@ async function parseWorkbook(file) {
 
 function expectedHeaders(type) {
   return type === TYPES.CUSTOS
-    ? ['etapa_macro_codigo', 'etapa_macro_descricao', 'descricao_servico', 'unidade', 'valor_unitario', 'quantidade']
+    ? ['descricao_servico', 'unidade', 'quantidade', 'valor_unitario']
     : ['etapa_macro_codigo', 'etapa_macro_descricao', 'item_codigo', 'descricao', 'unidade', 'quantidade_orcada', 'quantidade_ja_medida', 'saldo_disponivel', 'quantidade'];
 }
 
@@ -353,6 +363,18 @@ function validateHeaders(headers, type) {
 }
 
 function validateWorkbookContext(metadata, context) {
+  if (context.type === TYPES.CUSTOS) {
+    const universalCostsModel = text(metadata?.tipo, 40) === TYPES.CUSTOS
+      && text(metadata?.escopo, 40).toUpperCase() === 'UNIVERSAL';
+    if (!universalCostsModel) {
+      throw createBusinessError(
+        409,
+        'CR_PLANILHA_CONTEXTO',
+        'Utilize o modelo universal atualizado de custos planejados.'
+      );
+    }
+    return;
+  }
   const valid = Number(metadata?.obra_id) === Number(context.obra.id)
     && text(metadata?.competencia, 20) === context.competencia
     && text(metadata?.tipo, 40) === context.type
@@ -370,7 +392,6 @@ function validateWorkbookContext(metadata, context) {
 function validateRows(context, inputRows = []) {
   const errors = [];
   const seen = new Set();
-  const macros = new Map(context.macros.map((macro) => [macro.codigo, macro]));
   const itemByCode = new Map(context.items.map((item) => [item.item_codigo, item]));
   const rows = [];
   (Array.isArray(inputRows) ? inputRows : []).forEach((raw, index) => {
@@ -380,14 +401,12 @@ function validateRows(context, inputRows = []) {
     const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
     const line = Number(raw.linha_planilha) || index + 2;
     if (context.type === TYPES.CUSTOS) {
-      const macroCode = text(raw.etapa_macro_codigo, 80);
       const description = text(raw.descricao_servico || raw.descricao);
       const unit = text(raw.unidade, 30);
       const unitValue = number(raw.valor_unitario, NaN);
-      const key = `${macroCode}|${description.toLocaleLowerCase('pt-BR')}|${unit.toLocaleLowerCase('pt-BR')}`;
+      const key = `${description.toLocaleLowerCase('pt-BR')}|${unit.toLocaleLowerCase('pt-BR')}`;
       const rowErrors = [];
       if (!Number.isFinite(quantity) || quantity < 0) rowErrors.push('Informe uma quantidade maior que zero.');
-      if (!macros.has(macroCode)) rowErrors.push('Etapa macro inexistente no plano da competencia.');
       if (description.length < 2) rowErrors.push('Informe a descricao do servico.');
       if (!unit) rowErrors.push('Informe a unidade.');
       if (!Number.isFinite(unitValue) || unitValue < 0) rowErrors.push('Informe um valor unitario valido.');
@@ -396,8 +415,8 @@ function validateRows(context, inputRows = []) {
       const item = {
         chave_importacao: `custo-${line}-${index}`,
         linha_planilha: line,
-        etapa_macro_codigo: macroCode,
-        etapa_macro_descricao: macros.get(macroCode)?.descricao || text(raw.etapa_macro_descricao),
+        etapa_macro_codigo: null,
+        etapa_macro_descricao: null,
         descricao: description,
         unidade: unit,
         valor_unitario: Number.isFinite(unitValue) ? unitValue : 0,
@@ -445,9 +464,9 @@ function validateRows(context, inputRows = []) {
     tipo: context.type,
     obra: context.obra,
     competencia: context.competencia,
-    plano: { id: Number(context.plan.id), versao: Number(context.plan.versao) },
+    plano: context.plan ? { id: Number(context.plan.id), versao: Number(context.plan.versao) } : null,
     itens: rows,
-    catalogo: context.type === TYPES.CUSTOS ? context.macros : context.items,
+    catalogo: context.type === TYPES.CUSTOS ? [] : context.items,
     erros: errors,
     resumo: {
       linhas_lidas: Array.isArray(inputRows) ? inputRows.length : 0,

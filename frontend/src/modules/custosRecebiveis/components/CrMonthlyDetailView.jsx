@@ -70,55 +70,44 @@ function EmptyDetail({ children }) {
 }
 
 function CostDetail({ data }) {
-  const groups = groupRows(data.custos, data.macros);
-  if (!groups.length) return <EmptyDetail>Nenhum custo planejado foi registrado neste mês.</EmptyDetail>;
+  const rows = Array.isArray(data.custos) ? data.custos : [];
+  if (!rows.length) return <EmptyDetail>Nenhum custo planejado foi registrado neste mês.</EmptyDetail>;
   return (
-    <div className="cr-month-read-groups">
-      {groups.map((group) => {
-        const total = group.rows.reduce((sum, row) => sum + Number(row.valor_previsto || 0), 0);
-        return (
-          <section className="cr-month-read-group" key={group.codigo}>
-            <header><strong>{group.codigo} · {group.descricao}</strong><span>{currency.format(total)}</span></header>
-            <TabelaPadrao
-              colunas={[
-                {
-                  id: 'descricao',
-                  titulo: 'Descrição do serviço',
-                  // R17: o serviço NOMEIA a linha do custo planejado.
-                  tipo: 'identidade',
-                  noCard: 'titulo',
-                  render: (row) => <strong>{row.descricao}</strong>
-                },
-                { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: (row) => row.unidade || '-' },
-                {
-                  id: 'quantidade',
-                  titulo: 'Quantidade',
-                  tipo: 'numero',
-                  render: (row) => decimal.format(Number(row.quantidade || 0))
-                },
-                {
-                  id: 'custo_unitario',
-                  titulo: 'Valor unitário',
-                  tipo: 'valor',
-                  render: (row) => currency.format(Number(row.custo_unitario || 0))
-                },
-                {
-                  id: 'valor_previsto',
-                  titulo: 'Total',
-                  tipo: 'valor',
-                  render: (row) => <strong>{currency.format(Number(row.valor_previsto || 0))}</strong>
-                }
-              ]}
-              itens={group.rows}
-              getId={(row) => row.id || row.chave_local}
-              storageKey={`tabela:custos-recebiveis-mes-custos:${group.codigo}`}
-              rotuloRolagem={`Custos planejados de ${group.codigo}`}
-              vazio="Nenhum custo planejado neste grupo."
-            />
-          </section>
-        );
-      })}
-    </div>
+    <TabelaPadrao
+      colunas={[
+        {
+          id: 'descricao',
+          titulo: 'Descrição do serviço',
+          tipo: 'identidade',
+          noCard: 'titulo',
+          render: (row) => <strong>{row.descricao}</strong>
+        },
+        { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: (row) => row.unidade || '-' },
+        {
+          id: 'quantidade',
+          titulo: 'Quantidade',
+          tipo: 'numero',
+          render: (row) => decimal.format(Number(row.quantidade || 0))
+        },
+        {
+          id: 'custo_unitario',
+          titulo: 'Valor unitário',
+          tipo: 'valor',
+          render: (row) => currency.format(Number(row.custo_unitario || 0))
+        },
+        {
+          id: 'valor_previsto',
+          titulo: 'Total',
+          tipo: 'valor',
+          render: (row) => <strong>{currency.format(Number(row.valor_previsto || 0))}</strong>
+        }
+      ]}
+      itens={rows}
+      getId={(row) => row.id || row.chave_local}
+      storageKey="tabela:custos-recebiveis-mes-custos"
+      rotuloRolagem="Custos planejados no mês"
+      vazio="Nenhum custo planejado foi registrado neste mês."
+    />
   );
 }
 

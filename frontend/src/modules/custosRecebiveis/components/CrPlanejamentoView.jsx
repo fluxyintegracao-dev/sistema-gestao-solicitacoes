@@ -560,15 +560,15 @@ export default function CrPlanejamentoView({
     setApprovedSearch('');
   }
 
-  function addCost(macro) {
+  function addCost() {
     setCosts((current) => [...current, {
       id: null,
       chave_local: newLocalKey(),
       plano_item_id: null,
-      etapa_macro_codigo: macro.codigo,
+      etapa_macro_codigo: null,
       descricao: '',
       unidade: '',
-      ordem: current.filter((item) => item.etapa_macro_codigo === macro.codigo).length + 1,
+      ordem: current.length + 1,
       item: null,
       quantidade: '',
       custo_unitario: '',
@@ -667,22 +667,21 @@ export default function CrPlanejamentoView({
       setCosts((current) => {
         const next = [...current];
         importRows.forEach((row) => {
-          const macroCode = String(row.etapa_macro_codigo || '').trim();
-          const identity = `${macroCode}|${String(row.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(row.unidade || '').trim().toLocaleLowerCase('pt-BR')}`;
+          const identity = `${String(row.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(row.unidade || '').trim().toLocaleLowerCase('pt-BR')}`;
           const index = next.findIndex((item) => (
-            `${item.etapa_macro_codigo}|${String(item.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(item.unidade || '').trim().toLocaleLowerCase('pt-BR')}` === identity
+            `${String(item.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(item.unidade || '').trim().toLocaleLowerCase('pt-BR')}` === identity
           ));
           const imported = {
             ...(index >= 0 ? next[index] : {}),
             id: index >= 0 ? next[index].id : null,
             chave_local: index >= 0 ? next[index].chave_local : newLocalKey('cr-import-cost'),
             plano_item_id: null,
-            etapa_macro_codigo: macroCode,
+            etapa_macro_codigo: null,
             descricao: row.descricao,
             unidade: row.unidade,
             ordem: index >= 0
               ? next[index].ordem
-              : next.filter((item) => item.etapa_macro_codigo === macroCode).length + 1,
+              : next.length + 1,
             item: null,
             quantidade: asNumber(row.quantidade),
             custo_unitario: asNumber(row.valor_unitario),
@@ -754,12 +753,13 @@ export default function CrPlanejamentoView({
     setFeedback(`${importRows.length} item(ns) aplicados ao rascunho. Revise e salve para gravar.`);
   }
 
-  function renderPlanningSheetActions(type, allowed = true) {
+  function renderPlanningSheetActions(type, allowed = true, extraAction = null) {
     if (!allowed) return null;
     const downloading = sheetLoading === `download:${type}`;
     const uploading = sheetLoading === `upload:${type}`;
     return (
       <div className="cr-planning-sheet-actions">
+        {extraAction}
         <button
           type="button"
           className="btn btn-outline"
@@ -780,10 +780,6 @@ export default function CrPlanejamentoView({
         </button>
       </div>
     );
-  }
-
-  function costsForMacro(macroCode) {
-    return costs.filter((item) => item.etapa_macro_codigo === macroCode);
   }
 
   function receiptsForMacro(macroCode) {
@@ -818,31 +814,6 @@ export default function CrPlanejamentoView({
     const lista = data?.macros || [];
     const indice = lista.findIndex((item) => item.codigo === codigo);
     return { macro: lista[indice] || { codigo }, indice };
-  }
-
-  function renderCostMacroHeading(codigo, itensDoGrupo) {
-    const { macro, indice } = macroDoGrupo(codigo);
-    const rows = itensDoGrupo.filter((item) => !item.__vazio);
-    const total = rows.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0);
-    return (
-      <div className="cr-macro-planning-heading">
-        <div>
-          <b>{indice + 1}</b>
-          <div>
-            <strong>{macro.codigo} · {macro.descricao}</strong>
-            <span>
-              Orçado na macro: {currency.format(macro.valor_orcado || 0)} · Total da etapa: {currency.format(total)}
-            </span>
-          </div>
-        </div>
-        {!readonly && permissions.costs ? (
-          <button type="button" className="btn btn-outline" onClick={() => addCost(macro)}>
-            <HiOutlinePlus className="h-4 w-4" />
-            Adicionar subitem
-          </button>
-        ) : null}
-      </div>
-    );
   }
 
   function renderForecastMacroHeading(codigo, itensDoGrupo) {
@@ -1832,12 +1803,21 @@ export default function CrPlanejamentoView({
         <div className="cr-planning-panel cr-macro-planning-panel">
           <div className="cr-block-heading">
             <div>
-              <h3>Custos planejados por etapa macro</h3>
+              <h3>Custos planejados no mês</h3>
               <p>
-                Cadastre livremente os serviços previstos para o mês. Cada subitem permanece vinculado à etapa macro para comparação, auditoria e medição.
+                Adicione linhas livres para descrever os custos gerais previstos. Não é necessário escolher item ou etapa macro.
               </p>
             </div>
-            {renderPlanningSheetActions('custos', permissions.costs)}
+            {renderPlanningSheetActions(
+              'custos',
+              permissions.costs,
+              !readonly && permissions.costs ? (
+                <button type="button" className="btn btn-outline" onClick={addCost}>
+                  <HiOutlinePlus className="h-4 w-4" />
+                  Adicionar linha
+                </button>
+              ) : null,
+            )}
           </div>
           <div className="cr-planning-total-banner">
             <span>Custo planejado no mês</span>
@@ -1854,7 +1834,6 @@ export default function CrPlanejamentoView({
                 noCard: 'titulo',
                 // Edição inline: o controle mora no render da coluna.
                 render: (item) => {
-                  if (item.__vazio) return 'Nenhum subitem planejado nesta etapa.';
                   const index = costs.findIndex((row) => planningRowKey(row) === planningRowKey(item));
                   const rowError = costErrors.find((entry) => entry.index === index);
                   return (
@@ -1876,7 +1855,7 @@ export default function CrPlanejamentoView({
                 id: 'unidade',
                 titulo: 'Unidade',
                 tipo: 'codigo',
-                render: (item) => (item.__vazio ? null : (
+                render: (item) => (
                   <input
                     value={item.unidade || ''}
                     placeholder="un, m², mês..."
@@ -1889,13 +1868,13 @@ export default function CrPlanejamentoView({
                       event.target.value
                     )}
                   />
-                ))
+                )
               },
               {
                 id: 'quantidade',
                 titulo: 'Quantidade',
                 tipo: 'numero',
-                render: (item) => (item.__vazio ? null : (
+                render: (item) => (
                   <input
                     type="number"
                     min="0"
@@ -1909,13 +1888,13 @@ export default function CrPlanejamentoView({
                       event.target.value
                     )}
                   />
-                ))
+                )
               },
               {
                 id: 'custo_unitario',
                 titulo: 'Valor unitário',
                 tipo: 'valor',
-                render: (item) => (item.__vazio ? null : (
+                render: (item) => (
                   <input
                     type="number"
                     min="0"
@@ -1929,28 +1908,26 @@ export default function CrPlanejamentoView({
                       event.target.value
                     )}
                   />
-                ))
+                )
               },
               {
                 id: 'valor_previsto',
                 titulo: 'Valor total',
                 tipo: 'valor',
-                render: (item) => (item.__vazio ? null : <strong>{currency.format(item.valor_previsto || 0)}</strong>)
+                render: (item) => <strong>{currency.format(item.valor_previsto || 0)}</strong>
               }
             ]}
-            itens={linhasPorMacro(costsForMacro)}
+            itens={costs}
             getId={idDaLinha}
-            agruparPor={{ chave: chaveDoMacro, titulo: renderCostMacroHeading }}
             storageKey="tabela:cr-planejamento:custos"
-            rotuloRolagem="Custos planejados por etapa macro"
-            vazio="Nenhuma etapa macro disponível no plano publicado."
+            rotuloRolagem="Custos planejados no mês"
+            vazio="Nenhum custo planejado informado. Use Adicionar linha ou importe a planilha modelo."
             urgencia={(item) => {
-              if (item.__vazio) return null;
               const index = costs.findIndex((row) => planningRowKey(row) === planningRowKey(item));
               return costErrors.some((entry) => entry.index === index) ? 'danger' : null;
             }}
             acoesLinha={(item) => (
-              !item.__vazio && !readonly && permissions.costs ? (
+              !readonly && permissions.costs ? (
                 <button
                   type="button"
                   className="btn btn-outline btn-sm"

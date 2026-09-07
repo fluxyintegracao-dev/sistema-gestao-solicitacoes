@@ -24,7 +24,7 @@ function asNumber(value) {
 }
 
 function keyOf(row, index = 0) {
-  return row.chave_importacao || row.plano_item_id || `${row.etapa_macro_codigo}-${row.descricao}-${index}`;
+  return row.chave_importacao || row.plano_item_id || `${row.descricao}-${row.unidade}-${index}`;
 }
 
 export default function CrPlanningImportModal({
@@ -87,28 +87,26 @@ export default function CrPlanningImportModal({
     markDirty(rows.filter((_, rowIndex) => rowIndex !== index));
   }
 
+  function addFreeCost() {
+    markDirty([...rows, {
+      chave_importacao: `local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      descricao: '',
+      unidade: '',
+      valor_unitario: '',
+      quantidade: '',
+      valor_total: 0,
+      erros: []
+    }]);
+  }
+
   function addCatalogItem(item) {
-    if (isCosts) {
-      markDirty([...rows, {
-        chave_importacao: `local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        etapa_macro_codigo: item.codigo,
-        etapa_macro_descricao: item.descricao,
-        descricao: '',
-        unidade: '',
-        valor_unitario: '',
-        quantidade: '',
-        valor_total: 0,
-        erros: []
-      }]);
-    } else {
-      markDirty([...rows, {
-        ...item,
-        chave_importacao: `item-${item.plano_item_id}`,
-        quantidade: '',
-        valor_total: 0,
-        erros: []
-      }]);
-    }
+    markDirty([...rows, {
+      ...item,
+      chave_importacao: `item-${item.plano_item_id}`,
+      quantidade: '',
+      valor_total: 0,
+      erros: []
+    }]);
     setCatalogSearch('');
   }
 
@@ -175,19 +173,24 @@ export default function CrPlanningImportModal({
         </div>
 
         <div className="cr-import-modal__add">
-          <label>
-            <span>{isCosts ? 'Adicionar serviço em uma etapa macro' : 'Adicionar item do orçamento'}</span>
+          {isCosts ? (
+            <button type="button" className="btn btn-outline" onClick={addFreeCost}>
+              <HiOutlinePlus className="h-4 w-4" />
+              Adicionar linha livre
+            </button>
+          ) : <label>
+            <span>Adicionar item do orçamento</span>
             <div>
               <HiOutlineMagnifyingGlass className="h-4 w-4" />
               <input
                 type="search"
                 value={catalogSearch}
-                placeholder={isCosts ? 'Pesquise a etapa macro...' : 'Pesquise por código ou descrição...'}
+                placeholder="Pesquise por código ou descrição..."
                 onChange={(event) => setCatalogSearch(event.target.value)}
               />
             </div>
-          </label>
-          {catalogSearch ? (
+          </label>}
+          {!isCosts && catalogSearch ? (
             <div className="cr-import-modal__catalog">
               {availableCatalog.map((item) => (
                 <button
@@ -196,11 +199,7 @@ export default function CrPlanningImportModal({
                   onClick={() => addCatalogItem(item)}
                 >
                   <span>{item.item_codigo || item.codigo} · {item.descricao}</span>
-                  <small>
-                    {isCosts
-                      ? 'Novo custo livre nesta etapa'
-                      : `${item.unidade || 'un'} · saldo ${item.saldo_disponivel}`}
-                  </small>
+                  <small>{item.unidade || 'un'} · saldo {item.saldo_disponivel}</small>
                   <HiOutlinePlus className="h-4 w-4" />
                 </button>
               ))}
@@ -232,7 +231,7 @@ export default function CrPlanningImportModal({
             */
             colunasConfiguraveis={false}
             colunas={[
-              {
+              ...(!isCosts ? [{
                 id: 'etapa',
                 titulo: 'Etapa / item',
                 // R17: a etapa/item NOMEIA a linha da prévia.
@@ -241,10 +240,10 @@ export default function CrPlanningImportModal({
                 render: ({ row }) => (
                   <>
                     <strong>{row.etapa_macro_codigo}</strong>
-                    <span>{isCosts ? row.etapa_macro_descricao : `${row.item_codigo} · ${row.descricao}`}</span>
+                    <span>{row.item_codigo} · {row.descricao}</span>
                   </>
                 )
-              },
+              }] : []),
               ...(isCosts ? [
                 {
                   id: 'descricao',

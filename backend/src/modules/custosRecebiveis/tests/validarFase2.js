@@ -206,6 +206,9 @@ function validateBackendContracts() {
   assert(spreadsheetService.includes("worksheet.protect('FluxyPlanejamento'"));
   assert(spreadsheetService.includes("workbook.addWorksheet('_METADADOS')"));
   assert(spreadsheetService.includes("metadata.state = 'veryHidden'"));
+  assert(spreadsheetService.includes("['escopo', 'UNIVERSAL']"));
+  assert(spreadsheetService.includes("'modelo-custos-planejados-geral.xlsx'"));
+  assert(spreadsheetService.includes("? ['descricao_servico', 'unidade', 'quantidade', 'valor_unitario']"));
   assert(spreadsheetService.includes('Formulas nao sao permitidas'));
   assert(spreadsheetService.includes('saldo_disponivel'));
   assert(spreadsheetService.includes("header: 'quantidade_ja_medida'"));
@@ -260,8 +263,9 @@ function validateFrontendContracts() {
   assert(planning.includes('Etapa {step} de {steps.length}'));
   assert(planning.includes('Fonte automática: contratos e títulos do Financeiro'));
   assert(!planning.includes('checked={Boolean(item.confirmado)}'));
-  assert(planning.includes('Custos planejados por etapa macro'));
-  assert(planning.includes('Adicionar subitem'));
+  assert(planning.includes('Custos planejados no mês'));
+  assert(planning.includes('Adicionar linha'));
+  assert(planning.includes('Não é necessário escolher item ou etapa macro'));
   assert(planning.includes('previsao_custo_id'));
   assert(planning.includes('Qtd. orçada'));
   assert(planning.includes('Math.min('));
@@ -383,17 +387,21 @@ function validatePlanningSpreadsheetPreview() {
 
   const freeCosts = validarLinhasPlanejamento({
     ...baseContext,
-    type: PLANNING_SHEET_TYPES.CUSTOS
+    type: PLANNING_SHEET_TYPES.CUSTOS,
+    plan: null,
+    macros: [],
+    items: []
   }, [{
-    etapa_macro_codigo: '00.001',
-    etapa_macro_descricao: 'Texto adulterado',
     descricao_servico: 'Equipe de campo',
     unidade: 'mes',
     valor_unitario: 2500,
     quantidade: 2
   }]);
   assert.strictEqual(freeCosts.resumo.valido, true);
-  assert.strictEqual(freeCosts.itens[0].etapa_macro_descricao, 'Administracao');
+  assert.strictEqual(freeCosts.itens[0].etapa_macro_codigo, null);
+  assert.strictEqual(freeCosts.itens[0].etapa_macro_descricao, null);
+  assert.deepStrictEqual(freeCosts.catalogo, []);
+  assert.strictEqual(freeCosts.plano, null);
   assert.strictEqual(freeCosts.resumo.valor_total, 5000);
 }
 
@@ -719,7 +727,6 @@ async function validateMonthlyMacroSubitemsAndForecastMeasurement() {
     {
       itens: [{
         chave_local: 'local-subitem-1',
-        etapa_macro_codigo: '01',
         descricao: 'Mobilização da equipe',
         unidade: 'mês',
         ordem: 1,
@@ -749,7 +756,7 @@ async function validateMonthlyMacroSubitemsAndForecastMeasurement() {
   );
   assert.strictEqual(costResult.total, 300);
   assert.strictEqual(savedCosts[0].plano_item_id, null);
-  assert.strictEqual(savedCosts[0].etapa_macro_codigo, '01');
+  assert.strictEqual(savedCosts[0].etapa_macro_codigo, null);
   assert.strictEqual(savedCosts[0].descricao, 'Mobilização da equipe');
 
   const receiptResult = await salvarRecebiveis(
