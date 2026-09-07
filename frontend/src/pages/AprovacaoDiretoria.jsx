@@ -101,7 +101,7 @@ export default function AprovacaoDiretoria() {
           ))}
         </div>
 
-        <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-4 text-sm text-[var(--c-muted)]">
+        <div className="rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface-2)] p-4 text-sm text-[var(--c-muted)]">
           Fluxo aplicado: usuário cria a solicitação, seleciona a área responsável final e o sistema envia primeiro para a diretoria da obra.
           Depois da aprovacao, a solicitacao segue automaticamente para a area responsavel escolhida.
         </div>

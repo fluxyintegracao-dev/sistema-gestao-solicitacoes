@@ -15,7 +15,7 @@ function moeda(value) {
  * do card, com titulo e apoio ancorados nele) e `CamposComVazios` (o grid de
  * ladrilhos, que ja carrega o alternador "ver todos os campos"). O `<dl>` a
  * mao usava `gap-x-5`, fora dos degraus da escala (R10), e a pilula de status
- * pintava o fundo com `var(--c-surface-alt)` — token que NAO EXISTE em CSS
+ * pintava o fundo com `var(--ui-surface-2)` — token que NAO EXISTE em CSS
  * nenhum nem no ThemeContext, o que invalidava a declaracao em silencio.
  * O status agora usa o `StatusBadge`, que e a etiqueta unica do sistema e
  * carrega a familia semantica + icone.

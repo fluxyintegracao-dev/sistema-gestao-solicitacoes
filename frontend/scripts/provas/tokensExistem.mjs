@@ -120,14 +120,54 @@ for (const f of faltando) {
   porNome.get(f.nome).ocorrencias.push(`${f.rel}:${f.linha}`);
 }
 
+/*
+  DUAS FAMILIAS, E ELAS NAO SAO A MESMA COISA (06/09, decisao do cliente).
+
+  Ate hoje esta prova somava token e classe num numero so, e isso escondia
+  a diferenca que importa:
+
+    TOKEN de cor fantasma SEMPRE QUEBRA. `var(--nao-existe)` resolve para
+    VAZIO, entao `background: var(--c-card)` vira FUNDO TRANSPARENTE. Foi
+    literalmente o que aconteceu com a tela de erro que serve de rede a 201
+    rotas: o cartao era uma borda de 1px flutuando no cinza. Nao ha caso em
+    que isso seja intencional.
+
+    CLASSE fantasma PODE SER DE PROPOSITO. Classe sem regra CSS nao quebra
+    nada — ela e marcacao semantica que nao pinta. `.form-field` tem 68
+    usos e nunca foi declarada, e as telas funcionam: quem da forma sao as
+    classes de dentro (`.form-label`, `.form-control`). Pode ser gancho
+    legitimo, e pode ser marcacao escrita esperando um estilo que nunca
+    existiu — e a diferenca so se resolve OLHANDO A TELA, uma a uma.
+
+  Somar as duas fazia o numero dizer "18 defeitos" quando eram 4 defeitos e
+  14 talvezes. Separadas, o token vira sinal forte e a classe vira lista de
+  trabalho — que e o que ela e.
+*/
+const tokens = [...porNome].filter(([, v]) => v.tipo === 'token');
+const classes = [...porNome].filter(([, v]) => v.tipo === 'classe');
+const porTamanho = (a, b) => b[1].ocorrencias.length - a[1].ocorrencias.length;
+
 if (!porNome.size) {
   console.log('  ok    todo token e classe do sistema usados nas telas existem');
+}
+
+if (tokens.length) {
+  console.log('  -- TOKEN DE COR fantasma: resolve para VAZIO, o fundo fica transparente --');
+  for (const [nome, { ocorrencias }] of tokens.sort(porTamanho)) {
+    console.log(`  FALHA token FANTASMA ${nome} — usado em ${ocorrencias.length} ponto(s) e NUNCA declarado. Ex.: ${ocorrencias.slice(0, 2).join(', ')}`);
+  }
 } else {
-  for (const [nome, { tipo, ocorrencias }] of [...porNome].sort((a, b) => b[1].ocorrencias.length - a[1].ocorrencias.length)) {
-    console.log(`  FALHA ${tipo} FANTASMA ${nome} — usado em ${ocorrencias.length} ponto(s) e NUNCA declarado. Ex.: ${ocorrencias.slice(0, 2).join(', ')}`);
+  console.log('  ok    nenhum token de cor fantasma — nenhum fundo resolve para vazio');
+}
+
+if (classes.length) {
+  console.log('  -- NOME DE CLASSE fantasma: nao pinta, e PODE ser gancho semantico de proposito --');
+  for (const [nome, { ocorrencias }] of classes.sort(porTamanho)) {
+    console.log(`  aviso classe FANTASMA ${nome} — usada em ${ocorrencias.length} ponto(s) e nunca declarada. Ex.: ${ocorrencias.slice(0, 2).join(', ')}`);
   }
 }
-console.log(`\n[provas] tokens e classes existem: ${porNome.size === 0 ? 'ok' : `${porNome.size} fantasma(s)`}`);
+
+console.log(`\n[provas] tokens e classes existem: ${tokens.length} token(s) de cor · ${classes.length} nome(s) de classe`);
 /*
   TRINCO, e o motivo de não ser bloqueante direto: são 39 fantasmas
   herdados, espalhados por telas que nenhuma leva tocou ainda. Reprovar

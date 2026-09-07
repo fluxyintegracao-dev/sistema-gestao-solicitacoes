@@ -161,7 +161,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
             Distribua {moeda(valorBase)} entre as obras e apropriações vinculadas ao solicitante.
           </p>
         </div>
-        <span className="app-status-pill bg-[var(--c-surface-alt)] text-[var(--c-text)]">{status}</span>
+        <span className="app-status-pill bg-[var(--ui-surface-2)] text-[var(--c-text)]">{status}</span>
       </div>
 
       {prestacao?.motivo_rejeicao && status === 'REJEITADA' ? (
@@ -169,7 +169,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
       ) : null}
 
       <div className="overflow-hidden rounded-lg border border-[var(--c-border)]">
-        <div className="hidden grid-cols-[minmax(190px,0.9fr)_minmax(240px,1.3fr)_minmax(130px,0.45fr)_auto] gap-3 bg-[var(--c-surface-alt)] px-3 py-2 text-xs uppercase tracking-wide text-[var(--c-muted)] lg:grid">
+        <div className="hidden grid-cols-[minmax(190px,0.9fr)_minmax(240px,1.3fr)_minmax(130px,0.45fr)_auto] gap-3 bg-[var(--ui-surface-2)] px-3 py-2 text-xs uppercase tracking-wide text-[var(--c-muted)] lg:grid">
           <span>Obra / Centro de custo</span>
           <span>Apropriação</span>
           <span>Valor</span>
@@ -273,7 +273,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
 
       {podeInteragir && podeValidar && status === 'ENVIADA' ? (
         <div className="grid gap-3 border-t border-[var(--c-border)] pt-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--c-surface-alt)] px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--ui-surface-2)] px-3 py-2">
             <p className="text-xs text-[var(--c-muted)]">
               Ajuste obra e apropriação acima, se necessário. Os valores informados pelo solicitante permanecem preservados.
             </p>

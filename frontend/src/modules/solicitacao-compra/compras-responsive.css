@@ -847,7 +847,7 @@
 }
 
 .compras-responsive-scope .compra-item-origin {
-  background: var(--c-surface-muted);
+  background: var(--ui-surface-2);
   color: var(--c-muted);
 }
 
@@ -909,7 +909,7 @@
   gap: 0.2rem;
   margin-top: 0.85rem;
   padding: 0.7rem 0.8rem;
-  background: var(--c-surface-muted);
+  background: var(--ui-surface-2);
   color: var(--c-text);
   font-size: var(--fonte-detalhe);
 }
@@ -960,7 +960,7 @@
   padding: 0.2rem;
   border: 1px solid var(--c-border);
   border-radius: 0.55rem;
-  background: var(--c-surface-muted);
+  background: var(--ui-surface-2);
 }
 
 .compras-responsive-scope .compra-item-tratamento-choice button {
@@ -1080,7 +1080,7 @@
 }
 
 .compras-responsive-scope .compra-item-autocomplete-clear:hover {
-  background: var(--c-surface-muted);
+  background: var(--ui-surface-2);
   color: var(--c-text);
 }
 
@@ -1123,7 +1123,7 @@
 }
 
 .compras-responsive-scope .compra-item-autocomplete-options > button:is(:hover, .is-active) {
-  background: var(--c-surface-muted);
+  background: var(--ui-surface-2);
 }
 
 .compras-responsive-scope .compra-item-autocomplete-options > button.is-selected {
@@ -1275,7 +1275,7 @@
 
 .compras-responsive-scope .compra-itens-tabela th {
   padding: 0.55rem 0.65rem;
-  background: var(--c-surface-muted);
+  background: var(--ui-surface-2);
   color: var(--c-muted);
   font-size: var(--fonte-detalhe);
   font-weight: 800;
@@ -1305,7 +1305,7 @@
 
 .compras-responsive-scope .compra-item-table-row:hover > td,
 .compras-responsive-scope .compra-item-table-row.is-open > td {
-  background: var(--c-surface-muted);
+  background: var(--ui-surface-2);
 }
 
 .compras-responsive-scope .compra-item-cell-index,
@@ -1389,8 +1389,8 @@
   padding: 0;
   border-top: 1px solid var(--c-border);
   border-bottom: 1px solid var(--c-border);
-  background: var(--c-surface-muted);
-  background: color-mix(in srgb, var(--c-surface-muted) 72%, var(--c-surface));
+  background: var(--ui-surface-2);
+  background: color-mix(in srgb, var(--ui-surface-2) 72%, var(--c-surface));
 }
 
 .compras-responsive-scope .compra-item-table-detail {

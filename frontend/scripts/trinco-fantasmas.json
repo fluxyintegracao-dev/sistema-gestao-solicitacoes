@@ -3,9 +3,6 @@
   "criado_em": "2026-09-04",
   "porque": "Token e classe que a tela usa e que NUNCA foram declarados. O CSS nao resolve, a declaracao e descartada, e o estilo nunca chega a tela. Classe fantasma e pior que valor errado: parece intencao. O numero SO DESCE.",
   "nomes": {
-    "--c-surface-alt": 8,
-    "--c-surface-muted": 13,
-    "--c-surface-subtle": 1,
     ".alert-danger": 5,
     ".app-alert--success": 5,
     ".badge-soft": 3,

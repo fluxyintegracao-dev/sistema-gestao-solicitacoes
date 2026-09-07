@@ -549,7 +549,7 @@ export default function BlocoMedicaoContrato({
                   >
                     {resultadosFavorecido.map((p) => (
                       <button key={p.id} type="button" role="option" aria-selected={false}
-                        className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-[var(--c-surface-subtle)]"
+                        className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-[var(--ui-surface-soft)]"
                         onClick={() => escolherFavorecido(p)}>
                         {p.nome}{(p.cpf_cnpj || p.telefone || p.pix_chave_fixa_1 || p.pix_chave_fixa_2 || p.pix_chave_variavel)
                           ? ` — ${p.cpf_cnpj || p.telefone || p.pix_chave_fixa_1 || p.pix_chave_fixa_2 || p.pix_chave_variavel}`
