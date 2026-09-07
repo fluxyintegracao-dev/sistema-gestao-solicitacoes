@@ -20,6 +20,7 @@ import {
   uploadArquivosCotacaoPublica
 } from '../../../services/compras';
 import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
+import DateInputBR from '../../../components/DateInputBR';
 
 /*
   COTAÇÃO PÚBLICA DO FORNECEDOR — a única tela do sistema usada por alguém de
@@ -1003,9 +1004,8 @@ export default function CotacaoFornecedorPublica() {
           {freteTipo === 'TERCEIRO' ? (
             <>
               <CampoForm label="Data para pagamento" obrigatorio>
-                <input
+                <DateInputBR
                   className="input"
-                  type="date"
                   value={freteDataVencimento}
                   disabled={formularioBloqueado}
                   onChange={(event) => setFreteDataVencimento(event.target.value)}
@@ -1103,7 +1103,7 @@ export default function CotacaoFornecedorPublica() {
           rotulada — nenhum ancestral aqui recorta com `hidden`. */}
       <BlocoConteudo
         titulo="Itens da cotação"
-        descricao="Informe o preço unitário e a quantidade que você tem disponível. Item deixado sem preço ou sem quantidade é enviado como “não tenho” — e isso não invalida a proposta."
+        descricao="Informe o preço unitário e a quantidade que você tem disponível. Item deixado sem preço ou sem quantidade é enviado como “não tenho” — e isso não inválida a proposta."
       >
         <TabelaPadrao
           /*

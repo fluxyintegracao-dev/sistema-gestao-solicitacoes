@@ -69,7 +69,7 @@ export default function SstHeatmap() {
       <PageHeader
         titulo="Mapa de risco operacional"
         contagem={loading ? 'Carregando' : `${pontos.length} obra(s)`}
-        descricao="Concentra pendencias, bloqueios, acidentes e riscos por obra para priorizar acao operacional."
+        descricao="Concentra pendências, bloqueios, acidentes e riscos por obra para priorizar ação operacional."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -105,7 +105,7 @@ export default function SstHeatmap() {
           variante="primario"
           cor="var(--module-sst)"
           contagem={`${pontos.length} ponto(s)`}
-          descricao="Cada celula soma pendencias, bloqueios, acidentes e riscos da obra."
+          descricao="Cada celula soma pendências, bloqueios, acidentes e riscos da obra."
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {pontos.map((item) => (
@@ -114,18 +114,18 @@ export default function SstHeatmap() {
                 variante="secundario"
                 className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
                 titulo={item.obra}
-                descricao={`Indice de risco ${item.indice_risco}`}
+                descricao={`Índice de risco ${item.indice_risco}`}
                 acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
               >
                 <StatGrid colunas={2}>
-                  <StatTile label="Pendencias" valor={item.pendencias ?? 0} tom={item.pendencias ? 'warning' : undefined} />
+                  <StatTile label="Pendências" valor={item.pendencias ?? 0} tom={item.pendencias ? 'warning' : undefined} />
                   <StatTile label="Bloqueios" valor={item.bloqueios ?? 0} tom={item.bloqueios ? 'danger' : undefined} />
                   <StatTile label="Acidentes" valor={item.acidentes ?? 0} tom={item.acidentes ? 'danger' : undefined} />
                   <StatTile label="Riscos" valor={item.riscos ?? 0} tom={item.riscos ? 'warning' : undefined} />
                 </StatGrid>
               </BlocoConteudo>
             ))}
-            {!pontos.length ? <p className="text-sm text-muted">Nenhum ponto critico detectado.</p> : null}
+            {!pontos.length ? <p className="text-sm text-muted">Nenhum ponto crítico detectado.</p> : null}
           </div>
         </BlocoConteudo>
       </BlocosPersonalizaveis>

@@ -107,7 +107,7 @@ export default function SolicitacoesSlaSetor() {
       <PageHeader
         titulo="SLA por setor"
         contagem={loading ? null : `${resumo.setores} setor(es) ativo(s)`}
-        descricao="Defina o prazo real, em dias, que cada setor possui para movimentar solicitacoes abertas."
+        descricao="Defina o prazo real, em dias, que cada setor possui para movimentar solicitações abertas."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar SLA',
           onClick: salvar,
@@ -150,7 +150,7 @@ export default function SolicitacoesSlaSetor() {
         titulo="Prazos operacionais"
         variante="primario"
         cor="var(--c-primary)"
-        descricao="Setores sem prazo cadastrado nao entram como vencidos no relatorio. Eles aparecem separadamente como sem SLA configurado."
+        descricao="Setores sem prazo cadastrado não entram como vencidos no relatório. Eles aparecem separadamente como sem SLA configurado."
         className="overflow-clip"
       >
         <TabelaPadrao
@@ -165,7 +165,7 @@ export default function SolicitacoesSlaSetor() {
             },
             {
               id: 'codigo',
-              titulo: 'Codigo',
+              titulo: 'Código',
               tipo: 'codigo',
               render: (setor) => normalizeSetor(setor.codigo || setor.nome)
             },
@@ -205,7 +205,7 @@ export default function SolicitacoesSlaSetor() {
                       checked={regra.ativo !== false}
                       onChange={(event) => atualizarRegra(codigo, { ativo: event.target.checked })}
                     />
-                    Usar no relatorio
+                    Usar no relatório
                   </label>
                 );
               }

@@ -70,7 +70,7 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
   async function salvar() {
     setErro('');
     if (!String(motivo).trim()) {
-      setErro('Informe o motivo da alteracao.');
+      setErro('Informe o motivo da alteração.');
       return;
     }
     const payload = linhas
@@ -78,7 +78,7 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
       .map((l) => ({ apropriacao_id: Number(l.apropriacao_id), percentual: numeroDoCampo(l.percentual) }));
 
     if (payload.length === 0) {
-      setErro('Informe ao menos uma apropriacao.');
+      setErro('Informe ao menos uma apropriação.');
       return;
     }
     // A mesma tolerancia do backend. Barrar aqui evita a viagem so para receber o 400.
@@ -102,11 +102,11 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
 
   return (
     <BlocoConteudo
-      titulo="Apropriacoes do contrato"
-      descricao="Rateio aplicado a todas as parcelas. E daqui que sai a divisao de cada titulo na aprovacao."
+      titulo="Apropriações do contrato"
+      descricao="Rateio aplicado a todas as parcelas. E daqui que sai a divisão de cada título na aprovação."
       acoes={podeEditar ? (
         <button type="button" className="btn btn-outline btn-sm" onClick={abrir} data-testid="editar-apropriacoes-contrato">
-          Editar apropriacoes
+          Editar apropriações
         </button>
       ) : null}
     >
@@ -115,7 +115,7 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
         colunas={[
           {
             id: 'apropriacao',
-            titulo: 'Apropriacao',
+            titulo: 'Apropriação',
             tipo: 'identidade',
             noCard: 'titulo',
             render: (a) => nomeApropriacao(a)
@@ -135,7 +135,7 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
         ]}
         itens={lista}
         getId={(a) => a.apropriacao_id}
-        vazio="Nenhuma apropriacao cadastrada para este contrato."
+        vazio="Nenhuma apropriação cadastrada para este contrato."
         storageKey="tabela:solicitacao-detalhe-apropriacoes-contrato"
         rotuloRolagem="Apropriacoes do contrato"
       />
@@ -143,7 +143,7 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
 
       <OverlayModal
         aberto={aberto}
-        rotulo="Editar apropriacoes do contrato"
+        rotulo="Editar apropriações do contrato"
         onFechar={salvando ? undefined : () => setAberto(false)}
       >
         <div data-modal="cabecalho" className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
@@ -175,7 +175,7 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
               disabled={salvando}
             />
             <span className="text-xs text-[var(--c-muted)]">
-              Fica no historico da solicitacao, com o rateio antes e depois.
+              Fica no histórico da solicitação, com o rateio antes e depois.
             </span>
           </label>
         </div>

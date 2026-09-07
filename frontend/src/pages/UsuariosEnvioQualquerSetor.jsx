@@ -37,7 +37,7 @@ export default function UsuariosEnvioQualquerSetor() {
         ));
       } catch (error) {
         console.error(error);
-        avisar.erro('Erro ao carregar usuarios com permissao especial de envio.');
+        avisar.erro('Erro ao carregar usuários com permissão especial de envio.');
       } finally {
         setCarregando(false);
       }
@@ -95,7 +95,7 @@ export default function UsuariosEnvioQualquerSetor() {
         ...usuario,
         pode_enviar_qualquer_setor: selecionados.has(String(usuario.id))
       })));
-      avisar.sucesso('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuração salva com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao salvar permissao especial de envio.');
@@ -121,7 +121,7 @@ export default function UsuariosEnvioQualquerSetor() {
     },
     {
       id: 'usuario',
-      titulo: 'Usuario',
+      titulo: 'Usuário',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
@@ -153,7 +153,7 @@ export default function UsuariosEnvioQualquerSetor() {
       <PageHeader
         titulo="Envio livre entre setores"
         contagem={`${selecionados.size} marcado(s)`}
-        descricao="Libera usuarios especificos para enviar solicitacoes a outro setor mesmo quando elas nao estao no setor atual deles. Usuarios do setor OBRA continuam fora desta regra."
+        descricao="Libera usuários específicos para enviar solicitações a outro setor mesmo quando elas não estão no setor atual deles. Usuários do setor OBRA continuam fora desta regra."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -168,7 +168,7 @@ export default function UsuariosEnvioQualquerSetor() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
-        titulo="Usuarios"
+        titulo="Usuários"
         variante="primario"
         cor="var(--c-primary)"
       >

@@ -14,6 +14,7 @@ import {
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getRelatorioFluxoConsolidado } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
+import DateInputBR from '../components/DateInputBR';
 
 const DEFAULT_FILTERS = {
   periodo: 'MES_ATUAL',
@@ -229,10 +230,10 @@ export default function FinanceiroFluxoConsolidado() {
         <form onSubmit={aplicarFiltros}>
           <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
             <label className="app-filter-field">
-              <span className="app-filter-label">Periodo</span>
+              <span className="app-filter-label">Período</span>
               <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
-                <option value="MES_ATUAL">Mes atual</option>
-                <option value="PROXIMO_MES">Proximo mes</option>
+                <option value="MES_ATUAL">Mês atual</option>
+                <option value="PROXIMO_MES">Próximo mês</option>
                 <option value="HOJE">Hoje</option>
                 <option value="7_DIAS">7 dias</option>
                 <option value="30_DIAS">30 dias</option>
@@ -242,11 +243,11 @@ export default function FinanceiroFluxoConsolidado() {
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Data inicial</span>
-              <input className="input w-full input-sm" type="date" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
+              <DateInputBR className="input w-full input-sm" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Data final</span>
-              <input className="input w-full input-sm" type="date" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
+              <DateInputBR className="input w-full input-sm" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Holding</span>
@@ -306,7 +307,7 @@ export default function FinanceiroFluxoConsolidado() {
           aqui.
         */}
         <BlocoConteudo
-          titulo="Consolidado do periodo"
+          titulo="Consolidado do período"
           descricao="Azul e o previsto; vermelho e o realizado. A mesma dupla vale nas tabelas abaixo."
           variante="primario"
           cor="var(--module-financeiro)"
@@ -315,10 +316,10 @@ export default function FinanceiroFluxoConsolidado() {
             <StatTile
               label="Entradas previstas"
               valor={<Previsto>{formatCurrency(resumo.entradas_previstas)}</Previsto>}
-              sub={`${resumo.titulos_previstos || 0} titulo(s)`}
+              sub={`${resumo.titulos_previstos || 0} título(s)`}
             />
             <StatTile
-              label="Saidas previstas"
+              label="Saídas previstas"
               valor={<Previsto>{formatCurrency(resumo.saidas_previstas)}</Previsto>}
               sub="Pagamentos em aberto"
             />
@@ -343,7 +344,7 @@ export default function FinanceiroFluxoConsolidado() {
             <StatTile
               label="Entre Empresas previsto eliminado"
               valor={formatCurrency(resumo.intercompany_previsto_eliminado)}
-              sub={`${resumo.intercompany_titulos_eliminados || 0} titulo(s)`}
+              sub={`${resumo.intercompany_titulos_eliminados || 0} título(s)`}
             />
             <StatTile
               label="Entre Empresas realizado eliminado"
@@ -360,11 +361,11 @@ export default function FinanceiroFluxoConsolidado() {
             <BlocoConteudo
               titulo="Alertas do fluxo"
               contagem={`${alertas.length} alerta(s)`}
-              descricao="Calculados sobre o fluxo previsto e realizado do periodo filtrado."
+              descricao="Calculados sobre o fluxo previsto e realizado do período filtrado."
               variante="secundario"
             >
               {alertas.length === 0 ? (
-                <div className="app-empty-card">Nenhum alerta critico encontrado para os filtros atuais.</div>
+                <div className="app-empty-card">Nenhum alerta crítico encontrado para os filtros atuais.</div>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
                   {alertas.map((alerta) => (
@@ -392,7 +393,7 @@ export default function FinanceiroFluxoConsolidado() {
             <BlocoConteudo
               titulo="Resumo por empresa"
               contagem={`${empresasResumo.length} empresa(s)`}
-              descricao="Previsto usa a empresa do titulo. Realizado usa a empresa informada na baixa."
+              descricao="Previsto usa a empresa do título. Realizado usa a empresa informada na baixa."
               variante="secundario"
               className="app-table-shell"
             >
@@ -407,7 +408,7 @@ export default function FinanceiroFluxoConsolidado() {
                     render: (empresa) => empresa.empresa_nome
                   },
                   { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.entradas_previstas)}</Previsto> },
-                  { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.saidas_previstas)}</Previsto> },
+                  { id: 'saidas_previstas', titulo: 'Saídas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.saidas_previstas)}</Previsto> },
                   {
                     id: 'saldo_previsto',
                     titulo: 'Saldo previsto',
@@ -417,7 +418,7 @@ export default function FinanceiroFluxoConsolidado() {
                     )
                   },
                   { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.entradas_realizadas)}</Realizado> },
-                  { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
+                  { id: 'saidas_realizadas', titulo: 'Saídas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
                   {
                     id: 'saldo_realizado',
                     titulo: 'Saldo realizado',
@@ -438,7 +439,7 @@ export default function FinanceiroFluxoConsolidado() {
             <BlocoConteudo
               titulo="Resumo por obra/centro de custo"
               contagem={`${obrasResumo.length} obra(s)/centro(s)`}
-              descricao="Identifica obras e centros que consomem ou geram caixa previsto no periodo."
+              descricao="Identifica obras e centros que consomem ou geram caixa previsto no período."
               variante="secundario"
               className="app-table-shell"
             >
@@ -459,7 +460,7 @@ export default function FinanceiroFluxoConsolidado() {
                   },
                   { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (obra) => obra.tipo_centro_custo || '-' },
                   { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.entradas_previstas)}</Previsto> },
-                  { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.saidas_previstas)}</Previsto> },
+                  { id: 'saidas_previstas', titulo: 'Saídas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.saidas_previstas)}</Previsto> },
                   {
                     id: 'saldo_previsto',
                     titulo: 'Saldo previsto',
@@ -486,27 +487,27 @@ export default function FinanceiroFluxoConsolidado() {
             </BlocoConteudo>
 
             <BlocoConteudo
-              titulo="Serie consolidada"
-              contagem={`${serie.length} periodo(s)`}
-              descricao="Acompanha entradas, saidas e saldos por periodo."
+              titulo="Série consolidada"
+              contagem={`${serie.length} período(s)`}
+              descricao="Acompanha entradas, saídas e saldos por período."
               variante="secundario"
               className="app-table-shell"
             >
               <TabelaPadrao
                 colunas={[
-                  { id: 'periodo', titulo: 'Periodo', tipo: 'data', noCard: 'titulo', render: (item) => item.label },
+                  { id: 'periodo', titulo: 'Período', tipo: 'data', noCard: 'titulo', render: (item) => item.label },
                   { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.entradas_previstas)}</Previsto> },
-                  { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.saidas_previstas)}</Previsto> },
+                  { id: 'saidas_previstas', titulo: 'Saídas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.saidas_previstas)}</Previsto> },
                   { id: 'saldo_previsto', titulo: 'Saldo previsto', tipo: 'valor', render: (item) => <strong className="texto-previsto">{formatCurrency(item.saldo_previsto)}</strong> },
                   { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.entradas_realizadas)}</Realizado> },
-                  { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.saidas_realizadas)}</Realizado> },
+                  { id: 'saidas_realizadas', titulo: 'Saídas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.saidas_realizadas)}</Realizado> },
                   { id: 'saldo_realizado', titulo: 'Saldo realizado', tipo: 'valor', render: (item) => <strong className="texto-realizado">{formatCurrency(item.saldo_realizado)}</strong> }
                 ]}
                 itens={serie}
                 getId={(item) => item.referencia}
                 storageKey="tabela:financeiro-fluxo-consolidado:serie"
                 rotuloRolagem="Serie consolidada"
-                vazio="Nenhum periodo encontrado."
+                vazio="Nenhum período encontrado."
                 // R17: linha e periodo x totais de fluxo — nao ha registro nomeado
                 // para virar identidade; o unico rotulo e a competencia temporal.
                 semIdentidade

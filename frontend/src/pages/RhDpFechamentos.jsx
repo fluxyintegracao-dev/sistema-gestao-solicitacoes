@@ -332,7 +332,7 @@ export default function RhDpFechamentos() {
       });
       setDetalhe(atualizado);
       await carregarFechamentos();
-      avisar.sucesso('Fechamento estornado e apuracao reaberta. O financeiro foi notificado.');
+      avisar.sucesso('Fechamento estornado e apuração reaberta. O financeiro foi notificado.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao reabrir fechamento RH/DP');
@@ -494,7 +494,7 @@ export default function RhDpFechamentos() {
 
               {detalhe.observacoes ? (
                 <p className="app-note">
-                  <strong>Observacoes:</strong> {detalhe.observacoes}
+                  <strong>Observações:</strong> {detalhe.observacoes}
                 </p>
               ) : null}
 
@@ -521,7 +521,7 @@ export default function RhDpFechamentos() {
                   },
                   {
                     id: 'titulo',
-                    titulo: 'Titulo',
+                    titulo: 'Título',
                     tipo: 'texto',
                     render: (item) => (item.tituloFinanceiro?.id ? (
                       <Link className="text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${item.tituloFinanceiro.id}`}>
@@ -557,7 +557,7 @@ export default function RhDpFechamentos() {
                 itens={detalhe.titulos || []}
                 storageKey="tabela:rh-dp-fechamentos:titulos"
                 rotuloRolagem="Títulos do fechamento"
-                vazio="Nenhum titulo foi vinculado a este fechamento."
+                vazio="Nenhum título foi vinculado a este fechamento."
               />
             </>
           )}

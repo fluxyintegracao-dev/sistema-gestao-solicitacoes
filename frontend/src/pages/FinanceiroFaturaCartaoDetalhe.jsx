@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -182,7 +183,7 @@ export default function FinanceiroFaturaCartaoDetalhe() {
       setProcessing(true);
       const data = await baixarFaturaCartaoFinanceiro(faturaAlvo.id, dados);
       setFatura(data);
-      avisar.sucesso('Pagamento da fatura registrado. A conta real recebeu a saida e a conta do cartao recebeu o credito de compensacao.');
+      avisar.sucesso('Pagamento da fatura registrado. A conta real recebeu a saída e a conta do cartão recebeu o crédito de compensação.');
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao baixar fatura de cartao');
     } finally {
@@ -267,9 +268,8 @@ export default function FinanceiroFaturaCartaoDetalhe() {
                     </select>
                   </CampoForm>
                   <CampoForm label="Data de pagamento" obrigatorio>
-                    <input
+                    <DateInputBR
                       className="input"
-                      type="date"
                       value={baixaForm.data_pagamento}
                       onChange={(event) => setBaixaForm((current) => ({ ...current, data_pagamento: event.target.value }))}
                       required
@@ -309,7 +309,7 @@ export default function FinanceiroFaturaCartaoDetalhe() {
               colunas={[
                 {
                   id: 'titulo',
-                  titulo: 'Titulo',
+                  titulo: 'Título',
                   tipo: 'codigo',
                   render: (titulo) => (
                     <div>
@@ -337,7 +337,7 @@ export default function FinanceiroFaturaCartaoDetalhe() {
                 { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (titulo) => formatCurrency(titulo.valor_saldo) }
               ]}
               itens={fatura.titulos || []}
-              vazio="Nenhum titulo vinculado a esta fatura."
+              vazio="Nenhum título vinculado a esta fatura."
               storageKey="tabela:fatura-cartao-detalhe:titulos"
               rotuloRolagem="Titulos da fatura"
             />

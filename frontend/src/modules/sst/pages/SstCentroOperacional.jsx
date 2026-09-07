@@ -56,28 +56,28 @@ const ACOES = {
     rotulo: 'Recalcular score',
     ocupado: 'Calculando...',
     titulo: 'Recalcular score SST',
-    mensagem: 'Recalcula o score de todos os colaboradores avaliados do grupo. O valor atual sera substituido.',
+    mensagem: 'Recalcula o score de todos os colaboradores avaliados do grupo. O valor atual será substituído.',
     confirmar: 'Recalcular'
   },
   recomendacoes: {
-    rotulo: 'Gerar recomendacoes',
+    rotulo: 'Gerar recomendações',
     ocupado: 'Gerando...',
-    titulo: 'Gerar recomendacoes operacionais',
-    mensagem: 'Gera novas recomendacoes a partir dos sinais operacionais do momento.',
+    titulo: 'Gerar recomendações operacionais',
+    mensagem: 'Gera novas recomendações a partir dos sinais operacionais do momento.',
     confirmar: 'Gerar'
   },
   workflows: {
     rotulo: 'Workflows',
     ocupado: 'Processando...',
     titulo: 'Processar workflows SST',
-    mensagem: 'Processa ate 30 workflows pendentes, executando as etapas ja programadas.',
+    mensagem: 'Processa até 30 workflows pendentes, executando as etapas já programadas.',
     confirmar: 'Processar'
   },
   automacoes: {
-    rotulo: 'Automacoes',
+    rotulo: 'Automações',
     ocupado: 'Orquestrando...',
-    titulo: 'Processar automacoes SST',
-    mensagem: 'Executa ate 30 automacoes pendentes, que podem criar pendencias, bloqueios e notificacoes.',
+    titulo: 'Processar automações SST',
+    mensagem: 'Executa até 30 automações pendentes, que podem criar pendências, bloqueios e notificações.',
     confirmar: 'Processar'
   }
 };
@@ -131,7 +131,7 @@ export default function SstCentroOperacional() {
       if (tipo === 'recomendacoes') await gerarRecomendacoesSst();
       if (tipo === 'workflows') await processarWorkflowsSst({ limit: 30 });
       if (tipo === 'automacoes') await processarAutomacoesSst({ limit: 30 });
-      avisar.sucesso('Processamento concluido.');
+      avisar.sucesso('Processamento concluído.');
       load();
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao processar acao SST');
@@ -159,9 +159,9 @@ export default function SstCentroOperacional() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Risco, conformidade e automacoes em uma tela"
+        titulo="Risco, conformidade e automações em uma tela"
         contagem={loading ? 'Carregando' : `${fmt(resumo.obras_mapeadas)} obra(s) mapeada(s)`}
-        descricao="Visao corporativa multiempresa, com heatmap, score, sinais operacionais e recomendacoes geradas pelo backend."
+        descricao="Visão corporativa multiempresa, com heatmap, score, sinais operacionais e recomendações geradas pelo backend."
         acaoPrincipal={acao('automacoes')}
         secundarias={[acao('score'), acao('recomendacoes'), acao('workflows')]}
       />
@@ -188,7 +188,7 @@ export default function SstCentroOperacional() {
             <StatTile label="Empresas" valor={fmt(resumo.empresas_mapeadas)} sub="Base do grupo" />
             <StatTile label="Obras" valor={fmt(resumo.obras_mapeadas)} sub="Obras e centros" />
             <StatTile
-              label="Pendencias"
+              label="Pendências"
               valor={fmt(resumo.pendencias_abertas)}
               sub="Abertas"
               tom={resumo.pendencias_abertas ? 'warning' : undefined}
@@ -202,7 +202,7 @@ export default function SstCentroOperacional() {
             <StatTile
               label="Riscos"
               valor={fmt(resumo.riscos_criticos)}
-              sub="Altos ou criticos"
+              sub="Altos ou críticos"
               tom={resumo.riscos_criticos ? 'danger' : undefined}
             />
           </StatGrid>
@@ -217,7 +217,7 @@ export default function SstCentroOperacional() {
         <BlocoConteudo
           titulo="Heatmap corporativo"
           contagem={`${topHeatmap.length} de ${(data?.heatmap_corporativo || []).length} obra(s)`}
-          descricao="As obras de maior indice de risco; o mapa completo fica na tela de heatmap."
+          descricao="As obras de maior índice de risco; o mapa completo fica na tela de heatmap."
           acoes={<Link to="/sst/relatorios/heatmap" className="btn btn-outline btn-sm">Abrir mapa</Link>}
         >
           <div className="grid gap-3 md:grid-cols-2">
@@ -227,11 +227,11 @@ export default function SstCentroOperacional() {
                 variante="secundario"
                 className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
                 titulo={item.obra}
-                descricao={`Indice ${item.indice_risco} com ${item.pendencias} pendencia(s)`}
+                descricao={`Índice ${item.indice_risco} com ${item.pendencias} pendência(s)`}
                 acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
               />
             ))}
-            {!topHeatmap.length ? <p className="text-sm text-muted">Nenhum ponto critico no heatmap.</p> : null}
+            {!topHeatmap.length ? <p className="text-sm text-muted">Nenhum ponto crítico no heatmap.</p> : null}
           </div>
         </BlocoConteudo>
 
@@ -251,14 +251,14 @@ export default function SstCentroOperacional() {
                 acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
               />
             ))}
-            {!sinais.length ? <p className="text-sm text-muted">Nenhum sinal critico gerado pelo motor.</p> : null}
+            {!sinais.length ? <p className="text-sm text-muted">Nenhum sinal crítico gerado pelo motor.</p> : null}
           </div>
         </BlocoConteudo>
 
         <BlocoConteudo
-          titulo="Recomendacoes operacionais"
-          contagem={`${topRecomendacoes.length} de ${recomendacoes.length} recomendacao(oes)`}
-          descricao="Acao sugerida pelo backend para os sinais de maior criticidade."
+          titulo="Recomendações operacionais"
+          contagem={`${topRecomendacoes.length} de ${recomendacoes.length} recomendação(oes)`}
+          descricao="Ação sugerida pelo backend para os sinais de maior criticidade."
           acoes={<Link to="/sst/recomendacoes" className="btn btn-outline btn-sm">Ver lista</Link>}
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -272,7 +272,7 @@ export default function SstCentroOperacional() {
                 acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
               />
             ))}
-            {!recomendacoes.length ? <p className="text-sm text-muted">Nenhuma recomendacao gerada.</p> : null}
+            {!recomendacoes.length ? <p className="text-sm text-muted">Nenhuma recomendação gerada.</p> : null}
           </div>
         </BlocoConteudo>
       </BlocosPersonalizaveis>

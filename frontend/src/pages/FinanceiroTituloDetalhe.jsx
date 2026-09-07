@@ -26,6 +26,7 @@ import {
   useConfirmacao
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
+import DateInputBR from '../components/DateInputBR';
 
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
 const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
@@ -53,7 +54,7 @@ const NATUREZAS_INTERCOMPANY_BAIXA = [
   },
   {
     value: 'TRANSFERENCIA_INTERNA',
-    label: 'Transferencia interna entre empresas',
+    label: 'Transferência interna entre empresas',
     description: 'Use para cobertura de caixa ou envio de recurso entre empresas. Nao entra na DRE consolidada.',
     tipo_intercompany: 'COBERTURA_CAIXA',
     elimina_consolidado: true,
@@ -61,7 +62,7 @@ const NATUREZAS_INTERCOMPANY_BAIXA = [
   },
   {
     value: 'REEMBOLSO_COMPENSACAO',
-    label: 'Reembolso ou compensacao entre empresas',
+    label: 'Reembolso ou compensação entre empresas',
     description: 'Use para acerto/reembolso interno. Mantem o rastro sem tratar como despesa operacional da obra.',
     tipo_intercompany: 'REEMBOLSO',
     elimina_consolidado: true,
@@ -556,7 +557,7 @@ export default function FinanceiroTituloDetalhe() {
       // Recarrega primeiro e avisa depois: `carregar()` limpa o estado de
       // erro da tela, e avisar antes apagaria a confirmação recém-pintada.
       await carregar();
-      avisar.sucesso('Dados de cobranca atualizados com sucesso.');
+      avisar.sucesso('Dados de cobrança atualizados com sucesso.');
     } catch (err) {
       setError(err?.message || 'Erro ao atualizar cobranca do titulo');
     } finally {
@@ -659,7 +660,7 @@ export default function FinanceiroTituloDetalhe() {
   async function handleCorrigirBaixa(movimento) {
     const { ok } = await confirmar({
       titulo: 'Corrigir baixa',
-      mensagem: 'Confirmar estorno desta baixa e abrir a correcao para alterar conta bancaria e data?',
+      mensagem: 'Confirmar estorno desta baixa e abrir a correção para alterar conta bancária e data?',
       rotuloConfirmar: 'Estornar e corrigir',
       destrutiva: true
     });
@@ -686,11 +687,11 @@ export default function FinanceiroTituloDetalhe() {
   }
 
   if (loading) {
-    return <p className="text-sm text-[var(--c-muted)]">Carregando titulo financeiro...</p>;
+    return <p className="text-sm text-[var(--c-muted)]">Carregando título financeiro...</p>;
   }
 
   if (!titulo) {
-    return <p className="text-sm text-[var(--c-muted)]">Titulo financeiro nao encontrado.</p>;
+    return <p className="text-sm text-[var(--c-muted)]">Título financeiro não encontrado.</p>;
   }
 
 
@@ -734,9 +735,9 @@ export default function FinanceiroTituloDetalhe() {
           */
           secundarias={[
             podeEditarTitulo
-              ? { rotulo: 'Editar titulo', to: `/financeiro/titulos/${titulo.id}/editar` }
+              ? { rotulo: 'Editar título', to: `/financeiro/titulos/${titulo.id}/editar` }
               : {
-                rotulo: 'Editar titulo',
+                rotulo: 'Editar título',
                 desabilitada: true,
                 title: 'Somente titulos em aberto, sem baixa e sem pagamento em massa vinculado podem ser editados',
                 onClick: () => {}
@@ -781,7 +782,7 @@ export default function FinanceiroTituloDetalhe() {
         {/* B3: a descrição do título mora na FAIXA (apoio do registro) —
             repetir aqui era a mesma informação duas vezes na tela. */}
         <BlocoConteudo
-          titulo="Dados do titulo"
+          titulo="Dados do título"
           variante="primario"
           cor="var(--module-financeiro)"
         >
@@ -791,12 +792,12 @@ export default function FinanceiroTituloDetalhe() {
               { label: 'Parceiro', valor: titulo.parceiro?.nome, span: 2 },
               { label: 'Obra', valor: titulo.obra?.nome, span: 2 },
               { label: 'Vencimento', valor: formatDate(titulo.data_vencimento) === '-' ? null : formatDate(titulo.data_vencimento) },
-              { label: 'Emissao', valor: formatDate(titulo.data_emissao) === '-' ? null : formatDate(titulo.data_emissao) },
+              { label: 'Emissão', valor: formatDate(titulo.data_emissao) === '-' ? null : formatDate(titulo.data_emissao) },
               { label: 'Valor baixado', valor: Number(titulo.valor_baixado) > 0 ? formatCurrency(titulo.valor_baixado) : null },
               { label: 'Quitacao', valor: formatDate(titulo.data_quitacao) === '-' ? null : formatDate(titulo.data_quitacao) },
               { label: 'Categoria', valor: titulo.categoriaFinanceira?.nome },
               {
-                label: 'Solicitacao',
+                label: 'Solicitação',
                 valor: titulo.solicitacao?.id ? (
                   <Link className="text-[var(--c-primary)] hover:underline" to={`/solicitacoes/${titulo.solicitacao.id}`}>
                     {titulo.solicitacao.codigo || `#${titulo.solicitacao.id}`}
@@ -839,7 +840,7 @@ export default function FinanceiroTituloDetalhe() {
                       {titulo.tipo === 'PAGAR' ? 'Empresa pagadora' : 'Empresa recebedora'}
                     </div>
                     <div className="text-sm font-medium text-[var(--c-text)]">{fonte.empresa_nome}</div>
-                    <div className="mt-1 text-xs text-[var(--c-muted)]">Conta bancaria</div>
+                    <div className="mt-1 text-xs text-[var(--c-muted)]">Conta bancária</div>
                     <div className="text-sm font-medium text-[var(--c-text)]">{fonte.conta_bancaria_nome}</div>
                   </div>
                 ))}
@@ -853,7 +854,7 @@ export default function FinanceiroTituloDetalhe() {
             a versao editavel — e o break-all letra a letra saiu junto. */}
         {titulo.tipo === 'RECEBER' && (
           <BlocoConteudo
-            titulo="Cobranca externa"
+            titulo="Cobrança externa"
             variante="secundario"
             recolhivel
             recolhidoPadrao={!titulo.forma_cobranca}
@@ -862,12 +863,12 @@ export default function FinanceiroTituloDetalhe() {
             ) : null}
           >
             <p className="app-note mb-3">
-              Use esta area para complementar o titulo com os dados do boleto emitido diretamente no banco.
+              Use esta área para complementar o título com os dados do boleto emitido diretamente no banco.
             </p>
 
             <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
               <label className="text-sm">
-                <span className="mb-1 block text-muted">Forma de cobranca</span>
+                <span className="mb-1 block text-muted">Forma de cobrança</span>
                 <select
                   className="input w-full"
                   value={cobrancaForm.forma_cobranca}
@@ -877,7 +878,7 @@ export default function FinanceiroTituloDetalhe() {
                     status_cobranca: event.target.value ? current.status_cobranca : 'PENDENTE_EMISSAO'
                   }))}
                 >
-                  <option value="">Nao controlar</option>
+                  <option value="">Não controlar</option>
                   {FORMAS_COBRANCA.map((item) => (
                     <option key={item} value={item}>{item}</option>
                   ))}
@@ -885,7 +886,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-muted">Status da cobranca</span>
+                <span className="mb-1 block text-muted">Status da cobrança</span>
                 <select
                   className="input w-full"
                   value={cobrancaForm.status_cobranca}
@@ -899,7 +900,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-muted">Codigo do banco</span>
+                <span className="mb-1 block text-muted">Código do banco</span>
                 <input
                   className="input w-full"
                   inputMode="numeric"
@@ -913,8 +914,7 @@ export default function FinanceiroTituloDetalhe() {
 
               <label className="text-sm">
                 <span className="mb-1 block text-muted">Emitido em</span>
-                <input
-                  type="date"
+                <DateInputBR
                   className="input w-full"
                   value={cobrancaForm.boleto_emitido_em}
                   onChange={(event) => setCobrancaForm((current) => ({ ...current, boleto_emitido_em: event.target.value }))}
@@ -922,7 +922,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-muted">Nosso numero</span>
+                <span className="mb-1 block text-muted">Nosso número</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.nosso_numero}
@@ -940,7 +940,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm md:col-span-2">
-                <span className="mb-1 block text-muted">Linha digitavel</span>
+                <span className="mb-1 block text-muted">Linha digitável</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.linha_digitavel}
@@ -949,7 +949,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm md:col-span-4">
-                <span className="mb-1 block text-muted">Codigo de barras</span>
+                <span className="mb-1 block text-muted">Código de barras</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.codigo_barras}
@@ -977,12 +977,12 @@ export default function FinanceiroTituloDetalhe() {
             ) : null}
           >
             <p className="app-note mb-3">
-              A linha digitavel ou codigo de barras habilita este titulo para remessa Caixa CNAB240 em Bancos Enterprise.
+              A linha digitável ou código de barras habilita este título para remessa Caixa CNAB240 em Bancos Enterprise.
             </p>
 
             <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
               <label className="text-sm">
-                <span className="mb-1 block text-muted">Codigo do banco</span>
+                <span className="mb-1 block text-muted">Código do banco</span>
                 <input
                   className="input w-full"
                   inputMode="numeric"
@@ -995,7 +995,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm md:col-span-2">
-                <span className="mb-1 block text-muted">Linha digitavel</span>
+                <span className="mb-1 block text-muted">Linha digitável</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.linha_digitavel}
@@ -1004,7 +1004,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-muted">Codigo de barras</span>
+                <span className="mb-1 block text-muted">Código de barras</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.codigo_barras}
@@ -1023,17 +1023,17 @@ export default function FinanceiroTituloDetalhe() {
 
         {String(titulo.tipo || '').toUpperCase() === 'PAGAR' && podeVerPagamentosBancarios && (
           <BlocoConteudo
-            titulo="Pagamentos bancarios"
+            titulo="Pagamentos bancários"
             variante="secundario"
             recolhivel
             recolhidoPadrao={!Array.isArray(titulo.paymentIntents) || titulo.paymentIntents.length === 0}
             acoes={<Link to="/financeiro/pagamentos" className="btn btn-outline btn-sm">Abrir pagamentos</Link>}
           >
-            <p className="app-note mb-3">Status bancario separado do status financeiro do titulo.</p>
+            <p className="app-note mb-3">Status bancário separado do status financeiro do título.</p>
 
             {!Array.isArray(titulo.paymentIntents) || titulo.paymentIntents.length === 0 ? (
               <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
-                Nenhuma intencao de pagamento criada para este titulo.
+                Nenhuma intenção de pagamento criada para este título.
               </div>
             ) : (
               <div className="space-y-3">
@@ -1083,7 +1083,7 @@ export default function FinanceiroTituloDetalhe() {
         <BlocoConteudo titulo="Movimentos financeiros" variante="secundario">
           {!Array.isArray(titulo.movimentos) || titulo.movimentos.length === 0 ? (
             <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
-              Nenhum movimento registrado neste titulo.
+              Nenhum movimento registrado neste título.
             </div>
           ) : (
             <div className="space-y-3">
@@ -1199,11 +1199,11 @@ export default function FinanceiroTituloDetalhe() {
           recolhivel
           recolhidoPadrao
         >
-          <p className="app-note mb-3">Criacao, baixas e estornos ficam rastreados no backend.</p>
+          <p className="app-note mb-3">Criação, baixas e estornos ficam rastreados no backend.</p>
 
           {auditoria.length === 0 ? (
             <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
-              Nenhum evento auditavel encontrado para este titulo.
+              Nenhum evento auditável encontrado para este título.
             </div>
           ) : (
             <div className="space-y-3">
@@ -1244,7 +1244,7 @@ export default function FinanceiroTituloDetalhe() {
                                 <div className="font-medium text-[var(--c-text)]">
                                   {fonte.empresa?.nome || fonte.empresa?.razao_social || 'Empresa nao informada'}
                                 </div>
-                                <div className="mt-1 text-[var(--c-muted)]">Conta bancaria</div>
+                                <div className="mt-1 text-[var(--c-muted)]">Conta bancária</div>
                                 <div className="font-medium text-[var(--c-text)]">
                                   {fonte.conta_bancaria?.nome || 'Sem conta bancaria vinculada'}
                                 </div>
@@ -1327,7 +1327,7 @@ export default function FinanceiroTituloDetalhe() {
                       conta_bancaria_id: ''
                     }))}
                   >
-                    <option value="">Nao informar</option>
+                    <option value="">Não informar</option>
                     {FORMAS_RECEBIMENTO.map((item) => (
                       <option key={item} value={item}>{item}</option>
                     ))}
@@ -1368,7 +1368,7 @@ export default function FinanceiroTituloDetalhe() {
 
                 {baixaUsaCartao ? (
                   <label className="text-sm md:col-span-2">
-                    <span className="mb-1 block text-muted">Cartao utilizado</span>
+                    <span className="mb-1 block text-muted">Cartão utilizado</span>
                     <select
                       className="input w-full"
                       value={baixaForm.cartao_id}
@@ -1383,7 +1383,7 @@ export default function FinanceiroTituloDetalhe() {
                       }}
                       required
                     >
-                      <option value="">Selecione o cartao</option>
+                      <option value="">Selecione o cartão</option>
                       {cartoesBaixa.map((cartao) => (
                         <option key={cartao.id} value={cartao.id}>
                           {getCartaoLabel(cartao)}
@@ -1392,7 +1392,7 @@ export default function FinanceiroTituloDetalhe() {
                     </select>
                     {baixaCartaoDebito ? (
                       <span className="mt-1 block text-xs text-[var(--c-muted)]">
-                        Cartao de debito baixa pela conta bancaria vinculada ao cartao.
+                        Cartão de débito baixa pela conta bancária vinculada ao cartão.
                       </span>
                     ) : null}
                   </label>
@@ -1425,7 +1425,7 @@ export default function FinanceiroTituloDetalhe() {
                     </label>
                     {baixaPagaComChequeTerceiro ? (
                       <label className="mt-3 block text-sm">
-                        <span className="mb-1 block text-[var(--sem-warning)]">Cheque disponivel</span>
+                        <span className="mb-1 block text-[var(--sem-warning)]">Cheque disponível</span>
                         <select
                           className="input w-full bg-white"
                           value={baixaForm.cheque_terceiro_id || ''}
@@ -1462,7 +1462,7 @@ export default function FinanceiroTituloDetalhe() {
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <label>
-                        <span className="mb-1 block text-[var(--sem-info)]">Numero do cheque</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Número do cheque</span>
                         <input
                           className="input w-full bg-white"
                           value={baixaForm.cheque_numero}
@@ -1496,7 +1496,7 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-[var(--sem-info)]">Agencia</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Agência</span>
                         <input
                           className="input w-full bg-white"
                           value={baixaForm.cheque_agencia}
@@ -1512,19 +1512,17 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-[var(--sem-info)]">Emissao</span>
-                        <input
+                        <span className="mb-1 block text-[var(--sem-info)]">Emissão</span>
+                        <DateInputBR
                           className="input w-full bg-white"
-                          type="date"
                           value={baixaForm.data_emissao}
                           onChange={(event) => setBaixaForm((current) => ({ ...current, data_emissao: event.target.value }))}
                         />
                       </label>
                       <label>
                         <span className="mb-1 block text-[var(--sem-info)]">Vencimento</span>
-                        <input
+                        <DateInputBR
                           className="input w-full bg-white"
-                          type="date"
                           value={baixaForm.data_vencimento}
                           onChange={(event) => setBaixaForm((current) => ({ ...current, data_vencimento: event.target.value }))}
                         />
@@ -1566,9 +1564,8 @@ export default function FinanceiroTituloDetalhe() {
 
                 <label className="text-sm">
                   <span className="mb-1 block text-muted">Data do movimento</span>
-                  <input
+                  <DateInputBR
                     className="input w-full"
-                    type="date"
                     value={baixaForm.data_movimento}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, data_movimento: event.target.value }))}
                     required
@@ -1604,7 +1601,7 @@ export default function FinanceiroTituloDetalhe() {
                   <span>
                     <span className="block font-semibold">Baixa Entre Empresas</span>
                     <span className="block text-xs text-[var(--c-muted)]">
-                      Use quando uma empresa paga ou recebe um titulo que pertence a outra empresa do grupo.
+                      Use quando uma empresa paga ou recebe um título que pertence a outra empresa do grupo.
                     </span>
                   </span>
                 </label>
@@ -1669,23 +1666,23 @@ export default function FinanceiroTituloDetalhe() {
                     value={baixaForm.categoria_bem}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, categoria_bem: event.target.value }))}
                   >
-                    <option value="">Nao informar</option>
+                    <option value="">Não informar</option>
                     {CATEGORIAS_BEM.map((item) => (
                       <option key={item} value={item}>{item}</option>
                     ))}
                   </select>
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted">Bem / descricao</span>
+                  <span className="mb-1 block text-muted">Bem / descrição</span>
                   <input
                     className="input w-full"
                     value={baixaForm.descricao_bem}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, descricao_bem: event.target.value }))}
-                    placeholder="Veiculo, imovel, terreno..."
+                    placeholder="Veículo, imóvel, terreno..."
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted">Valor referencia</span>
+                  <span className="mb-1 block text-muted">Valor referência</span>
                   <input
                     className="input input-moeda w-full"
                     inputMode="decimal"
@@ -1697,12 +1694,12 @@ export default function FinanceiroTituloDetalhe() {
               </div>
 
               <label className="text-sm block">
-                <span className="mb-1 block text-muted">Documento de referencia</span>
+                <span className="mb-1 block text-muted">Documento de referência</span>
                 <input
                   className="input w-full"
                   value={baixaForm.documento_referencia}
                   onChange={(event) => setBaixaForm((current) => ({ ...current, documento_referencia: event.target.value }))}
-                  placeholder="Numero de contrato, recibo, placa, matricula..."
+                  placeholder="Número de contrato, recibo, placa, matrícula..."
                 />
               </label>
 
@@ -1751,7 +1748,7 @@ export default function FinanceiroTituloDetalhe() {
               </div>
 
               <label className="text-sm block">
-                <span className="mb-1 block text-muted">Observacoes</span>
+                <span className="mb-1 block text-muted">Observações</span>
                 <textarea
                   className="input min-h-24 w-full"
                   value={baixaForm.observacoes}

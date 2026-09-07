@@ -104,8 +104,8 @@ export default function RateioApropriacoesContrato({
           type="button"
           className="btn btn-outline btn-sm"
           data-testid="add-apropriacao"
-          title="Acrescentar apropriacao"
-          aria-label="Acrescentar apropriacao"
+          title="Acrescentar apropriação"
+          aria-label="Acrescentar apropriação"
           disabled={desabilitado}
           onClick={() => onChange([...linhas, { apropriacao_id: '', percentual: '', valor: '' }])}
         >
@@ -126,7 +126,7 @@ export default function RateioApropriacoesContrato({
         colunas={[
           {
             id: 'apropriacao',
-            titulo: 'Apropriacao',
+            titulo: 'Apropriação',
             // R17: a apropriacao nomeia a linha do rateio.
             tipo: 'identidade',
             noCard: 'titulo',
@@ -187,14 +187,14 @@ export default function RateioApropriacoesContrato({
         getId={(linha) => `rateio-${linhas.indexOf(linha)}`}
         storageKey="tabela:contrato-rateio-apropriacoes"
         rotuloRolagem="Rateio entre apropriacoes"
-        vazio="Nenhuma apropriacao no rateio"
+        vazio="Nenhuma apropriação no rateio"
         acoesLinha={(linha) => (
           linhas.length > 1 ? (
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              title="Remover apropriacao"
-              aria-label="Remover apropriacao"
+              title="Remover apropriação"
+              aria-label="Remover apropriação"
               onClick={() => onChange(linhas.filter((_, x) => x !== linhas.indexOf(linha)))}
               disabled={desabilitado}
             >

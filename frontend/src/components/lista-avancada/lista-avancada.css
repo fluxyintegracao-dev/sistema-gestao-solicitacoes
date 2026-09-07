@@ -673,16 +673,43 @@
 @media (max-width: 767px) {
   .la-cards-grid { grid-template-columns: 1fr; }
 
-  /* Empilhado: busca -> visões (rolagem horizontal) -> Filtrar/Exibir */
+  /* Empilhado: busca -> visões -> Filtrar/Exibir */
   .la-busca { max-width: none; }
 
-  .la-visoes {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 2px;
-  }
+  /*
+    A FAIXA DE VISÕES QUEBRA EM LINHAS TAMBÉM NO CELULAR (06/09).
 
+    Aqui ela virava `flex-wrap: nowrap; overflow-x: auto` — uma tira que
+    rola na horizontal. O revisor separado registrou como SUSPEITA (S4):
+    "nenhuma visão parece selecionada — a faixa rola na horizontal e o chip
+    ativo fica fora da tela, sem pista de que há rolagem". Medido, a
+    suspeita se confirmou e não é acidente de dado:
+
+      solicitacoes @390  faixa 369px, conteúdo 608px, scrollLeft 0
+                         chip ativo ("Todas") em 530→608px — FORA DA TELA
+
+    E é por CONSTRUÇÃO: a tela declara "Todas" como a ÚLTIMA das cinco
+    visões e abre com `visaoInicial="todas"`. Toda vez que alguém abre
+    `solicitacoes` num celular, a visão em que ele está é a única que ele
+    não vê — e a tira não dá sinal nenhum de que há mais coisa à direita.
+    A pessoa lê "nenhuma selecionada".
+
+    O QUE NÃO SERVIA COMO CONSERTO, e por quê:
+      - rolar o chip ativo para dentro no primeiro render resolveria, mas
+        mora no JS da `ListaAvancada` — arquivo em reescrita por outra
+        frente nesta mesma leva (a passagem de acentuação), e cruzar ali
+        seria trocar um defeito por um conflito;
+      - `order: -1` no chip ativo o traria para o começo da tira sem JS, e
+        embaralharia a ordem das visões a cada troca — estado escondido
+        vira estado que se mexe.
+
+    O que resta é o que a folha JÁ FAZ acima de 768px: quebrar em linhas.
+    Não é regra nova — é a regra base desta classe (`flex-wrap: wrap`, lá em
+    cima), e o que sai é a EXCEÇÃO do celular. Custo medido: a faixa passa
+    de 44px para 94px de altura em 390px, em duas linhas. É a troca que o
+    cliente já decidiu em 02/09 — "mais rolagem é aceitável, apertar os
+    olhos não" —, e aqui não era nem apertar os olhos: era não ver.
+  */
   .la-visao { flex-shrink: 0; }
 }
 

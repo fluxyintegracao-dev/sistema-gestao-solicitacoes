@@ -1,3 +1,4 @@
+import DateInputBR from '../../components/DateInputBR';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import OverlayModal from '../../components/ui/OverlayModal';
 import StatusBadge from '../../components/StatusBadge';
@@ -136,7 +137,7 @@ function getParceiroPixOptions(parceiro) {
     },
     {
       id: 'pix_chave_variavel',
-      label: 'Chave variavel',
+      label: 'Chave variável',
       tipo: parceiro.pix_chave_variavel_tipo,
       chave: parceiro.pix_chave_variavel
     }
@@ -624,7 +625,7 @@ function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagament
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-[var(--c-text)]">Impacto gerencial antes de salvar</div>
-          <div className="text-xs text-[var(--c-muted)]">Confira DRE, caixa e consolidado deste titulo.</div>
+          <div className="text-xs text-[var(--c-muted)]">Confira DRE, caixa e consolidado deste título.</div>
         </div>
         {form.intercompany && (
           <span className="rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }}>
@@ -649,7 +650,7 @@ function ImpactoGerencialPreview({ form, categoria, empresasGrupo, totalPagament
         >
           <div className="text-xs font-semibold uppercase tracking-[0.16em]">Caixa</div>
           <div className="mt-1 text-sm font-semibold">{caixaTexto}</div>
-          <div className="mt-1 text-xs opacity-80">Vai para o fluxo previsto ate a baixa.</div>
+          <div className="mt-1 text-xs opacity-80">Vai para o fluxo previsto até a baixa.</div>
         </div>
         <div
           className="rounded-xl border px-3 py-2"
@@ -1770,7 +1771,7 @@ export default function FinanceiroCard({
   const colunasTitulos = [
     {
       id: 'titulo',
-      titulo: 'Titulo',
+      titulo: 'Título',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (titulo) => {
@@ -1800,7 +1801,7 @@ export default function FinanceiroCard({
     },
     {
       id: 'situacao',
-      titulo: 'Situacao',
+      titulo: 'Situação',
       tipo: 'status',
       render: (titulo) => {
         const situacao = situacaoPorTitulo.get(String(titulo.id)) || titulo.status;
@@ -1923,7 +1924,7 @@ export default function FinanceiroCard({
 
         {exibirTitulosDetalhados && (
           <StatGrid colunas={4}>
-            <StatTile label="Titulos" valor={titulos.length} />
+            <StatTile label="Títulos" valor={titulos.length} />
             {/*
               DEFEITO DE SIGNIFICADO, corrigido no ROTULO e nao no calculo
               (o calculo nao e meu para mudar): o ladrilho soma
@@ -1935,7 +1936,7 @@ export default function FinanceiroCard({
             <StatTile
               label="Total original"
               valor={formatCurrency(totalTitulos)}
-              sub="Soma do valor original dos titulos (a coluna Saldo mostra o que resta)"
+              sub="Soma do valor original dos títulos (a coluna Saldo mostra o que resta)"
             />
             <StatTile
               label="Parceiro"
@@ -1959,7 +1960,7 @@ export default function FinanceiroCard({
             getId={(titulo) => titulo.id}
             carregando={loading}
             storageKey="tabela:solicitacao-detalhe:titulos-financeiros"
-            vazio="Nenhum titulo financeiro foi gerado para esta solicitacao."
+            vazio="Nenhum título financeiro foi gerado para esta solicitação."
             rotuloRolagem="Titulos financeiros da solicitacao"
           />
         )}
@@ -1988,7 +1989,7 @@ export default function FinanceiroCard({
             <div>
               <h3 className="text-lg font-semibold text-[var(--c-text)]">Cadastrar credor</h3>
               <p className="text-sm text-[var(--c-muted)]">
-                Cadastre uma pessoa como credor ativo e vincule a esta solicitacao.
+                Cadastre uma pessoa como credor ativo e vincule a esta solicitação.
               </p>
             </div>
             <button
@@ -2082,7 +2083,7 @@ export default function FinanceiroCard({
                     name="representante_cpf"
                     value={cadastroCredorForm.representante_cpf}
                     onChange={handleCadastroCredorChange}
-                    placeholder="Somente numeros"
+                    placeholder="Somente números"
                     disabled={cadastroCredorSaving}
                   />
                 </CampoForm>
@@ -2092,7 +2093,7 @@ export default function FinanceiroCard({
                     name="representante_cargo"
                     value={cadastroCredorForm.representante_cargo}
                     onChange={handleCadastroCredorChange}
-                    placeholder="Socio, diretor, procurador"
+                    placeholder="Sócio, diretor, procurador"
                     disabled={cadastroCredorSaving}
                   />
                 </CampoForm>
@@ -2126,15 +2127,15 @@ export default function FinanceiroCard({
           do campo de visao quando a busca devolve muitos resultados. */}
       {credorModalOpen && (
         <OverlayModal
-          rotulo="Editar credor da solicitacao"
+          rotulo="Editar credor da solicitação"
           largura="var(--modal-max-w-md, 640px)"
           onFechar={credorSaving ? undefined : fecharCredorModal}
         >
           <div data-modal="cabecalho" className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-4">
             <div>
-              <h3 className="text-lg font-semibold text-[var(--c-text)]">Editar credor da solicitacao</h3>
+              <h3 className="text-lg font-semibold text-[var(--c-text)]">Editar credor da solicitação</h3>
               <p className="text-sm text-[var(--c-muted)]">
-                Atualize o credor vinculado ao pagamento desta solicitacao.
+                Atualize o credor vinculado ao pagamento desta solicitação.
               </p>
             </div>
             <button
@@ -2210,7 +2211,7 @@ export default function FinanceiroCard({
               onClick={() => setCredorSelecionado(null)}
               disabled={credorSaving || !credorSelecionado}
             >
-              Remover vinculo
+              Remover vínculo
             </button>
             <button
               type="button"
@@ -2244,7 +2245,7 @@ export default function FinanceiroCard({
             <div>
               <h3 className="text-lg font-semibold text-[var(--c-text)]">Gerar conta</h3>
               <p className="text-sm text-[var(--c-muted)]">
-                O sistema sugere os dados da solicitacao. Voce confirma e cria o titulo.
+                O sistema sugere os dados da solicitação. Você confirma e cria o título.
               </p>
             </div>
             <button
@@ -2282,10 +2283,10 @@ export default function FinanceiroCard({
                     onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
                   >
                     <option value="ABERTO">Aberto</option>
-                    <option value="PREVISAO">Previsao</option>
+                    <option value="PREVISAO">Previsão</option>
                   </select>
                   <span className="mt-1 block text-xs text-[var(--c-muted)]">
-                    Previsao entra nos relatorios, mas nao permite baixa ate virar aberto.
+                    Previsão entra nos relatórios, mas não permite baixa até virar aberto.
                   </span>
                 </label>
 
@@ -2360,10 +2361,10 @@ export default function FinanceiroCard({
                       desconto_financeiro: formatCurrencyInput(event.target.value)
                     }))}
                   />
-                  <span className="app-note mt-2">Opcional. Reduz o valor liquido do titulo.</span>
+                  <span className="app-note mt-2">Opcional. Reduz o valor líquido do título.</span>
                 </label>
                 <div className="text-sm">
-                  <span className="mb-1 block text-[var(--c-muted)]">Valor liquido previsto</span>
+                  <span className="mb-1 block text-[var(--c-muted)]">Valor líquido previsto</span>
                   <div className="input input-moeda flex items-center justify-end bg-[var(--c-bg)] text-[var(--c-text)]">
                     {formatCurrency(valorLiquidoPrevisto)}
                   </div>
@@ -2471,16 +2472,15 @@ export default function FinanceiroCard({
               */}
               <FormSecao colunas={1}>
                 <CampoForm
-                  label="Competencia DRE"
+                  label="Competência DRE"
                   obrigatorio={isCategoriaClassificadaParaDre(selectedCategory)}
                   hint={isCategoriaClassificadaParaDre(selectedCategory)
                     ? 'Obrigatoria para DRE. Informe o periodo economico real.'
                     : 'Opcional quando o titulo nao entra na DRE.'}
                   linha
                 >
-                  <input
+                  <DateInputBR
                     className="input"
-                    type="date"
                     value={form.competencia_data}
                     onChange={(event) => setForm((current) => ({ ...current, competencia_data: event.target.value }))}
                     required={isCategoriaClassificadaParaDre(selectedCategory)}
@@ -2529,10 +2529,10 @@ export default function FinanceiroCard({
                   {paymentDraft.preparar_pagamento_pix && (
                     <FormSecao colunas={2}>
                       {loadingBeneficiaries && (
-                        <div className="app-note form-campo--linha">Carregando dados bancarios do credor...</div>
+                        <div className="app-note form-campo--linha">Carregando dados bancários do credor...</div>
                       )}
 
-                      <CampoForm label="Favorecido bancario vinculado">
+                      <CampoForm label="Favorecido bancário vinculado">
                         <select
                           className="input"
                           value={paymentDraft.payment_beneficiary_id}
@@ -2652,7 +2652,7 @@ export default function FinanceiroCard({
                   <div>
                     <div className="text-sm font-semibold text-[var(--c-text)]">Rateio por obra/centro de custo</div>
                     <div className="text-xs text-[var(--c-muted)]">
-                      Opcional. Use quando o titulo precisa compor mais de uma obra nos relatorios financeiros.
+                      Opcional. Use quando o título precisa compor mais de uma obra nos relatórios financeiros.
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -2726,7 +2726,7 @@ export default function FinanceiroCard({
                           </label>
                         )}
                         <label className="text-sm xl:col-span-3">
-                          <span className="mb-1 block text-[var(--c-muted)]">Observacoes</span>
+                          <span className="mb-1 block text-[var(--c-muted)]">Observações</span>
                           <input
                             className="input w-full"
                             placeholder="Opcional"
@@ -2760,10 +2760,10 @@ export default function FinanceiroCard({
                       intercompany_group_id: event.target.checked ? current.intercompany_group_id : ''
                     }))}
                   />
-                  Movimentacao entre empresas do grupo
+                  Movimentação entre empresas do grupo
                 </label>
                 <div className="text-xs text-[var(--c-muted)]">
-                  Use esta configuracao manual para pagamentos sem cartao. Em pagamentos com cartao, o sistema usa automaticamente a empresa da conta vinculada ao cartao em cada titulo.
+                  Use esta configuração manual para pagamentos sem cartão. Em pagamentos com cartão, o sistema usa automaticamente a empresa da conta vinculada ao cartão em cada título.
                 </div>
                 {form.intercompany && (
                   <div className="grid gap-3 md:grid-cols-2">
@@ -2823,7 +2823,7 @@ export default function FinanceiroCard({
               <div className="financeiro-formas-pagamento space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-[var(--c-text)]">Titulos e formas de pagamento</div>
+                    <div className="text-sm font-semibold text-[var(--c-text)]">Títulos e formas de pagamento</div>
                     <div className="text-xs text-[var(--c-muted)]">
                       {geracaoMultiplaTitulos
                         ? 'Crie titulos separados com vencimento, forma e valor proprios ate fechar o valor da solicitacao.'
@@ -2836,17 +2836,17 @@ export default function FinanceiroCard({
                         disabled={freteTerceiroObrigatorio}
                         onChange={(event) => toggleGeracaoMultiplaTitulos(event.target.checked)}
                       />
-                      Gerar multiplos titulos
+                      Gerar múltiplos títulos
                     </label>
                     {freteTerceiroObrigatorio ? (
                       <div className="mt-1 text-xs" style={{ color: 'var(--sem-warning)' }}>
-                        Obrigatorio para separar a compra do frete pago ao terceiro.
+                        Obrigatório para separar a compra do frete pago ao terceiro.
                       </div>
                     ) : null}
                   </div>
                   {geracaoMultiplaTitulos ? (
                     <button type="button" className="btn btn-outline shrink-0" onClick={adicionarPagamento}>
-                      Adicionar titulo
+                      Adicionar título
                     </button>
                   ) : null}
                 </div>
@@ -2893,7 +2893,7 @@ export default function FinanceiroCard({
 
                       {geracaoMultiplaTitulos && (
                         <CategoriaFinanceiraAutocomplete
-                          label="Categoria financeira deste titulo"
+                          label="Categoria financeira deste título"
                           value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
                           options={categoriasCompativeis}
                           onChange={(categoriaId) => updatePagamento(pagamentoIndex, {
@@ -2962,9 +2962,8 @@ export default function FinanceiroCard({
                         {usaCartao ? (
                           <label className="text-sm">
                             <span className="mb-1 block text-[var(--c-muted)]">Data da compra</span>
-                            <input
+                            <DateInputBR
                               className="input w-full"
-                              type="date"
                               value={pagamento.data_compra}
                               onChange={(event) => updatePagamento(pagamentoIndex, { data_compra: event.target.value })}
                             />
@@ -2977,9 +2976,8 @@ export default function FinanceiroCard({
                         ) : (
                           <label className="text-sm">
                             <span className="mb-1 block text-[var(--c-muted)]">Vencimento</span>
-                            <input
+                            <DateInputBR
                               className="input w-full"
-                              type="date"
                               value={pagamento.data_vencimento}
                               onChange={(event) => updatePagamento(pagamentoIndex, { data_vencimento: event.target.value })}
                               required
@@ -2991,13 +2989,13 @@ export default function FinanceiroCard({
                       {forma?.exige_cartao && (
                         <div className="space-y-2">
                           <label className="text-sm">
-                            <span className="mb-1 block text-[var(--c-muted)]">Cartao utilizado</span>
+                            <span className="mb-1 block text-[var(--c-muted)]">Cartão utilizado</span>
                             <select
                               className="input w-full"
                               value={pagamento.cartao_id || ''}
                               onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
                             >
-                              <option value="">Selecione o cartao</option>
+                              <option value="">Selecione o cartão</option>
                               {cartoesFiltrados.map((cartao) => {
                                 const empresaCartao = cartao?.contaBancaria?.empresa?.nome;
                                 return (
@@ -3008,7 +3006,7 @@ export default function FinanceiroCard({
                               })}
                             </select>
                             <span className="mt-1 block text-xs text-[var(--c-muted)]">
-                              A conta vinculada ao cartao define a empresa que realizou o pagamento.
+                              A conta vinculada ao cartão define a empresa que realizou o pagamento.
                             </span>
                           </label>
 
@@ -3052,9 +3050,8 @@ export default function FinanceiroCard({
                                 </label>
                                 <label className="text-sm">
                                   <span className="mb-1 block text-[var(--c-muted)]">Vencimento</span>
-                                  <input
+                                  <DateInputBR
                                     className="input w-full"
-                                    type="date"
                                     value={parcela.data_vencimento || ''}
                                     onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'data_vencimento', event.target.value)}
                                     required
@@ -3064,7 +3061,7 @@ export default function FinanceiroCard({
                                 {formaAceitaDadosBoletoOuGuia(forma) && (
                                   <>
                                     <label className="text-sm md:col-span-2">
-                                      <span className="mb-1 block text-[var(--c-muted)]">Documento ou referencia</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Documento ou referência</span>
                                       <input
                                         className="input w-full"
                                         value={parcela.numero_documento || ''}
@@ -3073,7 +3070,7 @@ export default function FinanceiroCard({
                                       />
                                     </label>
                                     <label className="text-sm">
-                                      <span className="mb-1 block text-[var(--c-muted)]">Codigo do banco</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Código do banco</span>
                                       <input
                                         className="input w-full"
                                         inputMode="numeric"
@@ -3085,21 +3082,21 @@ export default function FinanceiroCard({
                                       />
                                     </label>
                                     <label className="text-sm">
-                                      <span className="mb-1 block text-[var(--c-muted)]">Linha digitavel</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Linha digitável</span>
                                       <input
                                         className="input w-full"
                                         value={parcela.linha_digitavel || ''}
                                         onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'linha_digitavel', event.target.value)}
-                                        placeholder="Linha digitavel, se houver"
+                                        placeholder="Linha digitável, se houver"
                                       />
                                     </label>
                                     <label className="text-sm md:col-span-2">
-                                      <span className="mb-1 block text-[var(--c-muted)]">Codigo de barras</span>
+                                      <span className="mb-1 block text-[var(--c-muted)]">Código de barras</span>
                                       <input
                                         className="input w-full"
                                         value={parcela.codigo_barras || ''}
                                         onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'codigo_barras', event.target.value)}
-                                        placeholder="Codigo de barras, se houver"
+                                        placeholder="Código de barras, se houver"
                                       />
                                     </label>
                                   </>
@@ -3110,7 +3107,7 @@ export default function FinanceiroCard({
                                     className="rounded-xl border px-3 py-2 text-xs md:col-span-2"
                                     style={{ borderColor: 'var(--sem-warning-border)', background: 'var(--sem-warning-bg)', color: 'var(--sem-warning)' }}
                                   >
-                                    Os dados do cheque serao informados na baixa, quando o instrumento real for definido.
+                                    Os dados do cheque serão informados na baixa, quando o instrumento real for definido.
                                   </div>
                                 )}
                               </div>
@@ -3169,7 +3166,7 @@ export default function FinanceiroCard({
             <div>
               <h3 className="text-lg font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
               <p className="text-xs text-[var(--c-muted)]">
-                Pesquise pelo nome e escolha uma categoria compativel com o tipo do titulo.
+                Pesquise pelo nome e escolha uma categoria compatível com o tipo do título.
               </p>
             </div>
             <button
@@ -3189,7 +3186,7 @@ export default function FinanceiroCard({
               <input
                 className="input app-busca"
                 type="text"
-                placeholder="Buscar categoria por ID, nome ou descricao"
+                placeholder="Buscar categoria por ID, nome ou descrição"
                 value={categoriaSearch}
                 onChange={(event) => setCategoriaSearch(event.target.value)}
               />

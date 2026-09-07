@@ -17,6 +17,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
+import postcss from 'postcss';
+import tailwindcss from 'tailwindcss';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ_FRONT = path.resolve(AQUI, '..', '..');
@@ -92,7 +94,30 @@ const HTML = `<!doctype html>
   o punhado de regras de layout que só aquela prova precisa. O resto (a
   lista de CSS, a ordem, o esbuild, o `define` do ambiente) é comum.
 */
-export async function criarServidorDeFixture({ entrada, cssExtra = '', caminho = 'fixture' }) {
+/*
+  O TAILWIND PRECISA SER PROCESSADO (06/09) — sem isto a fixture mede OUTRA
+  barra.
+
+  `src/index.css` começa com `@tailwind base/components/utilities`. Servido
+  cru, essas três linhas não viram nada: as classes utilitárias não existem
+  na folha, e `class="hidden sm:inline"` deixa de esconder. Medido na barra
+  do topo a 390px: o botão "Início" dava 86px com o rótulo à mostra, contra
+  43px só com o ícone — metade da barra de erro, num defeito que é de
+  ESPAÇO. Uma fixture que serve CSS cru mede uma tela que não existe.
+
+  O processamento é o do projeto (`postcss.config.js` = tailwind +
+  autoprefixer) e o `content` é o `tailwind.config.js`, então as classes
+  geradas são as MESMAS do `npm run build`. O autoprefixer fica de fora de
+  propósito: ele só acrescenta prefixos de fabricante, e o Chromium do
+  harness não precisa de nenhum.
+*/
+async function comTailwind(css) {
+  const resultado = await postcss([tailwindcss({ config: path.join(RAIZ_FRONT, 'tailwind.config.js') })])
+    .process(css, { from: path.join(RAIZ_FRONT, 'src/index.css') });
+  return resultado.css;
+}
+
+export async function criarServidorDeFixture({ entrada, cssExtra = '', caminho = 'fixture', tailwind = false }) {
   const pacote = await esbuild.build({
     entryPoints: [path.join(AQUI, entrada)],
     bundle: true,
@@ -101,7 +126,10 @@ export async function criarServidorDeFixture({ entrada, cssExtra = '', caminho =
     platform: 'browser',
     target: 'chrome110',
     jsx: 'automatic',
-    loader: { '.js': 'jsx', '.jsx': 'jsx' },
+    /* As imagens entram como `dataurl` porque a marca da barra do topo é
+       um `<img>` de verdade e a LARGURA dela sai da proporção do arquivo:
+       um stub vazio daria 0px e encolheria a barra medida. */
+    loader: { '.js': 'jsx', '.jsx': 'jsx', '.png': 'dataurl', '.svg': 'dataurl', '.jpg': 'dataurl' },
     absWorkingDir: RAIZ_FRONT,
     logLevel: 'silent',
     define: {
@@ -113,8 +141,9 @@ export async function criarServidorDeFixture({ entrada, cssExtra = '', caminho =
     }
   });
   const js = pacote.outputFiles[0].text;
-  const css = CSS.map((rel) => fs.readFileSync(path.join(RAIZ_FRONT, rel), 'utf8')).join('\n\n')
+  const cru = CSS.map((rel) => fs.readFileSync(path.join(RAIZ_FRONT, rel), 'utf8')).join('\n\n')
     + '\n\n' + cssExtra;
+  const css = tailwind ? await comTailwind(cru) : cru;
 
   const servidor = http.createServer((req, res) => {
     const rota = req.url.split('?')[0];
@@ -152,5 +181,21 @@ export function criarServidorDeCamadas() {
     entrada: 'fixtureCamadas.jsx',
     cssExtra: CSS_FIXTURE,
     caminho: 'camadas'
+  });
+}
+
+/*
+  A FIXTURE DA BARRA DO TOPO — terceira entrada do MESMO servidor, pelo
+  mesmo motivo escrito lá em cima: o que muda entre uma prova e outra é a
+  ENTRADA, não a montagem. Ela não pede CSS extra nenhum, e isso é de
+  propósito: a barra é `sticky` no topo do `.layout-content-shell` e
+  qualquer regra inventada aqui mudaria a geometria que a prova mede.
+*/
+export function criarServidorDeBarraDoTopo() {
+  return criarServidorDeFixture({
+    entrada: 'fixtureBarraDoTopo.jsx',
+    cssExtra: 'body { margin: 0; }',
+    caminho: 'barra-do-topo',
+    tailwind: true
   });
 }

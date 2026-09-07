@@ -642,7 +642,7 @@ export default function SolicitacaoDetalhe() {
 
   async function salvarApropriacoesSolicitacao() {
     if (!String(motivoApropriacoes || '').trim()) {
-      avisar.alerta('Informe o motivo da alteracao das apropriacoes.');
+      avisar.alerta('Informe o motivo da alteração das apropriações.');
       return;
     }
 
@@ -659,7 +659,7 @@ export default function SolicitacaoDetalhe() {
       }));
 
     if (rateiosValidos.some((item) => !item.apropriacao_id)) {
-      avisar.alerta('Preencha todas as apropriacoes do rateio.');
+      avisar.alerta('Preencha todas as apropriações do rateio.');
       return;
     }
 
@@ -815,7 +815,7 @@ export default function SolicitacaoDetalhe() {
 
     const motivo = String(motivoCompraDireta || '').trim();
     if (!motivo) {
-      avisar.alerta('Informe o motivo da alteracao.');
+      avisar.alerta('Informe o motivo da alteração.');
       return;
     }
 
@@ -1090,12 +1090,12 @@ export default function SolicitacaoDetalhe() {
   const conteudoBlocos = {
     apropriacoes: podeEditarApropriacoesSolicitacaoNormal ? (
       <BlocoConteudo
-        titulo="Apropriacoes da solicitacao"
+        titulo="Apropriações da solicitação"
         variante="secundario"
-        descricao="Ajuste a apropriacao principal ou o rateio do contrato com motivo e auditoria."
+        descricao="Ajuste a apropriação principal ou o rateio do contrato com motivo e auditoria."
         acoes={(
           <button type="button" className="btn btn-outline btn-sm" onClick={abrirModalApropriacoes}>
-            Editar apropriacoes
+            Editar apropriações
           </button>
         )}
       />
@@ -1155,9 +1155,9 @@ export default function SolicitacaoDetalhe() {
 
     aprovacao_diretoria: podeAprovarDiretoria ? (
       <BlocoConteudo
-        titulo="Aprovacao por diretoria"
+        titulo="Aprovação por diretoria"
         variante="secundario"
-        descricao={`Ao aprovar, a solicitacao segue para ${solicitacao.setor_destino_aprovacao || solicitacao.setor_destino_pos_aprovacao || 'a area responsavel'}.`}
+        descricao={`Ao aprovar, a solicitação segue para ${solicitacao.setor_destino_aprovacao || solicitacao.setor_destino_pos_aprovacao || 'a area responsavel'}.`}
         acoes={(
           <button type="button" className="btn btn-primary btn-sm" onClick={aprovarDiretoria}>
             Aprovar e enviar
@@ -1216,7 +1216,7 @@ export default function SolicitacaoDetalhe() {
         <BlocoConteudo
           titulo="Auditoria de prazo e documentos"
           variante="secundario"
-          descricao="Registre solicitacoes enviadas fora do prazo ou sem nota/boleto para medir regularizacao por usuario."
+          descricao="Registre solicitações enviadas fora do prazo ou sem nota/boleto para medir regularizacao por usuário."
           acoes={(
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setAuditoriaAberta(false)}>
               Recolher auditoria
@@ -1237,7 +1237,7 @@ export default function SolicitacaoDetalhe() {
                     marcar: event.target.checked
                   }))}
                 />
-                Marcar pendencia para auditoria
+                Marcar pendência para auditoria
               </span>
             </CampoForm>
 
@@ -1253,14 +1253,14 @@ export default function SolicitacaoDetalhe() {
                 disabled={!pendenciaFinanceira.marcar}
               >
                 <option value="FORA_DO_PRAZO">Enviada fora do prazo</option>
-                <option value="SEM_NOTA">Sem nota ate o vencimento</option>
-                <option value="SEM_BOLETO">Sem boleto ate o vencimento</option>
+                <option value="SEM_NOTA">Sem nota até o vencimento</option>
+                <option value="SEM_BOLETO">Sem boleto até o vencimento</option>
                 <option value="SEM_NOTA_E_BOLETO">Sem nota e boleto</option>
                 <option value="OUTRO">Outro</option>
               </select>
             </CampoForm>
 
-            <CampoForm label="Observacao" tipo="observacao">
+            <CampoForm label="Observação" tipo="observacao">
               <textarea
                 className="input"
                 value={pendenciaFinanceira.observacao}
@@ -1268,7 +1268,7 @@ export default function SolicitacaoDetalhe() {
                   ...prev,
                   observacao: event.target.value
                 }))}
-                placeholder="Ex.: nota enviada apos vencimento, boleto ausente, prazo regularizado..."
+                placeholder="Ex.: nota enviada após vencimento, boleto ausente, prazo regularizado..."
               />
             </CampoForm>
           </FormSecao>
@@ -1521,26 +1521,26 @@ export default function SolicitacaoDetalhe() {
         apropriações" dependia de a tela lembrar de rolar o corpo.
       */}
       {modalApropriacoesAberto && (
-        <OverlayModal rotulo="Editar apropriacoes" onFechar={fecharModalApropriacoes}>
+        <OverlayModal rotulo="Editar apropriações" onFechar={fecharModalApropriacoes}>
           <div data-modal="cabecalho" className="app-bloco-head">
-            <h2 className="app-bloco-titulo">Editar apropriacoes</h2>
+            <h2 className="app-bloco-titulo">Editar apropriações</h2>
             <span className="app-bloco-acoes">
               <button type="button" className="btn btn-outline btn-sm" onClick={fecharModalApropriacoes}>
                 Fechar
               </button>
             </span>
           </div>
-          <p className="app-bloco-lead" title="A alteracao nao muda a visibilidade da solicitacao e fica registrada no historico.">
-            A alteracao nao muda a visibilidade da solicitacao e fica registrada no historico.
+          <p className="app-bloco-lead" title="A alteração não muda a visibilidade da solicitação e fica registrada no histórico.">
+            A alteração não muda a visibilidade da solicitação e fica registrada no histórico.
           </p>
 
           <FormSecao colunas={2}>
-            <CampoForm label="Apropriacao principal" linha>
+            <CampoForm label="Apropriação principal" linha>
               <ApropriacaoAutocomplete
                 value={apropriacaoPrincipalId}
                 options={apropriacoesCatalogo}
                 onChange={setApropriacaoPrincipalId}
-                placeholder="Digite para buscar a apropriacao"
+                placeholder="Digite para buscar a apropriação"
               />
             </CampoForm>
           </FormSecao>
@@ -1548,7 +1548,7 @@ export default function SolicitacaoDetalhe() {
           <BlocoConteudo
             titulo="Rateio do contrato"
             variante="secundario"
-            descricao="Use percentual ou valor em R$. Nao misture os dois criterios na mesma alteracao."
+            descricao="Use percentual ou valor em R$. Não misture os dois critérios na mesma alteração."
             acoes={(
               <button type="button" className="btn btn-outline btn-sm" onClick={adicionarRateioApropriacao}>
                 Adicionar linha
@@ -1557,12 +1557,12 @@ export default function SolicitacaoDetalhe() {
           >
             {rateiosApropriacao.map((rateio, index) => (
               <FormSecao key={`rateio-solicitacao-${index}`} colunas={4}>
-                <CampoForm label="Apropriacao" span={2}>
+                <CampoForm label="Apropriação" span={2}>
                   <ApropriacaoAutocomplete
                     value={rateio.apropriacao_id}
                     options={apropriacoesCatalogo}
                     onChange={(valor) => atualizarRateioApropriacao(index, 'apropriacao_id', valor)}
-                    placeholder="Buscar apropriacao"
+                    placeholder="Buscar apropriação"
                   />
                 </CampoForm>
                 <CampoForm label="Percentual">
@@ -1599,17 +1599,17 @@ export default function SolicitacaoDetalhe() {
             <StatGrid colunas={3}>
               <StatTile label="Percentual informado" valor={`${resumoRateio.percentual.toFixed(4)}%`} />
               <StatTile label="Valor informado" valor={formatarMoedaLocal(resumoRateio.valor)} />
-              <StatTile label="Valor da solicitacao" valor={formatarMoedaLocal(solicitacao?.valor)} />
+              <StatTile label="Valor da solicitação" valor={formatarMoedaLocal(solicitacao?.valor)} />
             </StatGrid>
           </BlocoConteudo>
 
           <FormSecao colunas={2}>
-            <CampoForm label="Motivo da alteracao" obrigatorio tipo="observacao">
+            <CampoForm label="Motivo da alteração" obrigatorio tipo="observacao">
               <textarea
                 className="input"
                 value={motivoApropriacoes}
                 onChange={(event) => setMotivoApropriacoes(event.target.value)}
-                placeholder="Explique por que a apropriacao foi alterada."
+                placeholder="Explique por que a apropriação foi alterada."
               />
             </CampoForm>
           </FormSecao>
@@ -1756,12 +1756,12 @@ export default function SolicitacaoDetalhe() {
                     <>
                       {rateiosCompraDireta.map((rateio, index) => (
                         <FormSecao key={`rateio-compra-direta-${index}`} colunas={4}>
-                          <CampoForm label="Apropriacao" span={2}>
+                          <CampoForm label="Apropriação" span={2}>
                             <ApropriacaoAutocomplete
                               value={rateio.apropriacao_id}
                               options={apropriacoesCatalogo}
                               onChange={(valor) => atualizarRateioCompraDireta(index, 'apropriacao_id', valor)}
-                              placeholder="Buscar apropriacao"
+                              placeholder="Buscar apropriação"
                             />
                           </CampoForm>
                           <CampoForm label="Quantidade">

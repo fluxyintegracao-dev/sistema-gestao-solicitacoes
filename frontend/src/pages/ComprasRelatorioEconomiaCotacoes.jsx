@@ -352,9 +352,9 @@ export default function ComprasRelatorioEconomiaCotacoes() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Economia em Cotacoes"
-        contagem="Compras / Relatorios"
-        descricao="Comparacao entre menor preco disponivel e fornecedor vencedor em cotacoes encerradas."
+        titulo="Economia em Cotações"
+        contagem="Compras / Relatórios"
+        descricao="Comparação entre menor preço disponível e fornecedor vencedor em cotações encerradas."
         /* R11: o retorno ao hub de relatórios mora na seta do cabeçalho. */
         voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
         acaoPrincipal={{
@@ -399,12 +399,12 @@ export default function ComprasRelatorioEconomiaCotacoes() {
           sobrepreço é perigo (e só fica vermelho quando existe). */}
       <StatGrid colunas={4}>
         <StatTile
-          label="Cotacoes encerradas"
+          label="Cotações encerradas"
           valor={Number(resumo.cotacoes_encerradas || 0).toLocaleString('pt-BR')}
-          sub="No periodo filtrado"
+          sub="No período filtrado"
         />
         <StatTile
-          label="No menor preco"
+          label="No menor preço"
           valor={formatPercent(resumo.percentual_menor_preco)}
           sub={`${Number(resumo.itens_menor_preco || 0).toLocaleString('pt-BR')} item(ns)`}
         />
@@ -438,16 +438,16 @@ export default function ComprasRelatorioEconomiaCotacoes() {
             não a dos maiores impactos financeiros, que traria as economias
             junto.
           */
-          titulo="Maiores sobreprecos por cotacao"
+          titulo="Maiores sobreprecos por cotação"
           contagem={`Top ${LIMITE_COTACOES_IMPACTO}`}
-          descricao="Ordenado pelo sobrepreco somado dos itens vencidos no periodo; a economia da mesma cotacao aparece ao lado, para comparacao."
+          descricao="Ordenado pelo sobrepreco somado dos itens vencidos no período; a economia da mesma cotação aparece ao lado, para comparação."
           variante="primario"
           cor="var(--c-primary)"
         >
           {loading ? (
-            <div className="app-empty-card">Carregando cotacoes...</div>
+            <div className="app-empty-card">Carregando cotações...</div>
           ) : cotacoesResumo.length === 0 ? (
-            <div className="app-empty-card">Sem cotacoes encerradas com vencedor para montar o grafico.</div>
+            <div className="app-empty-card">Sem cotações encerradas com vencedor para montar o gráfico.</div>
           ) : (
             <div className="grid gap-4">
               {cotacoesResumo.map((cotacao) => {
@@ -514,13 +514,13 @@ export default function ComprasRelatorioEconomiaCotacoes() {
             scrollport e mata o `position: sticky` sem erro nenhum. */}
         <BlocoConteudo
           titulo="Economia por item cotado"
-          descricao="Menor preco disponivel contra o fornecedor vencedor, item a item."
+          descricao="Menor preço disponível contra o fornecedor vencedor, item a item."
         >
           <TabelaPadrao
             colunas={[
               {
                 id: 'cotacao',
-                titulo: 'Cotacao',
+                titulo: 'Cotação',
                 tipo: 'codigo',
                 render: (linha) => (
                   <CelulaDupla
@@ -555,7 +555,7 @@ export default function ComprasRelatorioEconomiaCotacoes() {
               */
               {
                 id: 'menor_preco',
-                titulo: 'Menor preco',
+                titulo: 'Menor preço',
                 tipo: 'valor',
                 render: (linha) => (
                   <div
@@ -611,7 +611,7 @@ export default function ComprasRelatorioEconomiaCotacoes() {
                 titulo: 'Sinal',
                 tipo: 'badge',
                 render: (linha) => (linha.selecionou_menor_preco ? (
-                  <span className="badge badge-success">Menor preco</span>
+                  <span className="badge badge-success">Menor preço</span>
                 ) : (
                   <span className="badge badge-warning">Acima do menor</span>
                 ))

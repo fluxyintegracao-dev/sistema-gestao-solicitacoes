@@ -12,6 +12,7 @@ import {
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getRelatorioEndividamentoFinanceiro } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
+import DateInputBR from '../components/DateInputBR';
 
 const DEFAULT_FILTERS = {
   periodo: 'MES_ATUAL',
@@ -210,17 +211,17 @@ export default function FinanceiroEndividamento() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
-        titulo="Recorte do relatorio"
-        descricao="A tela so muda ao atualizar o relatorio."
+        titulo="Recorte do relatório"
+        descricao="A tela so muda ao atualizar o relatório."
         variante="secundario"
       >
       <form onSubmit={aplicarFiltros}>
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           <label className="app-filter-field">
-            <span className="app-filter-label">Periodo</span>
+            <span className="app-filter-label">Período</span>
             <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
-              <option value="MES_ATUAL">Mes atual</option>
-              <option value="PROXIMO_MES">Proximo mes</option>
+              <option value="MES_ATUAL">Mês atual</option>
+              <option value="PROXIMO_MES">Próximo mês</option>
               <option value="HOJE">Hoje</option>
               <option value="7_DIAS">7 dias</option>
               <option value="30_DIAS">30 dias</option>
@@ -230,11 +231,11 @@ export default function FinanceiroEndividamento() {
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Holding</span>
@@ -273,7 +274,7 @@ export default function FinanceiroEndividamento() {
           </label>
           {rascunho ? (
             <span className="text-xs text-[var(--c-muted)]">
-              Recorte em rascunho — clique em Atualizar relatorio para valer.
+              Recorte em rascunho — clique em Atualizar relatório para valer.
             </span>
           ) : null}
         </div>
@@ -283,7 +284,7 @@ export default function FinanceiroEndividamento() {
             implicitamente). O botao visivel e o "Atualizar relatorio" da
             faixa fixa; este so preserva o Enter, e por isso nao aparece —
             dois botoes iguais seriam duplicacao de dono (R16). */}
-        <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar relatorio</button>
+        <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar relatório</button>
       </form>
       </BlocoConteudo>
 
@@ -330,7 +331,7 @@ export default function FinanceiroEndividamento() {
             tom={Number(resumo.saldo_vencido || 0) > 0 ? 'danger' : 'success'}
           />
           <StatTile
-            label="Vence no periodo"
+            label="Vence no período"
             valor={formatCurrency(resumo.saldo_periodo)}
             sub={periodoTexto || 'Periodo selecionado'}
           />
@@ -347,30 +348,30 @@ export default function FinanceiroEndividamento() {
           <StatTile
             label="Valor baixado"
             valor={formatCurrency(resumo.valor_baixado_total)}
-            sub="Amortizacao ja registrada"
+            sub="Amortização já registrada"
           />
         </StatGrid>
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Credito rotativo"
+        titulo="Crédito rotativo"
         descricao="Liberacoes e amortizacoes conciliadas pelo extrato, sem cadastro de linha e sem impacto na DRE."
         variante="secundario"
       >
         <StatGrid colunas={3}>
           <StatTile
-            label="Credito rotativo aberto"
+            label="Crédito rotativo aberto"
             valor={formatCurrency(resumo.credito_rotativo_saldo)}
             sub="Liberacoes menos amortizacoes"
             tom={Number(resumo.credito_rotativo_saldo || 0) > 0 ? 'warning' : undefined}
           />
           <StatTile
-            label="Liberado no periodo"
+            label="Liberado no período"
             valor={formatCurrency(resumo.credito_rotativo_liberado_periodo)}
             sub={periodoTexto || 'Periodo selecionado'}
           />
           <StatTile
-            label="Amortizado no periodo"
+            label="Amortizado no período"
             valor={formatCurrency(resumo.credito_rotativo_amortizado_periodo)}
             sub={periodoTexto || 'Periodo selecionado'}
           />
@@ -383,7 +384,7 @@ export default function FinanceiroEndividamento() {
         <div className="grid gap-4 xl:grid-cols-3">
           <BlocoConteudo
             titulo="Por empresa"
-            descricao="Saldo aberto por empresa do titulo."
+            descricao="Saldo aberto por empresa do título."
             variante="secundario"
             className="app-table-shell"
           >
@@ -397,7 +398,7 @@ export default function FinanceiroEndividamento() {
                   noCard: 'titulo',
                   render: (empresa) => empresa.empresa_nome
                 },
-                { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (empresa) => empresa.titulos },
+                { id: 'titulos', titulo: 'Títulos', tipo: 'numero', render: (empresa) => empresa.titulos },
                 { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (empresa) => formatCurrency(empresa.saldo_total) }
               ]}
               itens={empresasResumo}
@@ -424,7 +425,7 @@ export default function FinanceiroEndividamento() {
                   noCard: 'titulo',
                   render: (categoria) => categoria.categoria_nome
                 },
-                { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (categoria) => categoria.titulos },
+                { id: 'titulos', titulo: 'Títulos', tipo: 'numero', render: (categoria) => categoria.titulos },
                 { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (categoria) => formatCurrency(categoria.saldo_total) }
               ]}
               itens={categoriasResumo}
@@ -436,7 +437,7 @@ export default function FinanceiroEndividamento() {
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Titulos classificados"
+            titulo="Títulos classificados"
             contagem={`${titulos.length} linha(s)`}
             descricao={cortadoNoTeto
               ? `Teto de ${TETO_TITULOS} atingido: a lista mostra os vencimentos mais antigos do recorte, nao o recorte inteiro.`
@@ -458,7 +459,7 @@ export default function FinanceiroEndividamento() {
                 },
                 {
                   id: 'titulo',
-                  titulo: 'Titulo',
+                  titulo: 'Título',
                   // R17: o codigo do titulo NOMEIA o registro.
                   tipo: 'identidade',
                   noCard: 'titulo',
@@ -477,12 +478,12 @@ export default function FinanceiroEndividamento() {
               itens={titulos}
               storageKey="tabela:financeiro-endividamento:titulos"
               rotuloRolagem="Titulos classificados como endividamento"
-              vazio="Nenhum titulo de endividamento encontrado para os filtros."
+              vazio="Nenhum título de endividamento encontrado para os filtros."
             />
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Movimentacoes de credito rotativo"
+            titulo="Movimentações de crédito rotativo"
             contagem={`${movimentosCreditoRotativo.length} movimento(s)`}
             variante="secundario"
             className="app-table-shell xl:col-span-3"
@@ -514,7 +515,7 @@ export default function FinanceiroEndividamento() {
               itens={movimentosCreditoRotativo}
               storageKey="tabela:financeiro-endividamento:credito-rotativo"
               rotuloRolagem="Movimentacoes de credito rotativo"
-              vazio="Nenhuma movimentacao de credito rotativo encontrada."
+              vazio="Nenhuma movimentação de crédito rotativo encontrada."
             />
           </BlocoConteudo>
         </div>

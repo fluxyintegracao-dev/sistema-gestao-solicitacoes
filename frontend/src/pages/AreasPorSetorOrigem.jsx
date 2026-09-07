@@ -95,7 +95,7 @@ export default function AreasPorSetorOrigem() {
     try {
       setSalvando(true);
       await salvarAreasPorSetorOrigem({ regras });
-      avisar.sucesso('Configuracao salva com sucesso');
+      avisar.sucesso('Configuração salva com sucesso');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao salvar configuracao');
@@ -112,9 +112,9 @@ export default function AreasPorSetorOrigem() {
           abaixo da grade de setores; no cabecalho ele fica a um clique
           mesmo com a lista rolada. */}
       <PageHeader
-        titulo="Areas por setor de origem"
+        titulo="Áreas por setor de origem"
         contagem={origemSelecionada ? `${destinosSelecionados.size} de ${setoresOrdenados.length} area(s) marcada(s)` : null}
-        descricao="Defina quais setores cada setor pode selecionar como area responsavel na Nova Solicitacao."
+        descricao="Defina quais setores cada setor pode selecionar como área responsável na Nova Solicitação."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -124,7 +124,7 @@ export default function AreasPorSetorOrigem() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <BlocoConteudo titulo="Areas liberadas" variante="primario" cor="var(--c-primary)">
+      <BlocoConteudo titulo="Áreas liberadas" variante="primario" cor="var(--c-primary)">
         <div className="space-y-4">
           {/* R12: seletor de CONTEXTO, nao filtro — ele escolhe QUAL regra
               se edita, e as marcacoes abaixo pertencem a origem escolhida. */}
@@ -164,7 +164,7 @@ export default function AreasPorSetorOrigem() {
               })}
             </div>
           ) : (
-            <p className="app-note">Escolha o setor de origem para liberar as areas responsaveis.</p>
+            <p className="app-note">Escolha o setor de origem para liberar as áreas responsáveis.</p>
           )}
         </div>
       </BlocoConteudo>

@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -606,7 +607,7 @@ export default function FinanceiroFinanciamentosBancarios() {
             { id: 'total', titulo: 'Parcela', tipo: 'valor', render: (parcela) => <span className="font-semibold">{formatCurrency(parcela.valor_parcela)}</span> },
             {
               id: 'titulo',
-              titulo: 'Titulo',
+              titulo: 'Título',
               tipo: 'codigo',
               render: (parcela) => (parcela.tituloFinanceiro ? (
                 /* R25 — o azul do link vem do token do sistema, não de
@@ -718,13 +719,13 @@ export default function FinanceiroFinanciamentosBancarios() {
 
             <FormSecao legenda="Prazos e parcelas" colunas={2}>
               <CampoForm label="Data do contrato" obrigatorio>
-                <input className="input" type="date" value={form.data_contrato} onChange={(event) => updateForm('data_contrato', event.target.value)} required />
+                <DateInputBR className="input" value={form.data_contrato} onChange={(event) => updateForm('data_contrato', event.target.value)} required />
               </CampoForm>
               <CampoForm label="Data do crédito" obrigatorio>
-                <input className="input" type="date" value={form.data_credito} onChange={(event) => updateForm('data_credito', event.target.value)} required />
+                <DateInputBR className="input" value={form.data_credito} onChange={(event) => updateForm('data_credito', event.target.value)} required />
               </CampoForm>
               <CampoForm label="Primeiro vencimento" obrigatorio>
-                <input className="input" type="date" value={form.primeiro_vencimento} onChange={(event) => updateForm('primeiro_vencimento', event.target.value)} required />
+                <DateInputBR className="input" value={form.primeiro_vencimento} onChange={(event) => updateForm('primeiro_vencimento', event.target.value)} required />
               </CampoForm>
               <CampoForm label="Parcelas" obrigatorio>
                 <input className="input" type="number" min="1" max="240" value={form.quantidade_parcelas} onChange={(event) => updateForm('quantidade_parcelas', event.target.value)} required />

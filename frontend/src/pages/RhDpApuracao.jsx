@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -124,7 +125,7 @@ function getPixOptions(item) {
   return [
     { key: 'principal', label: 'Principal', value: pagamento.chave_pix },
     { key: 'secundaria', label: 'Fixa 2', value: pagamento.chave_pix_secundaria },
-    { key: 'variavel', label: 'Variavel', value: pagamento.chave_pix_variavel }
+    { key: 'variavel', label: 'Variável', value: pagamento.chave_pix_variavel }
   ]
     .map((option) => ({ ...option, value: String(option.value || '').trim() }))
     .filter((option) => option.value);
@@ -339,7 +340,7 @@ export default function RhDpApuracao() {
     if (!podeEditar) return;
 
     if (!form.competencia) {
-      avisar.alerta('Informe a competencia antes de gerar a apuracao.');
+      avisar.alerta('Informe a competência antes de gerar a apuração.');
       return;
     }
 
@@ -395,7 +396,7 @@ export default function RhDpApuracao() {
 
     const { ok } = await confirmar({
       titulo: 'Concluir conferência',
-      mensagem: 'Concluir a conferencia desta apuracao? Todos os itens precisam estar marcados como conferidos.',
+      mensagem: 'Concluir a conferência desta apuração? Todos os itens precisam estar marcados como conferidos.',
       rotuloConfirmar: 'Concluir conferência'
     });
     if (!ok) return;
@@ -475,7 +476,7 @@ export default function RhDpApuracao() {
       const atualizado = await getRhApuracao(detalhe.id);
       setDetalhe(atualizado);
       await carregarApuracoes();
-      avisar.sucesso('Fechamento estornado e apuracao reaberta. O financeiro foi notificado.');
+      avisar.sucesso('Fechamento estornado e apuração reaberta. O financeiro foi notificado.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao reabrir fechamento RH/DP');
@@ -573,8 +574,8 @@ export default function RhDpApuracao() {
                 onChange={(event) => setForm((current) => ({ ...current, dias_base: event.target.value }))}
                 disabled={!podeEditar}
               >
-                <option value="30">30 dias - mensal padrao</option>
-                <option value="22">22 dias - dias uteis</option>
+                <option value="30">30 dias - mensal padrão</option>
+                <option value="22">22 dias - dias úteis</option>
                 <option value="20">20 dias - escala operacional</option>
               </select>
             </CampoForm>
@@ -585,9 +586,9 @@ export default function RhDpApuracao() {
                 onChange={(event) => setForm((current) => ({ ...current, tipo_vinculo: event.target.value }))}
                 disabled={!podeEditar}
               >
-                <option value="">Todos os vinculos</option>
+                <option value="">Todos os vínculos</option>
                 <option value="CLT">CLT</option>
-                <option value="NAO_CLT">Nao CLT</option>
+                <option value="NAO_CLT">Não CLT</option>
               </select>
             </CampoForm>
             <CampoForm label="Observações do recorte" tipo="observacao">
@@ -750,7 +751,7 @@ export default function RhDpApuracao() {
           storageKey="tabela:rh-dp-apuracao:lista"
           rotuloRolagem="Apurações RH/DP"
           carregando={carregandoBase || carregandoLista}
-          vazio="Nenhuma apuracao encontrada para os filtros atuais."
+          vazio="Nenhuma apuração encontrada para os filtros atuais."
           acoesLinha={(item) => (
             <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirApuracao(item.id)}>
               Abrir
@@ -762,7 +763,7 @@ export default function RhDpApuracao() {
 
       {detalhe ? (
         <BlocoConteudo
-          titulo={`Apuracao ${detalhe.competencia} - ${detalhe.obra?.nome || 'obra nao informada'}`}
+          titulo={`Apuração ${detalhe.competencia} - ${detalhe.obra?.nome || 'obra nao informada'}`}
           contagem={`${detalhe.total_colaboradores || 0} colaborador(es)`}
           descricao={`Recorte: empresa do cadastro do colaborador | ${detalhe.tipo_vinculo || 'todos os vinculos'} | base ${detalhe.dias_base || 30} dias | criada em ${formatDateTime(detalhe.createdAt)} por ${detalhe.criadoPor?.nome || 'sistema'}`}
           acoes={(
@@ -791,23 +792,23 @@ export default function RhDpApuracao() {
           <StatGrid colunas={5}>
             <StatTile label="Total bruto" valor={formatCurrency(detalhe.total_bruto)} />
             <StatTile label="Total descontos" valor={formatCurrency(detalhe.total_descontos)} />
-            <StatTile label="Total liquido" valor={formatCurrency(detalhe.total_liquido)} />
+            <StatTile label="Total líquido" valor={formatCurrency(detalhe.total_liquido)} />
             <StatTile
-              label="Conferencia"
+              label="Conferência"
               valor={`${detalhe.resumo_operacional?.itens_conferidos || 0} item(ns)`}
               sub={`${detalhe.resumo_operacional?.itens_pendentes || 0} pendente(s)`}
               tom={detalhe.resumo_operacional?.itens_pendentes ? 'warning' : 'success'}
             />
             <StatTile
-              label="Base da diaria"
+              label="Base da diária"
               valor={`${detalhe.dias_base || 30} dias`}
-              sub="Parametro usado no calculo proporcional"
+              sub="Parametro usado no cálculo proporcional"
             />
           </StatGrid>
 
           {detalhe.observacoes ? (
             <p className="app-note">
-              <strong>Observacoes:</strong> {detalhe.observacoes}
+              <strong>Observações:</strong> {detalhe.observacoes}
             </p>
           ) : null}
 
@@ -821,7 +822,7 @@ export default function RhDpApuracao() {
           {detalhe.fechamentoRh ? (
             <Alert
               type="success"
-              title="Competencia fechada"
+              title="Competência fechada"
               message={(
                 <>
                   Fechada em {new Date(`${detalhe.fechamentoRh.data_fechamento}T00:00:00`).toLocaleDateString('pt-BR')} com vencimento em{' '}
@@ -837,8 +838,8 @@ export default function RhDpApuracao() {
           {financeiroHabilitado && detalhe.status === 'CONFERIDA' && !detalhe.fechamentoRh && podeFechar ? (
             <BlocoConteudo
               variante="secundario"
-              titulo="Fechamento da competencia"
-              descricao="O fechamento gera titulos PAGAR no financeiro central e vincula cada item da apuracao ao respectivo titulo. A categoria financeira deve estar marcada para DRE e com grupo DRE classificado."
+              titulo="Fechamento da competência"
+              descricao="O fechamento gera títulos PAGAR no financeiro central e vincula cada item da apuração ao respectivo título. A categoria financeira deve estar marcada para DRE e com grupo DRE classificado."
             >
               <form className="space-y-4" onSubmit={onFecharApuracao}>
                 {/* Quatro células: as duas datas, a categoria em `span={2}` e a
@@ -846,8 +847,7 @@ export default function RhDpApuracao() {
                     campo de data por metade do bloco. */}
                 <FormSecao legenda="Dados do lote" colunas={4}>
                   <CampoForm label="Data de fechamento">
-                    <input
-                      type="date"
+                    <DateInputBR
                       className="input w-full"
                       value={fechamentoForm.data_fechamento}
                       onChange={(event) => setFechamentoForm((current) => ({ ...current, data_fechamento: event.target.value }))}
@@ -856,8 +856,7 @@ export default function RhDpApuracao() {
                   </CampoForm>
 
                   <CampoForm label="Data de vencimento">
-                    <input
-                      type="date"
+                    <DateInputBR
                       className="input w-full"
                       value={fechamentoForm.data_vencimento}
                       onChange={(event) => setFechamentoForm((current) => ({ ...current, data_vencimento: event.target.value }))}
@@ -889,7 +888,7 @@ export default function RhDpApuracao() {
                     </select>
                   </CampoForm>
 
-                  <CampoForm label="Observacoes do fechamento" tipo="observacao">
+                  <CampoForm label="Observações do fechamento" tipo="observacao">
                     <textarea
                       className="input w-full"
                       rows={3}
@@ -968,7 +967,7 @@ export default function RhDpApuracao() {
               {
                 id: 'pix',
                 sempreVisivel: true,
-                titulo: 'PIX do titulo',
+                titulo: 'PIX do título',
                 tipo: 'texto',
                 // Edicao inline: o controle mora no render da coluna.
                 render: (item) => {
@@ -999,7 +998,7 @@ export default function RhDpApuracao() {
                           ))
                         )}
                       </select>
-                      <span className="app-note mt-1 block">Principal usada por padrao.</span>
+                      <span className="app-note mt-1 block">Principal usada por padrão.</span>
                     </>
                   );
                 }
@@ -1007,7 +1006,7 @@ export default function RhDpApuracao() {
               {
                 id: 'ajuste_credito',
                 sempreVisivel: true,
-                titulo: 'Ajuste credito',
+                titulo: 'Ajuste crédito',
                 tipo: 'texto',
                 render: (item) => (
                   <input
@@ -1030,7 +1029,7 @@ export default function RhDpApuracao() {
               {
                 id: 'ajuste_debito',
                 sempreVisivel: true,
-                titulo: 'Ajuste debito',
+                titulo: 'Ajuste débito',
                 tipo: 'texto',
                 render: (item) => (
                   <input
@@ -1078,7 +1077,7 @@ export default function RhDpApuracao() {
               {
                 id: 'observacoes',
                 sempreVisivel: true,
-                titulo: 'Observacoes',
+                titulo: 'Observações',
                 tipo: 'texto',
                 render: (item) => (
                   <textarea
@@ -1102,7 +1101,7 @@ export default function RhDpApuracao() {
             itens={detalhe.itens || []}
             storageKey="tabela:rh-dp-apuracao:itens"
             rotuloRolagem="Itens da apuracao"
-            vazio="A apuracao nao possui itens."
+            vazio="A apuração não possui itens."
             acoesLinha={(item) => (
               podeEditar && detalhe.status === 'RASCUNHO' ? (
                 <button

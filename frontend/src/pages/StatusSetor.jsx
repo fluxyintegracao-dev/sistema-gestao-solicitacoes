@@ -187,7 +187,7 @@ export default function StatusSetor() {
       <PageHeader
         titulo="Status por Setor"
         contagem={`${status.length} status`}
-        descricao="Defina os status disponiveis por setor."
+        descricao="Defina os status disponíveis por setor."
         secundarias={[{
           rotulo: reordenando ? 'Reordenando...' : 'Reordenar',
           onClick: reordenar,

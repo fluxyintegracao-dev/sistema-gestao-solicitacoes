@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { HiOutlineEye, HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
@@ -49,13 +50,13 @@ const PARCELA_REAJUSTE_TIPOS = [
   { value: 'REAJUSTAVEL', label: 'Reajustavel', resumo: 'R' }
 ];
 const TIPOS_DOCUMENTO_MODELO = [
-  { value: 'CONTRATO', label: 'Contrato padrao' },
+  { value: 'CONTRATO', label: 'Contrato padrão' },
   { value: 'CONTRATO_ASSINADO', label: 'Contrato assinado' }
 ];
 const MODOS_COMPOSICAO = [
   { value: 'ENTRADA', label: 'Entrada' },
   { value: 'PERIODICO', label: 'Parcelas periodicas' },
-  { value: 'MANUAL', label: 'Lancamentos manuais' }
+  { value: 'MANUAL', label: 'Lançamentos manuais' }
 ];
 const PERIODICIDADES = [
   { value: 'AVISTA', label: 'A vista', intervalMonths: 0 },
@@ -1333,7 +1334,7 @@ export default function ComercialContratos() {
     if (!parcela) return;
 
     if (Math.abs(diferencaComposicao) <= 0.009) {
-      avisar.erro('As formas de pagamento ja fecham o valor total do contrato.');
+      avisar.erro('As formas de pagamento já fecham o valor total do contrato.');
       return;
     }
 
@@ -1341,7 +1342,7 @@ export default function ComercialContratos() {
     const novoValor = roundCurrency(valorAtual + diferencaComposicao);
 
     if (novoValor < 0) {
-      avisar.erro('A diferenca e maior que o valor desta parcela. Escolha outra parcela para ajustar o fechamento.');
+      avisar.erro('A diferença e maior que o valor desta parcela. Escolha outra parcela para ajustar o fechamento.');
       return;
     }
 
@@ -1481,7 +1482,7 @@ export default function ComercialContratos() {
   async function handleTrocaUnidadeContrato() {
     if (!contratoSelecionado?.id) return;
     if ((contratoSelecionado.unidades || []).length > 1 && !trocaForm.unidade_comercial_origem_id) {
-      avisar.erro('Selecione qual unidade do contrato sera trocada.');
+      avisar.erro('Selecione qual unidade do contrato será trocada.');
       return;
     }
     if (!trocaForm.unidade_comercial_destino_id) {
@@ -1491,7 +1492,7 @@ export default function ComercialContratos() {
     const novoValor = toNumber(trocaForm.novo_valor_total);
     const valorAtual = toNumber(contratoSelecionado.valor_total);
     if (novoValor > valorAtual && !hasText(trocaForm.competencia_data)) {
-      avisar.erro('Informe a competencia DRE do ajuste quando a troca aumentar o valor do contrato.');
+      avisar.erro('Informe a competência DRE do ajuste quando a troca aumentar o valor do contrato.');
       return;
     }
     try {
@@ -1725,7 +1726,7 @@ export default function ComercialContratos() {
       const tipo = pessoaRapidaModal || pessoaRapidaForm.tipo || 'cliente';
 
       if (!isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
-        avisar.erro('Informe um CPF/CNPJ valido no cadastro rapido.');
+        avisar.erro('Informe um CPF/CNPJ valido no cadastro rápido.');
         return;
       }
       if (tipo === 'testemunha' && onlyDigits(pessoaRapidaForm.cpf_cnpj).length !== 11) {
@@ -1737,15 +1738,15 @@ export default function ComercialContratos() {
 
       if (tipo === 'cliente' && pessoaRapidaForm.possui_conjuge) {
         if (!isValidCpfCnpj(pessoaRapidaForm.conjuge.cpf_cnpj)) {
-          avisar.erro('Informe um CPF/CNPJ valido para o conjuge.');
+          avisar.erro('Informe um CPF/CNPJ valido para o cônjuge.');
           return;
         }
         if (!String(pessoaRapidaForm.conjuge.nome || '').trim()) {
-          avisar.erro('Informe o nome do conjuge.');
+          avisar.erro('Informe o nome do cônjuge.');
           return;
         }
         if (!String(pessoaRapidaForm.conjuge.telefone || '').trim()) {
-          avisar.erro('Informe o telefone do conjuge.');
+          avisar.erro('Informe o telefone do cônjuge.');
           return;
         }
 
@@ -2080,7 +2081,7 @@ export default function ComercialContratos() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="sol-filter-label">Unidades do contrato</div>
-                  <div className="text-xs text-[var(--c-muted)]">O valor do cadastro e apenas referencia. Informe o valor real atribuido a cada unidade.</div>
+                  <div className="text-xs text-[var(--c-muted)]">O valor do cadastro e apenas referência. Informe o valor real atribuído a cada unidade.</div>
                 </div>
                 <button type="button" className="btn btn-outline btn-sm" onClick={adicionarUnidadeContrato} disabled={!form.empreendimento_id}>
                   <HiPlus className="h-4 w-4" /> Adicionar unidade
@@ -2151,7 +2152,7 @@ export default function ComercialContratos() {
                 Soma das unidades: {formatCurrency(totalValorUnidades)} · Valor do contrato: {formatCurrency(valorTotalContrato)}
               </div>
               {form.empreendimento_id && unidadesDoEmpreendimento.length === 0 && (
-                <div className="mt-2 text-xs text-[var(--c-muted)]">Nenhuma unidade disponivel para contrato neste empreendimento.</div>
+                <div className="mt-2 text-xs text-[var(--c-muted)]">Nenhuma unidade disponível para contrato neste empreendimento.</div>
               )}
             </div>
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
@@ -2181,7 +2182,7 @@ export default function ComercialContratos() {
               />
               {!form.id && (
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('cliente')}>
-                  Cadastro rapido
+                  Cadastro rápido
                 </button>
               )}
               {compradoresContrato[0]?.parceiro?.conjuge_nome && (
@@ -2222,11 +2223,11 @@ export default function ComercialContratos() {
                     Adicionar
                   </button>
                   <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirCadastroRapidoPessoa('cliente')}>
-                    Cadastro rapido
+                    Cadastro rápido
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-[var(--c-muted)]">
-                  O comprador adicional entra no contrato e nas assinaturas. O principal continua vinculado aos titulos financeiros.
+                  O comprador adicional entra no contrato e nas assinaturas. O principal continua vinculado aos títulos financeiros.
                 </p>
             </div>
           )}
@@ -2251,7 +2252,7 @@ export default function ComercialContratos() {
               )}
             </label>
             <label className="sol-filter-field">
-              <span className="sol-filter-label">Codigo do contrato</span>
+              <span className="sol-filter-label">Código do contrato</span>
               <input
                 className="input w-full"
                 value={form.id ? form.numero : numeroContratoCalculado}
@@ -2304,7 +2305,7 @@ export default function ComercialContratos() {
                   vagas_garagem_posicao: e.target.value === 'sim' ? c.vagas_garagem_posicao : ''
                 }))}
               >
-                <option value="nao">Nao possui</option>
+                <option value="nao">Não possui</option>
                 <option value="sim">Possui</option>
               </select>
             </label>
@@ -2315,7 +2316,7 @@ export default function ComercialContratos() {
                   <input className="input w-full" type="number" min="1" value={form.quantidade_vagas_garagem} onChange={(e) => setForm((c) => ({ ...c, quantidade_vagas_garagem: e.target.value }))} />
                 </label>
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">Posicao especifica</span>
+                  <span className="sol-filter-label">Posição especifica</span>
                   <select
                     className="input w-full"
                     value={form.vagas_garagem_posicao_especifica ? 'sim' : 'nao'}
@@ -2325,13 +2326,13 @@ export default function ComercialContratos() {
                       vagas_garagem_posicao: e.target.value === 'sim' ? c.vagas_garagem_posicao : ''
                     }))}
                   >
-                    <option value="nao">Nao</option>
+                    <option value="nao">Não</option>
                     <option value="sim">Sim</option>
                   </select>
                 </label>
                 {form.vagas_garagem_posicao_especifica && (
                   <label className="sol-filter-field">
-                    <span className="sol-filter-label">Posicao das vagas</span>
+                    <span className="sol-filter-label">Posição das vagas</span>
                     <input className="input w-full" value={form.vagas_garagem_posicao} onChange={(e) => setForm((c) => ({ ...c, vagas_garagem_posicao: e.target.value }))} placeholder="Ex.: vagas 12 e 13 / subsolo 1" />
                   </label>
                 )}
@@ -2359,13 +2360,13 @@ export default function ComercialContratos() {
                 emptyLabel="Nenhum corretor encontrado"
               />
               <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('corretor')}>
-                Cadastro rapido
+                Cadastro rápido
               </button>
             </label>
             {form.corretor_parceiro_id && (
               <>
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">Comissao %</span>
+                  <span className="sol-filter-label">Comissão %</span>
                   <input
                     className="input w-full"
                     type="number"
@@ -2377,7 +2378,7 @@ export default function ComercialContratos() {
                   />
                 </label>
                 <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">Dados da comissao</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">Dados da comissão</p>
                   <p className="mt-1 text-sm text-[var(--c-text)]">
                     Competencia DRE: <strong>{form.data_assinatura ? formatDate(form.data_assinatura) : 'Informe a data de assinatura'}</strong>
                   </p>
@@ -2392,7 +2393,7 @@ export default function ComercialContratos() {
             </label>
             <label className="sol-filter-field">
               <span className="sol-filter-label">Data de assinatura</span>
-              <input className="input w-full" type="date" value={form.data_assinatura} onChange={(e) => handleDataAssinaturaChange(e.target.value)} />
+              <DateInputBR className="input w-full" value={form.data_assinatura} onChange={(e) => handleDataAssinaturaChange(e.target.value)} />
             </label>
           </div>
           <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
@@ -2416,7 +2417,7 @@ export default function ComercialContratos() {
                   emptyLabel="Nenhuma testemunha encontrada"
                 />
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('testemunha', { slot: 1 })}>
-                  Cadastro rapido
+                  Cadastro rápido
                 </button>
               </label>
               <label className="sol-filter-field">
@@ -2437,7 +2438,7 @@ export default function ComercialContratos() {
                   emptyLabel="Nenhuma testemunha encontrada"
                 />
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('testemunha', { slot: 2 })}>
-                  Cadastro rapido
+                  Cadastro rápido
                 </button>
               </label>
             </div>
@@ -2447,7 +2448,7 @@ export default function ComercialContratos() {
               <div className="mb-3">
                 <p className="text-sm font-semibold text-[var(--c-text)]">Compradores vinculados ao contrato</p>
                 <p className="text-xs text-[var(--c-muted)]">
-                  Lista de conferencia para assinaturas e dados do contrato.
+                  Lista de conferência para assinaturas e dados do contrato.
                 </p>
               </div>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -2479,18 +2480,18 @@ export default function ComercialContratos() {
               </div>
             </section>
           )}
-          <label className="sol-filter-field"><span className="sol-filter-label">Observacoes</span><textarea className="input w-full" rows={3} value={form.observacoes} onChange={(e) => setForm((c) => ({ ...c, observacoes: e.target.value }))} /></label>
+          <label className="sol-filter-field"><span className="sol-filter-label">Observações</span><textarea className="input w-full" rows={3} value={form.observacoes} onChange={(e) => setForm((c) => ({ ...c, observacoes: e.target.value }))} /></label>
 
           {!form.id && (
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-[var(--c-text)]">Composicao das formas de pagamento</p>
+                  <p className="text-sm font-semibold text-[var(--c-text)]">Composição das formas de pagamento</p>
                   <p className="text-xs text-[var(--c-muted)]">
-                    Adicione blocos de recebimento e acompanhe a diferenca ate fechar o valor total do contrato.
+                    Adicione blocos de recebimento e acompanhe a diferença até fechar o valor total do contrato.
                   </p>
                   <p className="text-xs text-[var(--c-muted)]">
-                    Se houver entrada em dinheiro, PIX, bens ou outro formato, registre essa parte como um bloco proprio abaixo.
+                    Se houver entrada em dinheiro, PIX, bens ou outro formato, registre essa parte como um bloco próprio abaixo.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-sm">
@@ -2516,7 +2517,7 @@ export default function ComercialContratos() {
               </div>
 
               <div className="rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] px-3 py-2 text-xs text-[var(--sem-info)]">
-                <strong>Competencia DRE:</strong> {form.data_assinatura ? formatDate(form.data_assinatura) : 'informe a data de assinatura'}.
+                <strong>Competência DRE:</strong> {form.data_assinatura ? formatDate(form.data_assinatura) : 'informe a data de assinatura'}.
                 Todas as formas de pagamento usam automaticamente a assinatura do contrato como competencia.
               </div>
 
@@ -2528,7 +2529,7 @@ export default function ComercialContratos() {
                   </select>
                 </label>
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">Descricao do bloco</span>
+                  <span className="sol-filter-label">Descrição do bloco</span>
                   <input className="input w-full" value={generator.titulo_bloco} onChange={(e) => setGenerator((c) => ({ ...c, titulo_bloco: e.target.value }))} placeholder="Ex.: Mensais, reforco anual, bens recebidos" />
                 </label>
                 <label className="sol-filter-field">
@@ -2540,7 +2541,7 @@ export default function ComercialContratos() {
                 <label className="sol-filter-field md:col-span-2">
                   <span className="sol-filter-label">Forma prevista</span>
                   <select className="input w-full" value={generator.forma_recebimento_prevista} onChange={(e) => setGenerator((c) => ({ ...c, forma_recebimento_prevista: e.target.value, detalhe_forma_recebimento: isFormaComDetalhe(e.target.value) ? c.detalhe_forma_recebimento : '' }))}>
-                    <option value="">Nao informar</option>
+                    <option value="">Não informar</option>
                     {formasRecebimento.map((item) => <option key={getOptionValue(item)} value={getOptionValue(item)}>{getOptionLabel(item)}</option>)}
                   </select>
                 </label>
@@ -2562,7 +2563,7 @@ export default function ComercialContratos() {
                     className="input w-full"
                     value={generator.detalhe_forma_recebimento}
                     onChange={(e) => setGenerator((c) => ({ ...c, detalhe_forma_recebimento: e.target.value }))}
-                    placeholder="Ex.: veiculo Corolla 2024, permuta por lote 12, credito de terceiros"
+                    placeholder="Ex.: veículo Corolla 2024, permuta por lote 12, crédito de terceiros"
                   />
                 </label>
               )}
@@ -2575,7 +2576,7 @@ export default function ComercialContratos() {
                   </label>
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Vencimento da entrada</span>
-                    <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
+                    <DateInputBR className="input w-full" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
                   </label>
                 </div>
               ) : getModoComposicaoTipo(generator.modo) === 'PERIODICO' ? (
@@ -2596,16 +2597,16 @@ export default function ComercialContratos() {
                   </label>
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Primeiro vencimento</span>
-                    <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
+                    <DateInputBR className="input w-full" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
                   </label>
                 </div>
               ) : (
                 <div className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-[var(--c-text)]">Lancamentos manuais</p>
+                      <p className="text-sm font-semibold text-[var(--c-text)]">Lançamentos manuais</p>
                       <p className="text-xs text-[var(--c-muted)]">
-                        Use para bens, outros recebimentos ou parcelas com datas e valores especificos.
+                        Use para bens, outros recebimentos ou parcelas com datas e valores específicos.
                       </p>
                     </div>
                     <button type="button" className="btn btn-outline" onClick={adicionarParcelaCustomizada}>
@@ -2621,7 +2622,7 @@ export default function ComercialContratos() {
                     {(generator.parcelas_personalizadas || []).map((item, index) => (
                       <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 sm:grid-cols-2 xl:grid-cols-6">
                         <label className="sol-filter-field xl:col-span-2">
-                          <span className="sol-filter-label">Descricao</span>
+                          <span className="sol-filter-label">Descrição</span>
                           <input className="input w-full" value={item.descricao} onChange={(e) => updateParcelaCustomizada(index, 'descricao', e.target.value)} />
                         </label>
                         <label className="sol-filter-field">
@@ -2638,7 +2639,7 @@ export default function ComercialContratos() {
                         </label>
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Vencimento</span>
-                          <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcelaCustomizada(index, 'data_vencimento', e.target.value)} />
+                          <DateInputBR className="input w-full" value={item.data_vencimento} onChange={(e) => updateParcelaCustomizada(index, 'data_vencimento', e.target.value)} />
                         </label>
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Valor</span>
@@ -2734,7 +2735,7 @@ export default function ComercialContratos() {
 
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)] sm:col-span-2">
-                            Descricao
+                            Descrição
                             {isEditing ? (
                               <input className="input w-full" value={item.descricao} onChange={(e) => updateParcela(index, 'descricao', e.target.value)} />
                             ) : <span className="block text-sm font-medium text-[var(--c-text)]">{item.descricao || '-'}</span>}
@@ -2751,7 +2752,7 @@ export default function ComercialContratos() {
                             Forma
                             {isEditing ? (
                               <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
-                                <option value="">Nao informar</option>
+                                <option value="">Não informar</option>
                                 {formasRecebimento.map((forma) => <option key={getOptionValue(forma)} value={getOptionValue(forma)}>{getOptionLabel(forma)}</option>)}
                               </select>
                             ) : <span className="block text-sm font-medium text-[var(--c-text)]">{item.forma_recebimento_prevista || '-'}</span>}
@@ -2770,11 +2771,11 @@ export default function ComercialContratos() {
                           <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
                             Vencimento
                             {isEditing ? (
-                              <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(index, 'data_vencimento', e.target.value)} />
+                              <DateInputBR className="input w-full" value={item.data_vencimento} onChange={(e) => updateParcela(index, 'data_vencimento', e.target.value)} />
                             ) : <span className="block text-sm font-medium text-[var(--c-text)]">{formatDate(item.data_vencimento)}</span>}
                           </label>
                           <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
-                            Competencia DRE
+                            Competência DRE
                             <span className="block text-sm font-medium text-[var(--c-text)]">{formatDate(form.data_assinatura)}</span>
                           </label>
                           <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
@@ -2793,7 +2794,7 @@ export default function ComercialContratos() {
 
                         {isEditing && canAdjust && (
                           <button type="button" className="btn btn-primary btn-sm mt-3 w-full" onClick={() => ajustarParcelaParaFechamento(index)}>
-                            Fechar diferenca
+                            Fechar diferença
                           </button>
                         )}
                       </article>
@@ -2820,7 +2821,7 @@ export default function ComercialContratos() {
                     colunas={[
                       {
                         id: 'descricao',
-                        titulo: 'Descricao',
+                        titulo: 'Descrição',
                         // R17: a descricao e quem nomeia a parcela.
                         tipo: 'identidade',
                         noCard: 'titulo',
@@ -2853,7 +2854,7 @@ export default function ComercialContratos() {
                         render: (item) => (
                           parcelaEditandoIndex === item.__indice ? (
                             <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(item.__indice, 'forma_recebimento_prevista', e.target.value)}>
-                              <option value="">Nao informar</option>
+                              <option value="">Não informar</option>
                               {formasRecebimento.map((forma) => <option key={getOptionValue(forma)} value={getOptionValue(forma)}>{getOptionLabel(forma)}</option>)}
                             </select>
                           ) : (
@@ -2897,7 +2898,7 @@ export default function ComercialContratos() {
                         tipo: 'data',
                         render: (item) => (
                           parcelaEditandoIndex === item.__indice ? (
-                            <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(item.__indice, 'data_vencimento', e.target.value)} />
+                            <DateInputBR className="input w-full" value={item.data_vencimento} onChange={(e) => updateParcela(item.__indice, 'data_vencimento', e.target.value)} />
                           ) : (
                             <span className="text-[var(--c-muted)]">{formatDate(item.data_vencimento)}</span>
                           )
@@ -2905,7 +2906,7 @@ export default function ComercialContratos() {
                       },
                       {
                         id: 'competencia_dre',
-                        titulo: 'Competencia DRE',
+                        titulo: 'Competência DRE',
                         tipo: 'data',
                         render: () => <span className="text-[var(--c-muted)]">{formatDate(form.data_assinatura)}</span>
                       },
@@ -2958,9 +2959,9 @@ export default function ComercialContratos() {
                               type="button"
                               className="btn btn-primary btn-sm"
                               onClick={() => ajustarParcelaParaFechamento(item.__indice)}
-                              title="Ajusta esta parcela pela diferenca entre a agenda e o valor total do contrato."
+                              title="Ajusta esta parcela pela diferença entre a agenda e o valor total do contrato."
                             >
-                              Fechar diferenca
+                              Fechar diferença
                             </button>
                           )}
                         </>
@@ -2974,7 +2975,7 @@ export default function ComercialContratos() {
                 <section className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 md:p-4">
                   <div>
                     <h4 className="font-semibold text-[var(--c-text)]">Dados dos cheques</h4>
-                    <p className="mt-1 text-sm text-[var(--c-muted)]">Informe os dados de cada cheque. Ao criar o contrato, os documentos serao registrados automaticamente na Carteira de Cheques.</p>
+                    <p className="mt-1 text-sm text-[var(--c-muted)]">Informe os dados de cada cheque. Ao criar o contrato, os documentos serão registrados automaticamente na Carteira de Cheques.</p>
                   </div>
                   {form.parcelas.map((item, index) => {
                     if (!isChequeForma(item.forma_recebimento_prevista)) return null;
@@ -3004,7 +3005,7 @@ export default function ComercialContratos() {
                             <input className="input w-full" value={item.cheque_conta || ''} onChange={(e) => updateParcela(index, 'cheque_conta', e.target.value)} />
                           </label>
                           <label className="space-y-1 text-sm text-[var(--c-text)]">Data de emissao *
-                            <input className="input w-full" type="date" value={item.cheque_data_emissao || ''} onChange={(e) => updateParcela(index, 'cheque_data_emissao', e.target.value)} />
+                            <DateInputBR className="input w-full" value={item.cheque_data_emissao || ''} onChange={(e) => updateParcela(index, 'cheque_data_emissao', e.target.value)} />
                           </label>
                         </div>
                       </article>
@@ -3037,7 +3038,7 @@ export default function ComercialContratos() {
 
       <BlocoConteudo
         titulo="Carteira comercial"
-        descricao="Contratos de venda com acesso rapido ao financeiro."
+        descricao="Contratos de venda com acesso rápido ao financeiro."
       >
         {/*
           R12: o recorte era um `<select>` de Status com a busca solta ao lado
@@ -3139,7 +3140,7 @@ export default function ComercialContratos() {
               },
               {
                 id: 'comissao',
-                titulo: 'Comissao',
+                titulo: 'Comissão',
                 tipo: 'numero',
                 render: (item) => (
                   Number(item.comissao_percentual || 0) > 0
@@ -3220,7 +3221,7 @@ export default function ComercialContratos() {
       {contratoSelecionado && (
         <BlocoConteudo
           titulo={`Detalhe do contrato ${contratoSelecionado.numero}`}
-          descricao="Parcelas geradas e acesso aos titulos do financeiro."
+          descricao="Parcelas geradas e acesso aos títulos do financeiro."
         >
 
           <div className="mt-4 overflow-hidden rounded-xl border border-[var(--c-border)]">
@@ -3246,7 +3247,7 @@ export default function ComercialContratos() {
               <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{contratoSelecionado.corretor_nome || '-'}</div>
             </div>
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Comissao</div>
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Comissão</div>
               <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">
                 {Number(contratoSelecionado.comissao_percentual || 0) > 0
                   ? `${Number(contratoSelecionado.comissao_percentual).toLocaleString('pt-BR')}%`
@@ -3257,14 +3258,14 @@ export default function ComercialContratos() {
               </div>
             </div>
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Titulo comissao</div>
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Título comissão</div>
               <div className="mt-2">
                 {contratoSelecionado.tituloFinanceiroComissao?.id ? (
                   <Link className="btn btn-outline" to={`/financeiro/titulos/${contratoSelecionado.tituloFinanceiroComissao.id}`}>
-                    Abrir titulo da comissao
+                    Abrir título da comissão
                   </Link>
                 ) : (
-                  <span className="text-sm text-[var(--c-muted)]">Nao gerado</span>
+                  <span className="text-sm text-[var(--c-muted)]">Não gerado</span>
                 )}
               </div>
             </div>
@@ -3284,7 +3285,7 @@ export default function ComercialContratos() {
               <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{formatCurrency(contratoSelecionado.indicadoresFinanceiros?.valor_vencido || 0)}</div>
             </div>
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Proximo vencimento</div>
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Próximo vencimento</div>
               <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{formatDate(contratoSelecionado.indicadoresFinanceiros?.proximo_vencimento)}</div>
             </div>
           </div>
@@ -3298,7 +3299,7 @@ export default function ComercialContratos() {
           <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-[var(--c-text)]">Acoes operacionais do contrato</p>
+                <p className="text-sm font-semibold text-[var(--c-text)]">Ações operacionais do contrato</p>
                 <p className="text-xs text-[var(--c-muted)]">Controle inadimplencia, distrato guiado e troca de unidade com ajuste financeiro.</p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -3333,7 +3334,7 @@ export default function ComercialContratos() {
               <div className="grid gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 md:grid-cols-6">
                 {(contratoSelecionado.unidades || []).length > 1 && (
                   <label className="sol-filter-field">
-                    <span className="sol-filter-label">Unidade que sera trocada</span>
+                    <span className="sol-filter-label">Unidade que será trocada</span>
                     <select className="input w-full" value={trocaForm.unidade_comercial_origem_id} onChange={(e) => setTrocaForm((current) => ({ ...current, unidade_comercial_origem_id: e.target.value }))}>
                       <option value="">Selecione</option>
                       {(contratoSelecionado.unidades || []).map((item) => <option key={item.unidade_comercial_id} value={item.unidade_comercial_id}>{buildUnidadeOptionLabel(item.unidade)}</option>)}
@@ -3353,14 +3354,14 @@ export default function ComercialContratos() {
                 </label>
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Data efetiva</span>
-                  <input className="input w-full" type="date" value={trocaForm.data_efetiva} onChange={(e) => setTrocaForm((current) => ({ ...current, data_efetiva: e.target.value }))} />
+                  <DateInputBR className="input w-full" value={trocaForm.data_efetiva} onChange={(e) => setTrocaForm((current) => ({ ...current, data_efetiva: e.target.value }))} />
                 </label>
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">Competencia DRE do ajuste</span>
-                  <input className="input w-full" type="date" value={trocaForm.competencia_data} onChange={(e) => setTrocaForm((current) => ({ ...current, competencia_data: e.target.value }))} />
+                  <span className="sol-filter-label">Competência DRE do ajuste</span>
+                  <DateInputBR className="input w-full" value={trocaForm.competencia_data} onChange={(e) => setTrocaForm((current) => ({ ...current, competencia_data: e.target.value }))} />
                 </label>
                 <label className="sol-filter-field">
-                  <span className="sol-filter-label">Observacoes</span>
+                  <span className="sol-filter-label">Observações</span>
                   <input className="input w-full" value={trocaForm.observacoes} onChange={(e) => setTrocaForm((current) => ({ ...current, observacoes: e.target.value }))} />
                 </label>
                 <div className="md:col-span-5">
@@ -3375,14 +3376,14 @@ export default function ComercialContratos() {
               <div className="grid gap-3 rounded-2xl border border-[var(--sem-danger-border)] bg-[var(--sem-danger-bg)] p-4 md:grid-cols-3">
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Data do distrato</span>
-                  <input className="input w-full" type="date" value={distratoForm.data_distrato} onChange={(e) => setDistratoForm((current) => ({ ...current, data_distrato: e.target.value }))} />
+                  <DateInputBR className="input w-full" value={distratoForm.data_distrato} onChange={(e) => setDistratoForm((current) => ({ ...current, data_distrato: e.target.value }))} />
                 </label>
                 <label className="sol-filter-field md:col-span-2">
                   <span className="sol-filter-label">Motivo</span>
                   <input className="input w-full" value={distratoForm.motivo_distrato} onChange={(e) => setDistratoForm((current) => ({ ...current, motivo_distrato: e.target.value }))} />
                 </label>
                 <label className="sol-filter-field md:col-span-3">
-                  <span className="sol-filter-label">Observacoes</span>
+                  <span className="sol-filter-label">Observações</span>
                   <textarea className="input w-full" rows={3} value={distratoForm.observacoes} onChange={(e) => setDistratoForm((current) => ({ ...current, observacoes: e.target.value }))} />
                 </label>
                 <div className="md:col-span-3">
@@ -3399,7 +3400,7 @@ export default function ComercialContratos() {
               <div>
                 <p className="text-sm font-semibold text-[var(--c-text)]">Documentos e assinatura digital</p>
                 <p className="text-xs text-[var(--c-muted)]">
-                  Ao gerar contrato, o PDF sai com Quadro Resumo primeiro e Contrato na sequencia.
+                  Ao gerar contrato, o PDF sai com Quadro Resumo primeiro e Contrato na sequência.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -3448,13 +3449,13 @@ export default function ComercialContratos() {
 
             {!possuiModeloQuadroResumoSelecionado && (
               <div className="rounded-2xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] p-3 text-sm text-[var(--sem-warning)]">
-                Para gerar o contrato completo, cadastre tambem um modelo ativo de Quadro Resumo para este empreendimento.
+                Para gerar o contrato completo, cadastre também um modelo ativo de Quadro Resumo para este empreendimento.
               </div>
             )}
 
             {possuiContratoAssinado && (
               <div className="rounded-2xl border border-[var(--sem-success-border)] bg-[var(--sem-success-bg)] p-3 text-sm text-[var(--sem-success)]">
-                Este contrato ja possui documento assinado digitalmente. Uma nova geracao fica bloqueada para preservar o arquivo assinado.
+                Este contrato já possui documento assinado digitalmente. Uma nova geração fica bloqueada para preservar o arquivo assinado.
               </div>
             )}
 
@@ -3517,7 +3518,7 @@ export default function ComercialContratos() {
                 },
                 {
                   id: 'descricao',
-                  titulo: 'Descricao',
+                  titulo: 'Descrição',
                   // R17: a descricao e quem nomeia a parcela.
                   tipo: 'identidade',
                   noCard: 'titulo',
@@ -3561,7 +3562,7 @@ export default function ComercialContratos() {
                 },
                 {
                   id: 'competencia_data',
-                  titulo: 'Competencia DRE',
+                  titulo: 'Competência DRE',
                   tipo: 'data',
                   render: (parcela) => formatDate(parcela.competencia_data || parcela.tituloFinanceiro?.competencia_data)
                 },
@@ -3592,7 +3593,7 @@ export default function ComercialContratos() {
               acoesLinha={(parcela) => (
                 parcela.tituloFinanceiro?.id ? (
                   <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${parcela.tituloFinanceiro.id}`}>
-                    Abrir titulo
+                    Abrir título
                   </Link>
                 ) : (
                   <span className="text-[var(--c-muted)]">-</span>
@@ -3602,7 +3603,7 @@ export default function ComercialContratos() {
           </div>
 
           <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <div className="text-sm font-semibold text-[var(--c-text)]">Historico operacional</div>
+            <div className="text-sm font-semibold text-[var(--c-text)]">Histórico operacional</div>
             <div className="mt-3 space-y-3">
               {(contratoSelecionado.eventos || []).length === 0 ? (
                 <div className="text-sm text-[var(--c-muted)]">Nenhum evento comercial registrado para este contrato.</div>
@@ -3651,8 +3652,8 @@ export default function ComercialContratos() {
               {faixaAvisos}
               <section className="quick-person-section">
                 <div className="quick-person-section-head">
-                  <h3>Identificacao</h3>
-                  <p>Dados minimos para criar a pessoa e vincular ao contrato.</p>
+                  <h3>Identificação</h3>
+                  <p>Dados mínimos para criar a pessoa e vincular ao contrato.</p>
                 </div>
                 <div className="quick-person-grid quick-person-grid-main">
               <label className="sol-filter-field">
@@ -3667,7 +3668,7 @@ export default function ComercialContratos() {
                       return;
                     }
                     if (pessoaRapidaForm.cpf_cnpj && !isValidCpfCnpj(pessoaRapidaForm.cpf_cnpj)) {
-                      avisar.erro('Informe um CPF/CNPJ valido no cadastro rapido.');
+                      avisar.erro('Informe um CPF/CNPJ valido no cadastro rápido.');
                     }
                   }}
                   required
@@ -3725,9 +3726,8 @@ export default function ComercialContratos() {
                   <div className="quick-person-grid">
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Nascimento</span>
-                  <input
+                  <DateInputBR
                     className="input w-full"
-                    type="date"
                     value={pessoaRapidaForm.data_nascimento}
                     onChange={(e) => setPessoaRapidaForm((current) => ({ ...current, data_nascimento: e.target.value }))}
                   />
@@ -3775,8 +3775,8 @@ export default function ComercialContratos() {
                     }))}
                   />
                   <span>
-                    <strong>Possui conjuge</strong>
-                    <small>Cadastra o conjuge como uma segunda pessoa no sistema.</small>
+                    <strong>Possui cônjuge</strong>
+                    <small>Cadastra o cônjuge como uma segunda pessoa no sistema.</small>
                   </span>
                 </label>
                   </div>
@@ -3786,12 +3786,12 @@ export default function ComercialContratos() {
               {pessoaRapidaModal !== 'testemunha' && (
                 <section className="quick-person-section">
                   <div className="quick-person-section-head">
-                    <h3>Endereco</h3>
-                    <p>Preenche rua, numero, bairro, cidade, UF e CEP nos documentos.</p>
+                    <h3>Endereço</h3>
+                    <p>Preenche rua, número, bairro, cidade, UF e CEP nos documentos.</p>
                   </div>
                   <div className="quick-person-grid">
                     <label className="sol-filter-field quick-span-2">
-                      <span className="sol-filter-label">Endereco</span>
+                      <span className="sol-filter-label">Endereço</span>
                       <input
                         className="input w-full"
                         value={pessoaRapidaForm.endereco}
@@ -3799,7 +3799,7 @@ export default function ComercialContratos() {
                       />
                     </label>
                     <label className="sol-filter-field">
-                      <span className="sol-filter-label">Numero</span>
+                      <span className="sol-filter-label">Número</span>
                       <input
                         className="input w-full"
                         value={pessoaRapidaForm.numero}
@@ -3855,7 +3855,7 @@ export default function ComercialContratos() {
                 <>
                   <section className="quick-person-section">
                     <div className="quick-person-section-head">
-                      <h3>Conjuge</h3>
+                      <h3>Cônjuge</h3>
                       <p>Cria uma segunda pessoa ativa e vincula ao cliente principal.</p>
                     </div>
                     <div className="quick-person-grid quick-person-grid-main">
@@ -3867,7 +3867,7 @@ export default function ComercialContratos() {
                           onChange={(e) => atualizarConjugeRapido('cpf_cnpj', maskCpfCnpj(e.target.value))}
                           onBlur={() => {
                             if (pessoaRapidaForm.conjuge.cpf_cnpj && !isValidCpfCnpj(pessoaRapidaForm.conjuge.cpf_cnpj)) {
-                              avisar.erro('Informe um CPF/CNPJ valido para o conjuge.');
+                              avisar.erro('Informe um CPF/CNPJ valido para o cônjuge.');
                             }
                           }}
                         />
@@ -3901,15 +3901,14 @@ export default function ComercialContratos() {
 
                   <section className="quick-person-section">
                     <div className="quick-person-section-head">
-                      <h3>Dados civis do conjuge</h3>
+                      <h3>Dados civis do cônjuge</h3>
                       <p>Usado nos contratos quando o modelo exigir assinatura do casal.</p>
                     </div>
                     <div className="quick-person-grid">
                       <label className="sol-filter-field">
                         <span className="sol-filter-label">Nascimento</span>
-                        <input
+                        <DateInputBR
                           className="input w-full"
-                          type="date"
                           value={pessoaRapidaForm.conjuge.data_nascimento}
                           onChange={(e) => atualizarConjugeRapido('data_nascimento', e.target.value)}
                         />
@@ -3943,12 +3942,12 @@ export default function ComercialContratos() {
 
                   <section className="quick-person-section">
                     <div className="quick-person-section-head">
-                      <h3>Endereco do conjuge</h3>
-                      <p>Pode repetir o endereco do cliente ou guardar um endereco proprio.</p>
+                      <h3>Endereço do cônjuge</h3>
+                      <p>Pode repetir o endereço do cliente ou guardar um endereço próprio.</p>
                     </div>
                     <div className="quick-person-grid">
                       <label className="sol-filter-field quick-span-2">
-                        <span className="sol-filter-label">Endereco</span>
+                        <span className="sol-filter-label">Endereço</span>
                         <input
                           className="input w-full"
                           value={pessoaRapidaForm.conjuge.endereco}
@@ -3956,7 +3955,7 @@ export default function ComercialContratos() {
                         />
                       </label>
                       <label className="sol-filter-field">
-                        <span className="sol-filter-label">Numero</span>
+                        <span className="sol-filter-label">Número</span>
                         <input
                           className="input w-full"
                           value={pessoaRapidaForm.conjuge.numero}

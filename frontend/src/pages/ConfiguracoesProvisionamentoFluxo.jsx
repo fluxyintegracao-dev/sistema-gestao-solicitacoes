@@ -157,7 +157,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
       setSaving(true);
       const data = await salvarProvisionamentoFluxoConfig(config);
       setConfig(normalizarConfig(data));
-      avisar.sucesso('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuração salva com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao salvar configuracao.');
@@ -178,7 +178,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
       <Pagina>
         <PageHeader titulo="Fluxo do Provisionamento" descricao={DESCRICAO} />
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card">Carregando configuracao do provisionamento...</div>
+        <div className="app-empty-card">Carregando configuração do provisionamento...</div>
       </Pagina>
     );
   }
@@ -241,11 +241,11 @@ export default function ConfiguracoesProvisionamentoFluxo() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
               Regras de controle
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-[var(--c-text)]">Aprovacao, vencimento e bloqueios</h2>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--c-text)]">Aprovação, vencimento e bloqueios</h2>
           </div>
 
           <ConfigToggle
-            title="Aprovacao ativa"
+            title="Aprovação ativa"
             description="Libera o uso gerencial dos estados de analise e aprovacao."
             checked={config.aprovacao_ativa}
             disabled={modoInformativo}
@@ -259,42 +259,42 @@ export default function ConfiguracoesProvisionamentoFluxo() {
             onChange={(checked) => updateConfig('controle_vencimento_ativo', checked)}
           />
           <ConfigToggle
-            title="Integrar com solicitacoes"
+            title="Integrar com solicitações"
             description="Permite que solicitacoes sejam vinculadas a provisoes por registro estruturado."
             checked={config.integracao_solicitacoes_ativa}
             disabled={!modoIntegrado}
             onChange={(checked) => updateConfig('integracao_solicitacoes_ativa', checked)}
           />
           <ConfigToggle
-            title="Exigir provisao na solicitacao"
+            title="Exigir provisão na solicitação"
             description="Torna a selecao de provisao obrigatoria para os tipos marcados."
             checked={config.exigir_provisao_na_solicitacao}
             disabled={!modoIntegrado || !config.integracao_solicitacoes_ativa}
             onChange={(checked) => updateConfig('exigir_provisao_na_solicitacao', checked)}
           />
           <ConfigToggle
-            title="Bloquear solicitacao sem provisao"
+            title="Bloquear solicitação sem provisão"
             description="Impede o envio de solicitacoes de tipos marcados quando o vinculo nao existir."
             checked={config.bloquear_solicitacao_sem_provisao}
             disabled={!modoIntegrado || !config.integracao_solicitacoes_ativa || !config.exigir_provisao_na_solicitacao}
             onChange={(checked) => updateConfig('bloquear_solicitacao_sem_provisao', checked)}
           />
           <ConfigToggle
-            title="Validar saldo da provisao"
+            title="Validar saldo da provisão"
             description="Reserva validacao futura para comparar valor solicitado com saldo disponivel."
             checked={config.validar_saldo_provisao}
             disabled={!modoIntegrado || !config.integracao_solicitacoes_ativa}
             onChange={(checked) => updateConfig('validar_saldo_provisao', checked)}
           />
           <ConfigToggle
-            title="Somente provisoes aprovadas"
+            title="Somente provisões aprovadas"
             description="Restringe o vinculo a provisoes aprovadas quando o fluxo de aprovacao estiver ativo."
             checked={config.somente_provisoes_aprovadas}
             disabled={!modoIntegrado || !config.integracao_solicitacoes_ativa || !config.aprovacao_ativa}
             onChange={(checked) => updateConfig('somente_provisoes_aprovadas', checked)}
           />
           <ConfigToggle
-            title="Permitir multiplas provisoes por solicitacao"
+            title="Permitir múltiplas provisões por solicitação"
             description="Mantem a arquitetura aberta para uma solicitacao consumir mais de uma provisao."
             checked={config.permitir_multiplas_provisoes_por_solicitacao}
             disabled={!modoIntegrado || !config.integracao_solicitacoes_ativa}
@@ -303,7 +303,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
 
           {modoControlado ? (
             <div className="rounded-xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] px-4 py-3 text-sm text-[var(--sem-warning)]">
-              O modo controlado prepara aprovacao e vencimento sem exigir provisao nas solicitacoes.
+              O modo controlado prepara aprovação e vencimento sem exigir provisão nas solicitações.
             </div>
           ) : null}
         </div>
@@ -313,7 +313,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
               Tipos integrados
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-[var(--c-text)]">Solicitacoes que exigem provisao</h2>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--c-text)]">Solicitações que exigem provisão</h2>
             <p className="mt-1 text-sm text-[var(--c-muted)]">
               A lista so tem efeito quando o modo integrado e a exigencia estiverem ativos.
             </p>
@@ -350,7 +350,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
 
             {!tipos.length ? (
               <p className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-3 text-sm text-[var(--c-muted)]">
-                Nenhum tipo de solicitacao ativo encontrado.
+                Nenhum tipo de solicitação ativo encontrado.
               </p>
             ) : null}
           </div>

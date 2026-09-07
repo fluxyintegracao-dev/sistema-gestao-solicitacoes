@@ -1,15 +1,16 @@
 import { API_URL, authHeaders } from './api';
+import { mensagemDeErro } from './erroDeResposta';
 
 const COMPRAS_COTACOES_PERMISSOES_DETALHADAS = [
-  { key: 'compras.cotacoes.visualizar', label: 'Visualizar cotacoes', descricao: 'Ver cotacoes e comparativo de fornecedores.' },
-  { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotacoes', descricao: 'Criar, editar e operar cotacoes sem encerrar ou reabrir.' },
-  { key: 'compras.cotacoes.editar_respostas', label: 'Editar respostas', descricao: 'Preencher, ajustar e salvar respostas de cotacao.' },
-  { key: 'compras.cotacoes.salvar_rascunho', label: 'Salvar rascunho', descricao: 'Salvar respostas parciais sem encerrar cotacao.' },
-  { key: 'compras.cotacoes.cancelar', label: 'Cancelar cotacao', descricao: 'Cancelar uma cotacao aberta, com ou sem respostas, mantendo a auditoria.' },
-  { key: 'compras.cotacoes.fechar_parcial', label: 'Fechar parcialmente', descricao: 'Gerar pedidos dos itens selecionados e manter o saldo da cotacao aberto.' },
-  { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Gerar os pedidos finais e encerrar definitivamente a cotacao.' },
-  { key: 'compras.cotacoes.encerrar_sem_pedido', label: 'Encerrar sem pedido', descricao: 'Encerrar definitivamente a cotacao descartando o saldo restante sem gerar novos pedidos.' },
-  { key: 'compras.cotacoes.reabrir', label: 'Reabrir cotacao', descricao: 'Reabrir cotacao respondida para novo envio com justificativa.' }
+  { key: 'compras.cotacoes.visualizar', label: 'Visualizar cotações', descricao: 'Ver cotações e comparativo de fornecedores.' },
+  { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotações', descricao: 'Criar, editar e operar cotações sem encerrar ou reabrir.' },
+  { key: 'compras.cotacoes.editar_respostas', label: 'Editar respostas', descricao: 'Preencher, ajustar e salvar respostas de cotação.' },
+  { key: 'compras.cotacoes.salvar_rascunho', label: 'Salvar rascunho', descricao: 'Salvar respostas parciais sem encerrar cotação.' },
+  { key: 'compras.cotacoes.cancelar', label: 'Cancelar cotação', descricao: 'Cancelar uma cotação aberta, com ou sem respostas, mantendo a auditoria.' },
+  { key: 'compras.cotacoes.fechar_parcial', label: 'Fechar parcialmente', descricao: 'Gerar pedidos dos itens selecionados e manter o saldo da cotação aberto.' },
+  { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotação', descricao: 'Gerar os pedidos finais e encerrar definitivamente a cotação.' },
+  { key: 'compras.cotacoes.encerrar_sem_pedido', label: 'Encerrar sem pedido', descricao: 'Encerrar definitivamente a cotação descartando o saldo restante sem gerar novos pedidos.' },
+  { key: 'compras.cotacoes.reabrir', label: 'Reabrir cotação', descricao: 'Reabrir cotação respondida para novo envio com justificativa.' }
 ];
 
 function normalizarRegistryPermissoesAreas(registry) {
@@ -94,7 +95,7 @@ export async function salvarTimeoutInatividade(data) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao salvar timeout de inatividade');
+    throw new Error(mensagemDeErro(txt, 'Erro ao salvar timeout de inatividade', res.status));
   }
   return res.json();
 }
@@ -106,7 +107,7 @@ export async function enviarHeartbeatSessao() {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao enviar heartbeat da sessao');
+    throw new Error(mensagemDeErro(txt, 'Erro ao enviar heartbeat da sessao', res.status));
   }
   return res.json();
 }
@@ -478,7 +479,7 @@ export async function salvarStatusPedidosCompra(data) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao salvar configuracao de status dos pedidos');
+    throw new Error(mensagemDeErro(txt, 'Erro ao salvar configuracao de status dos pedidos', res.status));
   }
   return res.json();
 }
@@ -489,7 +490,7 @@ export async function getComercialCategoriasContrato() {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao buscar categorias comerciais do contrato');
+    throw new Error(mensagemDeErro(txt, 'Erro ao buscar categorias comerciais do contrato', res.status));
   }
   return res.json();
 }
@@ -502,7 +503,7 @@ export async function salvarComercialCategoriasContrato(data) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao salvar categorias comerciais do contrato');
+    throw new Error(mensagemDeErro(txt, 'Erro ao salvar categorias comerciais do contrato', res.status));
   }
   return res.json();
 }
@@ -513,7 +514,7 @@ export async function getProvisionamentoFluxoConfig() {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao buscar configuracao do fluxo de provisionamento');
+    throw new Error(mensagemDeErro(txt, 'Erro ao buscar configuracao do fluxo de provisionamento', res.status));
   }
   return res.json();
 }
@@ -537,7 +538,7 @@ export async function getNotificacoesSistema() {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao buscar configuracao de notificacoes do sistema');
+    throw new Error(mensagemDeErro(txt, 'Erro ao buscar configuracao de notificacoes do sistema', res.status));
   }
   return res.json();
 }
@@ -561,7 +562,7 @@ export async function getModulosSistema() {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao buscar configuracao de modulos');
+    throw new Error(mensagemDeErro(txt, 'Erro ao buscar configuracao de modulos', res.status));
   }
   return res.json();
 }
@@ -574,7 +575,7 @@ export async function salvarModulosSistema(data) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao salvar configuracao de modulos');
+    throw new Error(mensagemDeErro(txt, 'Erro ao salvar configuracao de modulos', res.status));
   }
   return res.json();
 }
@@ -605,14 +606,7 @@ export async function salvarObraTipoApropriacao(data) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    let message = txt;
-    try {
-      const dataErro = JSON.parse(txt);
-      message = dataErro?.error || dataErro?.message || txt;
-    } catch (_) {
-      // Resposta textual continua sendo exibida integralmente.
-    }
-    throw new Error(message || 'Erro ao salvar apropriacao padrao');
+    throw new Error(mensagemDeErro(txt, 'Erro ao salvar apropriacao padrao', res.status));
   }
   return res.json();
 }
@@ -633,7 +627,7 @@ export async function salvarContratoObraCategorias(categoriaIds) {
   });
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(txt || 'Erro ao salvar categorias do contrato de obra');
+    throw new Error(mensagemDeErro(txt, 'Erro ao salvar categorias do contrato de obra', res.status));
   }
   return res.json();
 }

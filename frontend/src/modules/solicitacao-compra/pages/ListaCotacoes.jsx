@@ -226,7 +226,7 @@ export default function ListaCotacoes() {
     },
     {
       id: 'solicitacao',
-      titulo: 'Solicitacao',
+      titulo: 'Solicitação',
       tipo: 'texto',
       render: (cotacao) => (
         <span className="text-muted">
@@ -282,9 +282,9 @@ export default function ListaCotacoes() {
   return (
     <Pagina className="compras-cotacoes-page">
       <PageHeader
-        titulo="Cotacoes"
+        titulo="Cotações"
         contagem={loading ? null : `${cotacoes.length} cotacao(oes)`}
-        descricao="Acompanhe todas as cotacoes enviadas a fornecedores, seus status de resposta e dados registrados."
+        descricao="Acompanhe todas as cotações enviadas a fornecedores, seus status de resposta e dados registrados."
         secundarias={[
           {
             rotulo: loading ? 'Buscando...' : 'Atualizar',
@@ -304,7 +304,7 @@ export default function ListaCotacoes() {
           busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: busca,
             aoMudar: setBusca,
-            placeholder: 'Fornecedor ou titulo da solicitacao'
+            placeholder: 'Fornecedor ou título da solicitação'
           } : null}
           filtros={dimensoes.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
@@ -321,7 +321,7 @@ export default function ListaCotacoes() {
       </StatGrid>
 
       <BlocoConteudo
-        titulo="Lista de cotacoes"
+        titulo="Lista de cotações"
         variante="primario"
         cor="var(--sem-info)"
         contagem={`${cotacoes.length} registro(s)`}
@@ -330,7 +330,7 @@ export default function ListaCotacoes() {
           colunas={colunas}
           itens={cotacoes}
           carregando={loading}
-          vazio="Nenhuma cotacao encontrada. Envie uma solicitacao de compra para fornecedores."
+          vazio="Nenhuma cotação encontrada. Envie uma solicitação de compra para fornecedores."
           storageKey="tabela:lista-cotacoes"
           rotuloRolagem="Lista de cotacoes"
           acoesLinha={(cotacao) => (
@@ -340,8 +340,8 @@ export default function ListaCotacoes() {
                   type="button"
                   className="btn btn-outline btn-sm"
                   onClick={() => navigate(`/solicitacoes-compra/${cotacao.solicitacao.id}/cotacao`)}
-                  title="Editar cotacao"
-                  aria-label={`Editar cotacao ${String(cotacao.id).padStart(5, '0')}`}
+                  title="Editar cotação"
+                  aria-label={`Editar cotação ${String(cotacao.id).padStart(5, '0')}`}
                 >
                   <HiOutlinePencilSquare />
                 </button>
@@ -352,7 +352,7 @@ export default function ListaCotacoes() {
                 rel="noreferrer"
                 className="btn btn-outline btn-sm"
                 title="Abrir portal do fornecedor"
-                aria-label={`Abrir portal do fornecedor da cotacao ${String(cotacao.id).padStart(5, '0')}`}
+                aria-label={`Abrir portal do fornecedor da cotação ${String(cotacao.id).padStart(5, '0')}`}
               >
                 <HiOutlineArrowTopRightOnSquare />
               </a>

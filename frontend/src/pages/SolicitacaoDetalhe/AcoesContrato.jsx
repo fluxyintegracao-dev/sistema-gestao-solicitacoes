@@ -75,24 +75,24 @@ const moeda = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFract
 
 const ESTADOS = {
   AGUARDANDO_APROVACAO: {
-    titulo: 'Aguardando aprovacao',
-    ajuda: 'Ao aprovar, as previsoes de parcela viram titulos financeiros com a categoria informada aqui.'
+    titulo: 'Aguardando aprovação',
+    ajuda: 'Ao aprovar, as previsões de parcela viram títulos financeiros com a categoria informada aqui.'
   },
   EM_ANALISE_JURIDICA: {
-    titulo: 'Em analise no Juridico',
-    ajuda: 'O Juridico avalia a documentacao e monta a minuta. Nenhum titulo existe ainda.'
+    titulo: 'Em analise no Jurídico',
+    ajuda: 'O Jurídico avalia a documentação e monta a minuta. Nenhum título existe ainda.'
   },
   AGUARDANDO_ASSINATURA: {
     titulo: 'Necessita assinatura',
-    ajuda: 'A minuta esta pronta. Anexe o contrato assinado ou confirme a assinatura pelo link e solicite a revisao final do Juridico.'
+    ajuda: 'A minuta esta pronta. Anexe o contrato assinado ou confirme a assinatura pelo link e solicite a revisão final do Jurídico.'
   },
   EM_REVISAO_JURIDICA: {
-    titulo: 'Em revisao no Juridico',
-    ajuda: 'O Juridico confere o contrato assinado. E na conferencia que as previsoes viram titulos — nao antes.'
+    titulo: 'Em revisão no Jurídico',
+    ajuda: 'O Jurídico confere o contrato assinado. E na conferência que as previsões viram títulos — não antes.'
   },
   ATIVO: {
     titulo: 'Contrato ativo',
-    ajuda: 'Os titulos foram criados. Medicoes deste contrato aparecem aqui mesmo, sem abrir nova solicitacao.'
+    ajuda: 'Os títulos foram criados. Medições deste contrato aparecem aqui mesmo, sem abrir nova solicitação.'
   },
   REJEITADO: {
     titulo: 'Devolvido para ajuste',
@@ -458,7 +458,7 @@ export default function AcoesContrato({ contrato, onMudou }) {
     const minuta = contrato?.minuta;
     const caminho = String(minuta?.caminho_arquivo || '').trim();
     if (!caminho) {
-      avisar.erro('A minuta nao possui um endereco de arquivo valido.');
+      avisar.erro('A minuta não possui um endereço de arquivo valido.');
       return;
     }
 
@@ -646,7 +646,7 @@ export default function AcoesContrato({ contrato, onMudou }) {
         {modo === 'aprovar-juridico' && (
           <div className="space-y-3" data-testid="confirmacao-aprovacao-juridica">
             <div className="app-alert app-alert--warning">
-              Esta acao ativa o contrato, cria os titulos financeiros e devolve a solicitacao para a
+              Esta ação ativa o contrato, cria os títulos financeiros e devolve a solicitação para a
               obra. Confira o documento assinado antes de continuar.
             </div>
             <FormSecao colunas={2}>
@@ -685,7 +685,7 @@ export default function AcoesContrato({ contrato, onMudou }) {
           <div className="space-y-3 border-t border-[var(--c-border)] pt-3" data-testid="ajuste-contrato-rejeitado">
             <FormSecao legenda="Resposta ao ajuste" colunas={2}>
               <CampoForm
-                label="Comentario do ajuste"
+                label="Comentário do ajuste"
                 tipo="texto-longo"
                 erro={erroReenvio}
                 hint="Informe o que foi corrigido, anexe o documento atualizado, ou use as duas opcoes. Comentario ou arquivo: ao menos um e obrigatorio."
@@ -762,7 +762,7 @@ export default function AcoesContrato({ contrato, onMudou }) {
                   options={categorias}
                   onChange={(id) => { setCategoriaId(id ? String(id) : ''); setErroCategoria(''); }}
                   inputClassName="input input-sm w-full"
-                  placeholder="Buscar por codigo ou nome do plano de contas..."
+                  placeholder="Buscar por código ou nome do plano de contas..."
                 />
                 <input type="hidden" name="categoria_financeira_id" value={categoriaId} />
               </CampoForm>
@@ -885,7 +885,7 @@ export default function AcoesContrato({ contrato, onMudou }) {
                   <span>
                     <strong className="font-semibold">Contrato assinado pelo link informado</strong>
                     <span className="block text-xs text-[var(--c-muted)]">
-                      Ao confirmar esta opcao, anexar o contrato assinado deixa de ser obrigatorio para solicitar a revisao.
+                      Ao confirmar esta opção, anexar o contrato assinado deixa de ser obrigatório para solicitar a revisão.
                     </span>
                   </span>
                 </label>

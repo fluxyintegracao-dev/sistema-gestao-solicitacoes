@@ -42,8 +42,8 @@ import { API_URL, authHeaders } from '../services/api';
 
 const NIVEIS = [
   { chave: 'cor_saudavel', rotulo: 'Saudavel', ajuda: 'Ha folga no contrato.' },
-  { chave: 'cor_normal', rotulo: 'Normal', ajuda: 'Ainda ha saldo, mas ja pede atencao.' },
-  { chave: 'cor_critico', rotulo: 'Critico', ajuda: 'O contrato esta no fim do saldo.' }
+  { chave: 'cor_normal', rotulo: 'Normal', ajuda: 'Ainda ha saldo, mas já pede atenção.' },
+  { chave: 'cor_critico', rotulo: 'Crítico', ajuda: 'O contrato esta no fim do saldo.' }
 ];
 
 const ROTA_ALERTAS_CONTRATO = '/configuracoes-contrato-alertas';
@@ -122,7 +122,7 @@ export default function ConfiguracoesContratoAlertasEFormas() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || 'Erro ao salvar o limite juridico do contrato.');
       setLimiteContrato(json);
-      avisar.sucesso('Limite juridico dos contratos salvo.');
+      avisar.sucesso('Limite jurídico dos contratos salvo.');
     } catch (e) {
       avisar.erro(e.message || 'Erro ao salvar o limite juridico do contrato.');
     } finally {
@@ -230,7 +230,7 @@ export default function ConfiguracoesContratoAlertasEFormas() {
       <Pagina>
         {cabecalho}
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card">Carregando configuracoes...</div>
+        <div className="app-empty-card">Carregando configurações...</div>
       </Pagina>
     );
   }
@@ -283,7 +283,7 @@ export default function ConfiguracoesContratoAlertasEFormas() {
       {/* ---------- ITEM 21 ---------- */}
       <BlocoConteudo
         titulo="Alerta de saldo do contrato"
-        descricao="A cor do texto do saldo, no card de titulos do contrato. O percentual e do saldo sobre o valor do contrato, com os aditivos."
+        descricao="A cor do texto do saldo, no card de títulos do contrato. O percentual e do saldo sobre o valor do contrato, com os aditivos."
         variante={varianteDoBloco('alerta-saldo')}
         cor={corDoBloco('alerta-saldo')}
         data-testid="config-alerta-saldo"
@@ -291,7 +291,7 @@ export default function ConfiguracoesContratoAlertasEFormas() {
         <form className="space-y-4" onSubmit={salvarAlerta}>
           {alerta.padrao && (
             <p className="app-note" data-testid="alerta-no-padrao">
-              Ainda nao ha configuracao gravada: valem os valores padrao abaixo.
+              Ainda não ha configuração gravada: valem os valores padrão abaixo.
             </p>
           )}
 
@@ -324,7 +324,7 @@ export default function ConfiguracoesContratoAlertasEFormas() {
             </label>
           </div>
           <p className="app-note">
-            Abaixo do corte de Normal, o saldo fica Critico. O corte de Saudavel tem de ser maior que o
+            Abaixo do corte de Normal, o saldo fica Crítico. O corte de Saudavel tem de ser maior que o
             de Normal — do contrario uma das faixas nunca aconteceria.
           </p>
 
@@ -401,7 +401,7 @@ export default function ConfiguracoesContratoAlertasEFormas() {
           </div>
 
           {(limitesDespesa.padrao_solicitacao || limitesDespesa.padrao_obra) && (
-            <p className="app-note">Ainda valem os limites padrao do sistema ate o primeiro salvamento.</p>
+            <p className="app-note">Ainda valem os limites padrão do sistema até o primeiro salvamento.</p>
           )}
 
           <div className="flex justify-end">
@@ -414,8 +414,8 @@ export default function ConfiguracoesContratoAlertasEFormas() {
 
       <BlocoConteudo
         id="formas-pagamento-solicitacao"
-        titulo="Formas exibidas na Nova Solicitacao"
-        descricao="Esta e uma configuracao unica para Contratos e para os demais tipos de solicitacao. As opcoes continuam vindo do cadastro do Financeiro; forma desativada nao aparece nem se estiver marcada aqui."
+        titulo="Formas exibidas na Nova Solicitação"
+        descricao="Esta e uma configuração única para Contratos e para os demais tipos de solicitação. As opções continuam vindo do cadastro do Financeiro; forma desativada não aparece nem se estiver marcada aqui."
         variante={varianteDoBloco('formas-pagamento')}
         cor={corDoBloco('formas-pagamento')}
         className="scroll-mt-4"

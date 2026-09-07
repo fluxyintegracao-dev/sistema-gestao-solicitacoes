@@ -65,10 +65,10 @@ export default function UsuariosAcessoFinanceiro() {
     try {
       setSalvando(true);
       await salvarUsuariosAcessoFinanceiro({ usuarios: Array.from(selecionados) });
-      avisar.sucesso('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuração salva com sucesso.');
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao salvar configuracao.');
+      avisar.erro('Erro ao salvar configuração.');
     } finally {
       setSalvando(false);
     }
@@ -91,7 +91,7 @@ export default function UsuariosAcessoFinanceiro() {
     },
     {
       id: 'usuario',
-      titulo: 'Usuario',
+      titulo: 'Usuário',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
@@ -114,7 +114,7 @@ export default function UsuariosAcessoFinanceiro() {
       tipo: 'status',
       render: (usuario) => (
         hasFinanceiroBaseAccess(usuario) ? (
-          <span title="Ja possui acesso por perfil/setor, mesmo sem marcacao nesta tela">
+          <span title="Já possui acesso por perfil/setor, mesmo sem marcacao nesta tela">
             <StatusBadge status="Ja liberado" kind="success" />
           </span>
         ) : (
@@ -129,9 +129,9 @@ export default function UsuariosAcessoFinanceiro() {
       {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
           linha no próprio PageHeader. */}
       <PageHeader
-        titulo="Acesso ao financeiro por usuario"
+        titulo="Acesso ao financeiro por usuário"
         contagem={`${selecionados.size} com acesso extra`}
-        descricao="Marque usuarios extras que devem acessar o modulo financeiro. Usuarios liberados aqui tambem passam a operar o financeiro com acesso a todas as obras."
+        descricao="Marque usuários extras que devem acessar o módulo financeiro. Usuários liberados aqui também passam a operar o financeiro com acesso a todas as obras."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -142,20 +142,20 @@ export default function UsuariosAcessoFinanceiro() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
-        titulo="Quem ja tem acesso por regra base"
+        titulo="Quem já tem acesso por regra base"
         variante="secundario"
         recolhivel
         recolhidoPadrao
       >
         <p className="app-note">
-          Perfis SUPERADMIN, ADMINISTRADOR, perfil FINANCEIRO e usuarios de setor financeiro
+          Perfis SUPERADMIN, ADMINISTRADOR, perfil FINANCEIRO e usuários de setor financeiro
           ja possuem acesso por regra base, mesmo sem marcacao nesta tela. Eles aparecem na
           lista com a etiqueta &quot;Ja liberado&quot;.
         </p>
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Usuarios ativos"
+        titulo="Usuários ativos"
         variante="primario"
         cor="var(--module-financeiro)"
       >

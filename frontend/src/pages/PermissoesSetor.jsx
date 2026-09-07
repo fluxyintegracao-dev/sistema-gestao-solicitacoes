@@ -63,7 +63,7 @@ export default function PermissoesSetor() {
 
   return (
     // B5: o carregamento acontece DENTRO da estrutura padrão — antes a tela
-    // devolvia `<p>Carregando permissoes...</p>` cru, sem página, sem
+    // devolvia `<p>Carregando permissões...</p>` cru, sem página, sem
     // cabeçalho e sem superfície. Quem carrega vê a mesma tela, com a
     // tabela em estado de carregamento.
     <Pagina>
@@ -101,7 +101,7 @@ export default function PermissoesSetor() {
             },
             {
               id: 'pode_assumir',
-              titulo: 'Usuario pode assumir',
+              titulo: 'Usuário pode assumir',
               tipo: 'status',
               render: item => (
                 <input
@@ -113,7 +113,7 @@ export default function PermissoesSetor() {
             },
             {
               id: 'pode_atribuir',
-              titulo: 'Usuario pode atribuir',
+              titulo: 'Usuário pode atribuir',
               tipo: 'status',
               render: item => (
                 <input

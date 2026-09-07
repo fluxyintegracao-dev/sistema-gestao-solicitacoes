@@ -1,3 +1,4 @@
+import DateInputBR from '../../../components/DateInputBR';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useFecharAoSair } from '../../../hooks/useFecharAoSair';
@@ -436,7 +437,7 @@ function getItemSituacao(item) {
   }
 
   if (isItemAbaixoMinimo(item)) {
-    return { label: 'Atencao', tom: 'atencao' };
+    return { label: 'Atenção', tom: 'atencao' };
   }
 
   return { label: 'Ativo', tom: 'sucesso' };
@@ -451,7 +452,7 @@ function getItemSituacao(item) {
 */
 const OPCOES_SITUACAO_ITEM = [
   { valor: 'ATIVOS', rotulo: 'Ativos' },
-  { valor: 'ATENCAO', rotulo: 'Atencao' },
+  { valor: 'ATENCAO', rotulo: 'Atenção' },
   { valor: 'REMOVIDOS', rotulo: 'Removidos' }
 ];
 
@@ -759,7 +760,7 @@ export default function PedidoCompraDetalhe() {
 
   function abrirEdicaoFrete(frete) {
     if (!fretePermiteControle(frete)) {
-      avisar.alerta('Este frete nao pode ser editado porque ja foi cancelado ou possui titulo financeiro vinculado.');
+      avisar.alerta('Este frete não pode ser editado porque já foi cancelado ou possui título financeiro vinculado.');
       return;
     }
 
@@ -1078,7 +1079,7 @@ export default function PedidoCompraDetalhe() {
     const freteId = freteAlvo?.id;
 
     if (!fretePermiteCancelamento(freteAlvo)) {
-      avisar.alerta('Este frete nao pode ser cancelado porque ja foi cancelado ou possui titulo financeiro vinculado.');
+      avisar.alerta('Este frete não pode ser cancelado porque já foi cancelado ou possui título financeiro vinculado.');
       return;
     }
 
@@ -1202,8 +1203,8 @@ export default function PedidoCompraDetalhe() {
   */
   async function handleReabrirCotacao() {
     const { ok, texto } = await confirmar({
-      titulo: 'Reabrir pedido para edicao ou cancelamento',
-      mensagem: 'Reabrir este pedido para edicao ou cancelamento? A cotacao vinculada voltara para edicao e a acao ficara registrada no historico.',
+      titulo: 'Reabrir pedido para edição ou cancelamento',
+      mensagem: 'Reabrir este pedido para edição ou cancelamento? A cotação vinculada voltará para edição e a ação ficará registrada no histórico.',
       rotuloConfirmar: 'Reabrir pedido',
       campo: { rotulo: 'Motivo da reabertura', obrigatorio: true, multilinha: true }
     });
@@ -1219,7 +1220,7 @@ export default function PedidoCompraDetalhe() {
       setReabrindoCotacao(true);
       const data = await reabrirPedidoCompraParaCotacao(id, { motivo: motivoNormalizado });
       setPedido(data || null);
-      avisar.sucesso('Pedido reaberto para edicao ou cancelamento.');
+      avisar.sucesso('Pedido reaberto para edição ou cancelamento.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao reabrir pedido');
@@ -1346,7 +1347,7 @@ export default function PedidoCompraDetalhe() {
       });
       setPedido(data || null);
       setModalCancelamentoAberto(false);
-      avisar.sucesso('Cancelamento registrado. O historico da solicitacao foi atualizado.');
+      avisar.sucesso('Cancelamento registrado. O histórico da solicitação foi atualizado.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao cancelar pedido');
@@ -1416,7 +1417,7 @@ export default function PedidoCompraDetalhe() {
   async function handleSalvarComentarioPedido() {
     const textoComentario = comentarioPedido;
     if (!textoComentario.trim()) {
-      avisar.alerta('Digite o comentario do pedido.');
+      avisar.alerta('Digite o comentário do pedido.');
       return;
     }
 
@@ -1424,7 +1425,7 @@ export default function PedidoCompraDetalhe() {
       setSalvandoComentario(true);
       await comentarPedidoCompra(id, { comentario: textoComentario });
       setComentarioPedido('');
-      avisar.sucesso('Comentario registrado no pedido e no historico da solicitacao.');
+      avisar.sucesso('Comentário registrado no pedido e no histórico da solicitação.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao registrar comentario');
@@ -1446,7 +1447,7 @@ export default function PedidoCompraDetalhe() {
         arquivo_nome_original: upload?.arquivo_nome_original || file.name
       });
       setPedido(data || null);
-      avisar.sucesso('Espelho anexado ao pedido e ao historico da solicitacao.');
+      avisar.sucesso('Espelho anexado ao pedido e ao histórico da solicitação.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao anexar espelho do fornecedor');
@@ -1514,7 +1515,7 @@ export default function PedidoCompraDetalhe() {
     return (
       <Pagina>
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card sol-surface-card">Pedido de compra nao encontrado.</div>
+        <div className="app-empty-card sol-surface-card">Pedido de compra não encontrado.</div>
         {elementoConfirmacao}
       </Pagina>
     );
@@ -1594,13 +1595,13 @@ export default function PedidoCompraDetalhe() {
         no corpo, junto do dado que o origina — nunca na barra de ações. O
         botão "Abrir solicitacao" da faixa virou o próprio código clicável.
       */
-      label: 'Solicitacao',
+      label: 'Solicitação',
       valor: (
         <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${pedido.solicitacao_compra_id}`}>
           {codigoSolicitacao}
         </Link>
       ),
-      sub: 'Abrir a solicitacao de compra de origem'
+      sub: 'Abrir a solicitação de compra de origem'
     },
     {
       label: 'Rodada de fechamento',
@@ -1639,7 +1640,7 @@ export default function PedidoCompraDetalhe() {
     },
     { label: 'Itens ativos', valor: String(itensAtivos.length) },
     {
-      label: 'Pedido minimo do fornecedor',
+      label: 'Pedido mínimo do fornecedor',
       valor: pedido.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : ''
     },
     { label: 'Condicao de pagamento', valor: pedido.condicao_pagamento || '' },
@@ -1657,7 +1658,7 @@ export default function PedidoCompraDetalhe() {
       <PageHeader
         titulo={pedido.fornecedor?.nome ? `${pedido.fornecedor.nome} — ${codigoPedido}` : codigoPedido}
         contagem={`${resumoItens.total} item(ns)`}
-        descricao="Gestao de itens, frete, comentarios e cancelamento deste pedido de compra."
+        descricao="Gestão de itens, frete, comentários e cancelamento deste pedido de compra."
         voltar={{ onClick: () => navigateBack('/pedidos-compra'), title: 'Voltar para pedidos de compra' }}
         acaoPrincipal={!pedidoCancelado ? {
           rotulo: enviandoPedido ? 'Preparando envio...' : 'Enviar pedido',
@@ -1677,7 +1678,7 @@ export default function PedidoCompraDetalhe() {
 
       {!podeGerenciarPedido ? (
         <div className="app-alert">
-          Voce esta visualizando este pedido. Alteracoes de status e itens ficam restritas ao setor de compras.
+          Você esta visualizando este pedido. Alterações de status e itens ficam restritas ao setor de compras.
         </div>
       ) : null}
 
@@ -1693,7 +1694,7 @@ export default function PedidoCompraDetalhe() {
         titulo="Resumo do pedido"
         variante="primario"
         cor="var(--module-compras)"
-        descricao="Fornecedor, valores e vinculos deste pedido de compra."
+        descricao="Fornecedor, valores e vínculos deste pedido de compra."
         acoes={businessAdmin ? (
           <button type="button" className="btn btn-outline" onClick={() => abrirAuditoria()}>
             Auditoria do pedido
@@ -1741,7 +1742,7 @@ export default function PedidoCompraDetalhe() {
         {!pedido.atingiu_pedido_minimo ? (
           <div className="mt-3">
             <FaixaCondicao tom="atencao">
-              O valor atual ainda nao atinge o pedido minimo informado pelo fornecedor.
+              O valor atual ainda não atinge o pedido mínimo informado pelo fornecedor.
             </FaixaCondicao>
           </div>
         ) : null}
@@ -1749,14 +1750,14 @@ export default function PedidoCompraDetalhe() {
 
       <BlocoConteudo
         titulo="Itens do pedido"
-        contagem={`${itensFiltrados.length} visivel(is)`}
-        descricao="Marque itens para cancelar em lote; a edicao de cada item abre em modal."
+        contagem={`${itensFiltrados.length} visível(is)`}
+        descricao="Marque itens para cancelar em lote; a edição de cada item abre em modal."
       >
         <StatGrid colunas={4}>
           <StatTile label="Ativos" valor={resumoItens.ativos} sub="Itens operacionais" />
-          <StatTile label="Atencao" valor={resumoItens.atencao} sub="Abaixo do minimo" tom={resumoItens.atencao ? 'warning' : undefined} />
-          <StatTile label="Removidos" valor={resumoItens.removidos} sub="Mantidos para historico" />
-          <StatTile label="Valor total" valor={formatMoney(pedido.valor_total)} sub="Total da aquisicao com frete" />
+          <StatTile label="Atenção" valor={resumoItens.atencao} sub="Abaixo do mínimo" tom={resumoItens.atencao ? 'warning' : undefined} />
+          <StatTile label="Removidos" valor={resumoItens.removidos} sub="Mantidos para histórico" />
+          <StatTile label="Valor total" valor={formatMoney(pedido.valor_total)} sub="Total da aquisição com frete" />
         </StatGrid>
 
         <div className="mt-4">
@@ -1764,9 +1765,9 @@ export default function PedidoCompraDetalhe() {
             busca={{
               valor: buscaItens,
               aoMudar: setBuscaItens,
-              placeholder: 'Buscar por descricao, origem ou unidade'
+              placeholder: 'Buscar por descrição, origem ou unidade'
             }}
-            filtros={[{ id: 'situacao', rotulo: 'Situacao', opcoes: OPCOES_SITUACAO_ITEM }]}
+            filtros={[{ id: 'situacao', rotulo: 'Situação', opcoes: OPCOES_SITUACAO_ITEM }]}
             ativos={filtrosItens}
             aoAlternar={alternarFiltroItens}
             aoLimpar={limparFiltrosItens}
@@ -1862,13 +1863,13 @@ export default function PedidoCompraDetalhe() {
               },
               {
                 id: 'total_aquisicao',
-                titulo: 'Total aquisicao',
+                titulo: 'Total aquisição',
                 tipo: 'valor',
                 render: (item) => formatMoney(Number(item.valor_total || 0) + Number(item.frete_rateado || 0))
               },
               {
                 id: 'situacao',
-                titulo: 'Situacao',
+                titulo: 'Situação',
                 tipo: 'status',
                 render: (item) => {
                   const situacao = getItemSituacao(item);
@@ -1935,12 +1936,12 @@ export default function PedidoCompraDetalhe() {
           <StatTile
             label="Total de frete rateado"
             valor={formatMoney(totalFretesPedido)}
-            sub="Nao inclui fretes cancelados"
+            sub="Não inclui fretes cancelados"
           />
           <StatTile
             label="Aguardando o financeiro"
             valor={`${fretesPendentesFinanceiro.length} frete(s)`}
-            sub="Pendentes de geracao de titulo"
+            sub="Pendentes de geração de título"
             tom={fretesPendentesFinanceiro.length ? 'warning' : undefined}
           />
         </StatGrid>
@@ -1965,7 +1966,7 @@ export default function PedidoCompraDetalhe() {
                 </div>
                 {frete.tituloFinanceiro?.id ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                    <Pilula tom="sucesso">Titulo gerado</Pilula>
+                    <Pilula tom="sucesso">Título gerado</Pilula>
                     <Link
                       className="font-semibold text-[var(--c-primary)] hover:underline"
                       to={`/financeiro/titulos/${frete.tituloFinanceiro.id}`}
@@ -2010,7 +2011,7 @@ export default function PedidoCompraDetalhe() {
 
       {podeEditarItensPedido ? (
         <BlocoConteudo
-          titulo="Itens cotados disponiveis"
+          titulo="Itens cotados disponíveis"
           variante="secundario"
           contagem={`${pedido.candidatos_adicao?.length || 0} candidato(s)`}
           descricao="Respostas do fornecedor que ainda podem entrar neste pedido."
@@ -2041,7 +2042,7 @@ export default function PedidoCompraDetalhe() {
             </div>
           ) : (
             <div className="app-empty-card py-6">
-              Todos os itens cotados desse fornecedor ja foram usados ou nao ha respostas adicionais disponiveis.
+              Todos os itens cotados desse fornecedor já foram usados ou não ha respostas adicionais disponíveis.
             </div>
           )}
         </BlocoConteudo>
@@ -2049,20 +2050,20 @@ export default function PedidoCompraDetalhe() {
 
       {podeComentarPedido || podeAnexarEspelhoPedido ? (
         <BlocoConteudo
-          titulo="Historico operacional"
+          titulo="Histórico operacional"
           variante="secundario"
-          descricao="Comentarios e espelho do fornecedor aparecem tambem no historico da solicitacao."
+          descricao="Comentários e espelho do fornecedor aparecem também no histórico da solicitação."
         >
           <div className="grid gap-4">
             {podeComentarPedido ? (
               <FormSecao colunas={1}>
-                <CampoForm label="Comentario do pedido" tipo="texto-longo">
+                <CampoForm label="Comentário do pedido" tipo="texto-longo">
                   <textarea
                     className="input w-full"
                     rows={4}
                     value={comentarioPedido}
                     onChange={(event) => setComentarioPedido(event.target.value)}
-                    placeholder="Registre alinhamentos, pendencias ou informacoes para a obra."
+                    placeholder="Registre alinhamentos, pendências ou informações para a obra."
                   />
                 </CampoForm>
                 <div className="app-actionbar">
@@ -2082,7 +2083,7 @@ export default function PedidoCompraDetalhe() {
               <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm">
                 <div className="font-semibold">Espelho do pedido do fornecedor</div>
                 <p className="mt-1 text-xs text-[var(--c-muted)]">
-                  Anexe aqui o comprovante/espelho enviado pelo fornecedor. Ele tambem aparece no historico da solicitacao.
+                  Anexe aqui o comprovante/espelho enviado pelo fornecedor. Ele também aparece no histórico da solicitação.
                 </p>
                 {pedido.espelho_fornecedor_url ? (
                   <div className="mt-2 text-xs text-[var(--c-muted)]">
@@ -2130,7 +2131,7 @@ export default function PedidoCompraDetalhe() {
             {itemEditando.removido ? (
               <div className="mb-3">
                 <FaixaCondicao tom="neutro">
-                  Este item foi removido do pedido. Ele permanece visivel para consulta, mas a trilha detalhada agora fica no
+                  Este item foi removido do pedido. Ele permanece visível para consulta, mas a trilha detalhada agora fica no
                   painel administrativo de relatorios.
                 </FaixaCondicao>
               </div>
@@ -2139,7 +2140,7 @@ export default function PedidoCompraDetalhe() {
             {itemEditandoAbaixoMinimo ? (
               <div className="mb-3">
                 <FaixaCondicao tom="atencao">
-                  A quantidade atual do pedido ainda esta abaixo do minimo definido para este item.
+                  A quantidade atual do pedido ainda esta abaixo do mínimo definido para este item.
                 </FaixaCondicao>
               </div>
             ) : null}
@@ -2173,7 +2174,7 @@ export default function PedidoCompraDetalhe() {
                     </CampoForm>
 
                     {/* R6: campo de dinheiro usa .input-moeda (mín. 180px, à direita, tabular). */}
-                    <CampoForm label="Preco unitario">
+                    <CampoForm label="Preço unitário">
                       <input
                         className="input input-moeda"
                         type="text"
@@ -2201,7 +2202,7 @@ export default function PedidoCompraDetalhe() {
                       </div>
                     </CampoForm>
 
-                    <CampoForm label="Observacoes do item" tipo="texto-longo">
+                    <CampoForm label="Observações do item" tipo="texto-longo">
                       <textarea
                         className="input w-full"
                         rows={3}
@@ -2228,7 +2229,7 @@ export default function PedidoCompraDetalhe() {
                 </div>
                 <div className="mt-3 grid gap-2 text-xs">
                   <div>
-                    <div className="text-[var(--c-muted)]">Situacao</div>
+                    <div className="text-[var(--c-muted)]">Situação</div>
                     <div className="mt-1">
                       <Pilula tom={itemEditandoSituacao.tom}>{itemEditandoSituacao.label}</Pilula>
                     </div>
@@ -2246,7 +2247,7 @@ export default function PedidoCompraDetalhe() {
                     <div className="font-semibold">{formatQuantityLabel(itemEditando.quantidade_pedido, itemEditando.unidade)}</div>
                   </div>
                   <div>
-                    <div className="text-[var(--c-muted)]">Minimo</div>
+                    <div className="text-[var(--c-muted)]">Mínimo</div>
                     <div className="font-semibold">{formatQuantityLabel(itemEditando.quantidade_minima_item, itemEditando.unidade)}</div>
                   </div>
                   <div>
@@ -2254,7 +2255,7 @@ export default function PedidoCompraDetalhe() {
                     <div className="font-semibold tabular-nums">{formatUnitPrice(itemEditandoPrecoContext?.precoCotado, itemEditando.unidade)}</div>
                   </div>
                   <div>
-                    <div className="text-[var(--c-muted)]">Preco atual do pedido</div>
+                    <div className="text-[var(--c-muted)]">Preço atual do pedido</div>
                     <div className="font-semibold tabular-nums">{formatUnitPrice(itemEditandoPrecoContext?.precoAtual, itemEditando.unidade)}</div>
                   </div>
                   <div>
@@ -2287,7 +2288,7 @@ export default function PedidoCompraDetalhe() {
                   <div>
                     <h3 className="font-semibold">Remanejar quantidade para outro fornecedor</h3>
                     <p className="mt-1 text-xs text-[var(--c-muted)]">
-                      Use quando parte ou todo o item precisar voltar para a cotacao e seguir em outro pedido.
+                      Use quando parte ou todo o item precisar voltar para a cotação e seguir em outro pedido.
                     </p>
                   </div>
                   <Pilula tom="info">
@@ -2388,7 +2389,7 @@ export default function PedidoCompraDetalhe() {
                 Cancelar pedido {codigoPedido}
               </h2>
               <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
-                O historico sera preservado. Se houver titulo financeiro ou frete com titulo, o sistema bloqueara a acao.
+                O histórico será preservado. Se houver título financeiro ou frete com título, o sistema bloqueara a ação.
                 Esta acao nao pode ser desfeita.
               </p>
             </div>
@@ -2435,9 +2436,9 @@ export default function PedidoCompraDetalhe() {
                     disabled={cancelandoPedido}
                   />
                   <span>
-                    <strong>Cancelar cotacao vinculada</strong>
+                    <strong>Cancelar cotação vinculada</strong>
                     <span className="block text-xs text-[var(--c-muted)]">
-                      Marca os links/respostas da cotacao como cancelados e evita nova interacao no fluxo.
+                      Marca os links/respostas da cotação como cancelados e evita nova interação no fluxo.
                     </span>
                   </span>
                 </label>
@@ -2453,9 +2454,9 @@ export default function PedidoCompraDetalhe() {
                     disabled={cancelandoPedido}
                   />
                   <span>
-                    <strong>Cancelar solicitacao de compra</strong>
+                    <strong>Cancelar solicitação de compra</strong>
                     <span className="block text-xs text-[var(--c-muted)]">
-                      Remove a SC do painel de delegacao, mantendo a consulta nas telas historicas.
+                      Remove a SC do painel de delegação, mantendo a consulta nas telas historicas.
                     </span>
                   </span>
                 </label>
@@ -2471,9 +2472,9 @@ export default function PedidoCompraDetalhe() {
                     disabled={cancelandoPedido}
                   />
                   <span>
-                    <strong>Cancelar tambem a solicitacao principal</strong>
+                    <strong>Cancelar também a solicitação principal</strong>
                     <span className="block text-xs text-[var(--c-muted)]">
-                      Use somente quando a solicitacao normal nao deve seguir em nenhum outro setor.
+                      Use somente quando a solicitação normal não deve seguir em nenhum outro setor.
                     </span>
                   </span>
                 </label>
@@ -2573,9 +2574,8 @@ export default function PedidoCompraDetalhe() {
 
               {freteForm.tipo === 'TERCEIRO' ? (
                 <CampoForm label="Data de vencimento" obrigatorio>
-                  <input
+                  <DateInputBR
                     className="input w-full"
-                    type="date"
                     value={freteForm.data_vencimento}
                     onChange={(event) => atualizarFreteForm({ data_vencimento: event.target.value })}
                     disabled={salvandoFrete}
@@ -2635,7 +2635,7 @@ export default function PedidoCompraDetalhe() {
                 <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
                   <div className="font-semibold">Credor/transportador</div>
                   <p className="mt-1 text-xs text-[var(--c-muted)]">
-                    Pesquise no cadastro de credores ou informe os dados para cadastro rapido.
+                    Pesquise no cadastro de credores ou informe os dados para cadastro rápido.
                   </p>
 
                   <div className="relative mt-3" ref={credorFreteRef}>
@@ -2706,7 +2706,7 @@ export default function PedidoCompraDetalhe() {
 
                 {!freteForm.fornecedor_compra_id && !freteForm.parceiro_id ? (
                   <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
-                    <div className="font-semibold">Cadastro rapido do credor/transportador</div>
+                    <div className="font-semibold">Cadastro rápido do credor/transportador</div>
                     <FormSecao colunas={2}>
                       <CampoForm label="Nome do fornecedor">
                         <input
@@ -2724,7 +2724,7 @@ export default function PedidoCompraDetalhe() {
                           onChange={(event) => atualizarNovoFornecedorFrete({ cpf_cnpj: maskCpfCnpj(event.target.value) })}
                           onBlur={(event) => {
                             if (event.target.value && !isValidCpfCnpj(event.target.value)) {
-                              avisar.alerta('CPF/CNPJ invalido para o credor/transportador.');
+                              avisar.alerta('CPF/CNPJ inválido para o credor/transportador.');
                             }
                           }}
                           placeholder="CPF/CNPJ"
@@ -2748,7 +2748,7 @@ export default function PedidoCompraDetalhe() {
                           onChange={(event) => atualizarNovoFornecedorFrete({ email: event.target.value.trim().toLowerCase() })}
                           onBlur={(event) => {
                             if (event.target.value && !isValidEmail(event.target.value)) {
-                              avisar.alerta('E-mail invalido para o credor/transportador.');
+                              avisar.alerta('E-mail inválido para o credor/transportador.');
                             }
                           }}
                           placeholder="Email"
@@ -2815,7 +2815,7 @@ export default function PedidoCompraDetalhe() {
                         onChange={(event) => atualizarDadosPagamentoFrete({ documento: maskCpfCnpj(event.target.value) })}
                         onBlur={(event) => {
                           if (event.target.value && !isValidCpfCnpj(event.target.value)) {
-                            avisar.alerta('CPF/CNPJ invalido para o favorecido.');
+                            avisar.alerta('CPF/CNPJ inválido para o favorecido.');
                           }
                         }}
                         placeholder="CPF/CNPJ do favorecido"
@@ -2831,12 +2831,12 @@ export default function PedidoCompraDetalhe() {
                         disabled={salvandoFrete}
                       />
                     </CampoForm>
-                    <CampoForm label="Agencia">
+                    <CampoForm label="Agência">
                       <input
                         className="input w-full"
                         value={freteForm.dados_pagamento.agencia}
                         onChange={(event) => atualizarDadosPagamentoFrete({ agencia: event.target.value })}
-                        placeholder="Agencia"
+                        placeholder="Agência"
                         disabled={salvandoFrete}
                       />
                     </CampoForm>
@@ -2849,13 +2849,13 @@ export default function PedidoCompraDetalhe() {
                         disabled={salvandoFrete}
                       />
                     </CampoForm>
-                    <CampoForm label="Observacoes para o financeiro" tipo="texto-longo">
+                    <CampoForm label="Observações para o financeiro" tipo="texto-longo">
                       <textarea
                         className="input w-full"
                         rows={3}
                         value={freteForm.dados_pagamento.observacoes}
                         onChange={(event) => atualizarDadosPagamentoFrete({ observacoes: event.target.value })}
-                        placeholder="Observacoes para o financeiro"
+                        placeholder="Observações para o financeiro"
                         disabled={salvandoFrete}
                       />
                     </CampoForm>
@@ -2866,13 +2866,13 @@ export default function PedidoCompraDetalhe() {
 
             <div className="mt-4">
               <FormSecao colunas={1}>
-                <CampoForm label="Observacoes do frete" tipo="texto-longo">
+                <CampoForm label="Observações do frete" tipo="texto-longo">
                   <textarea
                     className="input w-full"
                     rows={3}
                     value={freteForm.observacoes}
                     onChange={(event) => atualizarFreteForm({ observacoes: event.target.value })}
-                    placeholder="Ex.: frete embutido na negociacao ou frete pago diretamente a transportador."
+                    placeholder="Ex.: frete embutido na negociação ou frete pago diretamente a transportador."
                     disabled={salvandoFrete}
                   />
                 </CampoForm>

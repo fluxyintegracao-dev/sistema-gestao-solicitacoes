@@ -521,7 +521,7 @@ export default function GestaoContratos() {
         <div>
           <p className="text-sm font-semibold text-[var(--c-text)]">Credores vinculados ao contrato</p>
           <p className="text-xs text-[var(--c-muted)]">
-            A Nova Solicitacao listara somente estes credores quando o contrato for selecionado.
+            A Nova Solicitação listara somente estes credores quando o contrato for selecionado.
           </p>
         </div>
 
@@ -577,7 +577,7 @@ export default function GestaoContratos() {
                   className="input input-sm"
                   value={credor.observacao || ''}
                   onChange={e => alterarObservacaoCredor(credor.parceiro_id, e.target.value, setter)}
-                  placeholder="Observacao interna"
+                  placeholder="Observação interna"
                 />
                 <button
                   type="button"
@@ -599,8 +599,8 @@ export default function GestaoContratos() {
       <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 space-y-2">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-[var(--c-text)]">Apropriacoes do contrato</p>
-            <p className="text-xs text-[var(--c-muted)]">Use uma linha por item que podera ser rateado na solicitacao.</p>
+            <p className="text-sm font-semibold text-[var(--c-text)]">Apropriações do contrato</p>
+            <p className="text-xs text-[var(--c-muted)]">Use uma linha por item que podera ser rateado na solicitação.</p>
           </div>
           <button
             type="button"
@@ -613,7 +613,7 @@ export default function GestaoContratos() {
 
         {disponiveis.length === 0 && (
           <p className="text-xs text-[var(--c-muted)]">
-            Selecione uma obra com apropriacoes cadastradas para habilitar a lista.
+            Selecione uma obra com apropriações cadastradas para habilitar a lista.
           </p>
         )}
 
@@ -624,7 +624,7 @@ export default function GestaoContratos() {
               value={item.apropriacao_id}
               onChange={e => alterarLinhaApropriacao(index, 'apropriacao_id', e.target.value, setter)}
             >
-              <option value="">Apropriacao</option>
+              <option value="">Apropriação</option>
               {disponiveis.map(ap => (
                 <option key={ap.id} value={ap.id}>
                   {ap.codigo} - {ap.descricao}
@@ -647,7 +647,7 @@ export default function GestaoContratos() {
               className="input input-sm"
               value={item.observacao}
               onChange={e => alterarLinhaApropriacao(index, 'observacao', e.target.value, setter)}
-              placeholder="Observacao"
+              placeholder="Observação"
             />
             <button
               type="button"
@@ -721,7 +721,7 @@ export default function GestaoContratos() {
       };
 
       if (!payload.obra_id || !payload.codigo) {
-        avisar.alerta('Informe a obra e o codigo do contrato.');
+        avisar.alerta('Informe a obra e o código do contrato.');
         return;
       }
 
@@ -855,7 +855,7 @@ export default function GestaoContratos() {
 
   async function salvarEdicao(contrato) {
     if (!podeGerenciarContratos) {
-      avisar.erro('Seu usuario nao tem permissao para editar contratos.');
+      avisar.erro('Seu usuário não tem permissão para editar contratos.');
       return;
     }
     if (salvandoEdicaoId) return;
@@ -1493,37 +1493,37 @@ export default function GestaoContratos() {
         <BlocoConteudo
           titulo="Importação de apropriações"
           variante="secundario"
-          descricao="Importacao segura: altera somente os vinculos de apropriacao dos contratos listados."
+          descricao="Importação segura: altera somente os vínculos de apropriação dos contratos listados."
         >
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               className="btn btn-outline px-3"
               onClick={baixarModeloImportacaoContratos}
-              title="Baixar modelo de apropriacoes dos contratos"
-              aria-label="Baixar modelo de apropriacoes dos contratos"
+              title="Baixar modelo de apropriações dos contratos"
+              aria-label="Baixar modelo de apropriações dos contratos"
             >
               <HiArrowDownTray className="w-4 h-4" />
-              Modelo apropriacoes
+              Modelo apropriações
             </button>
 
             <button
               type="button"
               className="btn btn-outline px-3"
               onClick={handleExportarContratos}
-              title="Exportar contratos e apropriacoes (.csv)"
-              aria-label="Exportar contratos e apropriacoes"
+              title="Exportar contratos e apropriações (.csv)"
+              aria-label="Exportar contratos e apropriações"
             >
               Exportar CSV
             </button>
 
             <label
               className={`btn btn-outline px-3 cursor-pointer ${importandoContratos ? 'opacity-60 pointer-events-none' : ''}`}
-              title="Importar apenas apropriacoes dos contratos (.csv)"
-              aria-label="Importar apenas apropriacoes dos contratos"
+              title="Importar apenas apropriações dos contratos (.csv)"
+              aria-label="Importar apenas apropriações dos contratos"
             >
               <HiArrowUpTray className="w-4 h-4" />
-              Importar apropriacoes
+              Importar apropriações
               <input
                 type="file"
                 accept=".csv,text/csv"
@@ -1865,7 +1865,7 @@ export default function GestaoContratos() {
               type="button"
               className="btn btn-outline px-3 inline-flex items-center gap-2"
               onClick={() => encerrarContratoItem(contratoSelecionado)}
-              title="Zera o saldo restante e exclui os titulos em aberto"
+              title="Zera o saldo restante e exclui os títulos em aberto"
             >
               <HiXMark className="w-4 h-4" />
               <span>Encerrar contrato</span>

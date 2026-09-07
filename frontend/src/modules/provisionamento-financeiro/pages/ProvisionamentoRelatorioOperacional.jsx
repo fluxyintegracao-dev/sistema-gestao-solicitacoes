@@ -129,7 +129,7 @@ function BlocoAgrupado({ titulo, descricao, linhas, total, storageKey, rotulo })
         colunas={[
           {
             id: 'label',
-            titulo: 'Descricao',
+            titulo: 'Descrição',
             // R17: o rótulo NOMEIA a linha do agrupamento (obra, categoria,
             // status ou semana, conforme o bloco).
             tipo: 'identidade',
@@ -150,7 +150,7 @@ function BlocoAgrupado({ titulo, descricao, linhas, total, storageKey, rotulo })
           },
           {
             id: 'participacao',
-            titulo: 'Participacao',
+            titulo: 'Participação',
             tipo: 'numero',
             render: (linha) => percentual(Number(linha.total_valor || 0), total)
           }
@@ -365,7 +365,7 @@ export default function ProvisionamentoRelatorioOperacional() {
       <PageHeader
         titulo="Painel operacional de provisionamento"
         contagem={loading ? null : `${formatarMoedaBRL(totalPeriodo)} previstos`}
-        descricao="Marque o recorte e clique em Atualizar relatorio: com seis filtros, a consulta so roda no clique."
+        descricao="Marque o recorte e clique em Atualizar relatório: com seis filtros, a consulta so roda no clique."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
           onClick: aplicarFiltros,
@@ -416,26 +416,26 @@ export default function ProvisionamentoRelatorioOperacional() {
       */}
       <StatGrid colunas={4}>
         <StatTile
-          label="Proximos 7 dias"
+          label="Próximos 7 dias"
           valor={formatarMoedaBRL(dashboard?.cards?.total_proximos_7_dias || 0)}
-          sub="Pressao imediata de caixa"
+          sub="Pressão imediata de caixa"
           tom="warning"
         />
         <StatTile
-          label="Proximos 30 dias"
+          label="Próximos 30 dias"
           valor={formatarMoedaBRL(dashboard?.cards?.total_proximos_30_dias || 0)}
-          sub="Pressao de curto prazo"
+          sub="Pressão de curto prazo"
         />
         <StatTile
-          label="Vencidas nao tratadas"
+          label="Vencidas não tratadas"
           valor={String(vencidas.length)}
-          sub="Previstas/em analise ja vencidas"
+          sub="Previstas/em analise já vencidas"
           tom={vencidas.length ? 'danger' : 'success'}
         />
         <StatTile
-          label="Criticas proximas"
+          label="Críticas próximas"
           valor={String(criticas.length)}
-          sub="Prioridade critica nos proximos 7 dias"
+          sub="Prioridade critica nos próximos 7 dias"
           tom={criticas.length ? 'danger' : 'success'}
         />
         <StatTile
@@ -444,13 +444,13 @@ export default function ProvisionamentoRelatorioOperacional() {
           sub="Previstas, em analise ou aprovadas"
         />
         <StatTile
-          label="Concentracao alta"
+          label="Concentração alta"
           valor={String(concentracaoAlta.length)}
           sub="Obras acima do limiar do dashboard"
           tom={concentracaoAlta.length ? 'warning' : undefined}
         />
         <StatTile
-          label="Analitico carregado"
+          label="Analítico carregado"
           valor={String(lista.length)}
           sub={`Primeiros ${LIMITE_ANALITICO} itens do recorte`}
         />
@@ -467,7 +467,7 @@ export default function ProvisionamentoRelatorioOperacional() {
       <BlocosPersonalizaveis chave="blocos:provisionamento-relatorio-operacional" larguraPadrao="total">
         <BlocoConteudo
           titulo="Curva mensal prevista"
-          descricao="Valores por data prevista de desembolso, sem provisoes canceladas."
+          descricao="Valores por data prevista de desembolso, sem provisões canceladas."
           variante="primario"
           cor="var(--c-primary)"
         >
@@ -505,7 +505,7 @@ export default function ProvisionamentoRelatorioOperacional() {
 
         <BlocoAgrupado data-bloco-id="por-obra-centro" data-bloco-rotulo="Por obra/centro"
           titulo="Por obra/centro"
-          descricao="Onde a previsao esta concentrada."
+          descricao="Onde a previsão esta concentrada."
           linhas={dashboard?.graficos?.por_obra || []}
           total={totalPeriodo}
           storageKey="tabela:provisionamento-relatorio-operacional:por-obra"
@@ -514,7 +514,7 @@ export default function ProvisionamentoRelatorioOperacional() {
 
         <BlocoAgrupado data-bloco-id="por-categoria-macro" data-bloco-rotulo="Por categoria macro"
           titulo="Por categoria macro"
-          descricao="Composicao da previsao por natureza de gasto."
+          descricao="Composição da previsão por natureza de gasto."
           linhas={dashboard?.graficos?.por_categoria || []}
           total={totalPeriodo}
           storageKey="tabela:provisionamento-relatorio-operacional:por-categoria"
@@ -523,7 +523,7 @@ export default function ProvisionamentoRelatorioOperacional() {
 
         <BlocoAgrupado data-bloco-id="pipeline-por-status" data-bloco-rotulo="Pipeline por status"
           titulo="Pipeline por status"
-          descricao="Quanto ja passou por analise e aprovacao."
+          descricao="Quanto já passou por analise e aprovação."
           linhas={dashboard?.graficos?.pipeline_status || []}
           total={totalPeriodo}
           storageKey="tabela:provisionamento-relatorio-operacional:pipeline-status"
@@ -532,7 +532,7 @@ export default function ProvisionamentoRelatorioOperacional() {
 
         <BlocoAgrupado data-bloco-id="curva-semanal" data-bloco-rotulo="Curva semanal"
           titulo="Curva semanal"
-          descricao="Distribuicao da previsao nas proximas semanas do recorte."
+          descricao="Distribuição da previsão nas próximas semanas do recorte."
           linhas={dashboard?.graficos?.curva_semanal || []}
           total={totalPeriodo}
           storageKey="tabela:provisionamento-relatorio-operacional:curva-semanal"
@@ -540,15 +540,15 @@ export default function ProvisionamentoRelatorioOperacional() {
         />
 
         <BlocoConteudo
-          titulo="Analitico do recorte"
+          titulo="Analítico do recorte"
           contagem={`${lista.length} item(ns)`}
-          descricao={`Primeiros ${LIMITE_ANALITICO} provisionamentos ordenados pela data prevista mais proxima.`}
+          descricao={`Primeiros ${LIMITE_ANALITICO} provisionamentos ordenados pela data prevista mais próxima.`}
         >
           <TabelaPadrao
             colunas={[
               {
                 id: 'codigo',
-                titulo: 'Codigo',
+                titulo: 'Código',
                 // R17: o código NOMEIA o provisionamento da linha.
                 tipo: 'identidade',
                 noCard: 'titulo',
@@ -571,7 +571,7 @@ export default function ProvisionamentoRelatorioOperacional() {
               { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoriaMacro?.nome || '-' },
               {
                 id: 'descricao',
-                titulo: 'Descricao',
+                titulo: 'Descrição',
                 tipo: 'texto',
                 // T6: texto longo trunca com o conteúdo completo no tooltip.
                 render: (item) => <span title={item.descricao || undefined}>{item.descricao || '-'}</span>

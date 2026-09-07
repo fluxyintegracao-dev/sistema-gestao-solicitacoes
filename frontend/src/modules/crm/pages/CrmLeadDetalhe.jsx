@@ -37,6 +37,7 @@ import StatusBadge from '../../../components/StatusBadge';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canRedistributeCrmLeads } from '../../../utils/acessoProduto';
 import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
+import DateInputBR from '../../../components/DateInputBR';
 
 /*
   R25/R2 — a cor do status vinha de paleta crua do Tailwind
@@ -95,7 +96,7 @@ const PRIORIDADE_TAREFA = {
 
 const STATUS_TAREFA = {
   PENDING: { label: 'Pendente', kind: 'warning' },
-  DONE: { label: 'Concluida', kind: 'success' },
+  DONE: { label: 'Concluída', kind: 'success' },
   CANCELLED: { label: 'Cancelada', kind: 'neutral' }
 };
 
@@ -309,7 +310,7 @@ export default function CrmLeadDetalhe() {
     // R26: o nome usado na pergunta é o mesmo que a ação usa depois.
     const alvo = lead;
     const { ok } = await confirmar({
-      titulo: 'Registrar conversao',
+      titulo: 'Registrar conversão',
       mensagem: `Registrar a conversao do lead "${alvo.nome}"?`,
       rotuloConfirmar: 'Registrar conversao'
     });
@@ -317,7 +318,7 @@ export default function CrmLeadDetalhe() {
     try {
       const updated = await registrarConversaoLead(id);
       setLead((l) => ({ ...l, ...updated }));
-      avisar.sucesso('Conversao registrada.');
+      avisar.sucesso('Conversão registrada.');
     } catch (err) {
       avisar.erro(err.message || 'Erro ao registrar conversao');
     }
@@ -416,7 +417,7 @@ export default function CrmLeadDetalhe() {
         <PageHeader titulo="Lead" voltar={{ to: '/crm/leads', title: 'Voltar para leads' }} />
         <Avisos avisos={avisos} aoFechar={fechar} />
         <BlocoConteudo>
-          <p className="app-note">Lead nao encontrado.</p>
+          <p className="app-note">Lead não encontrado.</p>
         </BlocoConteudo>
       </Pagina>
     );
@@ -507,7 +508,7 @@ export default function CrmLeadDetalhe() {
           vazio={!lead.etapa}
         />
         <StatTile
-          label="Proximo follow-up"
+          label="Próximo follow-up"
           valor={fmtDataOuNulo(lead.proximo_followup_at)}
           vazio={!lead.proximo_followup_at}
         />
@@ -519,7 +520,7 @@ export default function CrmLeadDetalhe() {
         cor="var(--c-primary)"
       >
         {editando ? (
-          <FormSecao legenda="Identificacao e interesse" colunas={2}>
+          <FormSecao legenda="Identificação e interesse" colunas={2}>
             <CampoForm label="Nome" obrigatorio span={2}>
               {campoTexto('nome', { required: true })}
             </CampoForm>
@@ -559,15 +560,14 @@ export default function CrmLeadDetalhe() {
                 onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))}
               />
             </CampoForm>
-            <CampoForm label="Proximo follow-up">
-              <input
+            <CampoForm label="Próximo follow-up">
+              <DateInputBR
                 className="input w-full"
-                type="date"
                 value={form.proximo_followup_at || ''}
                 onChange={(e) => setForm((f) => ({ ...f, proximo_followup_at: e.target.value }))}
               />
             </CampoForm>
-            <CampoForm label="Observacoes" tipo="texto-longo" span={2}>
+            <CampoForm label="Observações" tipo="texto-longo" span={2}>
               <textarea
                 className="input w-full"
                 rows={3}
@@ -595,7 +595,7 @@ export default function CrmLeadDetalhe() {
               { label: 'Produto de interesse', valor: lead.produto_interesse, span: 2 },
               { label: 'Faixa de valor', valor: lead.faixa_valor },
               { label: 'Score', valor: Number(lead.score) > 0 ? String(lead.score) : null },
-              { label: 'Observacoes', valor: lead.observacoes, span: 4 }
+              { label: 'Observações', valor: lead.observacoes, span: 4 }
             ]}
           />
         )}
@@ -642,7 +642,7 @@ export default function CrmLeadDetalhe() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Interacoes"
+        titulo="Interações"
         contagem={`${interactions.length} registro(s)`}
         acoes={(
           <button
@@ -656,7 +656,7 @@ export default function CrmLeadDetalhe() {
       >
         {showAddInteraction && (
           <form onSubmit={handleAddInteraction} className="mb-4">
-            <FormSecao legenda="Nova interacao" colunas={2}>
+            <FormSecao legenda="Nova interação" colunas={2}>
               <CampoForm label="Tipo">
                 <select
                   className="input w-full"
@@ -668,7 +668,7 @@ export default function CrmLeadDetalhe() {
                   ))}
                 </select>
               </CampoForm>
-              <CampoForm label="Titulo (opcional)">
+              <CampoForm label="Título (opcional)">
                 <input
                   className="input w-full"
                   placeholder="Resumo..."
@@ -676,11 +676,11 @@ export default function CrmLeadDetalhe() {
                   onChange={(e) => setInteractionForm((f) => ({ ...f, title: e.target.value }))}
                 />
               </CampoForm>
-              <CampoForm label="Descricao" tipo="texto-longo" span={2}>
+              <CampoForm label="Descrição" tipo="texto-longo" span={2}>
                 <textarea
                   className="input w-full"
                   rows={3}
-                  placeholder="Detalhes da interacao..."
+                  placeholder="Detalhes da interação..."
                   value={interactionForm.content}
                   onChange={(e) => setInteractionForm((f) => ({ ...f, content: e.target.value }))}
                 />
@@ -695,7 +695,7 @@ export default function CrmLeadDetalhe() {
         )}
 
         {interactions.length === 0 ? (
-          <p className="app-note">Nenhuma interacao registrada.</p>
+          <p className="app-note">Nenhuma interação registrada.</p>
         ) : (
           <div className="space-y-3">
             {interactions.map((it) => (
@@ -735,7 +735,7 @@ export default function CrmLeadDetalhe() {
         {showAddTask && (
           <form onSubmit={handleAddTask} className="mb-4">
             <FormSecao legenda="Nova tarefa" colunas={2}>
-              <CampoForm label="Titulo" obrigatorio span={2}>
+              <CampoForm label="Título" obrigatorio span={2}>
                 <input
                   className="input w-full"
                   required
@@ -866,15 +866,15 @@ export default function CrmLeadDetalhe() {
         />
       </BlocoConteudo>
 
-      <BlocoConteudo titulo="Informacoes do registro" variante="secundario">
+      <BlocoConteudo titulo="Informações do registro" variante="secundario">
         <CamposComVazios
           colunas={4}
           campos={[
-            { label: 'Responsavel', valor: lead.responsavel?.nome },
+            { label: 'Responsável', valor: lead.responsavel?.nome },
             { label: 'Criado por', valor: lead.criadoPor?.nome },
             { label: 'Cadastrado em', valor: fmtOuNulo(lead.createdAt) },
             { label: 'Primeiro contato', valor: fmtOuNulo(lead.primeiro_contato_at) },
-            { label: 'Ultima interacao', valor: fmtOuNulo(lead.ultima_interacao_at) },
+            { label: 'Última interação', valor: fmtOuNulo(lead.ultima_interacao_at) },
             {
               label: 'Convertido em',
               contexto: lead.lifecycle_status === 'CONVERTIDO',
@@ -898,7 +898,7 @@ export default function CrmLeadDetalhe() {
       {/* Histórico: raro/auditoria — nasce recolhido, mas o título fica à vista. */}
       {Array.isArray(lead.auditLogs) && lead.auditLogs.length > 0 && (
         <BlocoConteudo
-          titulo="Historico do sistema"
+          titulo="Histórico do sistema"
           contagem={`${lead.auditLogs.length} evento(s)`}
           variante="secundario"
           recolhivel
@@ -947,7 +947,7 @@ export default function CrmLeadDetalhe() {
                   {motivosPerda.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
                 </select>
               </CampoForm>
-              <CampoForm label="Observacoes" tipo="texto-longo" linha>
+              <CampoForm label="Observações" tipo="texto-longo" linha>
                 <textarea
                   className="input w-full"
                   rows={3}
@@ -980,12 +980,12 @@ export default function CrmLeadDetalhe() {
             <div>
               <h2 className="app-bloco-titulo">Redistribuir lead</h2>
               <p className="app-note">
-                Escolha um responsavel ou deixe automatico para enviar ao usuario elegivel com menor backlog.
+                Escolha um responsável ou deixe automático para enviar ao usuário elegível com menor backlog.
               </p>
             </div>
 
             <FormSecao colunas={2}>
-              <CampoForm label="Novo responsavel" linha>
+              <CampoForm label="Novo responsável" linha>
                 <select
                   className="input w-full"
                   value={redistributionForm.assigned_user_id}
@@ -1013,7 +1013,7 @@ export default function CrmLeadDetalhe() {
                   rows={3}
                   value={redistributionForm.motivo}
                   onChange={(e) => setRedistributionForm((f) => ({ ...f, motivo: e.target.value }))}
-                  placeholder="Ex: SLA vencido, ausencia do responsavel, ajuste manual de carteira..."
+                  placeholder="Ex: SLA vencido, ausencia do responsável, ajuste manual de carteira..."
                 />
               </CampoForm>
             </FormSecao>

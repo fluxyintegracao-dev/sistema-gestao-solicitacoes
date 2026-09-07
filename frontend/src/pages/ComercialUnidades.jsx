@@ -24,6 +24,7 @@ import {
   getUnidadesComerciais
 } from '../services/comercial';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
+import DateInputBR from '../components/DateInputBR';
 
 const SITUACOES = ['DISPONIVEL', 'RESERVADA', 'VENDIDA', 'DISTRATADA', 'BLOQUEADA'];
 
@@ -309,7 +310,7 @@ export default function ComercialUnidades() {
     },
     {
       id: 'reservado_ate',
-      titulo: 'Reservado ate',
+      titulo: 'Reservado até',
       tipo: 'data',
       render: (item) => formatDate(item.reservado_ate)
     },
@@ -327,7 +328,7 @@ export default function ComercialUnidades() {
     },
     {
       id: 'situacao',
-      titulo: 'Situacao',
+      titulo: 'Situação',
       tipo: 'status',
       // R25: a statusClass() devolvia DEZ classes de paleta crua para cinco
       // status (emerald/amber/blue/rose/slate) — sem par no tema escuro e
@@ -340,7 +341,7 @@ export default function ComercialUnidades() {
     },
     {
       id: 'observacoes',
-      titulo: 'Observacoes',
+      titulo: 'Observações',
       tipo: 'texto',
       // T6: texto longo trunca com o texto completo no tooltip.
       render: (item) => (
@@ -374,7 +375,7 @@ export default function ComercialUnidades() {
       */}
       <BlocoConteudo
         titulo="Regra de venda manual"
-        descricao="Vale para todas as unidades; a mudanca e gravada no momento em que voce marca."
+        descricao="Vale para todas as unidades; a mudança e gravada no momento em que você marca."
       >
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -407,7 +408,7 @@ export default function ComercialUnidades() {
       */}
       <BlocoConteudo titulo={form.id ? 'Editar unidade' : 'Nova unidade'}>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <FormSecao legenda="Identificacao" colunas={2}>
+          <FormSecao legenda="Identificação" colunas={2}>
             <CampoForm label="Empreendimento" obrigatorio span={2}>
               {/* R12: select de FORMULÁRIO (entrada de dado do registro) —
                   legítimo. O filtro da lista, esse sim, virou marcação. */}
@@ -426,7 +427,7 @@ export default function ComercialUnidades() {
               </select>
             </CampoForm>
 
-            <CampoForm label="Codigo" obrigatorio>
+            <CampoForm label="Código" obrigatorio>
               <input
                 ref={campoCodigoRef}
                 className="input w-full"
@@ -513,7 +514,7 @@ export default function ComercialUnidades() {
             </CampoForm>
 
             <CampoForm
-              label="Situacao"
+              label="Situação"
               hint={!permitirVendaManual && form.situacao !== 'VENDIDA'
                 ? 'Vendida e definida automaticamente ao vincular um contrato.'
                 : undefined}
@@ -546,10 +547,9 @@ export default function ComercialUnidades() {
               </select>
             </CampoForm>
 
-            <CampoForm label="Reservado ate">
-              <input
+            <CampoForm label="Reservado até">
+              <DateInputBR
                 className="input w-full"
-                type="date"
                 value={form.reservado_ate}
                 onChange={(event) => setForm((current) => ({ ...current, reservado_ate: event.target.value }))}
               />
@@ -576,14 +576,14 @@ export default function ComercialUnidades() {
               />
             </CampoForm>
 
-            <CampoForm label="Observacoes" tipo="texto-longo" span={2}>
+            <CampoForm label="Observações" tipo="texto-longo" span={2}>
               {/* R10: a altura do textarea vem da folha do sistema
                   (textarea.input), não do `min-h-[96px]` que estava aqui. */}
               <textarea
                 className="input w-full"
                 value={form.observacoes}
                 onChange={(event) => setForm((current) => ({ ...current, observacoes: event.target.value }))}
-                placeholder="Pendencias, restricoes ou detalhes da unidade"
+                placeholder="Pendências, restrições ou detalhes da unidade"
               />
             </CampoForm>
 
@@ -629,7 +629,7 @@ export default function ComercialUnidades() {
           busca={{
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((prev) => ({ ...prev, q: valor })),
-            placeholder: 'Buscar codigo, torre, pavimento, reserva ou empreendimento'
+            placeholder: 'Buscar código, torre, pavimento, reserva ou empreendimento'
           }}
           filtros={[{
             id: 'empreendimento',

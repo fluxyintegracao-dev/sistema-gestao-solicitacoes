@@ -91,7 +91,7 @@ export default function SstConfiguracoes() {
     try {
       const data = await salvarSstConfig(form);
       setForm(data || {});
-      avisar.sucesso('Configuracoes SST salvas com sucesso.');
+      avisar.sucesso('Configurações SST salvas com sucesso.');
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao salvar configuracoes SST');
     } finally {
@@ -102,9 +102,9 @@ export default function SstConfiguracoes() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Configuracoes SST"
+        titulo="Configurações SST"
         contagem={loading ? 'Carregando' : `${totalItens} item(ns) configurado(s)`}
-        descricao="Parametrize as listas operacionais usadas no modulo, evitando hardcode e mantendo o cadastro alinhado com a realidade da empresa."
+        descricao="Parametrize as listas operacionais usadas no módulo, evitando hardcode e mantendo o cadastro alinhado com a realidade da empresa."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -112,7 +112,7 @@ export default function SstConfiguracoes() {
       <BlocoConteudo titulo="Panorama" descricao="O que este cadastro governa hoje.">
         <StatGrid colunas={3}>
           <StatTile label="Itens configurados" valor={totalItens} sub="Listas operacionais" />
-          <StatTile label="Alerta de validade" valor={`${form.dias_alerta_validade || 30} dias`} sub="Vencimentos proximos" />
+          <StatTile label="Alerta de validade" valor={`${form.dias_alerta_validade || 30} dias`} sub="Vencimentos próximos" />
           <StatTile
             label="eSocial"
             valor={Array.isArray(form.eventos_esocial) ? form.eventos_esocial.length : 0}
@@ -130,10 +130,10 @@ export default function SstConfiguracoes() {
         molde da ComercialUnidades.
       */}
       <BlocoConteudo
-        titulo="Parametros do modulo"
+        titulo="Parametros do módulo"
         variante="primario"
         cor="var(--module-sst)"
-        descricao="Vale para todas as empresas do grupo; a mudanca so grava ao salvar."
+        descricao="Vale para todas as empresas do grupo; a mudança so grava ao salvar."
       >
         <form className="space-y-4" onSubmit={submit}>
           <FormSecao legenda="Alertas e ambiente" colunas={2}>
@@ -167,7 +167,7 @@ export default function SstConfiguracoes() {
                     checked={Boolean(form.esocial_documentacao_oficial_validada)}
                     onChange={(event) => updateCampo('esocial_documentacao_oficial_validada', event.target.checked)}
                   />
-                  Documentacao oficial validada
+                  Documentação oficial validada
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -175,19 +175,19 @@ export default function SstConfiguracoes() {
                     checked={Boolean(form.esocial_transmissao_habilitada)}
                     onChange={(event) => updateCampo('esocial_transmissao_habilitada', event.target.checked)}
                   />
-                  Habilitar transmissao futura
+                  Habilitar transmissão futura
                 </label>
               </div>
             </CampoForm>
 
-            <CampoForm label="Observacoes tecnicas eSocial" tipo="texto-longo" span={2}>
+            <CampoForm label="Observações técnicas eSocial" tipo="texto-longo" span={2}>
               {/* R10: a altura do textarea vem da folha do sistema
                   (textarea.input), não do `min-h-20` que estava aqui. */}
               <textarea
                 className="input w-full"
                 value={form.esocial_observacoes_tecnicas || ''}
                 onChange={(event) => updateCampo('esocial_observacoes_tecnicas', event.target.value)}
-                placeholder="Decisoes, pendencias e combinados tecnicos do eSocial"
+                placeholder="Decisões, pendências e combinados técnicos do eSocial"
               />
             </CampoForm>
           </FormSecao>

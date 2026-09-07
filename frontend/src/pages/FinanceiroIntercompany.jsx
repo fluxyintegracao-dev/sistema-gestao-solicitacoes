@@ -12,6 +12,7 @@ import {
 } from '../components/padrao';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getRelatorioIntercompanyFinanceiro } from '../services/financeiro';
+import DateInputBR from '../components/DateInputBR';
 
 const DEFAULT_FILTERS = {
   periodo: 'MES_ATUAL',
@@ -221,7 +222,7 @@ export default function FinanceiroIntercompany() {
         faixa AVISA que a marca ainda nao vale.
       */}
       <PageHeader
-        titulo="Relatorio Entre Empresas"
+        titulo="Relatório Entre Empresas"
         contagem={loading ? 'Carregando…' : `${resumo.relacoes_empresas || 0} relacao(oes)`}
         descricao={apoioDaFaixa}
         acaoPrincipal={{
@@ -235,17 +236,17 @@ export default function FinanceiroIntercompany() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
-        titulo="Recorte do relatorio"
-        descricao="A tela so muda ao atualizar o relatorio."
+        titulo="Recorte do relatório"
+        descricao="A tela so muda ao atualizar o relatório."
         variante="secundario"
       >
       <form onSubmit={aplicarFiltros}>
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-7">
           <label className="app-filter-field">
-            <span className="app-filter-label">Periodo</span>
+            <span className="app-filter-label">Período</span>
             <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
-              <option value="MES_ATUAL">Mes atual</option>
-              <option value="PROXIMO_MES">Proximo mes</option>
+              <option value="MES_ATUAL">Mês atual</option>
+              <option value="PROXIMO_MES">Próximo mês</option>
               <option value="HOJE">Hoje</option>
               <option value="30_DIAS">30 dias</option>
               <option value="90_DIAS">90 dias</option>
@@ -254,11 +255,11 @@ export default function FinanceiroIntercompany() {
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Holding</span>
@@ -294,7 +295,7 @@ export default function FinanceiroIntercompany() {
             <select className="input w-full input-sm" value={filters.elimina_consolidado} onChange={(event) => updateFilter('elimina_consolidado', event.target.value)}>
               <option value="">Todos</option>
               <option value="true">Elimina</option>
-              <option value="false">Nao elimina</option>
+              <option value="false">Não elimina</option>
             </select>
           </label>
         </div>
@@ -309,8 +310,8 @@ export default function FinanceiroIntercompany() {
                 <option value="QUITADO">Quitado</option>
                 <option value="CANCELADO">Cancelado</option>
                 <option value="ESTORNADO">Estornado</option>
-                <option value="ATIVA">Transferencia ativa</option>
-                <option value="CANCELADA">Transferencia cancelada</option>
+                <option value="ATIVA">Transferência ativa</option>
+                <option value="CANCELADA">Transferência cancelada</option>
               </select>
             </label>
             <label className="app-filter-field">
@@ -319,15 +320,15 @@ export default function FinanceiroIntercompany() {
                   paginacao de exibicao. */}
               <span className="app-filter-label">Teto de registros lidos</span>
               <select className="input w-full input-sm" value={filters.limit} onChange={(event) => updateFilter('limit', event.target.value)}>
-                <option value="100">Ler ate 100 registros</option>
-                <option value="500">Ler ate 500 registros</option>
-                <option value="1000">Ler ate 1000 registros</option>
+                <option value="100">Ler até 100 registros</option>
+                <option value="500">Ler até 500 registros</option>
+                <option value="1000">Ler até 1000 registros</option>
               </select>
             </label>
           </div>
           {rascunho ? (
             <span className="text-xs text-[var(--c-muted)]">
-              Recorte em rascunho — clique em Atualizar relatorio para valer.
+              Recorte em rascunho — clique em Atualizar relatório para valer.
             </span>
           ) : null}
         </div>
@@ -335,7 +336,7 @@ export default function FinanceiroIntercompany() {
             submit dentro do formulario o navegador para de aplicar com
             Enter. O botao visivel e o da faixa fixa; este so preserva o
             Enter (R16: um dono por responsabilidade). */}
-        <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar relatorio</button>
+        <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar relatório</button>
       </form>
       </BlocoConteudo>
 
@@ -367,12 +368,12 @@ export default function FinanceiroIntercompany() {
           <StatTile
             label="Valor previsto"
             valor={<Previsto>{formatCurrency(resumo.valor_previsto)}</Previsto>}
-            sub={`${resumo.titulos || 0} titulo(s)`}
+            sub={`${resumo.titulos || 0} título(s)`}
           />
           <StatTile
             label="Valor realizado"
             valor={<Realizado>{formatCurrency(resumo.valor_realizado)}</Realizado>}
-            sub="Baixas e transferencias ativas"
+            sub="Baixas e transferências ativas"
           />
           <StatTile
             label="Eliminado consolidado"
@@ -380,13 +381,13 @@ export default function FinanceiroIntercompany() {
             sub="Movimento interno do grupo"
           />
           <StatTile
-            label="Nao eliminado"
+            label="Não eliminado"
             valor={formatCurrency(resumo.valor_nao_eliminado_consolidado)}
-            sub="Permanece na visao consolidada"
+            sub="Permanece na visão consolidada"
             tom={Number(resumo.valor_nao_eliminado_consolidado || 0) > 0 ? 'warning' : undefined}
           />
           <StatTile
-            label="Transferencias"
+            label="Transferências"
             valor={String(resumo.transferencias || 0)}
             sub="Registros financeiros"
           />
@@ -399,7 +400,7 @@ export default function FinanceiroIntercompany() {
       </BlocoConteudo>
 
       {loading ? (
-        <div className="app-empty-card">Carregando relatorio Entre Empresas...</div>
+        <div className="app-empty-card">Carregando relatório Entre Empresas...</div>
       ) : (
         <>
           <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -421,8 +422,8 @@ export default function FinanceiroIntercompany() {
                     render: (item) => item.empresa_origem_nome
                   },
                   { id: 'destino', titulo: 'Destino', tipo: 'texto', render: (item) => item.empresa_destino_nome },
-                  { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (item) => item.titulos },
-                  { id: 'transferencias', titulo: 'Transferencias', tipo: 'numero', render: (item) => item.transferencias },
+                  { id: 'titulos', titulo: 'Títulos', tipo: 'numero', render: (item) => item.titulos },
+                  { id: 'transferencias', titulo: 'Transferências', tipo: 'numero', render: (item) => item.transferencias },
                   { id: 'previsto', titulo: 'Previsto', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.valor_previsto)}</Previsto> },
                   { id: 'realizado', titulo: 'Realizado', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.valor_realizado)}</Realizado> }
                 ]}
@@ -430,7 +431,7 @@ export default function FinanceiroIntercompany() {
                 getId={(item) => `${item.empresa_origem_id || 'o'}-${item.empresa_destino_id || 'd'}`}
                 storageKey="tabela:financeiro-intercompany:relacoes"
                 rotuloRolagem="Fluxo entre empresas"
-                vazio="Nenhuma relacao entre empresas encontrada no periodo."
+                vazio="Nenhuma relação entre empresas encontrada no período."
               />
             </BlocoConteudo>
 
@@ -451,8 +452,8 @@ export default function FinanceiroIntercompany() {
                     noCard: 'titulo',
                     render: (item) => labelTipo(item.tipo_intercompany)
                   },
-                  { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (item) => item.titulos },
-                  { id: 'transferencias', titulo: 'Transferencias', tipo: 'numero', render: (item) => item.transferencias },
+                  { id: 'titulos', titulo: 'Títulos', tipo: 'numero', render: (item) => item.titulos },
+                  { id: 'transferencias', titulo: 'Transferências', tipo: 'numero', render: (item) => item.transferencias },
                   { id: 'realizado', titulo: 'Realizado', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.valor_realizado)}</Realizado> }
                 ]}
                 itens={porTipo}
@@ -465,9 +466,9 @@ export default function FinanceiroIntercompany() {
           </section>
 
           <BlocoConteudo
-            titulo="Transferencias financeiras entre empresas"
-            contagem={`${transferencias.length} transferencia(s)`}
-            descricao="Registros efetivos entre contas de empresas diferentes, vindos do caixa ou da conciliacao bancaria."
+            titulo="Transferências financeiras entre empresas"
+            contagem={`${transferencias.length} transferência(s)`}
+            descricao="Registros efetivos entre contas de empresas diferentes, vindos do caixa ou da conciliação bancária."
             variante="secundario"
             className="app-table-shell"
           >
@@ -516,13 +517,13 @@ export default function FinanceiroIntercompany() {
               itens={transferencias}
               storageKey="tabela:financeiro-intercompany:transferencias"
               rotuloRolagem="Transferencias financeiras entre empresas"
-              vazio="Nenhuma transferencia entre empresas encontrada para os filtros atuais."
+              vazio="Nenhuma transferência entre empresas encontrada para os filtros atuais."
             />
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Titulos entre empresas"
-            contagem={`${titulos.length} titulo(s)`}
+            titulo="Títulos entre empresas"
+            contagem={`${titulos.length} título(s)`}
             descricao={cortadoNoTeto
               ? `Teto de ${teto} registros atingido: a lista mostra as competencias mais antigas do recorte, nao o recorte inteiro.`
               : 'Base analitica para auditoria, conciliacao e explicacao do consolidado.'}
@@ -533,7 +534,7 @@ export default function FinanceiroIntercompany() {
               colunas={[
                 {
                   id: 'titulo',
-                  titulo: 'Titulo',
+                  titulo: 'Título',
                   // R17: o codigo do titulo NOMEIA o registro.
                   tipo: 'identidade',
                   noCard: 'titulo',
@@ -546,7 +547,7 @@ export default function FinanceiroIntercompany() {
                     </div>
                   )
                 },
-                { id: 'competencia', titulo: 'Competencia', tipo: 'data', render: (titulo) => formatDate(titulo.competencia_data || titulo.data_emissao || titulo.data_vencimento) },
+                { id: 'competencia', titulo: 'Competência', tipo: 'data', render: (titulo) => formatDate(titulo.competencia_data || titulo.data_emissao || titulo.data_vencimento) },
                 { id: 'origem', titulo: 'Origem', tipo: 'texto', render: (titulo) => titulo.empresa_origem_nome },
                 { id: 'destino', titulo: 'Destino', tipo: 'texto', render: (titulo) => titulo.empresa_destino_nome },
                 { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (titulo) => labelTipo(titulo.tipo_intercompany) },
@@ -558,7 +559,7 @@ export default function FinanceiroIntercompany() {
               itens={titulos}
               storageKey="tabela:financeiro-intercompany:titulos"
               rotuloRolagem="Titulos entre empresas"
-              vazio="Nenhum titulo entre empresas encontrado para os filtros atuais."
+              vazio="Nenhum título entre empresas encontrado para os filtros atuais."
             />
           </BlocoConteudo>
         </>

@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useState } from 'react';
 import { HiOutlineArrowDownTray, HiOutlineArrowUpTray, HiOutlineBuildingOffice2, HiOutlineXMark } from 'react-icons/hi2';
 import OverlayModal from '../components/ui/OverlayModal';
@@ -376,7 +377,7 @@ export default function FinanceiroObras({ embutido = false }) {
     if (!linhasValidas.length) return;
 
     const { ok } = await confirmar({
-      titulo: 'Confirmar importacao de custos historicos',
+      titulo: 'Confirmar importação de custos históricos',
       mensagem: `Importar ${linhasValidas.length} linha(s) valida(s) de "${lote.arquivo_nome || 'planilha'}" para o historico da obra? `
         + 'As linhas entram no executado/recebido do Financeiro de Obras e nao geram titulos, baixas, DRE nem movimento bancario. '
         + 'Esta acao nao pode ser desfeita por esta tela.',
@@ -462,7 +463,7 @@ export default function FinanceiroObras({ embutido = false }) {
   */
   const acoesDaTela = {
     acaoPrincipal: {
-      rotulo: 'Importar historico',
+      rotulo: 'Importar histórico',
       icone: <HiOutlineArrowUpTray aria-hidden="true" />,
       onClick: () => setImportModalOpen(true)
     },
@@ -481,7 +482,7 @@ export default function FinanceiroObras({ embutido = false }) {
         <PageHeader
           titulo="Financeiro de Obras"
           contagem={`${relatorio.resumo.quantidade_linhas || 0} linha(s)`}
-          descricao="Custo por obra nas visoes realizada, comprometida e a realizar."
+          descricao="Custo por obra nas visões realizada, comprometida e a realizar."
           acaoPrincipal={acoesDaTela.acaoPrincipal}
           secundarias={acoesDaTela.secundarias}
         />
@@ -522,11 +523,11 @@ export default function FinanceiroObras({ embutido = false }) {
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial} onChange={(e) => setFilter('data_inicial', e.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_inicial} onChange={(e) => setFilter('data_inicial', e.target.value)} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final} onChange={(e) => setFilter('data_final', e.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_final} onChange={(e) => setFilter('data_final', e.target.value)} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Tipo</span>
@@ -542,7 +543,7 @@ export default function FinanceiroObras({ embutido = false }) {
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Busca</span>
-            <input className="input w-full input-sm" value={filters.q} onChange={(e) => setFilter('q', e.target.value)} placeholder="Titulo, documento, parceiro..." />
+            <input className="input w-full input-sm" value={filters.q} onChange={(e) => setFilter('q', e.target.value)} placeholder="Título, documento, parceiro..." />
           </label>
         </div>
 
@@ -597,7 +598,7 @@ export default function FinanceiroObras({ embutido = false }) {
                 checked={filters.incluir_historico !== '0'}
                 onChange={(event) => setFilter('incluir_historico', event.target.checked ? '1' : '0')}
               />
-              Incluir historico legado no executado
+              Incluir histórico legado no executado
             </label>
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
@@ -609,7 +610,7 @@ export default function FinanceiroObras({ embutido = false }) {
             */}
             <span className="text-sm text-[var(--c-muted)]">{APOIO_RASCUNHO}</span>
             <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>
-            <button type="submit" className="btn btn-primary btn-sm">Gerar relatorio</button>
+            <button type="submit" className="btn btn-primary btn-sm">Gerar relatório</button>
           </div>
         </div>
       </form>
@@ -628,15 +629,15 @@ export default function FinanceiroObras({ embutido = false }) {
       */}
       <StatGrid colunas={4}>
         <StatTile
-          label="Credito"
+          label="Crédito"
           valor={formatCurrency(relatorio.resumo.credito_total)}
           sub="Entradas no recorte carregado"
           tom={tomDoValor('positive')}
         />
         <StatTile
-          label="Debito"
+          label="Débito"
           valor={formatCurrency(relatorio.resumo.debito_total)}
-          sub="Saidas no recorte carregado"
+          sub="Saídas no recorte carregado"
           tom={tomDoValor('negative')}
         />
         {/* O limite exibido é o do relatório JÁ CARREGADO (o que o servidor
@@ -649,9 +650,9 @@ export default function FinanceiroObras({ embutido = false }) {
           tom={tomDoValor(Number(relatorio.resumo.saldo_total || 0) >= 0 ? 'positive' : 'negative')}
         />
         <StatTile
-          label="Titulos"
+          label="Títulos"
           valor={String(relatorio.resumo.titulos || 0)}
-          sub={`${relatorio.resumo.movimentos || 0} baixa(s) / ${relatorio.resumo.historicos || 0} historico(s) / ${relatorio.resumo.fretes || 0} frete(s)`}
+          sub={`${relatorio.resumo.movimentos || 0} baixa(s) / ${relatorio.resumo.historicos || 0} histórico(s) / ${relatorio.resumo.fretes || 0} frete(s)`}
         />
       </StatGrid>
 
@@ -680,11 +681,11 @@ export default function FinanceiroObras({ embutido = false }) {
                 </div>
               )
             },
-            { id: 'titulo_parcela', titulo: 'Titulo/Parcela', tipo: 'codigo', render: (linha) => linha.titulo_parcela || '-' },
+            { id: 'titulo_parcela', titulo: 'Título/Parcela', tipo: 'codigo', render: (linha) => linha.titulo_parcela || '-' },
             { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (linha) => <span className="text-xs">{linha.documento || '-'}</span> },
             { id: 'plano_financeiro', titulo: 'Plano financeiro', tipo: 'texto', render: (linha) => <span className="line-clamp-2">{linha.plano_financeiro || '-'}</span> },
-            { id: 'credito', titulo: 'Credito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-success)]">{linha.credito ? formatCurrency(linha.credito) : '-'}</span> },
-            { id: 'debito', titulo: 'Debito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-danger)]">{linha.debito ? formatCurrency(linha.debito) : '-'}</span> },
+            { id: 'credito', titulo: 'Crédito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-success)]">{linha.credito ? formatCurrency(linha.credito) : '-'}</span> },
+            { id: 'debito', titulo: 'Débito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-danger)]">{linha.debito ? formatCurrency(linha.debito) : '-'}</span> },
             { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (linha) => <strong>{formatCurrency(linha.saldo)}</strong> },
             { id: 'obra_nome', titulo: 'Obra', tipo: 'texto', render: (linha) => (linha.obra_codigo ? `${linha.obra_codigo} - ${linha.obra_nome || ''}` : (linha.obra_nome || '-')) },
             { id: 'empresa_nome', titulo: 'Empresa', tipo: 'texto', render: (linha) => linha.empresa_nome || '-' },
@@ -695,7 +696,7 @@ export default function FinanceiroObras({ embutido = false }) {
           aoClicarLinha={abrirArquivos}
           storageKey="tabela:financeiro-obras:detalhamento"
           rotuloRolagem="Detalhamento financeiro das obras"
-          vazio="Nenhum titulo encontrado para os filtros selecionados."
+          vazio="Nenhum título encontrado para os filtros selecionados."
         />
       </section>
 
@@ -743,7 +744,7 @@ export default function FinanceiroObras({ embutido = false }) {
             {arquivosModal && !arquivosModal.motivo && !arquivosLoading
               && (arquivosModal.arquivos || []).length === 0 ? (
                 <p className="text-sm text-[var(--c-muted)]" data-testid="arquivos-vazio">
-                  A solicitacao deste pagamento nao tem nenhum arquivo anexado.
+                  A solicitação deste pagamento não tem nenhum arquivo anexado.
                 </p>
               ) : null}
 
@@ -779,7 +780,7 @@ export default function FinanceiroObras({ embutido = false }) {
           paleta crua. */}
       {importModalOpen ? (
         <OverlayModal
-          rotulo="Importar custos historicos"
+          rotulo="Importar custos históricos"
           largura="var(--modal-max-w-xl, 1120px)"
           onFechar={importLoading ? undefined : fecharImportModal}
         >
@@ -788,9 +789,9 @@ export default function FinanceiroObras({ embutido = false }) {
             className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-4"
           >
             <div>
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Importar custos historicos</h2>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Importar custos históricos</h2>
               <p className="text-sm text-[var(--c-muted)]">
-                As linhas importadas entram somente no executado/recebido do Financeiro de Obras e nao geram titulos, baixas, DRE ou movimento bancario.
+                As linhas importadas entram somente no executado/recebido do Financeiro de Obras e não geram títulos, baixas, DRE ou movimento bancário.
               </p>
             </div>
             <button type="button" className="btn btn-icon btn-outline shrink-0" onClick={fecharImportModal} disabled={importLoading} aria-label="Fechar">
@@ -817,7 +818,7 @@ export default function FinanceiroObras({ embutido = false }) {
                 </select>
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Empresa padrao</span>
+                <span className="app-filter-label">Empresa padrão</span>
                 <select
                   className="input w-full input-sm"
                   value={importForm.empresa_id}
@@ -831,7 +832,7 @@ export default function FinanceiroObras({ embutido = false }) {
                 </select>
               </label>
               <label className="app-filter-field">
-                <span className="app-filter-label">Plano financeiro padrao</span>
+                <span className="app-filter-label">Plano financeiro padrão</span>
                 <select
                   className="input w-full input-sm"
                   value={importForm.categoria_financeira_id}
@@ -868,11 +869,11 @@ export default function FinanceiroObras({ embutido = false }) {
                 {/* O resumo vem do servidor sobre a PLANILHA INTEIRA, nao
                     sobre a pagina visivel da pre-visualizacao abaixo. */}
                 <StatGrid colunas={3}>
-                  <StatTile label="Importaveis" valor={String(importPreview.resumo?.importaveis || 0)} sub="Linhas validas" tom={tomDoValor('positive')} />
-                  <StatTile label="Duplicadas" valor={String(importPreview.resumo?.duplicados || 0)} sub="Ja importadas" tom={tomDoValor(importPreview.resumo?.duplicados ? 'warning' : 'default')} />
+                  <StatTile label="Importaveis" valor={String(importPreview.resumo?.importaveis || 0)} sub="Linhas válidas" tom={tomDoValor('positive')} />
+                  <StatTile label="Duplicadas" valor={String(importPreview.resumo?.duplicados || 0)} sub="Já importadas" tom={tomDoValor(importPreview.resumo?.duplicados ? 'warning' : 'default')} />
                   <StatTile label="Erros" valor={String(importPreview.resumo?.erros || 0)} sub="Linhas ignoradas" tom={tomDoValor(importPreview.resumo?.erros ? 'negative' : 'default')} />
-                  <StatTile label="Creditos" valor={formatCurrency(importPreview.resumo?.credito_total)} sub="Recebido legado" tom={tomDoValor('positive')} />
-                  <StatTile label="Debitos" valor={formatCurrency(importPreview.resumo?.debito_total)} sub="Custo legado" tom={tomDoValor('negative')} />
+                  <StatTile label="Créditos" valor={formatCurrency(importPreview.resumo?.credito_total)} sub="Recebido legado" tom={tomDoValor('positive')} />
+                  <StatTile label="Débitos" valor={formatCurrency(importPreview.resumo?.debito_total)} sub="Custo legado" tom={tomDoValor('negative')} />
                   <StatTile label="Total" valor={formatCurrency(importPreview.resumo?.valor_total)} sub="Total importavel" />
                 </StatGrid>
 
@@ -882,7 +883,7 @@ export default function FinanceiroObras({ embutido = false }) {
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="flex items-center gap-2 text-sm text-[var(--c-muted)]">
-                      Por pagina
+                      Por página
                       <select
                         className="input input-sm"
                         value={importPreviewPageSize}
@@ -911,7 +912,7 @@ export default function FinanceiroObras({ embutido = false }) {
                       onClick={() => setImportPreviewPage((page) => Math.min(importPreviewTotalPages, page + 1))}
                       disabled={importPreviewPage >= importPreviewTotalPages}
                     >
-                      Proxima
+                      Próxima
                     </button>
                   </div>
                 </div>
@@ -934,15 +935,15 @@ export default function FinanceiroObras({ embutido = false }) {
                       },
                       { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (linha) => linha.documento || '-' },
                       { id: 'plano_financeiro', titulo: 'Plano financeiro', tipo: 'texto', render: (linha) => linha.plano_financeiro || '-' },
-                      { id: 'credito', titulo: 'Credito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-success)]">{linha.tipo === 'RECEBER' ? formatCurrency(linha.valor) : '-'}</span> },
-                      { id: 'debito', titulo: 'Debito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-danger)]">{linha.tipo === 'PAGAR' ? formatCurrency(linha.valor) : '-'}</span> },
-                      { id: 'observacao', titulo: 'Observacao', tipo: 'texto', render: (linha) => <span className="text-xs text-[var(--c-muted)]">{linha.erros?.join(' ') || '-'}</span> }
+                      { id: 'credito', titulo: 'Crédito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-success)]">{linha.tipo === 'RECEBER' ? formatCurrency(linha.valor) : '-'}</span> },
+                      { id: 'debito', titulo: 'Débito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-danger)]">{linha.tipo === 'PAGAR' ? formatCurrency(linha.valor) : '-'}</span> },
+                      { id: 'observacao', titulo: 'Observação', tipo: 'texto', render: (linha) => <span className="text-xs text-[var(--c-muted)]">{linha.erros?.join(' ') || '-'}</span> }
                     ]}
                     itens={importPreviewPagedRows}
                     getId={(linha) => `${linha.row_number}-${linha.hash_linha}`}
                     storageKey="tabela:financeiro-obras:importacao-preview"
                     rotuloRolagem="Pre-visualizacao da importacao de custos historicos"
-                    vazio="Nenhuma linha na pre-visualizacao."
+                    vazio="Nenhuma linha na pre-visualização."
                   />
                 </div>
 

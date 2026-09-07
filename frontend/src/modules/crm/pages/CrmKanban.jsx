@@ -92,7 +92,7 @@ function LeadCard({ lead, onOpenActions, onDragStart }) {
             onOpenActions(lead);
           }}
         >
-          Acoes
+          Ações
         </button>
       </div>
 
@@ -145,7 +145,7 @@ function StageModal({ mode, form, saving, onChange, onClose, onSubmit }) {
               className="input"
               value={form.nome}
               onChange={(event) => onChange({ ...form, nome: event.target.value })}
-              placeholder="Ex: Em negociacao"
+              placeholder="Ex: Em negociação"
               required
             />
           </CampoForm>
@@ -216,7 +216,7 @@ function LeadActionsModal({ lead, stages, moving, onClose, onView, onMove }) {
   if (!lead) return null;
 
   return (
-    <OverlayModal aberto rotulo={`Acoes do lead ${lead.nome}`} onFechar={onClose}>
+    <OverlayModal aberto rotulo={`Ações do lead ${lead.nome}`} onFechar={onClose}>
       <div data-modal="cabecalho" className="app-bloco-head">
         <h2 className="app-bloco-titulo">{lead.nome}</h2>
         <span className="app-bloco-acoes">
@@ -225,7 +225,7 @@ function LeadActionsModal({ lead, stages, moving, onClose, onView, onMove }) {
       </div>
 
       <div className="p-4">
-        <p className="text-sm text-muted">Acoes rapidas do lead no Kanban.</p>
+        <p className="text-sm text-muted">Ações rápidas do lead no Kanban.</p>
 
         <div className="mt-3 flex flex-col gap-3">
           <button type="button" className="btn btn-primary" onClick={onView}>
@@ -472,7 +472,7 @@ export default function CrmKanban() {
         cor="var(--sem-info)"
         titulo={kanban?.pipeline?.nome || 'Funil'}
         contagem={`${colunas.length} etapa${colunas.length !== 1 ? 's' : ''}`}
-        descricao="Arraste o cartao para mudar a etapa do lead; a mudanca pede confirmacao."
+        descricao="Arraste o cartão para mudar a etapa do lead; a mudança pede confirmação."
         acoes={pipelines.length > 1 ? (
           /*
             R12 — este `select` NÃO é filtro: é o seletor de CONTEXTO do

@@ -25,6 +25,7 @@ import {
 } from '../components/padrao';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
+import DateInputBR from '../components/DateInputBR';
 
 // Uma chave só para a tabela: a TabelaPadrao guarda nela a escolha de
 // colunas (visíveis + ordem) e as larguras. Substitui a chave antiga
@@ -119,7 +120,7 @@ const campoValor = (id) => (row) => formatCurrency(row[id]);
 const COLUNAS = [
   {
     id: 'titulo_codigo',
-    titulo: 'Titulo',
+    titulo: 'Título',
     // R17: o código do título é o que nomeia a linha do relatório.
     tipo: 'identidade',
     noCard: 'titulo',
@@ -149,7 +150,7 @@ const COLUNAS = [
   { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: campoTexto('tipo') },
   {
     id: 'status_titulo',
-    titulo: 'Status titulo',
+    titulo: 'Status título',
     tipo: 'status',
     texto: campoTexto('status_titulo'),
     render: (row) => (row.status_titulo
@@ -182,7 +183,7 @@ const COLUNAS = [
   { id: 'obra_nome', titulo: 'Obra', tipo: 'texto', texto: campoTexto('obra_nome'), render: (row) => <CelulaDupla principal={row.obra_nome || '-'} /> },
   { id: 'categoria_nome', titulo: 'Categoria', tipo: 'texto', texto: campoTexto('categoria_nome'), render: (row) => <CelulaDupla principal={row.categoria_nome || '-'} /> },
   { id: 'numero_documento', titulo: 'Documento', tipo: 'codigo', render: campoTexto('numero_documento') },
-  { id: 'data_emissao', titulo: 'Emissao', tipo: 'data', render: campoData('data_emissao') },
+  { id: 'data_emissao', titulo: 'Emissão', tipo: 'data', render: campoData('data_emissao') },
   { id: 'data_vencimento', titulo: 'Vencimento', tipo: 'data', render: campoData('data_vencimento') },
   { id: 'data_movimento', titulo: 'Data baixa', tipo: 'data', render: campoData('data_movimento') },
   { id: 'conta_bancaria_nome', titulo: 'Conta', tipo: 'texto', texto: campoTexto('conta_bancaria_nome'), render: (row) => <CelulaDupla principal={row.conta_bancaria_nome || '-'} /> },
@@ -194,7 +195,7 @@ const COLUNAS = [
   { id: 'multa', titulo: 'Multa', tipo: 'valor', render: campoValor('multa') },
   { id: 'desconto', titulo: 'Desconto', tipo: 'valor', render: campoValor('desconto') },
   { id: 'valor_quitacao', titulo: 'Quitacao', tipo: 'valor', render: campoValor('valor_quitacao') },
-  { id: 'usuario_baixa', titulo: 'Usuario baixa', tipo: 'texto', texto: campoTexto('usuario_baixa'), render: (row) => <CelulaDupla principal={row.usuario_baixa || '-'} /> },
+  { id: 'usuario_baixa', titulo: 'Usuário baixa', tipo: 'texto', texto: campoTexto('usuario_baixa'), render: (row) => <CelulaDupla principal={row.usuario_baixa || '-'} /> },
   { id: 'origem', titulo: 'Origem', tipo: 'texto', render: campoTexto('origem') }
 ];
 
@@ -353,7 +354,7 @@ export default function FinanceiroRelatorioAnalitico() {
         AVISA que a marca ainda nao vale.
       */}
       <PageHeader
-        titulo="Relatorio Analitico Financeiro"
+        titulo="Relatório Analítico Financeiro"
         contagem={loading ? 'Carregando…' : `${relatorio.linhas.length} linha(s)`}
         descricao={apoioDaFaixa}
         acaoPrincipal={{
@@ -381,7 +382,7 @@ export default function FinanceiroRelatorioAnalitico() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
-        titulo="Recorte do relatorio"
+        titulo="Recorte do relatório"
         descricao="A grade abaixo so muda ao consultar."
         variante="secundario"
       >
@@ -396,10 +397,10 @@ export default function FinanceiroRelatorioAnalitico() {
             </select>
           </label>
           <label className="app-filter-field xl:col-span-2">
-            <span className="app-filter-label">Status titulo</span>
+            <span className="app-filter-label">Status título</span>
             <select className="input w-full input-sm" value={filters.status_titulo} onChange={(event) => setFilter('status_titulo', event.target.value)}>
               <option value="">Todos</option>
-              <option value="PREVISAO">Previsao</option>
+              <option value="PREVISAO">Previsão</option>
               <option value="ABERTO">Aberto</option>
               <option value="PARCIAL">Parcial</option>
               <option value="QUITADO">Quitado</option>
@@ -418,23 +419,23 @@ export default function FinanceiroRelatorioAnalitico() {
           </label>
           <label className="app-filter-field xl:col-span-6">
             <span className="app-filter-label">Busca</span>
-            <input className="input w-full input-sm" value={filters.q} onChange={(event) => setFilter('q', event.target.value)} placeholder="Titulo, parceiro, documento ou obra" />
+            <input className="input w-full input-sm" value={filters.q} onChange={(event) => setFilter('q', event.target.value)} placeholder="Título, parceiro, documento ou obra" />
           </label>
           <label className="app-filter-field xl:col-span-2">
             <span className="app-filter-label">Baixa inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial} onChange={(event) => setFilter('data_inicial', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_inicial} onChange={(event) => setFilter('data_inicial', event.target.value)} />
           </label>
           <label className="app-filter-field xl:col-span-2">
             <span className="app-filter-label">Baixa final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final} onChange={(event) => setFilter('data_final', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_final} onChange={(event) => setFilter('data_final', event.target.value)} />
           </label>
           <label className="app-filter-field xl:col-span-2">
             <span className="app-filter-label">Venc. inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.vencimento_inicial} onChange={(event) => setFilter('vencimento_inicial', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.vencimento_inicial} onChange={(event) => setFilter('vencimento_inicial', event.target.value)} />
           </label>
           <label className="app-filter-field xl:col-span-2">
             <span className="app-filter-label">Venc. final</span>
-            <input className="input w-full input-sm" type="date" value={filters.vencimento_final} onChange={(event) => setFilter('vencimento_final', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.vencimento_final} onChange={(event) => setFilter('vencimento_final', event.target.value)} />
           </label>
           <label className="app-filter-field xl:col-span-4">
             <span className="app-filter-label">Obra</span>
@@ -503,9 +504,9 @@ export default function FinanceiroRelatorioAnalitico() {
       >
         <StatGrid colunas={3}>
           <StatTile
-            label="Titulos"
+            label="Títulos"
             valor={String(relatorio.resumo?.titulos || 0)}
-            sub={`${relatorio.resumo?.quantidade_linhas || 0} linha(s) de titulo e baixa`}
+            sub={`${relatorio.resumo?.quantidade_linhas || 0} linha(s) de título e baixa`}
           />
           <StatTile
             label={cortadoNoTeto ? 'Saldo nas linhas trazidas' : 'Saldo do recorte'}
@@ -529,7 +530,7 @@ export default function FinanceiroRelatorioAnalitico() {
           vazio="Nenhuma linha encontrada."
           larguraAcoes={120}
           acoesLinha={(row) => (
-            <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${row.titulo_id}`} title="Abrir titulo">
+            <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${row.titulo_id}`} title="Abrir título">
               <HiOutlineEye className="h-4 w-4" />
             </Link>
           )}

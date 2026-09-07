@@ -41,8 +41,8 @@ import {
 import '../styles/boleto-ficha.css';
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'Todos elegiveis' },
-  { value: 'PENDENTE_EMISSAO', label: 'Pendente emissao' },
+  { value: '', label: 'Todos elegíveis' },
+  { value: 'PENDENTE_EMISSAO', label: 'Pendente emissão' },
   { value: 'EMITIDO', label: 'Emitido' },
   { value: 'CANCELADO', label: 'Cancelado' }
 ];
@@ -165,7 +165,7 @@ function BarcodeSvg({ value }) {
       preserveAspectRatio="xMinYMid meet"
       className="boleto-codigo-barras"
       role="img"
-      aria-label="Codigo de barras do boleto"
+      aria-label="Código de barras do boleto"
     >
       {bars.map((bar, index) => (
         <rect key={`${bar.x}-${index}`} x={bar.x} y="0" width={bar.width} height={height} fill="currentColor" />
@@ -191,7 +191,7 @@ function BoletoPrintView({ detalhe }) {
   if (!boleto.codigo_barras) {
     return (
       <div className="app-empty-card">
-        Gere o boleto para visualizar a ficha de compensacao.
+        Gere o boleto para visualizar a ficha de compensação.
       </div>
     );
   }
@@ -205,7 +205,7 @@ function BoletoPrintView({ detalhe }) {
         </div>
         {boleto.modo_teste && (
           <div className="rounded-full border border-[color:var(--boleto-aviso)] px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--boleto-aviso)]">
-            Boleto de teste - nao registrado
+            Boleto de teste - não registrado
           </div>
         )}
         <div className="text-right font-mono text-sm font-semibold">{boleto.linha_digitavel}</div>
@@ -230,7 +230,7 @@ function BoletoPrintView({ detalhe }) {
           <div>{beneficiario.endereco || '-'}</div>
         </div>
         <div className="p-2">
-          <span className="block text-[var(--boleto-rotulo)]">Agencia / Codigo do beneficiario</span>
+          <span className="block text-[var(--boleto-rotulo)]">Agência / Código do beneficiario</span>
           <strong>{boleto.agencia_codigo_beneficiario || '-'}</strong>
         </div>
       </div>
@@ -253,7 +253,7 @@ function BoletoPrintView({ detalhe }) {
           <strong>N</strong>
         </div>
         <div className="p-2">
-          <span className="block text-[var(--boleto-rotulo)]">Nosso numero</span>
+          <span className="block text-[var(--boleto-rotulo)]">Nosso número</span>
           <strong>{boleto.nosso_numero || titulo.nosso_numero || '-'}</strong>
         </div>
       </div>
@@ -283,14 +283,14 @@ function BoletoPrintView({ detalhe }) {
 
       <div className="boleto-instrucoes grid border-b border-[color:var(--boleto-regua)] text-xs md:grid-cols-[2fr_1fr]">
         <div className="border-r border-[color:var(--boleto-regua)] p-2">
-          <span className="block text-[var(--boleto-rotulo)]">Instrucoes</span>
+          <span className="block text-[var(--boleto-rotulo)]">Instruções</span>
           <strong>Instrucoes (Texto de Responsabilidade do Beneficiario)</strong>
           {boleto.modo_teste && (
             <p className="mt-1 font-semibold text-[var(--boleto-aviso)]">
-              BOLETO DE TESTE. Nao usar para cobranca real e nao distribuir ao pagador.
+              BOLETO DE TESTE. Não usar para cobrança real e não distribuir ao pagador.
             </p>
           )}
-          <p className="mt-1">Nao receber apos o vencimento sem autorizacao do beneficiario.</p>
+          <p className="mt-1">Não receber após o vencimento sem autorização do beneficiario.</p>
           <p>{titulo.descricao}</p>
         </div>
         <div className="grid grid-rows-4">
@@ -318,7 +318,7 @@ function BoletoPrintView({ detalhe }) {
 
       <div className="grid items-end gap-4 pt-4 md:grid-cols-[minmax(0,1fr)_220px]">
         <BarcodeSvg value={boleto.codigo_barras} />
-        <div className="text-right text-xs font-semibold">Autenticacao Mecanica - Ficha de Compensacao</div>
+        <div className="text-right text-xs font-semibold">Autenticacao Mecanica - Ficha de Compensação</div>
       </div>
 
       <div className="mt-2 break-all font-mono text-xs text-[var(--boleto-rotulo)]">
@@ -345,11 +345,11 @@ function BoletoPrintView({ detalhe }) {
 */
 const FILTROS_DA_TELA = [
   { id: 'q', rotulo: 'Busca', obrigatorio: true },
-  { id: 'codigo', rotulo: 'Titulo' },
+  { id: 'codigo', rotulo: 'Título' },
   { id: 'numero_documento', rotulo: 'N. documento' },
-  { id: 'vencimento_inicial', rotulo: 'Vencimento inicio' },
+  { id: 'vencimento_inicial', rotulo: 'Vencimento início' },
   { id: 'vencimento_final', rotulo: 'Vencimento fim' },
-  { id: 'status_cobranca', rotulo: 'Status cobranca' },
+  { id: 'status_cobranca', rotulo: 'Status cobrança' },
   { id: 'origem', rotulo: 'Origem' },
   { id: 'empreendimento_id', rotulo: 'Empreendimento' }
 ];
@@ -668,7 +668,7 @@ export default function FinanceiroBoletos() {
 
   async function onGerarMassa() {
     if (!titulosSelecionados.length) {
-      avisar.alerta('Selecione ao menos um titulo para gerar boletos em massa.');
+      avisar.alerta('Selecione ao menos um título para gerar boletos em massa.');
       return;
     }
 
@@ -728,12 +728,12 @@ export default function FinanceiroBoletos() {
 
   async function onGerarRemessa() {
     if (!selecionados.length) {
-      avisar.alerta('Selecione os titulos com boleto gerado para montar a remessa.');
+      avisar.alerta('Selecione os títulos com boleto gerado para montar a remessa.');
       return;
     }
 
     if (!convenioSelecionadoId) {
-      avisar.alerta('Cadastre ou selecione um convenio Caixa antes de gerar a remessa.');
+      avisar.alerta('Cadastre ou selecione um convênio Caixa antes de gerar a remessa.');
       return;
     }
 
@@ -771,7 +771,7 @@ export default function FinanceiroBoletos() {
     }
 
     if (!convenioSelecionadoId) {
-      avisar.alerta('Selecione o convenio Caixa para importar o retorno.');
+      avisar.alerta('Selecione o convênio Caixa para importar o retorno.');
       return;
     }
 
@@ -904,7 +904,7 @@ export default function FinanceiroBoletos() {
   const dimensoesRascunho = [
     {
       id: 'status_cobranca',
-      rotulo: 'Status cobranca',
+      rotulo: 'Status cobrança',
       unico: true,
       opcoes: STATUS_OPTIONS.filter((item) => item.value).map((item) => ({ valor: item.value, rotulo: item.label }))
     },
@@ -931,7 +931,7 @@ export default function FinanceiroBoletos() {
   const condicoesDaIntegracao = [
     config && !config.configurado ? {
       id: 'configuracao',
-      titulo: 'Configuracao de boletos pendente',
+      titulo: 'Configuração de boletos pendente',
       cor: 'var(--sem-warning)',
       texto: `Configure ${getConfigIssues(config).join(', ')} no backend/.env antes de gerar boletos.`
     } : null,
@@ -939,13 +939,13 @@ export default function FinanceiroBoletos() {
       id: 'modo_teste',
       titulo: 'Ambiente de boletos em TESTE',
       cor: 'var(--sem-info)',
-      texto: 'A geracao e local: nao registra nem envia boletos para a Caixa.'
+      texto: 'A geração e local: não registra nem envia boletos para a Caixa.'
     } : null,
     config?.emissao_real_bloqueada ? {
       id: 'emissao_bloqueada',
-      titulo: 'Emissao real bloqueada',
+      titulo: 'Emissão real bloqueada',
       cor: 'var(--sem-warning)',
-      texto: 'Defina CAIXA_BOLETO_HOMOLOGADO=true somente apos homologacao formal com a Caixa.'
+      texto: 'Defina CAIXA_BOLETO_HOMOLOGADO=true somente após homologação formal com a Caixa.'
     } : null
   ].filter(Boolean);
 
@@ -961,10 +961,10 @@ export default function FinanceiroBoletos() {
           mesma remoção que a R11 autoriza pelo exemplo do "⋯" de Parceiros
           e que a FinanceiroTitulos aplicou a quatro links em 03/09. */}
       <PageHeader
-        titulo="Geracao de boletos"
+        titulo="Geração de boletos"
         /* C2: contagem é número em todos os estados; o "ainda não
            consultei" vive na descrição, que é onde essa informação cabe. */
-        contagem={`${hasConsulted ? titulos.length : 0} titulo(s) no resultado`}
+        contagem={`${hasConsulted ? titulos.length : 0} título(s) no resultado`}
         descricao={`${hasConsulted ? '' : 'Consulta ainda nao executada. '}${comercialHabilitado
           ? 'Emissao Caixa SIGCB a partir dos titulos a receber comerciais ou manuais.'
           : 'Emissao Caixa SIGCB a partir dos titulos a receber manuais.'}`}
@@ -995,7 +995,7 @@ export default function FinanceiroBoletos() {
       <BlocoConteudo
         titulo="Remessa e retorno Caixa"
         contagem={`${remessasCaixa.length} remessa(s) · ${retornosCaixa.length} retorno(s)`}
-        descricao="Use depois de gerar os boletos e antes da homologacao na agencia."
+        descricao="Use depois de gerar os boletos e antes da homologação na agência."
         variante="secundario"
         recolhivel
       >
@@ -1003,7 +1003,7 @@ export default function FinanceiroBoletos() {
           <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--ui-surface-soft)] p-3">
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
               <label className="sol-filter-field">
-                <span className="sol-filter-label">Convenio Caixa</span>
+                <span className="sol-filter-label">Convênio Caixa</span>
                 {/* R12: seletor de CONTEXTO — escolhe SOB QUAL convênio a
                     remessa é montada, e o arquivo herda a escolha. A regra
                     declara esse uso legítimo; não é filtro de lista. */}
@@ -1032,7 +1032,7 @@ export default function FinanceiroBoletos() {
               </button>
             </div>
             <p className="mt-2 text-xs text-[var(--c-muted)]">
-              A remessa usa os titulos selecionados na tabela. Gere o boleto antes de montar o arquivo CNAB.
+              A remessa usa os títulos selecionados na tabela. Gere o boleto antes de montar o arquivo CNAB.
             </p>
           </div>
 
@@ -1073,7 +1073,7 @@ export default function FinanceiroBoletos() {
               </button>
             </div>
             <p className="mt-2 text-xs text-[var(--c-muted)]">
-              Liquidacoes do retorno baixam os titulos vinculados de forma idempotente, sem duplicar movimentos ja aplicados.
+              Liquidacoes do retorno baixam os títulos vinculados de forma idempotente, sem duplicar movimentos já aplicados.
             </p>
           </div>
         </div>
@@ -1082,7 +1082,7 @@ export default function FinanceiroBoletos() {
           <div className="mt-4">
             <TabelaPadrao
               colunas={[
-                { id: 'numero', titulo: 'Ultimas remessas', tipo: 'codigo', render: (item) => <strong>#{item.numero_remessa}</strong> },
+                { id: 'numero', titulo: 'Últimas remessas', tipo: 'codigo', render: (item) => <strong>#{item.numero_remessa}</strong> },
                 {
                   id: 'arquivo',
                   titulo: 'Arquivo',
@@ -1114,7 +1114,7 @@ export default function FinanceiroBoletos() {
                     type="button"
                     className="btn btn-outline btn-sm"
                     onClick={() => onBaixarHomologacao(item)}
-                    title="Baixar o relatorio de homologacao em CSV"
+                    title="Baixar o relatório de homologação em CSV"
                     disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
                   >
                     {baixandoHomologacaoId === item.id ? 'CSV...' : 'CSV'}
@@ -1123,7 +1123,7 @@ export default function FinanceiroBoletos() {
                     type="button"
                     className="btn btn-primary btn-sm"
                     onClick={() => onBaixarPacoteHomologacao(item)}
-                    title="Baixar o pacote completo de homologacao"
+                    title="Baixar o pacote completo de homologação"
                     disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
                   >
                     {baixandoPacoteId === item.id ? 'ZIP...' : 'ZIP'}
@@ -1136,7 +1136,7 @@ export default function FinanceiroBoletos() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Consulta de titulos elegiveis"
+        titulo="Consulta de títulos elegíveis"
         variante="secundario"
         descricao={recorteEmRascunho
           ? 'As marcas abaixo sao RASCUNHO: a lista so muda quando voce clicar em Consultar.'
@@ -1161,12 +1161,12 @@ export default function FinanceiroBoletos() {
             busca={visibilidadeFiltros.ehVisivel('q') ? {
               valor: filters.q,
               aoMudar: (valor) => updateFilter('q', valor),
-              placeholder: 'Cliente, obra, documento, nosso numero ou linha digitavel'
+              placeholder: 'Cliente, obra, documento, nosso número ou linha digitável'
             } : null}
             campos={[
-              { id: 'codigo', rotulo: 'Titulo', tipo: 'text', valor: filters.codigo, aoMudar: (valor) => updateFilter('codigo', valor) },
+              { id: 'codigo', rotulo: 'Título', tipo: 'text', valor: filters.codigo, aoMudar: (valor) => updateFilter('codigo', valor) },
               { id: 'numero_documento', rotulo: 'N. documento', tipo: 'text', valor: filters.numero_documento, aoMudar: (valor) => updateFilter('numero_documento', valor) },
-              { id: 'vencimento_inicial', rotulo: 'Vencimento inicio', tipo: 'date', valor: filters.vencimento_inicial, aoMudar: (valor) => updateFilter('vencimento_inicial', valor) },
+              { id: 'vencimento_inicial', rotulo: 'Vencimento início', tipo: 'date', valor: filters.vencimento_inicial, aoMudar: (valor) => updateFilter('vencimento_inicial', valor) },
               { id: 'vencimento_final', rotulo: 'Vencimento fim', tipo: 'date', valor: filters.vencimento_final, aoMudar: (valor) => updateFilter('vencimento_final', valor) }
             ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
             filtros={dimensoesRascunho.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
@@ -1229,14 +1229,14 @@ export default function FinanceiroBoletos() {
           RESULTADO consultado, não da carteira inteira — `resumo` soma
           `titulos`, que é o que a consulta trouxe. */}
       <StatGrid colunas={4}>
-        <StatTile label="Titulos no resultado" valor={String(resumo.total)} />
+        <StatTile label="Títulos no resultado" valor={String(resumo.total)} />
         <StatTile label="Valor em aberto no resultado" valor={formatCurrency(resumo.valor)} />
-        <StatTile label="Ja emitidos no resultado" valor={String(resumo.emitidos)} />
+        <StatTile label="Já emitidos no resultado" valor={String(resumo.emitidos)} />
         <StatTile label="Ambiente" valor={config?.ambiente || 'TESTE'} />
       </StatGrid>
 
       <BlocoConteudo
-        titulo="Titulos para boleto"
+        titulo="Títulos para boleto"
         contagem={`${titulosSelecionados.length} selecionado(s) de ${titulos.length}`}
         descricao={!hasConsulted
           ? 'Aplique um filtro para carregar os boletos elegiveis.'
@@ -1282,7 +1282,7 @@ export default function FinanceiroBoletos() {
             colunas={[
               {
                 id: 'titulo',
-                titulo: 'Titulo',
+                titulo: 'Título',
                 tipo: 'codigo',
                 render: (titulo) => (
                   <div>
@@ -1334,7 +1334,7 @@ export default function FinanceiroBoletos() {
                 render: (titulo) => (
                   <div className="text-xs text-[var(--c-muted)]">
                     <div>{titulo.nosso_numero ? `Nosso numero: ${titulo.nosso_numero}` : 'Nao emitido'}</div>
-                    {titulo.codigo_barras && <div className="mt-1 text-[var(--sem-success)]">Codigo gerado</div>}
+                    {titulo.codigo_barras && <div className="mt-1 text-[var(--sem-success)]">Código gerado</div>}
                   </div>
                 )
               }
@@ -1351,7 +1351,7 @@ export default function FinanceiroBoletos() {
             */
             getId={(titulo) => Number(titulo.id)}
             carregando={loading}
-            vazio="Nenhum titulo elegivel encontrado para os filtros aplicados."
+            vazio="Nenhum título elegível encontrado para os filtros aplicados."
             storageKey="tabela:financeiro-boletos:titulos"
             rotuloRolagem="Titulos elegiveis para boleto"
             larguraAcoes={320}
@@ -1370,7 +1370,7 @@ export default function FinanceiroBoletos() {
             acoesTabela={(
               <>
                 <button type="button" className="btn btn-outline btn-sm" onClick={() => setSelecionados([])} disabled={!selecionados.length || gerandoMassa}>
-                  Limpar selecao
+                  Limpar seleção
                 </button>
                 {/*
                   CONSENTIMENTO: o número deste rótulo vem de
@@ -1392,7 +1392,7 @@ export default function FinanceiroBoletos() {
                   className="btn btn-outline btn-sm"
                   onClick={() => selecionarTitulo(titulo)}
                   title="Visualizar boleto"
-                  aria-label={`Visualizar boleto do titulo ${titulo.id}`}
+                  aria-label={`Visualizar boleto do título ${titulo.id}`}
                 >
                   <HiOutlineEye className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -1401,7 +1401,7 @@ export default function FinanceiroBoletos() {
                   className="btn btn-outline btn-sm"
                   disabled={gerandoId === titulo.id || gerandoMassa}
                   onClick={() => onGerarAmostra(titulo)}
-                  title="Gerar amostra para homologacao"
+                  title="Gerar amostra para homologação"
                 >
                   Amostra
                 </button>
@@ -1433,13 +1433,13 @@ export default function FinanceiroBoletos() {
           era ancestral do conteúdo rolável da pré-visualização. */}
       {previewOpen && (
         <OverlayModal
-          rotulo="Pre-visualizacao do boleto"
+          rotulo="Pre-visualização do boleto"
           largura="var(--modal-max-w-xl, 1080px)"
           onFechar={() => setPreviewOpen(false)}
         >
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--c-border)] p-4">
             <div>
-              <p className="app-confirmacao-titulo">Pre-visualizacao do boleto</p>
+              <p className="app-confirmacao-titulo">Pre-visualização do boleto</p>
               <p className="text-xs text-[var(--c-muted)]">A amostra deve ser homologada pela Caixa antes do uso em massa.</p>
             </div>
             <div className="flex flex-wrap gap-2">

@@ -157,7 +157,7 @@ export default function PrevisoesContrato({
           },
           {
             id: 'situacao',
-            titulo: 'Situacao',
+            titulo: 'Situação',
             tipo: 'status',
             render: (p) => (
               <span data-testid={`situacao-parcela-${p.numero}`}>{rotuloSituacao(p.situacao || p.status)}</span>
@@ -165,7 +165,7 @@ export default function PrevisoesContrato({
           },
           {
             id: 'medicao',
-            titulo: 'Medicao',
+            titulo: 'Medição',
             tipo: 'texto',
             render: (p) => (
               p.medicao ? (
@@ -200,8 +200,8 @@ export default function PrevisoesContrato({
             <Link
               to={`/financeiro/titulos/${p.titulo_financeiro_id}`}
               className="btn btn-outline btn-sm !px-2"
-              title={`Ver titulo da parcela ${p.numero}`}
-              aria-label={`Ver titulo financeiro da parcela ${p.numero}`}
+              title={`Ver título da parcela ${p.numero}`}
+              aria-label={`Ver título financeiro da parcela ${p.numero}`}
               data-testid={`ver-titulo-parcela-${p.numero}`}
             >
               <HiEye className="h-4 w-4" aria-hidden="true" />
@@ -244,7 +244,7 @@ export default function PrevisoesContrato({
             </strong>
           )}
         />
-        <StatTile label="Ja comprometido" valor={moeda(dados?.saldo?.comprometido)} />
+        <StatTile label="Já comprometido" valor={moeda(dados?.saldo?.comprometido)} />
       </StatGrid>
     </BlocoConteudo>
   );

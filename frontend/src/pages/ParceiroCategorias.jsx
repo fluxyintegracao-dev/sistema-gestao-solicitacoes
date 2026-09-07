@@ -153,7 +153,7 @@ export default function ParceiroCategorias() {
       <PageHeader
         titulo="Categorias de Parceiro"
         contagem={loading ? null : `${categorias.length} categoria(s)`}
-        descricao="Use categorias para agrupar fornecedores e facilitar o envio de cotacoes."
+        descricao="Use categorias para agrupar fornecedores e facilitar o envio de cotações."
         acaoPrincipal={{ rotulo: 'Nova categoria', onClick: abrirNovaCategoria }}
       />
 
@@ -182,7 +182,7 @@ export default function ParceiroCategorias() {
           </div>
           <div className="overflow-y-auto px-4 py-3">
             <form className="space-y-4" onSubmit={handleSalvarCategoria}>
-              <FormSecao legenda="Identificacao" colunas={2}>
+              <FormSecao legenda="Identificação" colunas={2}>
                 <CampoForm label="Nome da categoria" obrigatorio>
                   <input
                     className="input w-full"
@@ -192,7 +192,7 @@ export default function ParceiroCategorias() {
                     required
                   />
                 </CampoForm>
-                <CampoForm label="Situacao">
+                <CampoForm label="Situação">
                   <label className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
                     <input
                       type="checkbox"

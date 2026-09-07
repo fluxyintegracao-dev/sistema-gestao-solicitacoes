@@ -39,7 +39,7 @@ export default function PreviewAnexoModal({ anexo, onClose, usarPortal = false }
       return (
         <div className="text-center py-12" style={{ color: 'var(--c-muted)' }}>
           <p className="mb-2 font-semibold" style={{ color: 'var(--c-text)' }}>
-            Pre-visualizacao indisponivel
+            Pre-visualização indisponível
           </p>
           <p>{anexo.erro || 'Nao foi possivel gerar um link seguro para este arquivo.'}</p>
         </div>
@@ -61,13 +61,13 @@ export default function PreviewAnexoModal({ anexo, onClose, usarPortal = false }
         <iframe
           src={url}
           className="w-full h-[80vh]"
-          title={`Pre-visualizacao de ${anexo.nome || 'PDF'}`}
+          title={`Pre-visualização de ${anexo.nome || 'PDF'}`}
         />
       );
     }
 
     return (
-      <p className="text-center text-sm">Pre-visualizacao nao disponivel</p>
+      <p className="text-center text-sm">Pre-visualização não disponível</p>
     );
   }
 

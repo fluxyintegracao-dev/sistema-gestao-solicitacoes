@@ -322,7 +322,7 @@ export default function FinanceiroFaturasCartao() {
             },
             {
               id: 'cartao',
-              titulo: 'Cartao',
+              titulo: 'Cartão',
               // R17: o cartao NOMEIA a fatura.
               tipo: 'identidade',
               noCard: 'titulo',
@@ -341,7 +341,7 @@ export default function FinanceiroFaturasCartao() {
               render: (fatura) => <span className={statusBadgeClasse(fatura.status)}>{fatura.status || 'ABERTA'}</span>
             },
             { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (fatura) => <span className="font-semibold">{formatCurrency(fatura.valor_total)}</span> },
-            { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (fatura) => (fatura.titulos || []).length }
+            { id: 'titulos', titulo: 'Títulos', tipo: 'numero', render: (fatura) => (fatura.titulos || []).length }
           ]}
           itens={faturasVisiveis}
           carregando={loading}

@@ -104,10 +104,10 @@ export default function SetoresVisiveisUsuario() {
     try {
       setSalvando(true);
       await salvarSetoresVisiveisPorUsuario({ regras });
-      avisar.sucesso('Configuracao salva com sucesso');
+      avisar.sucesso('Configuração salva com sucesso');
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao salvar configuracao');
+      avisar.erro('Erro ao salvar configuração');
     } finally {
       setSalvando(false);
     }
@@ -122,11 +122,11 @@ export default function SetoresVisiveisUsuario() {
       {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
           linha no próprio PageHeader. */}
       <PageHeader
-        titulo="Setores visiveis por usuario"
+        titulo="Setores visíveis por usuário"
         contagem={usuarioSelecionado
           ? `${totalMarcados} de ${setoresOrdenados.length} selecionados`
           : null}
-        descricao="Defina setores adicionais que cada usuario pode visualizar na lista e no detalhe. As acoes continuam obedecendo as permissoes e regras atuais do setor responsavel."
+        descricao="Defina setores adicionais que cada usuário pode visualizar na lista e no detalhe. As ações continuam obedecendo as permissões e regras atuais do setor responsável."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -137,13 +137,13 @@ export default function SetoresVisiveisUsuario() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
-        titulo="Setores visiveis"
+        titulo="Setores visíveis"
         variante="primario"
         cor="var(--c-primary)"
       >
         <div className="space-y-4">
           <div className="md:max-w-md">
-            <CampoForm label="Usuario">
+            <CampoForm label="Usuário">
               <select
                 className="input w-full"
                 value={usuarioSelecionado}

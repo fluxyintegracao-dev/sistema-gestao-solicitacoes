@@ -64,7 +64,7 @@ export default function ArquivosModelosConfig() {
   useEffect(() => {
     carregar().catch(error => {
       console.error(error);
-      avisar.erro('Erro ao carregar configuracao de arquivos modelos');
+      avisar.erro('Erro ao carregar configuração de arquivos modelos');
     });
   }, []);
 
@@ -80,7 +80,7 @@ export default function ArquivosModelosConfig() {
       await criarPaginaArquivoModelo(novoNomePagina.trim());
       setNovoNomePagina('');
       await carregar();
-      avisar.sucesso('Pagina criada com sucesso.');
+      avisar.sucesso('Página criada com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao criar pagina');
@@ -114,7 +114,7 @@ export default function ArquivosModelosConfig() {
     try {
       setSalvando(true);
       await salvarUploadersArquivosModelos(uploadersByPagina);
-      avisar.sucesso('Permissoes de upload salvas com sucesso.');
+      avisar.sucesso('Permissões de upload salvas com sucesso.');
       await carregar();
     } catch (error) {
       console.error(error);

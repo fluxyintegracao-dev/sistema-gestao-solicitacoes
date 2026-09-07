@@ -39,6 +39,7 @@ import {
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { hasPermissao } from '../utils/acessoProduto';
 import { maskCpfCnpj, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
+import DateInputBR from '../components/DateInputBR';
 
 const STATUS_LABELS = {
   EM_CARTEIRA: 'Em carteira',
@@ -273,7 +274,7 @@ export default function FinanceiroChequesTerceiros() {
     try {
       await movimentarChequeTerceiro(selected.id, { acao: action, ...actionForm });
       setAction(null); setSelected(null); await load();
-      avisar.sucesso('Movimentacao registrada na custodia do cheque.');
+      avisar.sucesso('Movimentação registrada na custodia do cheque.');
     } catch (err) { avisar.erro(err.message || 'Erro ao movimentar cheque.'); }
     finally { setSaving(false); }
   }
@@ -705,9 +706,8 @@ export default function FinanceiroChequesTerceiros() {
                     titulo: 'Vencimento',
                     tipo: 'data',
                     render: (row) => (
-                      <input
+                      <DateInputBR
                         className="input input-sm"
-                        type="date"
                         aria-label={`Vencimento da linha ${row.linha}`}
                         value={row.data_vencimento || ''}
                         onChange={(e) => updateImportRow(row.__indice, 'data_vencimento', e.target.value)}
@@ -766,7 +766,7 @@ export default function FinanceiroChequesTerceiros() {
 
       {selected && !action ? <Modal title={`${selected.codigo} · cheque ${selected.numero_cheque}`} subtitle={`${selected.empresa?.nome || '-'} · ${money(selected.valor)}`} onClose={() => setSelected(null)}><div className="grid gap-3 sm:grid-cols-4"><div><small className="text-[var(--c-muted)]">Status</small><div className="mt-1"><StatusBadge status={selected.status} /></div></div><div><small className="text-[var(--c-muted)]">Titular</small><strong className="block">{selected.titularParceiro?.nome || selected.titular_nome || '-'}</strong></div><div><small className="text-[var(--c-muted)]">Cliente/origem</small><strong className="block">{selected.parceiroEntregou?.nome || selected.cliente_nome || '-'}</strong></div><div><small className="text-[var(--c-muted)]">Vencimento</small><strong className="block">{dateBr(selected.data_vencimento)}</strong></div></div>{selected.status === 'EM_CARTEIRA' ? <div className="mt-4 flex flex-wrap gap-2">{canDeposit ? <button className="btn btn-outline btn-sm" onClick={() => setAction('DEPOSITAR')}><HiOutlineBanknotes /> Depositar</button> : null}{canTransfer ? <button className="btn btn-outline btn-sm" onClick={() => setAction('TRANSFERIR')}><HiOutlineArrowRight /> Transferir</button> : null}{canReturn ? <button className="btn btn-outline btn-sm" onClick={() => setAction('DEVOLVER')}>Devolver</button> : null}{canCancel ? <button className="btn btn-outline btn-perigo-suave btn-sm" onClick={() => setAction('CANCELAR')}>Cancelar cheque</button> : null}</div> : null}<h3 className="mt-6 font-semibold">Histórico</h3><div className="mt-2 space-y-2">{(selected.historico || []).map((item) => <div key={item.id} className="rounded-xl border border-[var(--c-border)] p-3 text-sm"><div className="flex justify-between gap-3"><strong>{item.tipo_evento}</strong><span>{dateBr(item.data_evento)}</span></div><p className="mt-1 text-[var(--c-muted)]">{item.observacoes || `${item.status_anterior || '-'} → ${item.status_novo}`}</p></div>)}</div></Modal> : null}
 
-      {selected && action ? <Modal title={actionLabels[action]} subtitle={`${selected.codigo} · ${money(selected.valor)}`} onClose={() => setAction(null)}><form className="space-y-3" onSubmit={submitAction}>{action === 'DEPOSITAR' ? <label className="form-control"><span>Conta de destino *</span><select className="select" required value={actionForm.conta_bancaria_id} onChange={(e) => setActionForm((v) => ({ ...v, conta_bancaria_id: e.target.value }))}><option value="">Selecione</option>{contasEmpresaAcao.map((item) => <option key={item.id} value={item.id}>{item.nome || item.banco_nome || `Conta #${item.id}`}</option>)}</select></label> : null}{action === 'TRANSFERIR' ? <label className="form-control"><span>Empresa de destino *</span><select className="select" required value={actionForm.empresa_destino_id} onChange={(e) => setActionForm((v) => ({ ...v, empresa_destino_id: e.target.value }))}><option value="">Selecione</option>{empresas.filter((item) => Number(item.id) !== Number(selected.empresa_id)).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label> : null}<label className="form-control"><span>Data *</span><input type="date" className="input" required value={actionForm.data_evento} onChange={(e) => setActionForm((v) => ({ ...v, data_evento: e.target.value }))} /></label><label className="form-control"><span>Justificativa / observação *</span><textarea className="textarea" required value={actionForm.observacoes} onChange={(e) => setActionForm((v) => ({ ...v, observacoes: e.target.value }))} /></label><div className="flex justify-end gap-2"><button type="button" className="btn btn-outline" onClick={() => setAction(null)}>Voltar</button><button className="btn btn-primary" disabled={saving}>Confirmar</button></div></form></Modal> : null}
+      {selected && action ? <Modal title={actionLabels[action]} subtitle={`${selected.codigo} · ${money(selected.valor)}`} onClose={() => setAction(null)}><form className="space-y-3" onSubmit={submitAction}>{action === 'DEPOSITAR' ? <label className="form-control"><span>Conta de destino *</span><select className="select" required value={actionForm.conta_bancaria_id} onChange={(e) => setActionForm((v) => ({ ...v, conta_bancaria_id: e.target.value }))}><option value="">Selecione</option>{contasEmpresaAcao.map((item) => <option key={item.id} value={item.id}>{item.nome || item.banco_nome || `Conta #${item.id}`}</option>)}</select></label> : null}{action === 'TRANSFERIR' ? <label className="form-control"><span>Empresa de destino *</span><select className="select" required value={actionForm.empresa_destino_id} onChange={(e) => setActionForm((v) => ({ ...v, empresa_destino_id: e.target.value }))}><option value="">Selecione</option>{empresas.filter((item) => Number(item.id) !== Number(selected.empresa_id)).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label> : null}<label className="form-control"><span>Data *</span><DateInputBR className="input" required value={actionForm.data_evento} onChange={(e) => setActionForm((v) => ({ ...v, data_evento: e.target.value }))} /></label><label className="form-control"><span>Justificativa / observação *</span><textarea className="textarea" required value={actionForm.observacoes} onChange={(e) => setActionForm((v) => ({ ...v, observacoes: e.target.value }))} /></label><div className="flex justify-end gap-2"><button type="button" className="btn btn-outline" onClick={() => setAction(null)}>Voltar</button><button className="btn btn-primary" disabled={saving}>Confirmar</button></div></form></Modal> : null}
     </Pagina>
   );
 }

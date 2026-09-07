@@ -72,7 +72,7 @@ export default function UsuarioNovo() {
       }
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao carregar dados do usuario');
+      avisar.erro('Erro ao carregar dados do usuário');
     } finally {
       setLoading(false);
     }
@@ -125,7 +125,7 @@ export default function UsuarioNovo() {
         // dispensada — a confirmação do sistema faz o mesmo, e sair é o
         // único caminho (os dois botões seguem para a listagem).
         await confirmar({
-          titulo: 'Usuario criado, link nao enviado',
+          titulo: 'Usuário criado, link não enviado',
           mensagem: `Usuario criado, mas o link de definicao de senha nao foi enviado: ${resultado.convite_erro}`,
           rotuloConfirmar: 'Entendi',
           rotuloCancelar: 'Fechar'
@@ -141,7 +141,7 @@ export default function UsuarioNovo() {
   if (loading) {
     return (
       <Pagina>
-        <div className="app-empty-card">Carregando usuario...</div>
+        <div className="app-empty-card">Carregando usuário...</div>
       </Pagina>
     );
   }
@@ -152,7 +152,7 @@ export default function UsuarioNovo() {
           voltar à esquerda — affordance primária de retorno à listagem. */}
       <PageHeader
         titulo={editando ? 'Editar usuario' : 'Novo usuario'}
-        descricao="Dados de acesso, perfil, permissoes e obras vinculadas."
+        descricao="Dados de acesso, perfil, permissões e obras vinculadas."
         voltar={{ to: '/usuarios', title: 'Voltar para usuários' }}
       />
 
@@ -166,7 +166,7 @@ export default function UsuarioNovo() {
           cor="var(--sem-info)"
         >
           <div className="space-y-4">
-            <FormSecao legenda="Identificacao e acesso" colunas={2}>
+            <FormSecao legenda="Identificação e acesso" colunas={2}>
               <CampoForm label="Nome" obrigatorio>
                 <input
                   className="input w-full"
@@ -255,7 +255,7 @@ export default function UsuarioNovo() {
                   <span className="grid gap-1">
                     <span className="font-medium">Enviar link para definir senha por e-mail</span>
                     <span className="app-note">
-                      O usuario recebe um link seguro para criar a propria senha. Se desmarcar, informe uma senha inicial forte.
+                      O usuário recebe um link seguro para criar a própria senha. Se desmarcar, informe uma senha inicial forte.
                     </span>
                   </span>
                 </label>
@@ -264,7 +264,7 @@ export default function UsuarioNovo() {
 
             {isBusinessAdminLogado && (
               <BlocoConteudo
-                titulo="Permissao de solicitacao de compra"
+                titulo="Permissão de solicitação de compra"
                 variante="secundario"
                 recolhivel
                 recolhidoPadrao={!(permissaoCompraTravada || podeCriarSolicitacaoCompra)}
@@ -297,7 +297,7 @@ export default function UsuarioNovo() {
               <div className="max-h-72 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)]">
                 {listaObras.length === 0 ? (
                   <div className="px-4 py-4 text-sm text-[var(--c-muted)]">
-                    Nenhuma obra disponivel para vinculo.
+                    Nenhuma obra disponível para vínculo.
                   </div>
                 ) : (
                   listaObras.map((obra) => {

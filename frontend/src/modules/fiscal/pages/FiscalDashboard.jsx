@@ -85,7 +85,7 @@ export default function FiscalDashboard() {
       <PageHeader
         titulo="Painel Fiscal"
         contagem={loading ? null : `${texto(resumo.documentos_total)} documento(s) fiscal(is)`}
-        descricao="Fundacao do modulo fiscal preparada para empresas monitoradas, documentos DFe e logs de sincronizacao."
+        descricao="Fundacao do módulo fiscal preparada para empresas monitoradas, documentos DFe e logs de sincronização."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -107,19 +107,19 @@ export default function FiscalDashboard() {
               tom={Number(resumo.documentos_pendentes) > 0 ? 'warning' : undefined}
             />
             <StatTile
-              label="Divergencias abertas"
+              label="Divergências abertas"
               valor={texto(resumo.divergencias_abertas)}
               tom={Number(resumo.divergencias_abertas) > 0 ? 'danger' : undefined}
             />
             <StatTile
-              label="Com divergencia"
+              label="Com divergência"
               valor={texto(resumo.documentos_com_divergencia)}
               tom={Number(resumo.documentos_com_divergencia) > 0 ? 'warning' : undefined}
             />
             <StatTile label="Validados" valor={texto(resumo.documentos_validados)} tom="success" />
             <StatTile label="Ignorados" valor={texto(resumo.documentos_ignorados)} />
             <StatTile
-              label="Ultimo sync"
+              label="Último sync"
               valor={texto(sincronizacao?.ultimo_log?.status || '-')}
               sub={formatDateTime(sincronizacao?.ultimo_log?.started_at)}
               span={2}
@@ -141,7 +141,7 @@ export default function FiscalDashboard() {
           >
             <BlocoConteudo
               titulo="Estado da fundacao"
-              descricao="Como o modulo esta configurado neste ambiente."
+              descricao="Como o módulo esta configurado neste ambiente."
             >
               <StatGrid colunas={3}>
                 <StatTile label="SEFAZ real" valor={modulo.sefaz_enabled ? 'habilitada' : 'desabilitada'} />
@@ -228,7 +228,7 @@ export default function FiscalDashboard() {
                 colunas={[
                   {
                     id: 'emissao',
-                    titulo: 'Emissao',
+                    titulo: 'Emissão',
                     tipo: 'data',
                     render: (item) => formatDate(item.emission_date)
                   },
@@ -245,7 +245,7 @@ export default function FiscalDashboard() {
                   },
                   {
                     id: 'numero',
-                    titulo: 'Numero',
+                    titulo: 'Número',
                     tipo: 'codigo',
                     render: (item) => item.document_number || '-'
                   },
@@ -286,7 +286,7 @@ export default function FiscalDashboard() {
               colunas={[
                 {
                   id: 'inicio',
-                  titulo: 'Inicio',
+                  titulo: 'Início',
                   tipo: 'data',
                   noCard: 'titulo',
                   render: (log) => formatDateTime(log.started_at)

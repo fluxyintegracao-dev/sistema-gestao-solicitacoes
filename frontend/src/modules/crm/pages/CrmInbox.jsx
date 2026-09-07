@@ -396,7 +396,7 @@ export default function CrmInbox() {
       <PageHeader
         titulo="Inbox CRM"
         contagem={`${total} conversa${total !== 1 ? 's' : ''}`}
-        descricao="Conversas comerciais unificadas por canal, lead e responsavel."
+        descricao="Conversas comerciais unificadas por canal, lead e responsável."
         acaoPrincipal={{ rotulo: 'Nova conversa', onClick: () => setShowNew(true) }}
       />
 
@@ -413,7 +413,7 @@ export default function CrmInbox() {
           <BlocoConteudo
             titulo="Conversas"
             contagem={`${total} registro${total !== 1 ? 's' : ''}`}
-            descricao="Selecione uma conversa para abrir o historico."
+            descricao="Selecione uma conversa para abrir o histórico."
             acoes={(
               <button type="button" className="btn btn-outline btn-sm" onClick={loadList}>
                 Atualizar
@@ -443,7 +443,7 @@ export default function CrmInbox() {
                   id: 'unread_only',
                   rotulo: 'Leitura',
                   unico: true,
-                  opcoes: [{ valor: 'true', rotulo: 'Somente nao lidas' }]
+                  opcoes: [{ valor: 'true', rotulo: 'Somente não lidas' }]
                 }
               ].filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
               ativos={filtros}
@@ -481,7 +481,7 @@ export default function CrmInbox() {
                             {item.contact_name || item.lead?.nome || 'Contato sem nome'}
                           </span>
                           {item.unread_count > 0 && (
-                            <span className="badge badge-danger" title={`${item.unread_count} nao lida(s)`}>
+                            <span className="badge badge-danger" title={`${item.unread_count} não lida(s)`}>
                               {item.unread_count}
                             </span>
                           )}
@@ -545,7 +545,7 @@ export default function CrmInbox() {
             {loadingDetail ? (
               <p className="text-sm text-muted">Carregando conversa...</p>
             ) : !conversation ? (
-              <p className="text-sm text-muted">Selecione uma conversa para visualizar o historico.</p>
+              <p className="text-sm text-muted">Selecione uma conversa para visualizar o histórico.</p>
             ) : (
               <>
                 <div className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto pr-2">
@@ -629,9 +629,9 @@ export default function CrmInbox() {
 
           <BlocoConteudo
             variante="secundario"
-            titulo="Templates rapidos"
+            titulo="Templates rápidos"
             contagem={`${templates.length} salvo${templates.length !== 1 ? 's' : ''}`}
-            descricao="Modelos salvos ficam disponiveis no campo de resposta da conversa."
+            descricao="Modelos salvos ficam disponíveis no campo de resposta da conversa."
           >
             <form onSubmit={handleCreateTemplate}>
               <FormSecao colunas={3}>

@@ -73,7 +73,7 @@ export default class AppErrorBoundary extends React.Component {
               Tela interrompida
             </div>
             <h1 className="text-lg font-bold">
-              Nao foi possivel abrir esta tela.
+              Não foi possível abrir esta tela.
             </h1>
             <p className="mt-3 text-sm leading-6 text-[var(--c-muted)]">
               {this.state.isChunkError

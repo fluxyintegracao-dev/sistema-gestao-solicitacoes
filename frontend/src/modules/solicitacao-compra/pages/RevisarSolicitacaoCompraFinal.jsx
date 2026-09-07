@@ -77,7 +77,7 @@ export default function RevisarSolicitacaoCompraFinal() {
     try {
       const url = await obterUrlAssinadaCompra(item?.arquivo_url);
       if (!url) {
-        avisar.erro('Arquivo nao encontrado.');
+        avisar.erro('Arquivo não encontrado.');
         return;
       }
 
@@ -112,7 +112,7 @@ export default function RevisarSolicitacaoCompraFinal() {
           desabilitada: baixando
         }}
         secundarias={[
-          { rotulo: 'Ir para solicitacoes', onClick: () => navigate('/solicitacoes') },
+          { rotulo: 'Ir para solicitações', onClick: () => navigate('/solicitacoes') },
           {
             rotulo: compraDireta ? 'Nova compra direta' : 'Nova solicitacao',
             onClick: () => navigate(compraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova')
@@ -120,13 +120,13 @@ export default function RevisarSolicitacaoCompraFinal() {
         ]}
       />
 
-      <BlocoConteudo variante="primario" cor="var(--sem-success)" titulo="Confirmacao">
+      <BlocoConteudo variante="primario" cor="var(--sem-success)" titulo="Confirmação">
         <CamposComVazios
           colunas={3}
           campos={[
-            { label: 'Codigo principal', valor: codigo, tom: 'success' },
-            { label: 'ID da solicitacao de compra', valor: resultado?.id || id },
-            { label: 'Solicitacao principal vinculada', valor: resultado?.solicitacao_principal_id },
+            { label: 'Código principal', valor: codigo, tom: 'success' },
+            { label: 'ID da solicitação de compra', valor: resultado?.id || id },
+            { label: 'Solicitação principal vinculada', valor: resultado?.solicitacao_principal_id },
             { label: 'Obra', valor: resumo?.obra_nome },
             { label: 'Solicitante', valor: resumo?.solicitante_nome }
           ]}
@@ -136,7 +136,7 @@ export default function RevisarSolicitacaoCompraFinal() {
       <BlocoConteudo
         variante="secundario"
         titulo="Resumo enviado"
-        descricao="O que foi gravado nesta solicitacao, como saiu no documento."
+        descricao="O que foi gravado nesta solicitação, como saiu no documento."
       >
         {resumo ? (
           /*
@@ -162,7 +162,7 @@ export default function RevisarSolicitacaoCompraFinal() {
               },
               {
                 id: 'apropriacao',
-                titulo: 'Apropriacao',
+                titulo: 'Apropriação',
                 tipo: 'texto',
                 render: (item) => {
                   const linhas = montarLinhasResumoApropriacao(item);
@@ -179,7 +179,7 @@ export default function RevisarSolicitacaoCompraFinal() {
             ]}
             itens={itensRecibo}
             getId={(item) => item.__chave}
-            vazio="Nenhum item registrado nesta solicitacao."
+            vazio="Nenhum item registrado nesta solicitação."
             storageKey="tabela:solicitacao-compra-finalizada:itens"
             rotuloRolagem="Itens da solicitacao criada"
             acoesLinha={(item) => (
@@ -210,7 +210,7 @@ export default function RevisarSolicitacaoCompraFinal() {
           />
         ) : (
           <p className="text-sm text-[var(--c-muted)]">
-            Resumo nao disponivel nesta navegacao. O PDF pode ser aberto normalmente.
+            Resumo não disponível nesta navegação. O PDF pode ser aberto normalmente.
           </p>
         )}
       </BlocoConteudo>

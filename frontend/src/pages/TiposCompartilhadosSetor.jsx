@@ -42,7 +42,7 @@ export default function TiposCompartilhadosSetor() {
         if (ordenados.length > 0) setSetorOrigem(normalizarSetorToken(ordenados[0]));
       } catch (error) {
         console.error(error);
-        avisar.erro('Erro ao carregar configuracao de tipos compartilhados.');
+        avisar.erro('Erro ao carregar configuração de tipos compartilhados.');
       } finally {
         setLoading(false);
       }
@@ -87,7 +87,7 @@ export default function TiposCompartilhadosSetor() {
     try {
       setSalvando(true);
       await salvarTiposCompartilhadosSetor({ regras });
-      avisar.sucesso('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuração salva com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao salvar configuracao.');
@@ -99,7 +99,7 @@ export default function TiposCompartilhadosSetor() {
   if (loading) {
     return (
       <Pagina className="max-w-6xl mx-auto">
-        <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Carregando configuracoes...</p>
+        <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Carregando configurações...</p>
       </Pagina>
     );
   }
@@ -111,7 +111,7 @@ export default function TiposCompartilhadosSetor() {
       <PageHeader
         titulo="Tipos Compartilhados entre Setores"
         contagem={`${tiposOrdenados.length} tipo(s)`}
-        descricao="Permite que outros setores enxerguem tipos especificos sem alterar a area responsavel da solicitacao."
+        descricao="Permite que outros setores enxerguem tipos específicos sem alterar a área responsável da solicitação."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar configuracao',
           onClick: salvar,

@@ -51,25 +51,25 @@ function CentroCustoBloco({ centro }) {
     >
       <StatGrid colunas={2}>
         <StatTile
-          label="Solicitacoes"
+          label="Solicitações"
           valor={String(centro.solicitacoes?.quantidade || 0)}
           sub={formatCurrency(centro.solicitacoes?.total_valor)}
         />
         <StatTile
-          label="Saldo liquido"
+          label="Saldo líquido"
           valor={formatCurrency(saldoLiquido)}
           sub="Recebido menos pago"
         />
         <StatTile
           label="A pagar"
           valor={<Previsto>{formatCurrency(saidas)}</Previsto>}
-          sub={`${centro.pagar?.quantidade || 0} titulo(s)`}
+          sub={`${centro.pagar?.quantidade || 0} título(s)`}
         />
         <StatTile label="Pago" valor={<Realizado>{formatCurrency(pagas)}</Realizado>} />
         <StatTile
           label="A receber"
           valor={<Previsto>{formatCurrency(entradas)}</Previsto>}
-          sub={`${centro.receber?.quantidade || 0} titulo(s)`}
+          sub={`${centro.receber?.quantidade || 0} título(s)`}
         />
         <StatTile label="Recebido" valor={<Realizado>{formatCurrency(recebidas)}</Realizado>} />
       </StatGrid>
@@ -129,7 +129,7 @@ export default function FinanceiroResultadoCentrosCusto() {
       <PageHeader
         titulo="Resultado por Centro de Custo"
         contagem={loading ? 'Carregando…' : `${dados.length} centro(s)`}
-        descricao="Visao financeira dos cadastros administrativos que nao sao obras."
+        descricao="Visão financeira dos cadastros administrativos que não são obras."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -147,7 +147,7 @@ export default function FinanceiroResultadoCentrosCusto() {
         cor="var(--module-financeiro)"
       >
         <StatGrid colunas={5}>
-          <StatTile label="Solicitacoes" valor={String(resumo.solicitacoes)} />
+          <StatTile label="Solicitações" valor={String(resumo.solicitacoes)} />
           <StatTile label="A pagar" valor={<Previsto>{formatCurrency(resumo.aPagar)}</Previsto>} />
           <StatTile label="Pago" valor={<Realizado>{formatCurrency(resumo.pago)}</Realizado>} />
           <StatTile label="A receber" valor={<Previsto>{formatCurrency(resumo.aReceber)}</Previsto>} />

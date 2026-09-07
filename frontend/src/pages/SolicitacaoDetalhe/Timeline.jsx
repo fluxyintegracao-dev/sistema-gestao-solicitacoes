@@ -208,7 +208,7 @@ export default function Timeline({
     // sempre truthy — ler como booleano faria "Cancelar" remover o anexo.
     const { ok } = await confirmar({
       titulo: 'Remover anexo',
-      mensagem: 'Remover este anexo do historico? Esta acao nao pode ser desfeita.',
+      mensagem: 'Remover este anexo do histórico? Esta ação não pode ser desfeita.',
       rotuloConfirmar: 'Remover anexo',
       destrutiva: true
     });
@@ -243,8 +243,8 @@ export default function Timeline({
 
     // R21: DESESTRUTURADO — ver o comentario em removerAnexo.
     const { ok } = await confirmar({
-      titulo: 'Remover comentario',
-      mensagem: 'Remover este comentario do historico? Esta acao nao pode ser desfeita.',
+      titulo: 'Remover comentário',
+      mensagem: 'Remover este comentário do histórico? Esta ação não pode ser desfeita.',
       rotuloConfirmar: 'Remover comentario',
       destrutiva: true
     });
@@ -272,7 +272,7 @@ export default function Timeline({
 
   return (
     <BlocoConteudo
-      titulo="Historico"
+      titulo="Histórico"
       contagem={`${totalVisiveis} evento(s)`}
       descricao={ordem === 'desc' ? 'Mais recentes primeiro.' : 'Ordem cronologica — a rolagem comeca no evento mais recente.'}
       recolhivel
@@ -344,7 +344,7 @@ export default function Timeline({
                   style={{ color: 'var(--c-danger)' }}
                   onClick={() => removerComentario(h)}
                 >
-                  Remover comentario
+                  Remover comentário
                 </button>
               )}
 

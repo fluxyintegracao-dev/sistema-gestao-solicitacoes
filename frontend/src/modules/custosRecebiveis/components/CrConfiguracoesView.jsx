@@ -1,3 +1,4 @@
+import DateInputBR from '../../../components/DateInputBR';
 import { useEffect, useMemo, useState } from 'react';
 import {
   HiOutlineCheckCircle,
@@ -196,8 +197,7 @@ export default function CrConfiguracoesView({ obra, onChanged }) {
           </div>
           <label className="cr-field">
             <span>Início da vigência</span>
-            <input
-              type="date"
+            <DateInputBR
               max={today()}
               required
               value={form.vigencia_inicio}

@@ -209,9 +209,9 @@ export default function FinanceiroDiagnosticoDre() {
         sem recorte para virar rascunho.
       */}
       <PageHeader
-        titulo="Diagnostico da DRE"
+        titulo="Diagnóstico da DRE"
         contagem={loading ? 'Carregando…' : `${resumo.total_pendencias} pendencia(s)`}
-        descricao={`Situacao ${resumo.status} · gerado em ${formatDateTime(diagnostico.gerado_em)}`}
+        descricao={`Situação ${resumo.status} · gerado em ${formatDateTime(diagnostico.gerado_em)}`}
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar',
           onClick: carregar,
@@ -236,15 +236,15 @@ export default function FinanceiroDiagnosticoDre() {
           nao a lista delas.
         */}
         <BlocoConteudo
-          titulo="Situacao dos dados da DRE"
-          descricao="Corrija na ordem: primeiro as criticas, depois as altas."
+          titulo="Situação dos dados da DRE"
+          descricao="Corrija na ordem: primeiro as críticas, depois as altas."
           variante="primario"
           cor="var(--module-financeiro)"
           acoes={<StatusBadge status={resumo.status} kind={familiaDoStatus(resumo.status)} />}
         >
           <StatGrid colunas={5}>
             <StatTile
-              label="Criticas"
+              label="Críticas"
               valor={String(resumo.pendencias_criticas)}
               sub="Bloqueiam a leitura da DRE"
               tom={Number(resumo.pendencias_criticas) > 0 ? 'danger' : 'success'}
@@ -256,12 +256,12 @@ export default function FinanceiroDiagnosticoDre() {
               tom={Number(resumo.pendencias_altas) > 0 ? 'warning' : 'success'}
             />
             <StatTile
-              label="Medias"
+              label="Médias"
               valor={String(resumo.pendencias_medias)}
               sub="Revisar antes do fechamento"
             />
             <StatTile
-              label="Titulos na DRE"
+              label="Títulos na DRE"
               valor={String(resumo.total_titulos_dre)}
               sub="Marcados para considerar na DRE"
             />
@@ -277,14 +277,14 @@ export default function FinanceiroDiagnosticoDre() {
             nasce recolhido para nao empurrar as pendencias para baixo da
             dobra. Recolher e livre; remover exigiria o cliente. */}
         <BlocoConteudo
-          titulo="Como usar este diagnostico"
+          titulo="Como usar este diagnóstico"
           variante="secundario"
           recolhivel
           chavePreferencia="bloco:financeiro-diagnostico-dre:como-usar-este-diagnostico"
           recolhidoPadrao
         >
           <p className="text-sm text-[var(--c-text)]">
-            Antes de confiar na DRE da Holding, corrija primeiro pendencias criticas, depois pendencias altas.
+            Antes de confiar na DRE da Holding, corrija primeiro pendências críticas, depois pendências altas.
             A regra operacional recomendada e: toda obra/centro de custo pertence a uma empresa operacional,
             todo titulo financeiro herda ou informa essa empresa, toda categoria financeira tem grupo DRE,
             toda competencia representa o mes economico real do custo ou receita, e toda baixa ou transferencia
@@ -294,7 +294,7 @@ export default function FinanceiroDiagnosticoDre() {
       </BlocosPersonalizaveis>
 
       {loading ? (
-        <div className="app-empty-card">Carregando diagnostico...</div>
+        <div className="app-empty-card">Carregando diagnóstico...</div>
       ) : itensComPendencia.length ? (
         itensComPendencia.map((item) => (
           <PendenciaBloco key={item.codigo} item={item} />
@@ -302,7 +302,7 @@ export default function FinanceiroDiagnosticoDre() {
       ) : (
         <BlocoConteudo variante="secundario">
           <p className="text-sm text-[var(--c-text)]">
-            Nenhuma pendencia encontrada para os dados acessiveis ao seu usuario.
+            Nenhuma pendência encontrada para os dados acessiveis ao seu usuário.
           </p>
         </BlocoConteudo>
       )}

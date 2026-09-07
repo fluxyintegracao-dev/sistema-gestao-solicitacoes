@@ -21,6 +21,7 @@ import {
   BarraFiltros
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
+import DateInputBR from '../components/DateInputBR';
 
 const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
 const PAGE_SIZE_OPTIONS = ['25', '50', '100', '200', 'all'];
@@ -426,10 +427,10 @@ export default function Parceiros() {
       <PageHeader
         titulo="Cadastro de Pessoas"
         contagem={loading ? null : `${parceiros.length} pessoa(s)`}
-        descricao="Cadastro mestre de clientes, credores, fornecedores e corretores usado nas solicitacoes, financeiro, comercial e cotacoes."
+        descricao="Cadastro mestre de clientes, credores, fornecedores e corretores usado nas solicitações, financeiro, comercial e cotações."
         acaoPrincipal={{ rotulo: 'Nova pessoa', onClick: abrirNovaPessoa }}
         mais={[
-          { rotulo: 'Baixar modelo de importacao', onClick: handleBaixarModelo },
+          { rotulo: 'Baixar modelo de importação', onClick: handleBaixarModelo },
           { rotulo: 'Exportar pessoas', onClick: handleExportar },
           {
             rotulo: importing ? 'Importando…' : 'Importar pessoas (.xlsx/.csv)',
@@ -456,7 +457,7 @@ export default function Parceiros() {
 
       {importResult && (
         <BlocoConteudo
-          titulo={`Resultado da importacao: ${importResult.importados || 0} novo(s), ${importResult.atualizados || 0} atualizado(s), ${importResult.ignorados || 0} ignorado(s)`}
+          titulo={`Resultado da importação: ${importResult.importados || 0} novo(s), ${importResult.atualizados || 0} atualizado(s), ${importResult.ignorados || 0} ignorado(s)`}
           variante="secundario"
           acoes={(
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setImportResult(null)}>
@@ -514,7 +515,7 @@ export default function Parceiros() {
                 aí duas colunas dariam ~890px de campo para um CPF. Quatro
                 campos curtos cabem numa linha.
               */}
-              <FormSecao legenda="Identificacao" colunas={4}>
+              <FormSecao legenda="Identificação" colunas={4}>
                 <CampoForm label="CPF/CNPJ" obrigatorio>
                   <input
                     className="input w-full"
@@ -542,7 +543,7 @@ export default function Parceiros() {
                 </CampoForm>
               </FormSecao>
 
-              <FormSecao legenda="Vinculos da pessoa" colunas={2}>
+              <FormSecao legenda="Vínculos da pessoa" colunas={2}>
                 <div className="form-campo--linha flex flex-wrap gap-4 text-sm text-[var(--c-text)]">
                   <label className="flex items-center gap-2">
                     <input type="checkbox" checked={parceiroForm.cliente} onChange={atualizarCampo('cliente')} />
@@ -624,7 +625,7 @@ export default function Parceiros() {
                 recolhivel
                 recolhidoPadrao={!temPix}
               >
-                <p className="app-note mb-2">Ate duas chaves fixas e uma chave variavel.</p>
+                <p className="app-note mb-2">Até duas chaves fixas e uma chave variável.</p>
                 {[
                   ['pix_chave_fixa_1_tipo', 'pix_chave_fixa_1', 'Chave PIX fixa 1'],
                   ['pix_chave_fixa_2_tipo', 'pix_chave_fixa_2', 'Chave PIX fixa 2'],
@@ -650,7 +651,7 @@ export default function Parceiros() {
                     <input className="input w-full" value={parceiroForm.rg} onChange={(e) => setParceiroForm((current) => ({ ...current, rg: maskRg(e.target.value) }))} />
                   </CampoForm>
                   <CampoForm label="Nascimento">
-                    <input className="input w-full" type="date" value={parceiroForm.data_nascimento} onChange={atualizarCampo('data_nascimento')} />
+                    <DateInputBR className="input w-full" value={parceiroForm.data_nascimento} onChange={atualizarCampo('data_nascimento')} />
                   </CampoForm>
                   <CampoForm label="Nacionalidade">
                     <input className="input w-full" value={parceiroForm.nacionalidade} onChange={atualizarCampo('nacionalidade')} />
@@ -664,7 +665,7 @@ export default function Parceiros() {
                   <CampoForm label="CRECI">
                     <input className="input w-full" value={parceiroForm.creci} onChange={(e) => setParceiroForm((current) => ({ ...current, creci: maskCreci(e.target.value) }))} />
                   </CampoForm>
-                  <CampoForm label="Conjuge">
+                  <CampoForm label="Cônjuge">
                     <input className="input w-full" value={parceiroForm.conjuge_nome} onChange={atualizarCampo('conjuge_nome')} />
                   </CampoForm>
                   <CampoForm label="Regime de bens">
@@ -674,16 +675,16 @@ export default function Parceiros() {
               </BlocoConteudo>
 
               <BlocoConteudo
-                titulo="Endereco"
+                titulo="Endereço"
                 variante="secundario"
                 recolhivel
                 recolhidoPadrao={!temEndereco}
               >
                 <div className="form-grid">
-                  <CampoForm label="Endereco">
+                  <CampoForm label="Endereço">
                     <input className="input w-full" value={parceiroForm.endereco} onChange={atualizarCampo('endereco')} />
                   </CampoForm>
-                  <CampoForm label="Numero">
+                  <CampoForm label="Número">
                     <input className="input w-full" value={parceiroForm.numero} onChange={atualizarCampo('numero')} />
                   </CampoForm>
                   <CampoForm label="Complemento">
@@ -773,7 +774,7 @@ export default function Parceiros() {
                   disabled={pageSize === 'all' || currentPage >= totalPages}
                   onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                 >
-                  Proxima
+                  Próxima
                 </button>
               </div>
             </div>

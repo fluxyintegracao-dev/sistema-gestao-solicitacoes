@@ -673,7 +673,14 @@
   line-height: var(--lh-corpo);
   font-weight: 600;
   color: var(--c-text);
-  overflow-wrap: anywhere;
+  /* `break-word` e não `anywhere` (06/09): `anywhere` quebra em qualquer
+     letra ANTES de tentar as oportunidades de quebra que existem, e foi ele
+     que partiu "qa.visual@fluxy.local" em "…loc" / "al" no `perfil` a 390.
+     Os pontos de quebra do token agora vêm do `StatTile`, em `<wbr>`, nos
+     separadores onde a leitura sobrevive; `break-word` continua sendo a
+     rede para o token que não tem separador nenhum — quebrado feio ainda é
+     melhor que recortado. */
+  overflow-wrap: break-word;
 }
 
 .app-stat-sub {

@@ -5,21 +5,21 @@ import {
   deletarApropriacao as deletarApropriacaoCompartilhada,
   listarApropriacoes as listarApropriacoesCompartilhadas
 } from './apropriacoes';
+import { mensagemDeErro } from './erroDeResposta';
 
 function handleJsonResponse(response, fallbackMessage) {
   return response.text().then((text) => {
     if (!response.ok) {
-      let message = text;
       let parsed = null;
 
       try {
         parsed = text ? JSON.parse(text) : null;
-        message = parsed?.error || parsed?.message || text;
       } catch {
-        // Mantem o texto original quando a resposta nao for JSON.
+        /* Corpo que não é JSON: quem decide o que mostrar é o
+           `erroDeResposta`. Aqui o texto cru virava a mensagem. */
       }
 
-      const error = new Error(message || fallbackMessage);
+      const error = new Error(mensagemDeErro(text, fallbackMessage, response.status));
       error.status = response.status;
       error.code = parsed?.code;
       error.details = parsed?.details;
@@ -36,7 +36,7 @@ function handleJsonResponse(response, fallbackMessage) {
 async function downloadResponse(response, fallbackName, fallbackMessage) {
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || fallbackMessage);
+    throw new Error(mensagemDeErro(text, fallbackMessage, response.status));
   }
 
   const blob = await response.blob();

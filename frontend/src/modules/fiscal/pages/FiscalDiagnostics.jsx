@@ -148,7 +148,7 @@ export default function FiscalDiagnostics() {
         // Resultado do teste fica fixo no painel (StatTile) abaixo: o aviso pode sumir sozinho.
         avisar.sucesso('Storage fiscal validado: o backend conseguiu escrever no bucket configurado.', undefined, { efemero: true });
       } else {
-        avisar.alerta('Teste de storage concluido SEM confirmacao de escrita. Revise bucket, regiao e permissao.');
+        avisar.alerta('Teste de storage concluído SEM confirmação de escrita. Revise bucket, regiao e permissão.');
       }
     } catch (err) {
       avisar.erro(err.message || 'Erro ao testar storage fiscal');
@@ -189,9 +189,9 @@ export default function FiscalDiagnostics() {
       setPreflightResult(response);
       if (response?.ready) {
         // Resultado do teste fica fixo no painel (StatTile/StatusBadge) abaixo: o aviso pode sumir sozinho.
-        avisar.sucesso('Preflight concluido. Ambiente pronto para a proxima etapa controlada.', undefined, { efemero: true });
+        avisar.sucesso('Preflight concluído. Ambiente pronto para a próxima etapa controlada.', undefined, { efemero: true });
       } else {
-        avisar.alerta('Preflight concluido com pendencias. Revise os checks antes de ativar SEFAZ.');
+        avisar.alerta('Preflight concluído com pendências. Revise os checks antes de ativar SEFAZ.');
       }
     } catch (err) {
       avisar.erro(err.message || 'Erro ao executar preflight fiscal');
@@ -205,13 +205,13 @@ export default function FiscalDiagnostics() {
       <PageHeader
         titulo="Diagnóstico fiscal"
         contagem={data ? `${dados.empresas_monitoradas || 0} empresas monitoradas` : null}
-        descricao="Verificacao administrativa de configuracoes sensiveis sem expor senha, certificado ou credenciais."
+        descricao="Verificacao administrativa de configurações sensiveis sem expor senha, certificado ou credenciais."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       {loading ? (
-        <div className="app-empty-card">Carregando diagnostico...</div>
+        <div className="app-empty-card">Carregando diagnóstico...</div>
       ) : data ? (
         <>
           {/*
@@ -249,7 +249,7 @@ export default function FiscalDiagnostics() {
                   className="btn btn-primary"
                   onClick={handleStorageProbe}
                   disabled={probeLoading || !storage.configured}
-                  title="Cria um arquivo pequeno e sem dados fiscais no bucket configurado para validar permissao de escrita do backend."
+                  title="Cria um arquivo pequeno e sem dados fiscais no bucket configurado para validar permissão de escrita do backend."
                 >
                   {probeLoading ? 'Testando...' : 'Testar storage'}
                 </button>
@@ -323,7 +323,7 @@ export default function FiscalDiagnostics() {
               */}
               {!dados.empresas_monitoradas ? (
                 <p className="text-sm text-[var(--sem-warning)]">
-                  A empresa selecionada precisa estar ativa e com o modulo fiscal habilitado. Se nao estiver, o backend retornara a orientacao.
+                  A empresa selecionada precisa estar ativa e com o módulo fiscal habilitado. Se não estiver, o backend retornara a orientacao.
                 </p>
               ) : null}
 
@@ -368,7 +368,7 @@ export default function FiscalDiagnostics() {
               <CamposComVazios
                 campos={[
                   { label: 'Crypto configurado', valor: <SinalConfigurado ativo={crypto.configured} /> },
-                  { label: 'Crypto producao', valor: <SinalConfigurado ativo={crypto.min_length_ok_for_production} /> },
+                  { label: 'Crypto produção', valor: <SinalConfigurado ativo={crypto.min_length_ok_for_production} /> },
                   { label: 'SEFAZ habilitada', valor: <SinalConfigurado ativo={sefaz.enabled} /> },
                   { label: 'Ambiente SEFAZ', valor: sefaz.ambiente },
                   { label: 'UF SEFAZ', valor: sefaz.uf || 'pendente' },
@@ -472,10 +472,10 @@ export default function FiscalDiagnostics() {
                 <CamposComVazios
                   campos={[
                     { label: 'ID', valor: ultimoLog.id },
-                    { label: 'Inicio', valor: ultimoLog.started_at ? new Date(ultimoLog.started_at).toLocaleString('pt-BR') : '-' },
+                    { label: 'Início', valor: ultimoLog.started_at ? new Date(ultimoLog.started_at).toLocaleString('pt-BR') : '-' },
                     { label: 'Status', valor: ultimoLog.status },
                     { label: 'Tipo', valor: ultimoLog.request_type },
-                    { label: 'Codigo', valor: ultimoLog.response_code },
+                    { label: 'Código', valor: ultimoLog.response_code },
                     { label: 'Mensagem', valor: ultimoLog.response_message || ultimoLog.error_message || '-' }
                   ]}
                 />

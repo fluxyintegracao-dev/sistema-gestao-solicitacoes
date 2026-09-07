@@ -64,8 +64,8 @@ const ROTULO_SITUACAO = {
  */
 const OPCOES_SITUACAO = [
   { valor: 'RASCUNHO', rotulo: 'Rascunhos (faltam enviar)' },
-  { valor: 'ABERTA', rotulo: 'Aguardando decisao' },
-  { valor: 'REJEITADA', rotulo: 'Devolvidas para correcao' },
+  { valor: 'ABERTA', rotulo: 'Aguardando decisão' },
+  { valor: 'REJEITADA', rotulo: 'Devolvidas para correção' },
   { valor: 'APROVADA', rotulo: 'Aprovadas' },
   { valor: 'CANCELADA', rotulo: 'Canceladas' }
 ];
@@ -139,7 +139,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
   }, [solicitacoes]);
 
   const dimensoesFiltro = useMemo(() => [
-    { id: 'situacao', rotulo: 'Situacao', unico: true, opcoes: OPCOES_SITUACAO },
+    { id: 'situacao', rotulo: 'Situação', unico: true, opcoes: OPCOES_SITUACAO },
     {
       id: 'tipo',
       rotulo: 'Tipo',
@@ -210,7 +210,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
           mensagem: `Atestar que "${anexo.nome_original}" e valido e util.`,
           rotuloConfirmar: 'Atestar',
           campo: {
-            rotulo: 'Observacao (opcional)',
+            rotulo: 'Observação (opcional)',
             multilinha: true,
             valorInicial: 'Confere com o original.'
           }
@@ -308,7 +308,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
             ja termina em ponto. O texto e o corte do fluxo (cancelar = nao aprova) sao os mesmos.
           */
           const { ok } = await confirmar({
-            titulo: 'Aprovar com pendencia',
+            titulo: 'Aprovar com pendência',
             mensagem: `${partes.join(' ')} Aprovar mesmo assim?`,
             rotuloConfirmar: 'Aprovar mesmo assim',
             rotuloCancelar: 'Voltar'
@@ -323,8 +323,8 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
         // Devolver RECUSA o pedido de quem abriu: destrutiva, e o motivo e obrigatorio — era
         // um `window.prompt` com o mesmo corte (`if (!motivo || !motivo.trim()) return;`).
         const { ok, texto } = await confirmar({
-          titulo: 'Devolver para correcao',
-          mensagem: 'A solicitacao volta para quem abriu e sai da fila de decisao ate ser reenviada.',
+          titulo: 'Devolver para correção',
+          mensagem: 'A solicitação volta para quem abriu e sai da fila de decisão até ser reenviada.',
           rotuloConfirmar: 'Devolver',
           rotuloCancelar: 'Voltar',
           destrutiva: true,
@@ -348,7 +348,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
           Nao havia como desistir depois de clicar no botao — acao destrutiva sem saida.
         */
         const { ok, texto } = await confirmar({
-          titulo: 'Cancelar solicitacao',
+          titulo: 'Cancelar solicitação',
           mensagem: `Cancelar a solicitacao #${solicitacao.id}? Ela sai da fila de decisao.`,
           rotuloConfirmar: 'Cancelar solicitacao',
           rotuloCancelar: 'Manter solicitacao',
@@ -480,7 +480,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
             },
             {
               id: 'situacao',
-              titulo: 'Situacao',
+              titulo: 'Situação',
               tipo: 'status',
               render: (s) => (
                 <>
@@ -502,7 +502,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
           storageKey="tabela:rh-dp-pessoal-solicitacoes"
           rotuloRolagem="Solicitacoes RH/DP"
           carregando={carregando}
-          vazio="Nenhuma solicitacao neste filtro."
+          vazio="Nenhuma solicitação neste filtro."
           // Rascunho e aberta ainda esperam alguem: a linha fica marcada.
           urgencia={(s) => (['RASCUNHO', 'ABERTA'].includes(s.situacao) ? 'warning' : null)}
           acoesLinha={(s) => (
@@ -593,7 +593,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
               </div>
               {conferencia.aguardandoValidacao?.length ? (
                 <div className="rh-pessoal-conferencia--aguarda">
-                  <strong>Aguardando sua conferencia:</strong>{' '}
+                  <strong>Aguardando sua conferência:</strong>{' '}
                   {conferencia.aguardandoValidacao.map((d) => d.nome).join(', ')}
                 </div>
               ) : null}
@@ -646,7 +646,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
           <div>
             <h3 className="app-bloco-titulo mb-2">Documentos enviados pela obra</h3>
             {anexos.length === 0 ? (
-              <p className="opacity-70">Nenhum documento anexado a esta solicitacao.</p>
+              <p className="opacity-70">Nenhum documento anexado a esta solicitação.</p>
             ) : (
               <ul className="rh-pessoal-pedidos">
                 {anexos.map((anexo) => (
@@ -693,7 +693,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
 
           {aberta.historicos?.length ? (
             <div>
-              <h3 className="app-bloco-titulo mb-2">Historico</h3>
+              <h3 className="app-bloco-titulo mb-2">Histórico</h3>
               <ul className="rh-pessoal-historico">
                 {aberta.historicos.map((h) => (
                   <li key={h.id}>

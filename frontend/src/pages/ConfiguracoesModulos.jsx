@@ -89,7 +89,7 @@ export default function ConfiguracoesModulos() {
       const nextModules = Array.isArray(data?.modules) ? data.modules : modules;
       setModules(nextModules);
       updateUser({ modulos_habilitados: nextModules });
-      avisar.sucesso('Modulos atualizados: menu e rotas desta instalacao passam a refletir a nova configuracao.');
+      avisar.sucesso('Módulos atualizados: menu e rotas desta instalacao passam a refletir a nova configuração.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao salvar modulos');
@@ -106,9 +106,9 @@ export default function ConfiguracoesModulos() {
   */
   const cabecalho = (
     <PageHeader
-      titulo="Modulos e planos"
+      titulo="Módulos e planos"
       contagem={loading ? null : `${enabledCount} ativo(s)`}
-      descricao="Controle quais modulos ficam disponiveis para esta instalacao sem expor essa camada ao administrador interno."
+      descricao="Controle quais módulos ficam disponíveis para esta instalacao sem expor essa camada ao administrador interno."
       acaoPrincipal={{
         rotulo: saving ? 'Salvando...' : 'Salvar modulos',
         onClick: handleSave,
@@ -124,7 +124,7 @@ export default function ConfiguracoesModulos() {
       <Pagina>
         {cabecalho}
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card">Carregando modulos...</div>
+        <div className="app-empty-card">Carregando módulos...</div>
       </Pagina>
     );
   }
@@ -142,7 +142,7 @@ export default function ConfiguracoesModulos() {
         <div className="rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] p-4 text-sm text-[var(--sem-info)]">
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <p>
-              Esta leitura evita ambiguidade comercial e operacional: desligar um modulo deve ocultar menu, rotas e
+              Esta leitura evita ambiguidade comercial e operacional: desligar um módulo deve ocultar menu, rotas e
               obrigatoriedades ligadas a ele, sem quebrar o fluxo principal quando o acoplamento for opcional.
               Dependencias comerciais sao aplicadas automaticamente ao ativar ou desativar modulos.
             </p>
@@ -175,7 +175,7 @@ export default function ConfiguracoesModulos() {
 
                 <dl className="mt-3 space-y-2 text-sm text-[var(--c-muted)]">
                   <div>
-                    <dt className="font-medium text-[var(--c-text)]">Relacao com os demais modulos</dt>
+                    <dt className="font-medium text-[var(--c-text)]">Relação com os demais módulos</dt>
                     <dd>{item.dependency}</dd>
                   </div>
                   <div>
@@ -194,7 +194,7 @@ export default function ConfiguracoesModulos() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Modulos desta instalacao"
+        titulo="Módulos desta instalacao"
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -257,7 +257,7 @@ function ModuleCard({ item, governance, dependencyLabels, dependents, onToggle }
           ) : null}
           {dependentLabels.length ? (
             <p className="mt-2">
-              <strong className="text-[var(--c-text)]">Desligar tambem pode afetar:</strong> {dependentLabels.join(' | ')}
+              <strong className="text-[var(--c-text)]">Desligar também pode afetar:</strong> {dependentLabels.join(' | ')}
             </p>
           ) : null}
         </div>

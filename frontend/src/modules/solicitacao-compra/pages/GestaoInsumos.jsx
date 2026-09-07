@@ -202,7 +202,7 @@ export default function GestaoInsumos() {
 
     try {
       await deletarInsumo(alvo.id);
-      avisar.sucesso('Insumo excluido.');
+      avisar.sucesso('Insumo excluído.');
       // O formulário inline fica ACIMA da lista: se o registro aberto nele
       // acabou de ser apagado, salvar depois recriaria/atualizaria um id que
       // não existe mais.
@@ -285,7 +285,7 @@ export default function GestaoInsumos() {
     },
     {
       id: 'codigo',
-      titulo: 'Codigo',
+      titulo: 'Código',
       tipo: 'codigo',
       render: (item) => item.codigo || '-'
     },
@@ -322,7 +322,7 @@ export default function GestaoInsumos() {
     },
     {
       id: 'descricao',
-      titulo: 'Descricao',
+      titulo: 'Descrição',
       tipo: 'texto',
       // T6: texto longo trunca com o texto completo no tooltip.
       render: (item) => (
@@ -337,9 +337,9 @@ export default function GestaoInsumos() {
           `page-subtitle`. Agora moram na faixa fixa do PageHeader, que
           compacta na rolagem e mantém as ações a um clique. */}
       <PageHeader
-        titulo="Gestao de Insumos"
+        titulo="Gestão de Insumos"
         contagem={loading ? null : `${insumosFiltrados.length} insumo(s)`}
-        descricao="Cadastro de insumos vinculados a unidades e categorias do modulo compras."
+        descricao="Cadastro de insumos vinculados a unidades e categorias do módulo compras."
         acaoPrincipal={{ rotulo: 'Novo insumo', onClick: abrirNovo }}
         secundarias={[{
           rotulo: 'Importar em massa',
@@ -362,7 +362,7 @@ export default function GestaoInsumos() {
       */}
       <BlocoConteudo titulo={editandoId ? 'Editar insumo' : 'Novo insumo'}>
         <form className="space-y-4" onSubmit={handleSalvar}>
-          <FormSecao legenda="Identificacao" colunas={2}>
+          <FormSecao legenda="Identificação" colunas={2}>
             <CampoForm label="Nome" obrigatorio>
               <input
                 ref={campoNomeRef}
@@ -372,7 +372,7 @@ export default function GestaoInsumos() {
               />
             </CampoForm>
 
-            <CampoForm label="Codigo">
+            <CampoForm label="Código">
               <input
                 className="input w-full"
                 value={form.codigo}
@@ -424,7 +424,7 @@ export default function GestaoInsumos() {
               </select>
             </CampoForm>
 
-            <CampoForm label="Descricao" tipo="texto-longo" span={2}>
+            <CampoForm label="Descrição" tipo="texto-longo" span={2}>
               {/* R10: a altura do textarea vem da folha do sistema
                   (textarea.input), não do `min-h-[110px]` que estava aqui. */}
               <textarea
@@ -457,11 +457,11 @@ export default function GestaoInsumos() {
         <BlocoConteudo
           key="importacao-aberta"
           titulo="Importar insumos em massa"
-          descricao="Um insumo por linha. Linhas vazias sao ignoradas e duplicados nao sao criados."
+          descricao="Um insumo por linha. Linhas vazias são ignoradas e duplicados não são criados."
           variante="secundario"
         >
           <form onSubmit={handleImportarEmMassa} className="space-y-4">
-            <FormSecao legenda="Padrao aplicado a todas as linhas" colunas={2}>
+            <FormSecao legenda="Padrão aplicado a todas as linhas" colunas={2}>
               <CampoForm
                 label="Unidade (opcional)"
                 hint="Selecione uma unidade pre-cadastrada ou deixe em branco para preencher depois."
@@ -558,7 +558,7 @@ export default function GestaoInsumos() {
 
       <BlocoConteudo
         titulo="Insumos cadastrados"
-        descricao="Base dos itens de solicitacao, cotacao e pedido de compra."
+        descricao="Base dos itens de solicitação, cotação e pedido de compra."
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -566,7 +566,7 @@ export default function GestaoInsumos() {
           busca={{
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((atual) => ({ ...atual, q: valor })),
-            placeholder: 'Buscar por nome, codigo, descricao, categoria ou unidade'
+            placeholder: 'Buscar por nome, código, descrição, categoria ou unidade'
           }}
           filtros={[{
             id: 'categoria',

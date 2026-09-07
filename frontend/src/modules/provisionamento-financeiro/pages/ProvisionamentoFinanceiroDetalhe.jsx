@@ -1,3 +1,4 @@
+import DateInputBR from '../../../components/DateInputBR';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -166,7 +167,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
     if (!form || saving) return;
 
     if (!form.item_macro.trim() || !form.data_prevista_desembolso || !form.descricao.trim() || !form.valor_previsto) {
-      avisar.erro('Preencha item macro, data prevista, descricao e valor previsto.');
+      avisar.erro('Preencha item macro, data prevista, descrição e valor previsto.');
       return;
     }
 
@@ -181,7 +182,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
         prioridade: form.prioridade
       });
       setEditando(false);
-      avisar.sucesso('Alteracoes da provisao salvas.');
+      avisar.sucesso('Alterações da provisão salvas.');
       await carregar();
     } catch (error) {
       console.error(error);
@@ -195,7 +196,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
     event.preventDefault();
     if (comentando) return;
     if (!comentario.trim()) {
-      avisar.erro('Informe um comentario.');
+      avisar.erro('Informe um comentário.');
       return;
     }
 
@@ -203,7 +204,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
       setComentando(true);
       await adicionarComentarioProvisaoFinanceira(id, { comentario });
       setComentario('');
-      avisar.sucesso('Comentario registrado.');
+      avisar.sucesso('Comentário registrado.');
       await carregar();
     } catch (error) {
       console.error(error);
@@ -250,9 +251,9 @@ export default function ProvisionamentoFinanceiroDetalhe() {
   if (loading || !provisao || !form) {
     return (
       <Pagina>
-        <PageHeader titulo="Provisao" voltar={{ to: '/provisoes-financeiras' }} />
+        <PageHeader titulo="Provisão" voltar={{ to: '/provisoes-financeiras' }} />
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <BlocoConteudo>Carregando provisao...</BlocoConteudo>
+        <BlocoConteudo>Carregando provisão...</BlocoConteudo>
       </Pagina>
     );
   }
@@ -307,12 +308,12 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           label="Prioridade"
           valor={formatarPrioridadeOuNulo(provisao.prioridade)}
           vazio={!formatarPrioridadeOuNulo(provisao.prioridade)}
-          sub="Definida no cadastro da provisao"
+          sub="Definida no cadastro da provisão"
         />
       </StatGrid>
 
       <BlocoConteudo
-        titulo="Dados da provisao"
+        titulo="Dados da provisão"
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -334,7 +335,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
             { label: 'Criado por', valor: provisao.usuarioCriacao?.nome || null, span: 2 },
             { label: 'Atualizado por', valor: provisao.usuarioAtualizacao?.nome || null, span: 2 },
             {
-              label: 'Descricao',
+              label: 'Descrição',
               valor: provisao.descricao || null,
               span: 4
             }
@@ -348,7 +349,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
           (padrão de tela mista): a pessoa está no registro para mexer nele,
           e o modal a obrigaria a abrir e fechar para ver o que edita.
         */
-        <BlocoConteudo titulo="Editar provisao">
+        <BlocoConteudo titulo="Editar provisão">
           <form className="space-y-4" onSubmit={salvarEdicao}>
             <FormSecao legenda="Compromisso" colunas={2}>
               <CampoForm label="Item macro" obrigatorio>
@@ -367,8 +368,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
               </CampoForm>
 
               <CampoForm label="Data prevista" obrigatorio>
-                <input
-                  type="date"
+                <DateInputBR
                   className="input w-full"
                   value={form.data_prevista_desembolso}
                   onChange={(event) => setForm((atual) => ({ ...atual, data_prevista_desembolso: event.target.value }))}
@@ -394,7 +394,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
                   value={form.prioridade}
                   onChange={(event) => setForm((atual) => ({ ...atual, prioridade: event.target.value }))}
                 >
-                  <option value="">Nao definida</option>
+                  <option value="">Não definida</option>
                   <option value="baixa">Baixa</option>
                   <option value="media">Media</option>
                   <option value="alta">Alta</option>
@@ -410,7 +410,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
                 />
               </CampoForm>
 
-              <CampoForm label="Descricao" obrigatorio tipo="texto-longo" span={2}>
+              <CampoForm label="Descrição" obrigatorio tipo="texto-longo" span={2}>
                 {/* R10: altura do textarea vem da folha do sistema, não do
                     `min-h-[110px]` que estava aqui. */}
                 <textarea
@@ -432,18 +432,18 @@ export default function ProvisionamentoFinanceiroDetalhe() {
       )}
 
       <BlocoConteudo
-        titulo="Comentarios"
+        titulo="Comentários"
         variante="secundario"
-        descricao="Observacao complementar fica registrada no historico da provisao."
+        descricao="Observação complementar fica registrada no histórico da provisão."
       >
         <form className="space-y-4" onSubmit={enviarComentario}>
           <FormSecao colunas={2}>
-            <CampoForm label="Novo comentario" tipo="texto-longo" span={2}>
+            <CampoForm label="Novo comentário" tipo="texto-longo" span={2}>
               <textarea
                 className="input w-full"
                 value={comentario}
                 onChange={(event) => setComentario(event.target.value)}
-                placeholder="Registrar observacao complementar"
+                placeholder="Registrar observação complementar"
               />
             </CampoForm>
           </FormSecao>
@@ -523,7 +523,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
         vista para que se saiba que existe.
       */}
       <BlocoConteudo
-        titulo="Historico"
+        titulo="Histórico"
         variante="secundario"
         contagem={`${historicos.length} evento(s)`}
         recolhivel
@@ -544,7 +544,7 @@ export default function ProvisionamentoFinanceiroDetalhe() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--c-muted)]">Nenhum historico registrado.</p>
+          <p className="text-sm text-[var(--c-muted)]">Nenhum histórico registrado.</p>
         )}
       </BlocoConteudo>
     </Pagina>

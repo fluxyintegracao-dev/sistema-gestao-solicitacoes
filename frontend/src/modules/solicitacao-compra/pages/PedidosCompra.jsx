@@ -243,7 +243,7 @@ export default function PedidosCompra() {
     },
     {
       id: 'solicitacao',
-      titulo: 'Solicitacao',
+      titulo: 'Solicitação',
       tipo: 'codigo',
       render: (pedido) => `SC-${String(pedido.solicitacao_compra_id || pedido.solicitacao?.id || '').padStart(5, '0')}`
     },
@@ -264,7 +264,7 @@ export default function PedidosCompra() {
     },
     {
       id: 'pedido_minimo',
-      titulo: 'Pedido minimo',
+      titulo: 'Pedido mínimo',
       tipo: 'valor',
       render: (pedido) => (
         <>
@@ -274,7 +274,7 @@ export default function PedidosCompra() {
             // fora do piso de contraste). O aviso continua âmbar, agora pelo
             // token semântico.
             <div className="text-xs font-medium" style={{ color: 'var(--sem-warning)' }}>
-              Nao atingido
+              Não atingido
             </div>
           ) : null}
         </>
@@ -298,7 +298,7 @@ export default function PedidosCompra() {
       <PageHeader
         titulo="Pedidos de Compra"
         contagem={loading ? null : `${totalPedidos} pedido(s)`}
-        descricao="Consulta dos pedidos gerados a partir das cotacoes encerradas, com gestao restrita ao setor de compras."
+        descricao="Consulta dos pedidos gerados a partir das cotações encerradas, com gestão restrita ao setor de compras."
         secundarias={[
           {
             rotulo: loading ? 'Buscando...' : 'Atualizar',

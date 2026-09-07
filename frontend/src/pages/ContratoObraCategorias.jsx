@@ -48,7 +48,7 @@ export default function ContratoObraCategorias() {
         setSelecionadas(new Set((data?.categoria_ids || []).map(Number)));
         setInvalidas(data?.categorias_invalidas || []);
       } catch {
-        avisar.erro('Nao foi possivel carregar as categorias.');
+        avisar.erro('Não foi possível carregar as categorias.');
       } finally {
         setCarregando(false);
       }
@@ -101,7 +101,7 @@ export default function ContratoObraCategorias() {
       setInvalidas(data?.categorias_invalidas || []);
       avisar.sucesso('Categorias salvas.');
     } catch {
-      avisar.erro('Nao foi possivel salvar as categorias.');
+      avisar.erro('Não foi possível salvar as categorias.');
     } finally {
       setSalvando(false);
     }
@@ -166,16 +166,16 @@ export default function ContratoObraCategorias() {
               <span>Somente marcadas</span>
             </label>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => marcarVisiveis(true)}>
-              Marcar visiveis
+              Marcar visíveis
             </button>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => marcarVisiveis(false)}>
-              Desmarcar visiveis
+              Desmarcar visíveis
             </button>
           </div>
 
           {selecionadas.size === 0 && (
             <div className="app-alert app-alert--error">
-              Nenhuma categoria marcada — o contrato de obra ficara sem opcao de categoria.
+              Nenhuma categoria marcada — o contrato de obra ficará sem opção de categoria.
             </div>
           )}
 

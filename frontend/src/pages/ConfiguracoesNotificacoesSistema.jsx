@@ -175,7 +175,7 @@ export default function ConfiguracoesNotificacoesSistema() {
       }
       const data = await salvarNotificacoesSistema({ eventos });
       setGrupos(Array.isArray(data?.grupos) ? data.grupos : grupos);
-      avisar.sucesso('Notificacoes do sistema atualizadas com sucesso.');
+      avisar.sucesso('Notificações do sistema atualizadas com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao salvar notificacoes do sistema');
@@ -193,9 +193,9 @@ export default function ConfiguracoesNotificacoesSistema() {
   */
   const cabecalho = (
     <PageHeader
-      titulo="Notificacoes do Sistema"
+      titulo="Notificações do Sistema"
       contagem={loading ? null : `${resumo.ativos}/${resumo.total} ativos`}
-      descricao="Defina quais eventos podem gerar avisos no sino. A regra vale para todos os usuarios da instalacao."
+      descricao="Defina quais eventos podem gerar avisos no sino. A regra vale para todos os usuários da instalacao."
       acaoPrincipal={{
         rotulo: saving ? 'Salvando...' : 'Salvar notificacoes',
         onClick: handleSalvar,
@@ -209,7 +209,7 @@ export default function ConfiguracoesNotificacoesSistema() {
       <Pagina>
         {cabecalho}
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card">Carregando notificacoes do sistema...</div>
+        <div className="app-empty-card">Carregando notificações do sistema...</div>
       </Pagina>
     );
   }
@@ -226,7 +226,7 @@ export default function ConfiguracoesNotificacoesSistema() {
             de contraste do ThemeContext. O tom informativo do sistema são os
             tokens --sem-info-*. */}
         <p className="rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] p-4 text-sm text-[var(--sem-info)]">
-          Desativar um evento impede novas notificacoes desse tipo. Notificacoes antigas continuam registradas para
+          Desativar um evento impede novas notificações desse tipo. Notificações antigas continuam registradas para
           auditoria e rastreabilidade.
         </p>
       </BlocoConteudo>
@@ -243,7 +243,7 @@ export default function ConfiguracoesNotificacoesSistema() {
           busca={{
             valor: busca,
             aoMudar: setBusca,
-            placeholder: 'Digite modulo, evento ou descricao'
+            placeholder: 'Digite módulo, evento ou descrição'
           }}
           filtros={[{
             id: 'modulo',

@@ -122,7 +122,7 @@ export default function UsuariosPermissoesRhDp() {
 
       const response = await salvarUsuariosPermissoesRhDp(payload);
       setSelecionados(normalizePermissionMap(response?.usuarios));
-      avisar.sucesso('Permissoes do RH/DP salvas com sucesso.');
+      avisar.sucesso('Permissões do RH/DP salvas com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao salvar permissoes do RH/DP');
@@ -136,9 +136,9 @@ export default function UsuariosPermissoesRhDp() {
       {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
           linha no próprio PageHeader. */}
       <PageHeader
-        titulo="Permissoes RH/DP por usuario"
+        titulo="Permissões RH/DP por usuário"
         contagem={`${Object.keys(selecionados).length} configurado(s)`}
-        descricao="Monte usuarios de RH e contabilidade sem criar perfil novo: o ADMINISTRADOR define exatamente quais areas do RH/DP cada usuario pode operar."
+        descricao="Monte usuários de RH e contabilidade sem criar perfil novo: o ADMINISTRADOR define exatamente quais áreas do RH/DP cada usuário pode operar."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar matriz de permissoes',
           onClick: salvar,
@@ -161,7 +161,7 @@ export default function UsuariosPermissoesRhDp() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Usuarios ativos"
+        titulo="Usuários ativos"
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -180,7 +180,7 @@ export default function UsuariosPermissoesRhDp() {
               return (
                 <BlocoConteudo
                   key={usuario.id}
-                  titulo={`${usuario.nome} — ${currentPermissions.length} permissao(oes)`}
+                  titulo={`${usuario.nome} — ${currentPermissions.length} permissão(oes)`}
                   variante="secundario"
                   recolhivel
                   recolhidoPadrao={currentPermissions.length === 0}
@@ -232,7 +232,7 @@ export default function UsuariosPermissoesRhDp() {
 
             {!usuariosFiltrados.length && (
               <div className="app-empty-card">
-                Nenhum usuario encontrado para o filtro atual.
+                Nenhum usuário encontrado para o filtro atual.
               </div>
             )}
           </div>

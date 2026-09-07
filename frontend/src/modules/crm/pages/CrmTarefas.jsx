@@ -28,7 +28,7 @@ const POR_PAGINA = 50;
 */
 const STATUS_MAP = {
   PENDING: { label: 'Pendente', familia: 'warning' },
-  DONE: { label: 'Concluida', familia: 'success' },
+  DONE: { label: 'Concluída', familia: 'success' },
   OVERDUE: { label: 'Vencida', familia: 'danger' },
   CANCELLED: { label: 'Cancelada', familia: 'neutral' }
 };
@@ -226,7 +226,7 @@ export default function CrmTarefas() {
         cor="var(--sem-info)"
         titulo="Tarefas"
         contagem={`${tasks.length} em tela`}
-        descricao="Concluir e cancelar pedem confirmacao antes de gravar."
+        descricao="Concluir e cancelar pedem confirmação antes de gravar."
       >
         <BarraFiltros
           filtros={[
@@ -236,7 +236,7 @@ export default function CrmTarefas() {
               unico: true,
               opcoes: [
                 { valor: 'PENDING', rotulo: 'Pendente' },
-                { valor: 'DONE', rotulo: 'Concluida' },
+                { valor: 'DONE', rotulo: 'Concluída' },
                 { valor: 'CANCELLED', rotulo: 'Cancelada' }
               ]
             },
@@ -303,7 +303,7 @@ export default function CrmTarefas() {
             },
             {
               id: 'responsavel',
-              titulo: 'Responsavel',
+              titulo: 'Responsável',
               tipo: 'texto',
               render: (task) => <span className="text-sub">{task.responsavel?.nome || '—'}</span>
             },

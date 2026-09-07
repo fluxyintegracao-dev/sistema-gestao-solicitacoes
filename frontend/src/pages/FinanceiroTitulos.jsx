@@ -53,6 +53,7 @@ import {
 } from '../components/padrao';
 import PainelFiltrosVisiveis, { useFiltrosVisiveis } from '../components/padrao/PainelFiltrosVisiveis';
 import { usePreferenciaDeLista, TIPO_GERAL } from '../contexts/PreferenciasContext';
+import DateInputBR from '../components/DateInputBR';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -88,7 +89,7 @@ const NATUREZAS_INTERCOMPANY_BAIXA = [
   },
   {
     value: 'TRANSFERENCIA_INTERNA',
-    label: 'Transferencia interna entre empresas',
+    label: 'Transferência interna entre empresas',
     description: 'Use para cobertura de caixa ou envio de recurso entre empresas. Nao entra na DRE consolidada.',
     tipo_intercompany: 'COBERTURA_CAIXA',
     elimina_consolidado: true,
@@ -96,7 +97,7 @@ const NATUREZAS_INTERCOMPANY_BAIXA = [
   },
   {
     value: 'REEMBOLSO_COMPENSACAO',
-    label: 'Reembolso ou compensacao entre empresas',
+    label: 'Reembolso ou compensação entre empresas',
     description: 'Use para acerto/reembolso interno. Mantem o rastro sem tratar como despesa operacional da obra.',
     tipo_intercompany: 'REEMBOLSO',
     elimina_consolidado: true,
@@ -134,21 +135,21 @@ const NATUREZAS_INTERCOMPANY_BAIXA = [
   tela declara. Filtro novo continua aparecendo sozinho; nenhum some.
 */
 const FILTER_DEFINITIONS = [
-  { id: 'q', rotulo: 'Busca rapida', group: 'basic', span: 'xl:col-span-4', obrigatorio: true },
+  { id: 'q', rotulo: 'Busca rápida', group: 'basic', span: 'xl:col-span-4', obrigatorio: true },
   { id: 'status', rotulo: 'Status', group: 'basic', span: 'xl:col-span-2' },
   { id: 'obra_id', rotulo: 'Obra', group: 'basic', span: 'xl:col-span-4' },
-  { id: 'vencimento_inicial', rotulo: 'Vencimento inicio', group: 'basic', span: 'xl:col-span-2' },
+  { id: 'vencimento_inicial', rotulo: 'Vencimento início', group: 'basic', span: 'xl:col-span-2' },
   { id: 'vencimento_final', rotulo: 'Vencimento fim', group: 'basic', span: 'xl:col-span-2' },
-  { id: 'codigo', rotulo: 'Titulo', group: 'basic', span: 'xl:col-span-2', padrao: false },
+  { id: 'codigo', rotulo: 'Título', group: 'basic', span: 'xl:col-span-2', padrao: false },
   { id: 'numero_documento', rotulo: 'N. documento', group: 'basic', span: 'xl:col-span-2', padrao: false },
   { id: 'parceiro_id', rotulo: 'Cliente/Credor', group: 'basic', span: 'xl:col-span-4', padrao: false },
-  { id: 'data_emissao_inicial', rotulo: 'Emissao inicio', group: 'advanced', span: 'xl:col-span-2', padrao: false },
-  { id: 'data_emissao_final', rotulo: 'Emissao fim', group: 'advanced', span: 'xl:col-span-2', padrao: false },
+  { id: 'data_emissao_inicial', rotulo: 'Emissão início', group: 'advanced', span: 'xl:col-span-2', padrao: false },
+  { id: 'data_emissao_final', rotulo: 'Emissão fim', group: 'advanced', span: 'xl:col-span-2', padrao: false },
   { id: 'valor_min', rotulo: 'Valor mínimo', group: 'advanced', span: 'xl:col-span-2', padrao: false },
   { id: 'valor_max', rotulo: 'Valor máximo', group: 'advanced', span: 'xl:col-span-2', padrao: false },
   { id: 'categoria_financeira_id', rotulo: 'Categoria financeira', group: 'advanced', span: 'xl:col-span-3', padrao: false },
   { id: 'forma_pagamento_id', rotulo: 'Forma de pagamento', group: 'advanced', span: 'xl:col-span-3', padrao: false },
-  { id: 'cartao_id', rotulo: 'Cartao', group: 'advanced', span: 'xl:col-span-3', padrao: false }
+  { id: 'cartao_id', rotulo: 'Cartão', group: 'advanced', span: 'xl:col-span-3', padrao: false }
 ];
 
 /*
@@ -380,8 +381,8 @@ function FinanceiroFilterAutocomplete({
               setBrowseOpen(true);
             }}
             disabled={disabled}
-            title={`Ver todas as opcoes de ${label.toLowerCase()}`}
-            aria-label={`Ver todas as opcoes de ${label.toLowerCase()}`}
+            title={`Ver todas as opções de ${label.toLowerCase()}`}
+            aria-label={`Ver todas as opções de ${label.toLowerCase()}`}
           >
             <HiOutlineMagnifyingGlass className="h-4 w-4" />
           </button>
@@ -478,7 +479,7 @@ function FinanceiroFilterAutocomplete({
                     className="font-semibold text-[var(--c-primary)] hover:underline"
                     onClick={() => handleSelect('', '')}
                   >
-                    Limpar selecao
+                    Limpar seleção
                   </button>
                 ) : null}
               </div>
@@ -2342,7 +2343,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       case 'codigo':
         return (
           <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Titulo</span>
+            <span className="app-filter-label">Título</span>
             <input
               className="input w-full input-sm"
               value={draftFilters.codigo}
@@ -2354,7 +2355,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       case 'q':
         return (
           <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Busca rapida</span>
+            <span className="app-filter-label">Busca rápida</span>
             <input
               className="input w-full input-sm"
               value={draftFilters.q}
@@ -2374,7 +2375,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             >
               <option value="">Todos</option>
               <option value="EM_ABERTO">Em aberto (previsão + aberto + parcial)</option>
-              <option value="PREVISAO">Previsao</option>
+              <option value="PREVISAO">Previsão</option>
               <option value="ABERTO">Aberto</option>
               <option value="PARCIAL">Parcial</option>
               <option value="QUITADO">Quitado</option>
@@ -2435,7 +2436,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             options={obras}
             onChange={(nextValue) => setFilter('obra_id', nextValue)}
             disabled={loadingOptions}
-            placeholder="Digite nome ou codigo da obra"
+            placeholder="Digite nome ou código da obra"
             allLabel="Todas as obras"
             emptyLabel="Nenhuma obra encontrada"
             getLabel={(obra) => [obra?.codigo, obra?.nome].filter(Boolean).join(' - ') || obra?.nome || ''}
@@ -2475,10 +2476,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       case 'data_emissao_inicial':
         return (
           <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Emissao inicio</span>
-            <input
+            <span className="app-filter-label">Emissão início</span>
+            <DateInputBR
               className="input w-full input-sm"
-              type="date"
               value={draftFilters.data_emissao_inicial}
               onChange={(event) => setFilter('data_emissao_inicial', event.target.value)}
             />
@@ -2487,10 +2487,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       case 'data_emissao_final':
         return (
           <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Emissao fim</span>
-            <input
+            <span className="app-filter-label">Emissão fim</span>
+            <DateInputBR
               className="input w-full input-sm"
-              type="date"
               value={draftFilters.data_emissao_final}
               onChange={(event) => setFilter('data_emissao_final', event.target.value)}
             />
@@ -2507,7 +2506,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             options={categoriasFiltradas}
             onChange={(nextValue) => setFilter('categoria_financeira_id', nextValue)}
             disabled={loadingOptions}
-            placeholder="Digite codigo, nome ou grupo DRE"
+            placeholder="Digite código, nome ou grupo DRE"
             allLabel={`Todas as categorias de ${categoriasLabel}`}
             emptyLabel="Nenhuma categoria encontrada"
             getLabel={(categoria) => (
@@ -2542,14 +2541,14 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         if (!filtroFormaPagamentoUsaCartao) return null;
         return (
           <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Cartao</span>
+            <span className="app-filter-label">Cartão</span>
             <select
               className="input w-full input-sm"
               value={draftFilters.cartao_id}
               onChange={(event) => setFilter('cartao_id', event.target.value)}
               disabled={loadingOptions}
             >
-              <option value="">Todos os cartoes</option>
+              <option value="">Todos os cartões</option>
               {cartoesFiltro.map((cartao) => (
                 <option key={cartao.id} value={cartao.id}>
                   {getCartaoLabel(cartao)}
@@ -2561,10 +2560,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       case 'vencimento_inicial':
         return (
           <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Vencimento inicio</span>
-            <input
+            <span className="app-filter-label">Vencimento início</span>
+            <DateInputBR
               className="input w-full input-sm"
-              type="date"
               value={draftFilters.vencimento_inicial}
               onChange={(event) => setFilter('vencimento_inicial', event.target.value)}
             />
@@ -2574,9 +2572,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         return (
           <label key={filter.id} className={commonClass}>
             <span className="app-filter-label">Vencimento fim</span>
-            <input
+            <DateInputBR
               className="input w-full input-sm"
-              type="date"
               value={draftFilters.vencimento_final}
               onChange={(event) => setFilter('vencimento_final', event.target.value)}
             />
@@ -2605,7 +2602,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         contagem={contagemCabecalho}
         descricao={pageSubtitle}
         acaoPrincipal={{
-          rotulo: 'Novo titulo',
+          rotulo: 'Novo título',
           to: `/financeiro/titulos/novo?tipo=${fixedTipo || draftFilters.tipo || 'RECEBER'}`,
           icone: <HiOutlinePlus className="h-4 w-4" />
         }}
@@ -2649,7 +2646,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         ("Consultar"), com o apoio avisando que a lista só muda ali.
       */}
       <BlocoConteudo
-        titulo={`Consulta de titulos ${tipoLabel}`}
+        titulo={`Consulta de títulos ${tipoLabel}`}
         descricao="A lista abaixo atualiza somente ao consultar."
         variante="secundario"
         controles={(
@@ -2800,13 +2797,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         (Registrado no relatório: o agregado do recorte pede endpoint novo.)
       */}
       <StatGrid colunas={4}>
-        <StatTile label="Titulos nesta pagina" valor={String(resumo.quantidade)} sub={contagemCabecalho ? `${contagemCabecalho} no recorte` : null} />
-        <StatTile label="Valor desta pagina" valor={formatCurrency(resumo.total)} />
-        <StatTile label="Saldo em aberto nesta pagina" valor={formatCurrency(resumo.saldo)} />
+        <StatTile label="Títulos nesta página" valor={String(resumo.quantidade)} sub={contagemCabecalho ? `${contagemCabecalho} no recorte` : null} />
+        <StatTile label="Valor desta página" valor={formatCurrency(resumo.total)} />
+        <StatTile label="Saldo em aberto nesta página" valor={formatCurrency(resumo.saldo)} />
         <StatTile
-          label="Vencidos nesta pagina"
+          label="Vencidos nesta página"
           valor={formatCurrency(resumo.vencido)}
-          sub={`${resumo.quantidadeVencida} titulo(s)`}
+          sub={`${resumo.quantidadeVencida} título(s)`}
           tom={resumo.quantidadeVencida > 0 ? 'danger' : undefined}
         />
       </StatGrid>
@@ -2817,7 +2814,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         <BlocoConteudo
           titulo="Fretes de pedidos pendentes"
           contagem={loadingFretesPendentes ? 'Atualizando…' : `${fretesPendentes.length} pendente(s)`}
-          descricao="Fretes pagos a terceiro registrados em compras e ainda sem titulo financeiro vinculado."
+          descricao="Fretes pagos a terceiro registrados em compras e ainda sem título financeiro vinculado."
           variante="secundario"
           acoes={(
             <button
@@ -2851,7 +2848,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 },
                 {
                   id: 'solicitacao',
-                  titulo: 'Solicitacao',
+                  titulo: 'Solicitação',
                   tipo: 'codigo',
                   render: (frete) => (frete.solicitacaoPrincipal?.id ? (
                     <Link
@@ -2920,13 +2917,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               carregando={loadingFretesPendentes}
               acoesLinha={(frete) => (
                 <Link className="btn btn-primary btn-sm" to={buildFreteTituloUrl(frete)}>
-                  Gerar titulo
+                  Gerar título
                 </Link>
               )}
               larguraAcoes={160}
               storageKey="tabela:financeiro-titulos:fretes-pendentes"
               rotuloRolagem="Fretes de pedidos pendentes de titulo"
-              vazio="Nenhum frete de terceiro pendente de titulo."
+              vazio="Nenhum frete de terceiro pendente de título."
             />
           </div>
         </BlocoConteudo>
@@ -2968,7 +2965,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               className="btn btn-primary btn-sm"
               onClick={abrirModalBaixaMassa}
               disabled={selectedTitulosBaixaveis.length === 0 || savingBaixaMassa}
-              title="Baixar titulos selecionados"
+              title="Baixar títulos selecionados"
             >
               Baixar selecionados
               {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
@@ -2990,7 +2987,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               className="btn btn-outline btn-sm btn-perigo-suave"
               onClick={excluirTitulosSelecionados}
               disabled={!canDeleteTitulos || selectedTitulosExcluiveis.length === 0 || loading || savingBaixaMassa}
-              title="Excluir titulos selecionados sem apagar o registro do banco"
+              title="Excluir títulos selecionados sem apagar o registro do banco"
             >
               Excluir selecionados
               {selectedTitulosExcluiveis.length > 0 ? ` (${selectedTitulosExcluiveis.length})` : ''}
@@ -3004,9 +3001,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 className="btn btn-outline btn-sm"
                 onClick={exportarTitulos}
                 disabled={loading}
-                title="Exporta os titulos listados com as colunas visiveis e campos de boleto para preenchimento"
+                title="Exporta os títulos listados com as colunas visíveis e campos de boleto para preenchimento"
               >
-                Exportar titulos
+                Exportar títulos
               </button>
             ) : null}
             {canImportCodigos ? (
@@ -3045,7 +3042,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             <div className="flex flex-wrap items-center gap-2 text-[var(--c-muted)]">
               <span>Saldo selecionado: <strong className="text-[var(--c-text)]">{formatCurrency(selectedSaldo)}</strong></span>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => setSelectedTituloIds([])}>
-                Limpar selecao
+                Limpar seleção
               </button>
             </div>
           </div>
@@ -3061,7 +3058,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             colunas={[
               {
                 id: 'titulo',
-                titulo: 'Titulo',
+                titulo: 'Título',
                 // R17: o codigo do titulo nomeia o registro desta lista.
                 tipo: 'identidade',
                 noCard: 'titulo',
@@ -3161,7 +3158,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               },
               {
                 id: 'emissao',
-                titulo: 'Emissao',
+                titulo: 'Emissão',
                 tipo: 'data',
                 render: (titulo) => <span className="text-[var(--c-muted)]">{formatDate(titulo.data_emissao)}</span>
               },
@@ -3221,7 +3218,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 <Link
                   className="btn btn-outline btn-sm"
                   to={`/financeiro/titulos/${titulo.id}`}
-                  title="Abrir titulo"
+                  title="Abrir título"
                 >
                   <HiOutlineEye className="h-4 w-4" />
                 </Link>
@@ -3229,7 +3226,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   <Link
                     className="btn btn-outline btn-sm"
                     to={`/financeiro/titulos/${titulo.id}/editar`}
-                    title="Editar informacoes do titulo"
+                    title="Editar informações do título"
                   >
                     <HiOutlinePencilSquare className="h-4 w-4" />
                   </Link>
@@ -3238,7 +3235,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     type="button"
                     className="btn btn-outline btn-sm opacity-50"
                     disabled
-                    title="Somente titulos em aberto e sem baixa podem ser editados"
+                    title="Somente títulos em aberto e sem baixa podem ser editados"
                   >
                     <HiOutlinePencilSquare className="h-4 w-4" />
                   </button>
@@ -3261,7 +3258,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         {hasConsulted ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border)] pt-3">
             <label className="flex items-center gap-2 text-sm text-[var(--c-muted)]">
-              <span>Por pagina</span>
+              <span>Por página</span>
               <select
                 className="input input-sm"
                 value={String(pagination.limit || '25')}
@@ -3319,7 +3316,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       Relatorio de {pageTitle}
                     </h2>
                     <p className="text-xs text-[var(--c-muted)]">
-                      Todos os titulos encontrados pelos filtros aplicados, respeitando seu escopo de acesso.
+                      Todos os títulos encontrados pelos filtros aplicados, respeitando seu escopo de acesso.
                     </p>
                   </div>
                 </div>
@@ -3342,8 +3339,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   type="button"
                   className="btn btn-outline btn-sm"
                   onClick={fecharRelatorio}
-                  title="Fechar relatorio"
-                  aria-label="Fechar relatorio"
+                  title="Fechar relatório"
+                  aria-label="Fechar relatório"
                 >
                   <HiOutlineXMark className="h-4 w-4" />
                 </button>
@@ -3355,14 +3352,14 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 <div className="flex h-full min-h-64 items-center justify-center rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)]">
                   <div className="text-center">
                     <span className="loading loading-spinner loading-md text-primary" aria-hidden="true" />
-                    <p className="mt-3 text-sm font-semibold text-[var(--c-text)]">Preparando o relatorio completo...</p>
-                    <p className="mt-1 text-xs text-[var(--c-muted)]">Aguarde enquanto os titulos filtrados sao consolidados.</p>
+                    <p className="mt-3 text-sm font-semibold text-[var(--c-text)]">Preparando o relatório completo...</p>
+                    <p className="mt-1 text-xs text-[var(--c-muted)]">Aguarde enquanto os títulos filtrados são consolidados.</p>
                   </div>
                 </div>
               ) : relatorioError ? (
                 <div className="flex h-full min-h-64 items-center justify-center rounded-xl border border-[var(--sem-danger-border)] bg-[var(--c-surface)] p-4">
                   <div className="max-w-md text-center">
-                    <h3 className="text-sm font-semibold text-[var(--sem-danger)]">Nao foi possivel gerar o relatorio</h3>
+                    <h3 className="text-sm font-semibold text-[var(--sem-danger)]">Não foi possível gerar o relatório</h3>
                     <p className="mt-2 text-sm text-[var(--c-muted)]">{relatorioError}</p>
                     <button type="button" className="btn btn-outline btn-sm mt-4" onClick={abrirRelatorio}>
                       Tentar novamente
@@ -3372,7 +3369,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               ) : relatorioPdfUrl ? (
                 <iframe
                   src={relatorioPdfUrl}
-                  title={`Visualizacao do relatorio de ${pageTitle.toLowerCase()}`}
+                  title={`Visualização do relatório de ${pageTitle.toLowerCase()}`}
                   className="h-full min-h-64 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)]"
                 />
               ) : null}
@@ -3409,9 +3406,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="app-filter-field">
                   <span className="app-filter-label">Data da baixa</span>
-                  <input
+                  <DateInputBR
                     className="input w-full input-sm"
-                    type="date"
                     value={baixaMassaForm.data_movimento}
                     onChange={(event) => setBaixaMassaForm((current) => ({
                       ...current,
@@ -3506,7 +3502,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
 
                 {baixaMassaUsaCartao ? (
                   <label className="app-filter-field md:col-span-2">
-                    <span className="app-filter-label">Cartao utilizado</span>
+                    <span className="app-filter-label">Cartão utilizado</span>
                     <select
                       className="input w-full input-sm"
                       value={baixaMassaForm.cartao_id}
@@ -3521,7 +3517,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       }}
                       required
                     >
-                      <option value="">Selecione o cartao</option>
+                      <option value="">Selecione o cartão</option>
                       {cartoesBaixaMassa.map((cartao) => (
                         <option key={cartao.id} value={cartao.id}>
                           {getCartaoLabel(cartao)}
@@ -3530,7 +3526,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     </select>
                     {baixaMassaCartaoDebito ? (
                       <span className="mt-1 block text-xs text-[var(--c-muted)]">
-                        Cartao de debito baixa pela conta bancaria vinculada ao cartao.
+                        Cartão de débito baixa pela conta bancária vinculada ao cartão.
                       </span>
                     ) : null}
                   </label>
@@ -3602,7 +3598,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     <span>
                       <span className="block font-semibold">Baixa Entre Empresas</span>
                       <span className="block text-xs text-[var(--c-muted)]">
-                        Use quando a empresa pagadora/recebedora for diferente da empresa do titulo.
+                        Use quando a empresa pagadora/recebedora for diferente da empresa do título.
                       </span>
                     </span>
                   </label>
@@ -3662,9 +3658,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         onChange={(event) => setBaixaMassaParcelamentoAtivo(event.target.checked)}
                       />
                       <span>
-                        Agrupar titulos e gerar parcelas para conciliacao
+                        Agrupar títulos e gerar parcelas para conciliação
                         <span className="mt-1 block text-xs font-normal text-[var(--c-muted)]">
-                          Use para cheque ou cartao quando varios titulos forem pagos em parcelas. Os titulos originais serao quitados e cada parcela ficara disponivel para conciliacao pela data e valor.
+                          Use para cheque ou cartão quando varios títulos forem pagos em parcelas. Os títulos originais serão quitados e cada parcela ficará disponível para conciliação pela data e valor.
                         </span>
                       </span>
                     </label>
@@ -3695,7 +3691,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       <span>
                         Usar cheque de terceiro em carteira
                         <span className="mt-1 block text-xs font-normal text-[var(--c-muted)]">
-                          Selecione um cheque recebido anteriormente para pagar estes titulos.
+                          Selecione um cheque recebido anteriormente para pagar estes títulos.
                         </span>
                       </span>
                     </label>
@@ -3717,7 +3713,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       onChange={(event) => setBaixaMassaForm((current) => ({ ...current, cheque_terceiro_id: event.target.value }))}
                       required
                     >
-                      <option value="">Selecione um cheque disponivel</option>
+                      <option value="">Selecione um cheque disponível</option>
                       {chequesTerceirosDisponiveis.map((cheque) => (
                         <option key={cheque.id} value={cheque.id}>
                           {formatChequeTerceiroLabel(cheque)}
@@ -3742,7 +3738,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
 
                 {!baixaMassaParcelada ? (
                   <label className="app-filter-field md:col-span-2">
-                    <span className="app-filter-label">Desconto por titulo</span>
+                    <span className="app-filter-label">Desconto por título</span>
                     <input
                       className="input w-full input-sm"
                       value={baixaMassaForm.desconto}
@@ -3794,9 +3790,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                           <div className="grid gap-2 md:grid-cols-3">
                             <label className="app-filter-field">
                               <span className="app-filter-label">Data da parcela</span>
-                              <input
+                              <DateInputBR
                                 className="input w-full input-sm"
-                                type="date"
                                 value={parcela.data_movimento}
                                 onChange={(event) => updateBaixaMassaParcela(index, 'data_movimento', event.target.value)}
                                 required
@@ -3819,7 +3814,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                                 className="input w-full input-sm"
                                 value={parcela.documento_referencia}
                                 onChange={(event) => updateBaixaMassaParcela(index, 'documento_referencia', event.target.value)}
-                                placeholder="Referencia da parcela"
+                                placeholder="Referência da parcela"
                               />
                             </label>
                           </div>
@@ -3835,7 +3830,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                                     onChange={(event) => updateBaixaMassaParcela(index, 'cheque_terceiro_id', event.target.value)}
                                     required
                                   >
-                                    <option value="">Selecione um cheque disponivel</option>
+                                    <option value="">Selecione um cheque disponível</option>
                                     {chequesTerceirosDisponiveis.map((cheque) => (
                                       <option key={cheque.id} value={cheque.id}>
                                         {formatChequeTerceiroLabel(cheque)}
@@ -3862,7 +3857,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 ) : null}
 
                 <label className="app-filter-field md:col-span-2">
-                  <span className="app-filter-label">Observacoes</span>
+                  <span className="app-filter-label">Observações</span>
                   <textarea
                     /*
                       R10/R21: a altura era noventa e dois pixels soltos numa
@@ -3878,13 +3873,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     className="input w-full"
                     value={baixaMassaForm.observacoes}
                     onChange={(event) => setBaixaMassaForm((current) => ({ ...current, observacoes: event.target.value }))}
-                    placeholder="Ex.: Baixa em massa conforme extrato bancario."
+                    placeholder="Ex.: Baixa em massa conforme extrato bancário."
                   />
                 </label>
               </div>
 
               <div className="finance-operation-notice finance-operation-notice--warning text-xs">
-                <strong>Conferencia:</strong> a baixa em massa quita os titulos selecionados conforme a forma informada. Para cheque ou cartao parcelado, as parcelas geradas ficam disponiveis para conciliacao.
+                <strong>Conferência:</strong> a baixa em massa quita os titulos selecionados conforme a forma informada. Para cheque ou cartao parcelado, as parcelas geradas ficam disponiveis para conciliacao.
               </div>
 
               {error ? <p className="finance-operation-notice finance-operation-notice--danger">{error}</p> : null}
@@ -3943,7 +3938,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       {importandoCodigos ? (
         <div className="fixed inset-0 z-modal flex items-center justify-center bg-[var(--modal-overlay)] px-4 backdrop-blur-sm">
           <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-4 text-sm font-semibold text-[var(--c-text)] shadow-xl">
-            Importando codigos de barras...
+            Importando códigos de barras...
           </div>
         </div>
       ) : null}

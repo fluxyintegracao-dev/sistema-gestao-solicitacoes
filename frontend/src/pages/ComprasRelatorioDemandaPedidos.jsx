@@ -99,7 +99,7 @@ function StatusTable({ title, subtitle, rows, storageKey, loading }) {
         carregando={loading}
         storageKey={storageKey}
         rotuloRolagem={title}
-        vazio="Sem registros no periodo."
+        vazio="Sem registros no período."
       />
     </BlocoConteudo>
   );
@@ -117,8 +117,8 @@ function StatusTable({ title, subtitle, rows, storageKey, loading }) {
   pedido.
 */
 const FILTROS_DA_TELA = [
-  { id: 'data_inicio', rotulo: 'Criacao inicial' },
-  { id: 'data_fim', rotulo: 'Criacao final' },
+  { id: 'data_inicio', rotulo: 'Criação inicial' },
+  { id: 'data_fim', rotulo: 'Criação final' },
   { id: 'obra_id', rotulo: 'Obra / Centro de custo' }
 ];
 
@@ -294,8 +294,8 @@ export default function ComprasRelatorioDemandaPedidos() {
     <Pagina>
       <PageHeader
         titulo="Demanda e Pedidos"
-        contagem="Compras / Relatorios"
-        descricao="Visao sintetica e analitica das solicitacoes de compra e dos pedidos gerados."
+        contagem="Compras / Relatórios"
+        descricao="Visão sintética e analítica das solicitações de compra e dos pedidos gerados."
         /* R11: o retorno ao hub de relatórios fica na seta do cabeçalho —
            navegação não é ação, então não volta para a barra de ações. */
         voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
@@ -314,14 +314,14 @@ export default function ComprasRelatorioDemandaPedidos() {
           campos={[
             {
               id: 'data_inicio',
-              rotulo: 'Criacao inicial',
+              rotulo: 'Criação inicial',
               tipo: 'date',
               valor: filtros.data_inicio,
               aoMudar: (valor) => mudarCampo('data_inicio', valor)
             },
             {
               id: 'data_fim',
-              rotulo: 'Criacao final',
+              rotulo: 'Criação final',
               tipo: 'date',
               valor: filtros.data_fim,
               aoMudar: (valor) => mudarCampo('data_fim', valor)
@@ -336,11 +336,11 @@ export default function ComprasRelatorioDemandaPedidos() {
       </BlocoConteudo>
 
       <StatGrid colunas={5}>
-        <StatTile label="Solicitacoes" valor={formatNumber(resumo.solicitacoes)} sub="Criadas no periodo" />
+        <StatTile label="Solicitações" valor={formatNumber(resumo.solicitacoes)} sub="Criadas no período" />
         <StatTile label="Liberadas" valor={formatNumber(resumo.solicitacoes_liberadas)} sub="Com liberacao para compra" />
-        <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Gerados no periodo" />
+        <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Gerados no período" />
         <StatTile label="Valor pedidos" valor={formatMoney(resumo.valor_pedidos)} sub="Somente pedidos reais" />
-        <StatTile label="Ticket medio" valor={formatMoney(resumo.ticket_medio_pedido)} sub="Valor medio por pedido" />
+        <StatTile label="Ticket médio" valor={formatMoney(resumo.ticket_medio_pedido)} sub="Valor médio por pedido" />
       </StatGrid>
 
       {/* R18: as cinco tabelas viviam dentro de `card ... overflow-hidden`.
@@ -350,7 +350,7 @@ export default function ComprasRelatorioDemandaPedidos() {
           `overflow: clip`. */}
       <div className="grid gap-4 xl:grid-cols-2">
         <StatusTable
-          title="Solicitacoes por status"
+          title="Solicitações por status"
           subtitle="Volume de demandas de compra pela situacao atual."
           rows={solicitacoesPorStatus}
           storageKey="tabela:compras-demanda-pedidos:status-solicitacoes"
@@ -375,7 +375,7 @@ export default function ComprasRelatorioDemandaPedidos() {
       */}
       <BlocosPersonalizaveis chave="blocos:compras-relatorio-demanda-pedidos" larguraPadrao="total">
         <div data-bloco-id="solicitacoes-por-obra-centro" data-bloco-rotulo="Solicitacoes por obra/centro" className="grid gap-4 xl:grid-cols-2">
-          <BlocoConteudo titulo="Solicitacoes por obra/centro" descricao="Origem das demandas no periodo filtrado.">
+          <BlocoConteudo titulo="Solicitações por obra/centro" descricao="Origem das demandas no período filtrado.">
             <TabelaPadrao
               colunas={[
                 {
@@ -394,7 +394,7 @@ export default function ComprasRelatorioDemandaPedidos() {
               carregando={loading}
               storageKey="tabela:compras-demanda-pedidos:obras-solicitacoes"
               rotuloRolagem="Solicitacoes por obra/centro"
-              vazio="Sem solicitacoes no periodo."
+              vazio="Sem solicitações no período."
             />
           </BlocoConteudo>
 
@@ -417,15 +417,15 @@ export default function ComprasRelatorioDemandaPedidos() {
               carregando={loading}
               storageKey="tabela:compras-demanda-pedidos:obras-pedidos"
               rotuloRolagem="Pedidos por obra/centro"
-              vazio="Sem pedidos no periodo."
+              vazio="Sem pedidos no período."
             />
           </BlocoConteudo>
         </div>
 
         <BlocoConteudo
-          titulo="Analitico de solicitacoes"
-          contagem="Ultimas 100"
-          descricao="Solicitacoes conforme os filtros aplicados."
+          titulo="Analítico de solicitações"
+          contagem="Últimas 100"
+          descricao="Solicitações conforme os filtros aplicados."
           variante="primario"
           cor="var(--c-primary)"
         >
@@ -433,7 +433,7 @@ export default function ComprasRelatorioDemandaPedidos() {
             colunas={[
               {
                 id: 'codigo',
-                titulo: 'Codigo',
+                titulo: 'Código',
                 // R17: o codigo da solicitacao NOMEIA o registro.
                 tipo: 'identidade',
                 noCard: 'titulo',
@@ -443,7 +443,7 @@ export default function ComprasRelatorioDemandaPedidos() {
                   </Link>
                 )
               },
-              { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
+              { id: 'titulo', titulo: 'Título', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
               {
                 id: 'status',
                 titulo: 'Status',
@@ -459,13 +459,13 @@ export default function ComprasRelatorioDemandaPedidos() {
             carregando={loading}
             storageKey="tabela:compras-demanda-pedidos:solicitacoes"
             rotuloRolagem="Analitico de solicitacoes"
-            vazio="Sem solicitacoes no periodo."
+            vazio="Sem solicitações no período."
           />
         </BlocoConteudo>
 
         <BlocoConteudo
-          titulo="Analitico de pedidos"
-          contagem="Ultimos 100"
+          titulo="Analítico de pedidos"
+          contagem="Últimos 100"
           descricao="Pedidos conforme os filtros aplicados."
         >
           <TabelaPadrao
@@ -488,7 +488,7 @@ export default function ComprasRelatorioDemandaPedidos() {
                 tipo: 'status',
                 render: (item) => <StatusBadge status={item.status_label || '-'} />
               },
-              { id: 'solicitacao', titulo: 'Solicitacao', tipo: 'codigo', render: (item) => (item.solicitacao ? `SC #${item.solicitacao.id}` : '-') },
+              { id: 'solicitacao', titulo: 'Solicitação', tipo: 'codigo', render: (item) => (item.solicitacao ? `SC #${item.solicitacao.id}` : '-') },
               { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
               { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
               { id: 'criado', titulo: 'Criado em', tipo: 'data', render: (item) => formatDate(item.criado_em) }
@@ -497,7 +497,7 @@ export default function ComprasRelatorioDemandaPedidos() {
             carregando={loading}
             storageKey="tabela:compras-demanda-pedidos:pedidos"
             rotuloRolagem="Analitico de pedidos"
-            vazio="Sem pedidos no periodo."
+            vazio="Sem pedidos no período."
           />
         </BlocoConteudo>
       </BlocosPersonalizaveis>

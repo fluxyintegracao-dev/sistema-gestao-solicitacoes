@@ -132,7 +132,7 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
       const configNormalizada = normalizarConfigAutomacaoDestinoNovaSolicitacao(data);
       setDestinosDisponiveis(configNormalizada.destinos_disponiveis);
       setRegras(configNormalizada.regras);
-      avisar.sucesso('Automacao salva com sucesso.');
+      avisar.sucesso('Automação salva com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao salvar automacao.');
@@ -151,9 +151,9 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
   if (loading) {
     return (
       <Pagina>
-        <PageHeader titulo="Automacao da Nova Solicitacao" descricao={DESCRICAO} />
+        <PageHeader titulo="Automação da Nova Solicitação" descricao={DESCRICAO} />
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card">Carregando automacao da nova solicitacao...</div>
+        <div className="app-empty-card">Carregando automação da nova solicitação...</div>
       </Pagina>
     );
   }
@@ -167,7 +167,7 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
           sem sumir, entao "Salvar automacao" continua a um clique depois de
           rolar ate o painel de destino. */}
       <PageHeader
-        titulo="Automacao da Nova Solicitacao"
+        titulo="Automação da Nova Solicitação"
         contagem={automacaoAtiva ? 'Regra ativa neste tipo' : 'Sem regra neste tipo'}
         descricao={DESCRICAO}
         acaoPrincipal={{
@@ -182,9 +182,9 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
       <section className="config-summary-card">
         <div>
           <p className="config-summary-kicker">Redirecionamento por tipo</p>
-          <h2 className="config-summary-title">Abertura guiada para modulos especificos</h2>
+          <h2 className="config-summary-title">Abertura guiada para módulos específicos</h2>
           <p className="config-summary-copy">
-            Ao selecionar uma regra ativa, a tela Nova Solicitacao redireciona o usuario preservando a obra escolhida e usando o usuario logado como solicitante.
+            Ao selecionar uma regra ativa, a tela Nova Solicitação redireciona o usuário preservando a obra escolhida e usando o usuário logado como solicitante.
           </p>
         </div>
       </section>
@@ -196,7 +196,7 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
       <div className="grid gap-4 lg:grid-cols-4">
         <section className="card space-y-3">
           <label className="grid gap-2 text-sm">
-            Area responsavel
+            Área responsável
             <select
               className="input input-sm"
               value={areaSelecionada}
@@ -209,7 +209,7 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
           </label>
 
           <label className="grid gap-2 text-sm">
-            Tipo de solicitacao
+            Tipo de solicitação
             <select
               className="input input-sm"
               value={tipoSelecionadoId}
@@ -224,14 +224,14 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
 
           {tiposDaArea.length === 0 && (
             <p className="text-xs text-[var(--c-muted)]">
-              Nenhum tipo ativo encontrado para esta area.
+              Nenhum tipo ativo encontrado para esta área.
             </p>
           )}
         </section>
 
         <section className="card space-y-4 lg:col-span-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-[var(--c-muted)]">Destino automatico</p>
+            <p className="text-xs uppercase tracking-[0.08em] text-[var(--c-muted)]">Destino automático</p>
             <h2 className="mt-1 text-lg font-semibold text-[var(--c-text)]">
               {destinoCompra?.label || 'Nova Solicitacao de Compra'}
             </h2>
@@ -270,7 +270,7 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
             <div className="rounded border border-[var(--c-border)] bg-[var(--ui-surface-2)] p-3 text-sm">
               <div className="font-semibold text-[var(--c-text)]">Regra ativa</div>
               <div className="mt-1 text-[var(--c-muted)]">
-                A obra selecionada sera enviada por parametro e o solicitante sera o usuario logado na tela de compra.
+                A obra selecionada será enviada por parametro e o solicitante será o usuário logado na tela de compra.
               </div>
             </div>
           )}

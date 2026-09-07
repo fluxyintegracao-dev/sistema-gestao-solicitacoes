@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
@@ -176,7 +177,7 @@ function getParceiroPixOptions(parceiro) {
     },
     {
       id: 'pix_chave_variavel',
-      label: 'Chave variavel',
+      label: 'Chave variável',
       tipo: parceiro.pix_chave_variavel_tipo,
       chave: parceiro.pix_chave_variavel
     }
@@ -884,7 +885,7 @@ export default function FinanceiroTituloEditar() {
   if (loading) {
     return (
       <Pagina>
-        <div className="app-empty-card">Carregando titulo financeiro...</div>
+        <div className="app-empty-card">Carregando título financeiro...</div>
       </Pagina>
     );
   }
@@ -895,11 +896,11 @@ export default function FinanceiroTituloEditar() {
         {/* R11/C3: tela de REGISTRO — a seta de voltar é a affordance
             primária de retorno e fica também no estado sem registro. */}
         <PageHeader
-          titulo="Editar titulo"
+          titulo="Editar título"
           voltar={{ to: '/financeiro/titulos', title: 'Voltar para titulos' }}
         />
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card">Titulo financeiro nao encontrado.</div>
+        <div className="app-empty-card">Título financeiro não encontrado.</div>
       </Pagina>
     );
   }
@@ -918,7 +919,7 @@ export default function FinanceiroTituloEditar() {
           apoio da TELA mora aqui (R5), não solto sobre o canvas. */}
       <PageHeader
         titulo={`Editar titulo ${titulo.codigo || `#${titulo.id}`}`}
-        descricao="Ajuste permitido apenas enquanto o titulo estiver aberto e sem baixa."
+        descricao="Ajuste permitido apenas enquanto o título estiver aberto e sem baixa."
         voltar={{ to: `/financeiro/titulos/${id}`, title: 'Voltar ao titulo' }}
       />
 
@@ -936,7 +937,7 @@ export default function FinanceiroTituloEditar() {
       <form onSubmit={handleSubmit} className="space-y-3">
         <BlocoConteudo variante="primario" cor="var(--sem-info)">
           <div className="space-y-4">
-            <FormSecao legenda="Classificacao do titulo" colunas={2}>
+            <FormSecao legenda="Classificação do título" colunas={2}>
               <CampoForm label="Tipo" obrigatorio>
                 <select
                   className="input w-full"
@@ -957,7 +958,7 @@ export default function FinanceiroTituloEditar() {
                   disabled={Boolean(bloqueio)}
                 >
                   <option value="ABERTO">Aberto</option>
-                  <option value="PREVISAO">Previsao</option>
+                  <option value="PREVISAO">Previsão</option>
                 </select>
               </CampoForm>
 
@@ -995,7 +996,7 @@ export default function FinanceiroTituloEditar() {
                         setParceiroBusca(event.target.value);
                         updateField('parceiro_id', '');
                       }}
-                      placeholder="Digite nome, razao social, CPF ou CNPJ"
+                      placeholder="Digite nome, razão social, CPF ou CNPJ"
                       disabled={Boolean(bloqueio)}
                     />
                     <button
@@ -1116,21 +1117,21 @@ export default function FinanceiroTituloEditar() {
                 </div>
               </CampoForm>
 
-              <CampoForm label="Apropriacao">
+              <CampoForm label="Apropriação">
                 <select
                   className="input w-full"
                   value={form.apropriacao_id}
                   onChange={(event) => updateField('apropriacao_id', event.target.value)}
                   disabled={Boolean(bloqueio)}
                 >
-                  <option value="">Sem apropriacao</option>
+                  <option value="">Sem apropriação</option>
                   {apropriacoes.map((apropriacao) => (
                     <option key={apropriacao.id} value={apropriacao.id}>{apropriacao.codigo ? `${apropriacao.codigo} - ` : ''}{apropriacao.nome}</option>
                   ))}
                 </select>
               </CampoForm>
 
-              <CampoForm label="Numero do documento">
+              <CampoForm label="Número do documento">
                 <input
                   className="input w-full"
                   value={form.numero_documento}
@@ -1139,7 +1140,7 @@ export default function FinanceiroTituloEditar() {
                 />
               </CampoForm>
 
-              <CampoForm label="Descricao" obrigatorio linha>
+              <CampoForm label="Descrição" obrigatorio linha>
                 <input
                   className="input w-full"
                   value={form.descricao}
@@ -1177,9 +1178,8 @@ export default function FinanceiroTituloEditar() {
             </FormSecao>
 
             <FormSecao legenda="Datas" colunas={3}>
-              <CampoForm label="Emissao">
-                <input
-                  type="date"
+              <CampoForm label="Emissão">
+                <DateInputBR
                   className="input w-full"
                   value={form.data_emissao}
                   onChange={(event) => updateField('data_emissao', event.target.value)}
@@ -1188,8 +1188,7 @@ export default function FinanceiroTituloEditar() {
               </CampoForm>
 
               <CampoForm label="Vencimento" obrigatorio>
-                <input
-                  type="date"
+                <DateInputBR
                   className="input w-full"
                   value={form.data_vencimento}
                   onChange={(event) => updateField('data_vencimento', event.target.value)}
@@ -1198,12 +1197,11 @@ export default function FinanceiroTituloEditar() {
               </CampoForm>
 
               <CampoForm
-                label="Competencia DRE"
+                label="Competência DRE"
                 obrigatorio
                 hint="A categoria financeira define automaticamente se o titulo entra na DRE."
               >
-                <input
-                  type="date"
+                <DateInputBR
                   className="input w-full"
                   value={form.competencia_data}
                   onChange={(event) => updateField('competencia_data', event.target.value)}
@@ -1216,7 +1214,7 @@ export default function FinanceiroTituloEditar() {
 
         <BlocoConteudo
           titulo="Rateio por obra/centro de custo"
-          descricao="Use quando o mesmo titulo precisar compor mais de uma obra. Sem rateio, o titulo segue na obra principal selecionada."
+          descricao="Use quando o mesmo título precisar compor mais de uma obra. Sem rateio, o título segue na obra principal selecionada."
           variante="secundario"
           acoes={(
             <>
@@ -1232,7 +1230,7 @@ export default function FinanceiroTituloEditar() {
           )}
         >
           {(form.rateios || []).length === 0 ? (
-            <div className="app-note">Nenhum rateio lancado neste titulo.</div>
+            <div className="app-note">Nenhum rateio lancado neste título.</div>
           ) : (
             <div className="app-list-stack">
               {(form.rateios || []).map((rateio, index) => (
@@ -1288,7 +1286,7 @@ export default function FinanceiroTituloEditar() {
                       </CampoForm>
                     )}
 
-                    <CampoForm label="Observacoes" linha>
+                    <CampoForm label="Observações" linha>
                       <input
                         className="input w-full"
                         value={rateio.observacoes}
@@ -1309,22 +1307,22 @@ export default function FinanceiroTituloEditar() {
         </BlocoConteudo>
 
         <BlocoConteudo
-          titulo="Impostos e retencoes"
-          descricao="Registre retencoes ou acrescimos para acompanhar o valor liquido do titulo. Desconto fica no campo proprio, na secao de valores."
+          titulo="Impostos e retenções"
+          descricao="Registre retenções ou acréscimos para acompanhar o valor líquido do título. Desconto fica no campo próprio, na secao de valores."
           variante="secundario"
           acoes={(
             <button type="button" className="btn btn-outline" onClick={adicionarImposto} disabled={Boolean(bloqueio)}>
-              Adicionar imposto/retencao
+              Adicionar imposto/retenção
             </button>
           )}
         >
           {(form.impostos || []).length === 0 ? (
-            <div className="app-note">Nenhum imposto ou retencao lancado neste titulo.</div>
+            <div className="app-note">Nenhum imposto ou retenção lancado neste título.</div>
           ) : (
             <div className="app-list-stack">
               {(form.impostos || []).map((imposto, index) => (
                 <div key={imposto.id || index} className="app-list-card">
-                  <FormSecao legenda={`Imposto/retencao ${index + 1}`} colunas={3}>
+                  <FormSecao legenda={`Imposto/retenção ${index + 1}`} colunas={3}>
                     <CampoForm label="Natureza">
                       <select
                         className="input w-full"
@@ -1332,8 +1330,8 @@ export default function FinanceiroTituloEditar() {
                         onChange={(event) => updateImposto(index, 'natureza', event.target.value)}
                         disabled={Boolean(bloqueio)}
                       >
-                        <option value="RETENCAO">Retencao</option>
-                        <option value="ACRESCIMO">Acrescimo</option>
+                        <option value="RETENCAO">Retenção</option>
+                        <option value="ACRESCIMO">Acréscimo</option>
                       </select>
                     </CampoForm>
 
@@ -1347,7 +1345,7 @@ export default function FinanceiroTituloEditar() {
                       />
                     </CampoForm>
 
-                    <CampoForm label="Descricao">
+                    <CampoForm label="Descrição">
                       <input
                         className="input w-full"
                         value={imposto.descricao}
@@ -1356,7 +1354,7 @@ export default function FinanceiroTituloEditar() {
                       />
                     </CampoForm>
 
-                    <CampoForm label="Base de calculo">
+                    <CampoForm label="Base de cálculo">
                       <input
                         className="input input-moeda w-full"
                         inputMode="decimal"
@@ -1390,7 +1388,7 @@ export default function FinanceiroTituloEditar() {
                   </FormSecao>
                   <div className="app-actionbar">
                     <button type="button" className="btn btn-outline btn-perigo-suave" onClick={() => removerImposto(index)} disabled={Boolean(bloqueio)}>
-                      Remover imposto/retencao
+                      Remover imposto/retenção
                     </button>
                   </div>
                 </div>
@@ -1411,22 +1409,22 @@ export default function FinanceiroTituloEditar() {
               <dd className="valor-tabular text-sm font-semibold text-[var(--c-text)]">{formatCurrency(descontoFinanceiro)}</dd>
             </div>
             <div className="app-summary-card">
-              <dt className="text-xs text-[var(--c-muted)]">Retencoes</dt>
+              <dt className="text-xs text-[var(--c-muted)]">Retenções</dt>
               <dd className="valor-tabular text-sm font-semibold text-[var(--c-text)]">{formatCurrency(totalImpostosRetencao)}</dd>
             </div>
             <div className="app-summary-card">
-              <dt className="text-xs text-[var(--c-muted)]">Acrescimos</dt>
+              <dt className="text-xs text-[var(--c-muted)]">Acréscimos</dt>
               <dd className="valor-tabular text-sm font-semibold text-[var(--c-text)]">{formatCurrency(totalImpostosAcrescimo)}</dd>
             </div>
             <div className="app-summary-card">
-              <dt className="text-xs text-[var(--c-muted)]">Valor liquido previsto</dt>
+              <dt className="text-xs text-[var(--c-muted)]">Valor líquido previsto</dt>
               <dd className="valor-tabular text-sm font-semibold text-[var(--c-text)]">{formatCurrency(valorLiquidoPrevisto)}</dd>
             </div>
           </dl>
         </BlocoConteudo>
 
         {form.tipo === 'RECEBER' && (
-          <BlocoConteudo titulo="Dados de cobranca" variante="secundario">
+          <BlocoConteudo titulo="Dados de cobrança" variante="secundario">
             <FormSecao colunas={2}>
               <CampoForm label="Forma">
                 <select
@@ -1435,12 +1433,12 @@ export default function FinanceiroTituloEditar() {
                   onChange={(event) => updateField('forma_cobranca', event.target.value)}
                   disabled={Boolean(bloqueio)}
                 >
-                  <option value="">Sem cobranca</option>
+                  <option value="">Sem cobrança</option>
                   {FORMAS_COBRANCA.map((forma) => <option key={forma} value={forma}>{forma}</option>)}
                 </select>
               </CampoForm>
 
-              <CampoForm label="Situacao da cobranca">
+              <CampoForm label="Situação da cobrança">
                 <select
                   className="input w-full"
                   value={form.status_cobranca}
@@ -1460,7 +1458,7 @@ export default function FinanceiroTituloEditar() {
                 />
               </CampoForm>
 
-              <CampoForm label="Nosso numero">
+              <CampoForm label="Nosso número">
                 <input
                   className="input w-full"
                   value={form.nosso_numero}
@@ -1469,7 +1467,7 @@ export default function FinanceiroTituloEditar() {
                 />
               </CampoForm>
 
-              <CampoForm label="Linha digitavel" linha>
+              <CampoForm label="Linha digitável" linha>
                 <input
                   className="input w-full"
                   value={form.linha_digitavel}
@@ -1478,7 +1476,7 @@ export default function FinanceiroTituloEditar() {
                 />
               </CampoForm>
 
-              <CampoForm label="Codigo de barras" linha>
+              <CampoForm label="Código de barras" linha>
                 <input
                   className="input w-full"
                   value={form.codigo_barras}
@@ -1493,7 +1491,7 @@ export default function FinanceiroTituloEditar() {
         {form.tipo === 'PAGAR' && (
           <BlocoConteudo
             titulo="Dados do boleto para pagamento"
-            descricao="Informe a linha digitavel ou o codigo de barras para o titulo aparecer em Bancos Enterprise e gerar remessa Caixa CNAB240."
+            descricao="Informe a linha digitável ou o código de barras para o título aparecer em Bancos Enterprise e gerar remessa Caixa CNAB240."
             variante="secundario"
           >
             <FormSecao colunas={2}>
@@ -1506,7 +1504,7 @@ export default function FinanceiroTituloEditar() {
                 />
               </CampoForm>
 
-              <CampoForm label="Codigo de barras">
+              <CampoForm label="Código de barras">
                 <input
                   className="input w-full"
                   value={form.codigo_barras}
@@ -1515,7 +1513,7 @@ export default function FinanceiroTituloEditar() {
                 />
               </CampoForm>
 
-              <CampoForm label="Linha digitavel" linha>
+              <CampoForm label="Linha digitável" linha>
                 <input
                   className="input w-full"
                   value={form.linha_digitavel}
@@ -1568,7 +1566,7 @@ export default function FinanceiroTituloEditar() {
 
                 <FormSecao colunas={2}>
                   <CampoForm
-                    label="Favorecido bancario vinculado"
+                    label="Favorecido bancário vinculado"
                     hint="Se nao houver favorecido salvo, informe os dados abaixo."
                   >
                     <select
@@ -1667,7 +1665,7 @@ export default function FinanceiroTituloEditar() {
                 </FormSecao>
 
                 <div className="app-note">
-                  O lote de pagamento cria um snapshot do favorecido no momento da montagem. Ajustes feitos aqui valem para os proximos lotes.
+                  O lote de pagamento cria um snapshot do favorecido no momento da montagem. Ajustes feitos aqui valem para os próximos lotes.
                 </div>
               </div>
             ) : (
@@ -1748,9 +1746,9 @@ export default function FinanceiroTituloEditar() {
           </BlocoConteudo>
         )}
 
-        <BlocoConteudo titulo="Observacoes" variante="secundario">
+        <BlocoConteudo titulo="Observações" variante="secundario">
           <FormSecao colunas={2}>
-            <CampoForm label="Observacoes do titulo" tipo="observacao">
+            <CampoForm label="Observações do título" tipo="observacao">
               <textarea
                 className="input w-full"
                 value={form.observacoes}
@@ -1806,7 +1804,7 @@ export default function FinanceiroTituloEditar() {
                   Selecionar categoria financeira
                 </h2>
                 <p className="text-sm text-[var(--c-muted)]">
-                  Veja categorias compativeis com o tipo do titulo ou filtre por nome, grupo e descricao.
+                  Veja categorias compativeis com o tipo do título ou filtre por nome, grupo e descrição.
                 </p>
               </div>
               <button
@@ -1821,7 +1819,7 @@ export default function FinanceiroTituloEditar() {
             <div className="modal-body space-y-3">
               <input
                 className="input app-busca w-full"
-                placeholder="Filtrar por ID, nome, grupo, subgrupo ou descricao"
+                placeholder="Filtrar por ID, nome, grupo, subgrupo ou descrição"
                 value={categoriaModalBusca}
                 onChange={(event) => setCategoriaModalBusca(event.target.value)}
                 autoFocus
@@ -1876,7 +1874,7 @@ export default function FinanceiroTituloEditar() {
                   Pesquisar credor/fornecedor
                 </h2>
                 <p className="text-sm text-[var(--c-muted)]">
-                  Busque por CPF/CNPJ, nome ou razao social.
+                  Busque por CPF/CNPJ, nome ou razão social.
                 </p>
               </div>
               <button
@@ -1898,12 +1896,12 @@ export default function FinanceiroTituloEditar() {
                     placeholder="Digite CPF ou CNPJ"
                   />
                 </CampoForm>
-                <CampoForm label="Nome/Razao social">
+                <CampoForm label="Nome/Razão social">
                   <input
                     className="input w-full"
                     value={parceiroModalNomeBusca}
                     onChange={(event) => setParceiroModalNomeBusca(event.target.value)}
-                    placeholder="Digite parte do nome ou razao social"
+                    placeholder="Digite parte do nome ou razão social"
                   />
                 </CampoForm>
               </FormSecao>

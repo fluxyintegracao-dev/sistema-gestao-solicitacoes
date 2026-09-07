@@ -139,7 +139,7 @@ export default function SstObservabilidade() {
     try {
       if (kind === 'workflows') await homologarWorkflowsSst({ dry_run: true });
       if (kind === 'simular') await simularHomologacaoSst();
-      avisar.sucesso('Homologacao executada em modo analitico.');
+      avisar.sucesso('Homologação executada em modo analítico.');
       load();
     } catch (err) {
       avisar.erro(err.message || 'Erro ao executar homologacao SST');
@@ -158,9 +158,9 @@ export default function SstObservabilidade() {
   return (
     <Pagina className="sst-page">
       <PageHeader
-        titulo="Homologacao, logs e saude operacional"
+        titulo="Homologação, logs e saúde operacional"
         contagem={checklist?.status_geral || null}
-        descricao="Monitoramento tecnico-operacional de workflows, automacoes, integracoes controladas, bloqueios e flags."
+        descricao="Monitoramento técnico-operacional de workflows, automações, integrações controladas, bloqueios e flags."
         acaoPrincipal={{
           rotulo: busy === 'simular' ? 'Simulando...' : 'Simular massa',
           onClick: () => run('simular'),
@@ -186,11 +186,11 @@ export default function SstObservabilidade() {
 
       <StatGrid colunas={4}>
         <StatTile label="Eventos abertos" valor={fmt(cards.eventos_abertos)} />
-        <StatTile label="Notificacoes" valor={fmt(cards.notificacoes_nao_lidas)} sub="Nao lidas" />
+        <StatTile label="Notificações" valor={fmt(cards.notificacoes_nao_lidas)} sub="Não lidas" />
         <StatTile
-          label="Pendencias"
+          label="Pendências"
           valor={fmt(cards.pendencias_abertas)}
-          sub={`${fmt(cards.pendencias_criticas)} criticas`}
+          sub={`${fmt(cards.pendencias_criticas)} críticas`}
           tom={cards.pendencias_criticas ? 'danger' : undefined}
         />
         <StatTile label="Bloqueios" valor={fmt(cards.bloqueios_abertos)} tom={cards.bloqueios_abertos ? 'warning' : undefined} />
@@ -201,7 +201,7 @@ export default function SstObservabilidade() {
           sub={data?.saude_operacional?.nivel}
           tom={cards.erros_operacionais ? 'danger' : 'success'}
         />
-        <StatTile label="Checks" valor={checklist?.status_geral || '...'} sub={`${fmt(checklist?.pendencias)} pendencias`} />
+        <StatTile label="Checks" valor={checklist?.status_geral || '...'} sub={`${fmt(checklist?.pendencias)} pendências`} />
       </StatGrid>
 
       {/*
@@ -214,7 +214,7 @@ export default function SstObservabilidade() {
       */}
       <BlocosPersonalizaveis chave="blocos:sst-observabilidade" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Checklist de homologacao"
+          titulo="Checklist de homologação"
           contagem={`${checks.length} check(s)`}
           variante="primario"
           cor="var(--sem-info)"
@@ -290,17 +290,17 @@ export default function SstObservabilidade() {
           <GradeContadores itens={data?.status?.workflow_logs} />
         </BlocoConteudo>
 
-        <BlocoConteudo titulo="Logs de automacao por status">
+        <BlocoConteudo titulo="Logs de automação por status">
           <GradeContadores itens={data?.status?.automation_logs} />
         </BlocoConteudo>
 
-        <BlocoConteudo titulo="Logs de integracao por status">
+        <BlocoConteudo titulo="Logs de integração por status">
           <GradeContadores itens={data?.status?.integration_logs} />
         </BlocoConteudo>
 
         <TabelaLogs data-bloco-id="workflows-recentes" data-bloco-rotulo="Workflows recentes" titulo="Workflows recentes" logs={data?.ultimos_logs?.workflows} chaveTabela="logs-workflows" />
-        <TabelaLogs data-bloco-id="automacoes-recentes" data-bloco-rotulo="Automacoes recentes" titulo="Automacoes recentes" logs={data?.ultimos_logs?.automacoes} chaveTabela="logs-automacoes" />
-        <TabelaLogs data-bloco-id="integracoes-recentes" data-bloco-rotulo="Integracoes recentes" titulo="Integracoes recentes" logs={data?.ultimos_logs?.integracoes} chaveTabela="logs-integracoes" />
+        <TabelaLogs data-bloco-id="automacoes-recentes" data-bloco-rotulo="Automacoes recentes" titulo="Automações recentes" logs={data?.ultimos_logs?.automacoes} chaveTabela="logs-automacoes" />
+        <TabelaLogs data-bloco-id="integracoes-recentes" data-bloco-rotulo="Integracoes recentes" titulo="Integrações recentes" logs={data?.ultimos_logs?.integracoes} chaveTabela="logs-integracoes" />
         <TabelaLogs data-bloco-id="bloqueios-recentes" data-bloco-rotulo="Bloqueios recentes" titulo="Bloqueios recentes" logs={data?.ultimos_logs?.bloqueios} chaveTabela="logs-bloqueios" />
       </BlocosPersonalizaveis>
     </Pagina>

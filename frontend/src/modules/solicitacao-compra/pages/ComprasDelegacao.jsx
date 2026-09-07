@@ -23,6 +23,7 @@ import {
 import StatusBadge from '../../../components/StatusBadge';
 import { chaveStatusCompra } from '../utils/statusCompras';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
+import DateInputBR from '../../../components/DateInputBR';
 
 function formatDate(value) {
   return formatarDataLocalPtBr(value);
@@ -222,7 +223,7 @@ export default function ComprasDelegacao() {
       && String(payload.responsavel_id || '').trim()
       && !usuarios.some((usuario) => Number(usuario.id) === Number(payload.responsavel_id))
     ) {
-      avisar.alerta('Selecione um usuario ativo vinculado ao setor de Compras ou remova o responsavel atual.');
+      avisar.alerta('Selecione um usuário ativo vinculado ao setor de Compras ou remova o responsável atual.');
       return;
     }
 
@@ -258,9 +259,9 @@ export default function ComprasDelegacao() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Delegacao de Compras"
+        titulo="Delegação de Compras"
         contagem={loading ? null : `${resumo.total} solicitacao(oes) aberta(s)`}
-        descricao="Acompanhe responsavel, prazo, status e motivo de atraso das solicitacoes de compra abertas."
+        descricao="Acompanhe responsável, prazo, status e motivo de atraso das solicitações de compra abertas."
         secundarias={[
           {
             rotulo: loading ? 'Atualizando...' : 'Atualizar',
@@ -274,7 +275,7 @@ export default function ComprasDelegacao() {
 
       <StatGrid colunas={3}>
         <StatTile label="Abertas" valor={resumo.total} />
-        <StatTile label="Atribuidas" valor={resumo.atribuidas} tom="success" />
+        <StatTile label="Atribuídas" valor={resumo.atribuidas} tom="success" />
         <StatTile label="Atrasadas" valor={resumo.atrasadas} tom="danger" />
       </StatGrid>
 
@@ -288,7 +289,7 @@ export default function ComprasDelegacao() {
           busca={{
             valor: filtro,
             aoMudar: setFiltro,
-            placeholder: 'Solicitacao, obra, responsavel, solicitante ou status'
+            placeholder: 'Solicitação, obra, responsável, solicitante ou status'
           }}
         />
       </BlocoConteudo>
@@ -307,7 +308,7 @@ export default function ComprasDelegacao() {
         detalham essa resposta, não a substituem.
       */}
       <BlocoConteudo
-        titulo="Solicitacoes abertas"
+        titulo="Solicitações abertas"
         variante="primario"
         cor="var(--module-compras)"
       >
@@ -342,7 +343,7 @@ export default function ComprasDelegacao() {
                     legítimo — o que a regra proíbe é select de FILTRO. */}
                 <FormSecao colunas={2}>
                   <CampoForm
-                    label="Responsavel"
+                    label="Responsável"
                     hint={responsavelForaCompras && podeGerenciarDelegacao
                       ? 'A atribuicao anterior foi preservada. Selecione um usuario de Compras ou remova o responsavel antes de salvar.'
                       : (podeGerenciarDelegacao && !responsavelForaCompras
@@ -355,7 +356,7 @@ export default function ComprasDelegacao() {
                       onChange={(event) => updateEdicao(solicitacao.id, { responsavel_id: event.target.value })}
                       disabled={!podeGerenciarDelegacao}
                     >
-                      <option value="">Sem responsavel</option>
+                      <option value="">Sem responsável</option>
                       {responsavelNaoListado ? (
                         <option value={responsavelSelecionadoId} disabled>
                           {responsavelForaComprasNome}
@@ -371,9 +372,8 @@ export default function ComprasDelegacao() {
                   </CampoForm>
 
                   <CampoForm label="Prazo para finalizar pedido">
-                    <input
+                    <DateInputBR
                       className="input"
-                      type="date"
                       value={edicao.prazo_compra || ''}
                       onChange={(event) => updateEdicao(solicitacao.id, { prazo_compra: event.target.value })}
                       disabled={!podeGerenciarDelegacao}
@@ -409,11 +409,11 @@ export default function ComprasDelegacao() {
                 {(solicitacao.motivo_delegacao_vencida || solicitacao.motivo_atraso) ? (
                   <>
                     <MotivoRegistrado
-                      label="Motivo da delegacao com prazo vencido"
+                      label="Motivo da delegação com prazo vencido"
                       motivo={solicitacao.motivo_delegacao_vencida}
                     />
                     <MotivoRegistrado
-                      label="Motivo informado pelo responsavel"
+                      label="Motivo informado pelo responsável"
                       motivo={solicitacao.motivo_atraso}
                     />
                   </>
@@ -446,7 +446,7 @@ export default function ComprasDelegacao() {
           })}
 
           {!loading && solicitacoesFiltradas.length === 0 ? (
-            <div className="app-empty-card xl:col-span-2">Nenhuma solicitacao de compra aberta encontrada.</div>
+            <div className="app-empty-card xl:col-span-2">Nenhuma solicitação de compra aberta encontrada.</div>
           ) : null}
         </div>
       </BlocoConteudo>

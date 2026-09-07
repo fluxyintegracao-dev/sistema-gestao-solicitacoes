@@ -162,7 +162,7 @@ export default function TiposSubContrato() {
       carregar();
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao salvar edicao');
+      avisar.erro('Erro ao salvar edição');
     } finally {
       setSaving(false);
     }

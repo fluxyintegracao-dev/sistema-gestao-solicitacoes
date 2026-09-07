@@ -365,7 +365,7 @@ export default function ProvisionamentosFinanceiros() {
       <Pagina>
         <PageHeader titulo="Provisionamentos" />
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <BlocoConteudo>Carregando modulo...</BlocoConteudo>
+        <BlocoConteudo>Carregando módulo...</BlocoConteudo>
       </Pagina>
     );
   }
@@ -393,7 +393,7 @@ export default function ProvisionamentosFinanceiros() {
         contagem={loadingLista ? null : `${resumo.total_registros_filtrados || meta.total || 0} provisao(oes)`}
         descricao={`${formatarMoedaBRL(resumo.valor_total_filtrado)} previstos no recorte`}
         acaoPrincipal={contexto?.permissoes?.pode_criar
-          ? { rotulo: 'Nova provisao', to: '/provisoes-financeiras/nova' }
+          ? { rotulo: 'Nova provisão', to: '/provisoes-financeiras/nova' }
           : undefined}
         secundarias={[{ rotulo: 'Limpar filtros', onClick: limparFiltros }]}
       />
@@ -402,23 +402,23 @@ export default function ProvisionamentosFinanceiros() {
 
       <StatGrid colunas={2}>
         <StatTile
-          label="Valor nesta pagina"
+          label="Valor nesta página"
           valor={formatarMoedaBRL(valorDaPagina)}
-          sub={`Pagina ${meta.page || 1} de ${meta.pages || 1}`}
+          sub={`Página ${meta.page || 1} de ${meta.pages || 1}`}
         />
         <StatTile
-          label="Registros nesta pagina"
+          label="Registros nesta página"
           valor={String(lista.length)}
           /* B3: o total do recorte já está na faixa e não se repete aqui —
              dois números iguais em lugares diferentes fazem o leitor parar
              para procurar a diferença que não existe. */
-          sub={`${meta.limit || 25} por pagina`}
+          sub={`${meta.limit || 25} por página`}
         />
       </StatGrid>
 
       <BlocoConteudo
-        titulo="Provisoes registradas"
-        descricao="Acompanhe previsoes de desembolso por obra, categoria e periodo."
+        titulo="Provisões registradas"
+        descricao="Acompanhe previsões de desembolso por obra, categoria e período."
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -443,7 +443,7 @@ export default function ProvisionamentosFinanceiros() {
           busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: filtros.busca,
             aoMudar: (valor) => atualizarFiltro('busca', valor),
-            placeholder: 'Buscar codigo, descricao ou credor'
+            placeholder: 'Buscar código, descrição ou credor'
           } : null}
           campos={[
             {
@@ -485,7 +485,7 @@ export default function ProvisionamentosFinanceiros() {
           colunas={[
             {
               id: 'codigo',
-              titulo: 'Codigo',
+              titulo: 'Código',
               // R17: o codigo NOMEIA a provisao — coluna travada no painel.
               tipo: 'identidade',
               noCard: 'titulo',
@@ -521,7 +521,7 @@ export default function ProvisionamentosFinanceiros() {
             },
             {
               id: 'descricao',
-              titulo: 'Descricao',
+              titulo: 'Descrição',
               tipo: 'texto',
               ordenavel: true,
               valorOrdenacao: (item) => item.descricao || '',

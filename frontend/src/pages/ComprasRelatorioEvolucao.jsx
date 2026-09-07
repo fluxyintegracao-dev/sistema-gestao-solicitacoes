@@ -101,7 +101,7 @@ function MiniBar({ value, max }) {
 */
 const FILTROS_DA_TELA = [
   { id: 'data_inicio', rotulo: 'Pedido criado de' },
-  { id: 'data_fim', rotulo: 'Pedido criado ate' },
+  { id: 'data_fim', rotulo: 'Pedido criado até' },
   { id: 'obra_id', rotulo: 'Obra / Centro de custo' }
 ];
 
@@ -257,13 +257,13 @@ export default function ComprasRelatorioEvolucao() {
       {/* R11: "Voltar aos relatorios" era botao de acao fazendo papel de
           navegacao. Vira a seta `voltar` do PageHeader. */}
       <PageHeader
-        titulo="Evolucao Mensal de Compras"
+        titulo="Evolução Mensal de Compras"
         voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
-        contagem={`${formatNumber(meses.length)} mes(es) com movimentacao`}
+        contagem={`${formatNumber(meses.length)} mês(es) com movimentação`}
         /* R23: agregacao pesada sobre pedidos, itens e fornecedores — o
            recorte e RASCUNHO ate o clique, e a regra exige que a tela
            AVISE isso. */
-        descricao="Curva mensal de pedidos de compra emitidos, valor total, ticket medio e concentracao por obra/centro. Marque o recorte e clique em Atualizar relatorio."
+        descricao="Curva mensal de pedidos de compra emitidos, valor total, ticket médio e concentração por obra/centro. Marque o recorte e clique em Atualizar relatório."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
           onClick: aplicarFiltros,
@@ -286,7 +286,7 @@ export default function ComprasRelatorioEvolucao() {
             },
             {
               id: 'data_fim',
-              rotulo: 'Pedido criado ate',
+              rotulo: 'Pedido criado até',
               tipo: 'date',
               valor: filtros.data_fim,
               aoMudar: (valor) => atualizarCampo('data_fim', valor)
@@ -310,16 +310,16 @@ export default function ComprasRelatorioEvolucao() {
 
       <StatGrid colunas={3}>
         <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Pedidos emitidos" />
-        <StatTile label="Meses" valor={formatNumber(resumo.meses)} sub="Com movimentacao" />
+        <StatTile label="Meses" valor={formatNumber(resumo.meses)} sub="Com movimentação" />
         <StatTile label="Valor total" valor={formatMoney(resumo.valor_total)} sub="Soma dos pedidos" />
-        <StatTile label="Ticket medio" valor={formatMoney(resumo.ticket_medio)} sub="Valor por pedido" />
+        <StatTile label="Ticket médio" valor={formatMoney(resumo.ticket_medio)} sub="Valor por pedido" />
         <StatTile
-          label="Maior mes"
+          label="Maior mês"
           valor={resumo.maior_mes?.label || '-'}
           sub={resumo.maior_mes ? formatMoney(resumo.maior_mes.valor_total) : 'Sem dados'}
           vazio={!resumo.maior_mes}
         />
-        <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com pedido no periodo" />
+        <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com pedido no período" />
       </StatGrid>
 
       {/*
@@ -336,7 +336,7 @@ export default function ComprasRelatorioEvolucao() {
             cabecalho — sem erro e sem falha de build. */}
         <BlocoConteudo
           titulo="Curva mensal"
-          descricao="Pedidos agrupados pelo mes real de criacao do pedido de compra."
+          descricao="Pedidos agrupados pelo mês real de criação do pedido de compra."
           variante="primario"
           cor="var(--c-primary)"
         >
@@ -345,7 +345,7 @@ export default function ComprasRelatorioEvolucao() {
             // periodo, nao um registro nomeado; nao ha coluna de identidade.
             semIdentidade
             colunas={[
-              { id: 'mes', titulo: 'Mes', tipo: 'texto', noCard: 'titulo', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.label}</span> },
+              { id: 'mes', titulo: 'Mês', tipo: 'texto', noCard: 'titulo', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.label}</span> },
               { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
               { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
               { id: 'obras', titulo: 'Obras', tipo: 'numero', render: (item) => formatNumber(item.obras) },
@@ -392,7 +392,7 @@ export default function ComprasRelatorioEvolucao() {
         <div data-bloco-id="compras-por-obra-centro" data-bloco-rotulo="Compras por obra/centro" className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <BlocoConteudo
             titulo="Compras por obra/centro"
-            descricao="Ranking de valor comprado por obra ou centro de custo no periodo."
+            descricao="Ranking de valor comprado por obra ou centro de custo no período."
             variante="secundario"
           >
             <TabelaPadrao
@@ -460,7 +460,7 @@ export default function ComprasRelatorioEvolucao() {
 
           <BlocoConteudo
             titulo="Pedidos por status"
-            descricao="Distribuicao dos pedidos usados na evolucao."
+            descricao="Distribuição dos pedidos usados na evolução."
             variante="secundario"
           >
             <TabelaPadrao

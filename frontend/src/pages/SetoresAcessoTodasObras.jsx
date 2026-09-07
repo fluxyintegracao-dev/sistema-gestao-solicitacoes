@@ -59,10 +59,10 @@ export default function SetoresAcessoTodasObras() {
     try {
       setSalvando(true);
       await salvarSetoresAcessoTodasObras({ setores: Array.from(selecionados) });
-      avisar.sucesso('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuração salva com sucesso.');
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao salvar configuracao.');
+      avisar.erro('Erro ao salvar configuração.');
     } finally {
       setSalvando(false);
     }
@@ -75,7 +75,7 @@ export default function SetoresAcessoTodasObras() {
       <PageHeader
         titulo="Setores com acesso em todas as obras"
         contagem={`${totalMarcados} de ${setoresOrdenados.length} selecionados`}
-        descricao="Setores marcados podem visualizar e operar recursos protegidos por obra sem depender de vinculo manual em usuario x obra."
+        descricao="Setores marcados podem visualizar e operar recursos protegidos por obra sem depender de vínculo manual em usuário x obra."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,

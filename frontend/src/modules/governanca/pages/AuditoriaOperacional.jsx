@@ -95,11 +95,11 @@ function OperationalPanorama({ summary }) {
   if (!modules.length && !days.length) return null;
 
   return (
-    <section className="ao-panorama" aria-label="Distribuicao operacional do periodo">
+    <section className="ao-panorama" aria-label="Distribuição operacional do período">
       <div className="ao-panorama-block">
         <div className="ao-panorama-title">
-          <div><HiOutlineSquares2X2 /><strong>Operacoes por modulo</strong></div>
-          <span>ate 6 modulos com maior movimento</span>
+          <div><HiOutlineSquares2X2 /><strong>Operações por módulo</strong></div>
+          <span>até 6 módulos com maior movimento</span>
         </div>
         <div className="ao-module-list">
           {modules.map((item) => (
@@ -117,12 +117,12 @@ function OperationalPanorama({ summary }) {
 
       <div className="ao-panorama-block">
         <div className="ao-panorama-title">
-          <div><HiOutlineClock /><strong>Ritmo diario observado</strong></div>
-          <span>acoes registradas, sem estimar horas trabalhadas</span>
+          <div><HiOutlineClock /><strong>Ritmo diário observado</strong></div>
+          <span>ações registradas, sem estimar horas trabalhadas</span>
         </div>
         <div className="ao-day-list">
           {days.map((item) => (
-            <div className="ao-day-column" key={item.data} title={`${item.operacoes} operacoes e ${item.usuarios} usuarios`}>
+            <div className="ao-day-column" key={item.data} title={`${item.operacoes} operações e ${item.usuarios} usuários`}>
               <div className="ao-day-track">
                 <span style={{ '--ao-day-progress': `${Math.max(4, (Number(item.operacoes || 0) / maxDayOperations) * 100)}%` }} />
               </div>
@@ -218,7 +218,7 @@ function FinancialIndicators({ data, canUsers }) {
           getId={(item) => (view === 'USUARIOS' ? item.usuario.id : item.setor.id || 'sem-setor')}
           storageKey="tabela:auditoria-operacional:produtividade-financeira"
           rotuloRolagem="Produtividade financeira"
-          vazio="Nenhuma atividade financeira atribuida neste recorte."
+          vazio="Nenhuma atividade financeira atribuída neste recorte."
         />
       )}
       <div className="ao-financial-note">
@@ -272,10 +272,10 @@ function eventFields(event) {
 */
 const FILTROS_DA_TELA = [
   { id: 'data_inicio', rotulo: 'De' },
-  { id: 'data_fim', rotulo: 'Ate' },
-  { id: 'usuario_id', rotulo: 'Usuario' },
+  { id: 'data_fim', rotulo: 'Até' },
+  { id: 'usuario_id', rotulo: 'Usuário' },
   { id: 'setor_id', rotulo: 'Setor' },
-  { id: 'modulo', rotulo: 'Modulo' },
+  { id: 'modulo', rotulo: 'Módulo' },
   { id: 'categoria', rotulo: 'Categoria' },
   { id: 'tipo_evento', rotulo: 'Evento' },
   { id: 'resultado', rotulo: 'Resultado' }
@@ -395,7 +395,7 @@ export default function AuditoriaOperacional() {
   const dimensoesFiltro = [
     {
       id: 'usuario_id',
-      rotulo: 'Usuario',
+      rotulo: 'Usuário',
       unico: true,
       opcoes: (options.usuarios || []).map((item) => ({ valor: String(item.id), rotulo: item.nome }))
     },
@@ -407,7 +407,7 @@ export default function AuditoriaOperacional() {
     },
     {
       id: 'modulo',
-      rotulo: 'Modulo',
+      rotulo: 'Módulo',
       unico: true,
       opcoes: (options.modulos || []).map((item) => ({ valor: String(item), rotulo: String(item) }))
     },
@@ -416,8 +416,8 @@ export default function AuditoriaOperacional() {
       rotulo: 'Categoria',
       unico: true,
       opcoes: [
-        { valor: 'NAVEGACAO', rotulo: 'Navegacao' },
-        { valor: 'OPERACAO', rotulo: 'Operacao' },
+        { valor: 'NAVEGACAO', rotulo: 'Navegação' },
+        { valor: 'OPERACAO', rotulo: 'Operação' },
         { valor: 'SEGURANCA', rotulo: 'Falhas e bloqueios' }
       ]
     },
@@ -473,7 +473,7 @@ export default function AuditoriaOperacional() {
       <PageHeader
         titulo="Auditoria Operacional"
         contagem={canDetails ? `${Number(events.total || 0).toLocaleString('pt-BR')} evento(s)` : null}
-        descricao="Atividade registrada no sistema por usuario, modulo e horario. Conteudos sensiveis de formularios e documentos nao fazem parte desta trilha."
+        descricao="Atividade registrada no sistema por usuário, módulo e horario. Conteudos sensiveis de formulários e documentos não fazem parte desta trilha."
         acaoPrincipal={canExport ? {
           rotulo: 'Exportar CSV',
           icone: <HiOutlineArrowDownTray />,
@@ -527,7 +527,7 @@ export default function AuditoriaOperacional() {
             },
             {
               id: 'data_fim',
-              rotulo: 'Ate',
+              rotulo: 'Até',
               tipo: 'date',
               valor: filters.data_fim,
               aoMudar: (valor) => setFilters((old) => ({ ...old, data_fim: valor }))
@@ -551,19 +551,19 @@ export default function AuditoriaOperacional() {
       */}
       <BlocosPersonalizaveis chave="blocos:auditoria-operacional" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Movimento do periodo"
+          titulo="Movimento do período"
           descricao="Contagens do recorte consultado."
           variante="primario"
           cor="var(--sem-info)"
         >
           <div aria-busy={loading}>
             <StatGrid>
-              <StatTile label="Usuarios ativos" valor={Number(summary.usuarios || 0).toLocaleString('pt-BR')} />
-              <StatTile label="Acessos a paginas" valor={Number(summary.navegacoes || 0).toLocaleString('pt-BR')} />
-              <StatTile label="Acoes operacionais" valor={Number(summary.operacoes || 0).toLocaleString('pt-BR')} tom="info" />
+              <StatTile label="Usuários ativos" valor={Number(summary.usuarios || 0).toLocaleString('pt-BR')} />
+              <StatTile label="Acessos a páginas" valor={Number(summary.navegacoes || 0).toLocaleString('pt-BR')} />
+              <StatTile label="Ações operacionais" valor={Number(summary.operacoes || 0).toLocaleString('pt-BR')} tom="info" />
               <StatTile label="Registros criados" valor={Number(summary.criacoes || 0).toLocaleString('pt-BR')} />
-              <StatTile label="Alteracoes" valor={Number(summary.alteracoes || 0).toLocaleString('pt-BR')} />
-              <StatTile label="Conclusoes" valor={Number(summary.conclusoes || 0).toLocaleString('pt-BR')} tom="success" />
+              <StatTile label="Alterações" valor={Number(summary.alteracoes || 0).toLocaleString('pt-BR')} />
+              <StatTile label="Conclusões" valor={Number(summary.conclusoes || 0).toLocaleString('pt-BR')} tom="success" />
               <StatTile
                 label="Falhas ou bloqueios"
                 valor={Number(summary.falhas || 0).toLocaleString('pt-BR')}
@@ -586,8 +586,8 @@ export default function AuditoriaOperacional() {
         {/* Contexto do período: raro de consultar, então nasce recolhido — o
             título fica à vista para quem procura (regra de organização 1). */}
         <BlocoConteudo
-          titulo="Distribuicao operacional"
-          descricao="Operacoes por modulo e ritmo diario observado."
+          titulo="Distribuição operacional"
+          descricao="Operações por módulo e ritmo diário observado."
           variante="secundario"
           recolhivel
           chavePreferencia="bloco:auditoria-operacional:distribuicao-operacional"
@@ -598,13 +598,13 @@ export default function AuditoriaOperacional() {
 
         {canUsers && (
           <BlocoConteudo
-            titulo="Atividade por usuario"
-            contagem={`${users.length} usuario(s)`}
-            descricao="Escolher um usuario aqui restringe a linha do tempo abaixo."
+            titulo="Atividade por usuário"
+            contagem={`${users.length} usuário(s)`}
+            descricao="Escolher um usuário aqui restringe a linha do tempo abaixo."
             variante="secundario"
             acoes={<HiOutlineUserGroup aria-hidden="true" />}
           >
-            <button type="button" className={`ao-all-users ${!selectedUser ? 'selected' : ''}`} onClick={() => { setSelectedUser(''); setPage(1); }}>Todos os usuarios</button>
+            <button type="button" className={`ao-all-users ${!selectedUser ? 'selected' : ''}`} onClick={() => { setSelectedUser(''); setPage(1); }}>Todos os usuários</button>
             <div className="ao-users-list">
               {users.map((item) => <UserRow key={item.usuario_id} item={item} selected={String(selectedUser) === String(item.usuario_id)} onClick={() => { setSelectedUser(String(item.usuario_id)); setPage(1); }} />)}
               {!loading && !users.length && <p className="ao-empty">Nenhuma atividade encontrada.</p>}
@@ -792,7 +792,7 @@ export default function AuditoriaOperacional() {
               <HiOutlineShieldCheck />
               <div>
                 <strong>Detalhamento protegido</strong>
-                <p>Seu acesso permite consultar os indicadores agregados. Solicite a permissao de detalhes para abrir a linha do tempo.</p>
+                <p>Seu acesso permite consultar os indicadores agregados. Solicite a permissão de detalhes para abrir a linha do tempo.</p>
               </div>
             </div>
           )}

@@ -136,7 +136,7 @@ export default function Perfil() {
     }
 
     if (senhaNova !== confirmacao) {
-      avisar.alerta('A confirmacao da nova senha nao confere.');
+      avisar.alerta('A confirmação da nova senha não confere.');
       return;
     }
 
@@ -198,12 +198,12 @@ export default function Perfil() {
 
   async function habilitarMfa() {
     if (!mfaSetup) {
-      avisar.alerta('Inicie a configuracao antes de validar o codigo.');
+      avisar.alerta('Inicie a configuração antes de validar o código.');
       return;
     }
 
     if (!String(mfaCode || '').trim()) {
-      avisar.alerta('Informe o codigo do aplicativo autenticador.');
+      avisar.alerta('Informe o código do aplicativo autenticador.');
       return;
     }
 
@@ -225,7 +225,7 @@ export default function Perfil() {
 
   async function desabilitarMfa() {
     if (!String(mfaCode || '').trim()) {
-      avisar.alerta('Informe o codigo atual do autenticador para desabilitar o MFA.');
+      avisar.alerta('Informe o código atual do autenticador para desabilitar o MFA.');
       return;
     }
 
@@ -291,17 +291,17 @@ export default function Perfil() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
-        titulo="Identificacao e acesso"
+        titulo="Identificação e acesso"
         variante="primario"
         cor="var(--c-primary)"
-        descricao="Dados da sua conta. Nome, e-mail, perfil e setor sao mantidos pela administracao do sistema."
+        descricao="Dados da sua conta. Nome, e-mail, perfil e setor são mantidos pela administração do sistema."
       >
         <CamposComVazios campos={camposIdentificacao} colunas={3} />
       </BlocoConteudo>
 
       <BlocoConteudo
         titulo="Tela inicial"
-        descricao="Em qual tela voce quer entrar ao abrir o sistema. Tambem da para marcar direto na tela, pela casinha ao lado da estrela de atalho. Vale em qualquer navegador e no celular."
+        descricao="Em qual tela você quer entrar ao abrir o sistema. Também da para marcar direto na tela, pela casinha ao lado da estrela de atalho. Vale em qualquer navegador e no celular."
       >
         <FormSecao legenda="Onde o login entra" colunas={2}>
           <CampoForm
@@ -343,7 +343,7 @@ export default function Perfil() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Alteracao de senha"
+        titulo="Alteração de senha"
         descricao="Use uma senha forte e diferente das credenciais antigas."
       >
         <form onSubmit={(event) => { event.preventDefault(); salvarSenha(); }}>
@@ -389,7 +389,7 @@ export default function Perfil() {
 
       <BlocoConteudo
         titulo="Autenticacao em duas etapas"
-        descricao="Proteja o acesso com codigo TOTP no autenticador do celular."
+        descricao="Proteja o acesso com código TOTP no autenticador do celular."
       >
         {/* CONDIÇÃO, não evento: estas duas faixas descrevem o estado da
             conta (política de segurança do perfil). Fechá-las não muda
@@ -454,7 +454,7 @@ export default function Perfil() {
               />
             </CampoForm>
 
-            <CampoForm label="Codigo do autenticador" obrigatorio>
+            <CampoForm label="Código do autenticador" obrigatorio>
               <input
                 type="text"
                 inputMode="numeric"
@@ -468,7 +468,7 @@ export default function Perfil() {
 
             <CampoForm label="Como ativar" linha>
               <p className="text-sm text-[var(--c-muted)]">
-                Abra o aplicativo autenticador, escaneie o QR Code e informe o codigo de 6 digitos para ativar o MFA.
+                Abra o aplicativo autenticador, escaneie o QR Code e informe o código de 6 dígitos para ativar o MFA.
               </p>
             </CampoForm>
 
@@ -505,7 +505,7 @@ export default function Perfil() {
               </p>
             </CampoForm>
 
-            <CampoForm label="Codigo atual do autenticador">
+            <CampoForm label="Código atual do autenticador">
               <input
                 type="text"
                 inputMode="numeric"

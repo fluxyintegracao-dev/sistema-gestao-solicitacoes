@@ -114,7 +114,7 @@ export default function ConfiguracoesSuporte() {
 
           <div className="max-w-md">
             <label className="app-filter-label" htmlFor="suporte-whatsapp">
-              Numero WhatsApp
+              Número WhatsApp
             </label>
             <input
               id="suporte-whatsapp"
@@ -136,7 +136,7 @@ export default function ConfiguracoesSuporte() {
             </p>
           ) : (
             <p className="app-note">
-              Informe DDD e numero. O sistema adiciona o DDI 55 automaticamente.
+              Informe DDD e número. O sistema adiciona o DDI 55 automaticamente.
             </p>
           )}
 

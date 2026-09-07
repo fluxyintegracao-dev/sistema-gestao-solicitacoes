@@ -3,6 +3,7 @@ import { HiOutlinePlus, HiOutlineTrash, HiOutlineXMark } from 'react-icons/hi2';
 import { confirmarBaixaFinanceiraComposta, previewBaixaFinanceiraComposta } from '../../services/financeiro';
 import { TabelaPadrao } from '../padrao';
 import ChequePagamentoFields from './ChequePagamentoFields';
+import DateInputBR from '../DateInputBR';
 
 function round(value) { return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100; }
 function money(value) { return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -196,7 +197,7 @@ export default function BaixaCompostaModal({
           {compatible && new Set(titulos.map((item) => Number(item.empresa_id))).size > 1 ? <div className="finance-operation-notice finance-operation-notice--info mb-4">Os títulos pertencem a empresas diferentes. Cada fonte será movimentada na sua empresa e os rateios entre empresas serão registrados individualmente para conciliação.</div> : null}
           {error ? <div className="finance-operation-notice finance-operation-notice--danger mb-4">{error}</div> : null}
           <div className="mb-4 grid gap-3 md:grid-cols-[220px_1fr_auto]">
-            <label className="form-control"><span>Data do pagamento</span><input className="input" type="date" value={dataMovimento} onChange={(e) => { setDataMovimento(e.target.value); setPreview(null); }} /></label>
+            <label className="form-control"><span>Data do pagamento</span><DateInputBR className="input" value={dataMovimento} onChange={(e) => { setDataMovimento(e.target.value); setPreview(null); }} /></label>
             <label className="form-control"><span>Observações do grupo</span><input className="input" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} placeholder="Ex.: Pagamento combinado acordado com o credor" /></label>
             <div className="finance-operation-metric self-end px-4 py-2"><small className="block text-[var(--c-muted)]">Saldo selecionado</small><strong>{money(totalSaldo)}</strong></div>
           </div>

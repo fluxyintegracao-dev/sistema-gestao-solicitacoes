@@ -37,6 +37,7 @@ import {
 import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
 import { useAuth } from '../contexts/AuthContext';
 import { hasPermissao } from '../utils/acessoProduto';
+import DateInputBR from '../components/DateInputBR';
 
 const TIPOS_INTERCOMPANY = [
   { value: 'APORTE', label: 'Aporte' },
@@ -47,7 +48,7 @@ const TIPOS_INTERCOMPANY = [
   { value: 'FOLHA', label: 'Folha' },
   { value: 'ADMINISTRATIVO', label: 'Administrativo' },
   { value: 'IMPOSTO', label: 'Imposto' },
-  { value: 'TRANSFERENCIA_OPERACIONAL', label: 'Transferencia operacional' }
+  { value: 'TRANSFERENCIA_OPERACIONAL', label: 'Transferência operacional' }
 ];
 
 const CLASSIFICACOES_INCOMPATIVEIS_COM_TARIFA = new Set([
@@ -253,8 +254,8 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
       <div className="w-full max-w-xl rounded-2xl bg-[var(--c-surface)] p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
           <div>
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Acoes rapidas</h2>
-            <p className="mt-1 text-sm text-[var(--c-muted)]">Escolha como registrar este lancamento bancario.</p>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Ações rápidas</h2>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">Escolha como registrar este lançamento bancário.</p>
             {item && (
               <div className="mt-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
                 <span className="font-medium">{item.descricao_banco || 'Lancamento bancario'}</span>
@@ -272,14 +273,14 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
             className="rounded-xl border border-[var(--c-border)] px-4 py-3 text-left transition-colors hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)]"
             onClick={() => onNovoTitulo(item)}
           >
-            <span className="block text-sm font-semibold text-[var(--c-text)]">Criar titulo + baixa</span>
+            <span className="block text-sm font-semibold text-[var(--c-text)]">Criar título + baixa</span>
             <span className="mt-1 block text-xs text-[var(--c-muted)]">Usa o fluxo completo de contas a pagar/receber e concilia o movimento.</span>
           </button>
 
           <div className="rounded-xl border border-[var(--c-border)] px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-[var(--c-text)]">Credito rotativo</p>
+                <p className="text-sm font-semibold text-[var(--c-text)]">Crédito rotativo</p>
                 <p className="text-xs text-[var(--c-muted)]">
                   Registra {creditoRotativoNatureza} no caixa e no endividamento, sem compor a DRE.
                 </p>
@@ -300,10 +301,10 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
           <div className="rounded-xl border border-dashed border-[var(--c-border)] p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-semibold text-[var(--c-text)]">Registrar tarifa bancaria</p>
-                <p className="text-xs text-[var(--c-muted)]">Cria movimento avulso de tarifa com categoria financeira explicita para DRE.</p>
+                <p className="text-sm font-semibold text-[var(--c-text)]">Registrar tarifa bancária</p>
+                <p className="text-xs text-[var(--c-muted)]">Cria movimento avulso de tarifa com categoria financeira explícita para DRE.</p>
               </div>
-              {!isSaida && <span className="rounded-full bg-[var(--sem-warning-bg)] px-2 py-1 text-xs font-medium text-[var(--sem-warning)]">Apenas saidas</span>}
+              {!isSaida && <span className="rounded-full bg-[var(--sem-warning-bg)] px-2 py-1 text-xs font-medium text-[var(--sem-warning)]">Apenas saídas</span>}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {tarifasAtivas.length === 0 ? (
@@ -337,7 +338,7 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[var(--c-text)]">Lancar estorno de tarifa</p>
               <p className="text-xs text-[var(--c-muted)]">
-                Registra este credito como um lancamento independente, sem exigir uma tarifa anterior.
+                Registra este crédito como um lançamento independente, sem exigir uma tarifa anterior.
               </p>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -400,7 +401,7 @@ function AssociacaoManualTabela({
       colunas={[
         {
           id: 'titulo',
-          titulo: 'Titulo',
+          titulo: 'Título',
           // R17: a descricao do titulo e quem nomeia o movimento.
           tipo: 'identidade',
           noCard: 'titulo',
@@ -487,7 +488,7 @@ function FaturasAssociacaoTabela({ loading, itens, modal, processingId, onAssoci
       colunas={[
         {
           id: 'cartao',
-          titulo: 'Cartao',
+          titulo: 'Cartão',
           // R17: o cartao e quem nomeia a fatura na lista.
           tipo: 'identidade',
           noCard: 'titulo',
@@ -500,7 +501,7 @@ function FaturasAssociacaoTabela({ loading, itens, modal, processingId, onAssoci
         },
         {
           id: 'competencia',
-          titulo: 'Competencia',
+          titulo: 'Competência',
           tipo: 'texto',
           render: (fatura) => fatura.competencia || '-'
         },
@@ -518,7 +519,7 @@ function FaturasAssociacaoTabela({ loading, itens, modal, processingId, onAssoci
         },
         {
           id: 'total_titulos',
-          titulo: 'Titulos',
+          titulo: 'Títulos',
           tipo: 'numero',
           render: (fatura) => fatura.total_titulos || 0
         },
@@ -635,11 +636,11 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
     const valor = parseCurrencyInput(form.valor);
     if (!form.valor || valor <= 0) { setErro('Informe um valor válido.'); return; }
     if (!form.conta_bancaria_id) { setErro('Selecione a conta bancária.'); return; }
-    if (!form.empresa_id) { setErro('A conta bancaria precisa estar vinculada a uma empresa pagadora.'); return; }
+    if (!form.empresa_id) { setErro('A conta bancária precisa estar vinculada a uma empresa pagadora.'); return; }
     if (!form.obra_id) { setErro('Selecione a obra.'); return; }
     if (!form.parceiro_id) { setErro('Selecione um parceiro (obrigatório).'); return; }
-    if (!form.categoria_financeira_id) { setErro('Selecione a categoria financeira do titulo.'); return; }
-    if (!form.competencia_data) { setErro('Informe a competencia DRE real do titulo.'); return; }
+    if (!form.categoria_financeira_id) { setErro('Selecione a categoria financeira do título.'); return; }
+    if (!form.competencia_data) { setErro('Informe a competência DRE real do título.'); return; }
     if (form.considera_dre && !categoriaClassificadaDre) { setErro('Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.'); return; }
 
     try {
@@ -738,21 +739,20 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Vencimento</span>
-              <input className="input w-full" type="date" value={form.data_vencimento}
+              <DateInputBR className="input w-full" value={form.data_vencimento}
                 onChange={(e) => setForm((c) => ({ ...c, data_vencimento: e.target.value }))} />
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Data de pagamento</span>
-              <input className="input w-full" type="date" value={form.data_pagamento}
+              <DateInputBR className="input w-full" value={form.data_pagamento}
                 onChange={(e) => setForm((c) => ({ ...c, data_pagamento: e.target.value }))} />
             </label>
           </div>
 
           <label className="app-filter-field">
-            <span className="app-filter-label">Competencia DRE</span>
-            <input
+            <span className="app-filter-label">Competência DRE</span>
+            <DateInputBR
               className="input w-full"
-              type="date"
               value={form.competencia_data}
               onChange={(e) => setForm((c) => ({ ...c, competencia_data: e.target.value }))}
               required={Boolean(form.considera_dre)}
@@ -793,7 +793,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
               checked={Boolean(form.considera_dre)}
               onChange={(e) => setForm((c) => ({ ...c, considera_dre: e.target.checked }))}
             />
-            Considerar este titulo na DRE gerencial
+            Considerar este título na DRE gerencial
           </label>
 
           <div className="app-filter-field">
@@ -927,7 +927,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded bg-[var(--sem-warning)] px-2 py-1 text-xs font-bold uppercase tracking-wide text-[var(--c-surface)]">
-                  Estorno bancario
+                  Estorno bancário
                 </span>
                 <strong className="text-xs">
                   {alertaEstorno.tipo === 'PIX_REJEITADO'
@@ -943,7 +943,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                 </span>
               </div>
               <p className="mt-1 text-xs text-[var(--sem-warning)]">
-                Confirme qual saida e a contraparte. Sem baixa anterior, o par sera neutralizado e o titulo permanecera aberto para o pagamento efetivo.
+                Confirme qual saída e a contraparte. Sem baixa anterior, o par será neutralizado e o título permanecera aberto para o pagamento efetivo.
               </p>
             </div>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setEstornoExpandido((value) => !value)}>
@@ -954,7 +954,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
           {estornoExpandido && (
             <div className="mt-2 border-t border-[var(--sem-warning-border)] pt-2">
               {alertaEstorno.candidatos.length === 0 ? (
-                <p className="text-xs font-medium text-[var(--sem-danger)]">Nenhuma saida de mesmo valor foi localizada na janela de conferencia.</p>
+                <p className="text-xs font-medium text-[var(--sem-danger)]">Nenhuma saída de mesmo valor foi localizada na janela de conferência.</p>
               ) : (
                 <div className="grid gap-2 lg:grid-cols-2">
                   {alertaEstorno.candidatos.map((candidato) => {
@@ -973,13 +973,13 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                           <span className="block truncate text-xs text-[var(--c-muted)]">Titulo #{candidato.titulo.id} · {candidato.titulo.parceiro_nome || candidato.titulo.descricao}</span>
                         )}
                         {saidaSemBaixa && (
-                          <span className="block text-xs font-medium text-[var(--sem-success)]">Sem baixa de titulo: a saida e a devolucao serao pareadas, mantendo o titulo aberto.</span>
+                          <span className="block text-xs font-medium text-[var(--sem-success)]">Sem baixa de título: a saída e a devolução serão pareadas, mantendo o título aberto.</span>
                         )}
                         {tipoMovimento === 'TARIFA_BANCARIA' && (
-                          <span className="block text-xs font-medium text-[var(--sem-success)]">Tarifa ja registrada: a devolucao preservara a mesma classificacao financeira.</span>
+                          <span className="block text-xs font-medium text-[var(--sem-success)]">Tarifa já registrada: a devolução preservara a mesma classificação financeira.</span>
                         )}
                         {!candidatoApto && (
-                          <span className="block text-xs font-medium text-[var(--sem-danger)]">Concilie esta saida com o titulo correto antes de confirmar a devolucao.</span>
+                          <span className="block text-xs font-medium text-[var(--sem-danger)]">Concilie esta saída com o título correto antes de confirmar a devolução.</span>
                         )}
                       </span>
                     </label>
@@ -997,7 +997,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                     {isConfirmandoEstorno ? 'Confirmando...' : 'Confirmar devolucao'}
                   </button>
                 ) : (
-                  <span className="text-xs text-[var(--sem-warning)]">Seu usuario pode visualizar o alerta, mas nao possui permissao para estornar conciliacoes.</span>
+                  <span className="text-xs text-[var(--sem-warning)]">Seu usuário pode visualizar o alerta, mas não possui permissão para estornar conciliacoes.</span>
                 )}
               </div>
             </div>
@@ -1015,7 +1015,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                 checked={selected}
                 onChange={() => onToggleSelecao?.(item)}
               />
-              Selecionar para baixa em titulo
+              Selecionar para baixa em título
             </label>
           )}
           {/* header */}
@@ -1174,7 +1174,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
           ) : alertaEstorno ? (
             <div className="flex flex-1 items-center rounded border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] px-2 py-2">
               <p className="text-xs font-medium leading-tight text-[var(--sem-warning)]">
-                Aguardando a escolha do lancamento original. Nenhum titulo sera associado automaticamente.
+                Aguardando a escolha do lançamento original. Nenhum título será associado automaticamente.
               </p>
             </div>
           ) : temAssociacaoPreparada ? (
@@ -1455,9 +1455,9 @@ function BaixaExtratosTituloModal({ itens, onClose, onConfirmar }) {
       <form onSubmit={submit} className="w-full max-w-4xl overflow-hidden rounded-2xl bg-[var(--c-surface)] shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Baixar titulo com extratos selecionados</h2>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Baixar título com extratos selecionados</h2>
             <p className="mt-1 text-sm text-[var(--c-muted)]">
-              Cada lancamento selecionado vira uma baixa real no titulo, mantendo a data original do extrato.
+              Cada lançamento selecionado vira uma baixa real no título, mantendo a data original do extrato.
             </p>
           </div>
           <button type="button" className="btn btn-outline btn-sm" onClick={onClose}>Fechar</button>
@@ -1466,7 +1466,7 @@ function BaixaExtratosTituloModal({ itens, onClose, onConfirmar }) {
         <div className="max-h-[72vh] overflow-y-auto p-6">
           {!tipoEsperado && (
             <div className="mb-4 rounded-xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] px-4 py-3 text-sm text-[var(--sem-warning)]">
-              Selecione somente lancamentos de entrada ou somente de saida para vincular a um unico titulo.
+              Selecione somente lançamentos de entrada ou somente de saída para vincular a um único título.
             </div>
           )}
 
@@ -1479,7 +1479,7 @@ function BaixaExtratosTituloModal({ itens, onClose, onConfirmar }) {
                 </p>
               </div>
               <select className="input" value={formaRecebimento} onChange={(event) => setFormaRecebimento(event.target.value)}>
-                <option value="TRANSFERENCIA">Transferencia</option>
+                <option value="TRANSFERENCIA">Transferência</option>
                 <option value="PIX">PIX</option>
                 <option value="BOLETO">Boleto</option>
                 <option value="CHEQUE">Cheque</option>
@@ -1502,11 +1502,11 @@ function BaixaExtratosTituloModal({ itens, onClose, onConfirmar }) {
 
           <div className="mt-4 grid gap-3 md:grid-cols-[1fr_260px]">
             <label className="form-field">
-              <span className="form-label">Buscar titulo</span>
-              <input className="input" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Digite descricao, documento, parceiro ou codigo" />
+              <span className="form-label">Buscar título</span>
+              <input className="input" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Digite descrição, documento, parceiro ou código" />
             </label>
             <label className="form-field">
-              <span className="form-label">Observacao</span>
+              <span className="form-label">Observação</span>
               <input className="input" value={observacoes} onChange={(event) => setObservacoes(event.target.value)} placeholder="Opcional" />
             </label>
           </div>
@@ -1541,9 +1541,9 @@ function BaixaExtratosTituloModal({ itens, onClose, onConfirmar }) {
 
           <div className="mt-4 max-h-[60vh] space-y-2 overflow-y-auto rounded-xl border border-[var(--c-border)] p-2">
             {loading ? (
-              <div className="app-empty-card">Carregando titulos...</div>
+              <div className="app-empty-card">Carregando títulos...</div>
             ) : titulosFiltrados.length === 0 ? (
-              <div className="app-empty-card">Nenhum titulo aberto ou parcial encontrado.</div>
+              <div className="app-empty-card">Nenhum título aberto ou parcial encontrado.</div>
             ) : titulosFiltrados.map((titulo) => {
               const selected = String(tituloId) === String(titulo.id);
               return (
@@ -2011,7 +2011,7 @@ export default function FinanceiroConciliacao() {
     await baixarTituloPorConciliacoes(tituloId, payload);
     setBaixaExtratosModalOpen(false);
     setConciliacoesSelecionadas([]);
-    avisar.sucesso('Titulo baixado e lancamentos bancarios conciliados com sucesso.');
+    avisar.sucesso('Título baixado e lançamentos bancários conciliados com sucesso.');
     await carregarConciliacoes();
   }
 
@@ -2043,7 +2043,7 @@ export default function FinanceiroConciliacao() {
         delete next[Number(conciliacaoId)];
         return next;
       });
-      avisar.sucesso('Conciliacao confirmada com sucesso.');
+      avisar.sucesso('Conciliação confirmada com sucesso.');
       if (fecharModal) setAssociacaoModal((c) => ({ ...c, open: false, processing: false, error: '', selecionados: [], dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] } }));
       await carregarConciliacoes();
     } catch (err) {
@@ -2060,7 +2060,7 @@ export default function FinanceiroConciliacao() {
     if (!item?.id || !conciliacaoOrigemId) return;
     const candidato = item.estorno_bancario?.candidatos?.find((value) => Number(value.conciliacao_id) === Number(conciliacaoOrigemId));
     if (!candidatoEstornoApto(candidato)) {
-      avisar.erro('A saida original nao esta apta para confirmar esta devolucao. Atualize a conciliacao e tente novamente.');
+      avisar.erro('A saída original não esta apta para confirmar esta devolução. Atualize a conciliação e tente novamente.');
       return;
     }
     const tipoMovimento = String(candidato.movimento?.tipo_movimento || '').toUpperCase();
@@ -2122,7 +2122,7 @@ export default function FinanceiroConciliacao() {
     try {
       setProcessingId(`ignorar-${conciliacaoId}`); limparAvisos();
       await ignorarConciliacaoBancaria(conciliacaoId);
-      avisar.sucesso('Lancamento marcado como ignorado.');
+      avisar.sucesso('Lançamento marcado como ignorado.');
       await carregarConciliacoes();
     } catch (err) { avisar.erro(err?.message || 'Erro ao ignorar conciliacao'); } finally { setProcessingId(null); }
   }
@@ -2140,7 +2140,7 @@ export default function FinanceiroConciliacao() {
     try {
       setProcessingId(`remover-${conciliacaoId}`); limparAvisos();
       await removerConciliacaoBancaria(conciliacaoId, { motivo: 'Removido manualmente na tela de conciliacao' });
-      avisar.sucesso('Lancamento removido do extrato.');
+      avisar.sucesso('Lançamento removido do extrato.');
       await carregarConciliacoes();
     } catch (err) { avisar.erro(err?.message || 'Erro ao remover lancamento do extrato'); } finally { setProcessingId(null); }
   }
@@ -2296,7 +2296,7 @@ export default function FinanceiroConciliacao() {
       }
     }));
     limparAvisos();
-    avisar.sucesso('Associacao manual preparada. Revise as informacoes e clique em Conciliar para confirmar.');
+    avisar.sucesso('Associação manual preparada. Revise as informações e clique em Conciliar para confirmar.');
     fecharAssociacaoManual();
   }
 
@@ -2387,7 +2387,7 @@ export default function FinanceiroConciliacao() {
       setFaturaModal((c) => ({ ...c, processing: true, error: '' }));
       limparAvisos();
       await confirmarConciliacaoFaturaCartao(conciliacaoId, { fatura_cartao_id: faturaId });
-      avisar.sucesso('Fatura conciliada e titulos vinculados baixados com sucesso.');
+      avisar.sucesso('Fatura conciliada e títulos vinculados baixados com sucesso.');
       fecharAssociacaoFatura();
       await carregarConciliacoes();
     } catch (err) {
@@ -2457,7 +2457,7 @@ export default function FinanceiroConciliacao() {
         motivo_intercompany: transferenciaEntreEmpresas ? transferenciaModal.motivo_intercompany : undefined,
         elimina_consolidado: transferenciaEntreEmpresas ? transferenciaModal.elimina_consolidado : true
       });
-      avisar.sucesso('Lancamento conciliado como transferencia entre contas.');
+      avisar.sucesso('Lançamento conciliado como transferência entre contas.');
       fecharAssociacaoTransferencia();
       await carregarConciliacoes();
     } catch (err) {
@@ -2483,7 +2483,7 @@ export default function FinanceiroConciliacao() {
       limparAvisos();
       await estornarConciliacaoTransferencia(item.id, { motivo });
       setEstornoTransferenciaModal({ open: false, item: null, motivo: '', processing: false, error: '' });
-      avisar.sucesso('Transferencia estornada. Os lancamentos OFX vinculados voltaram para pendente.');
+      avisar.sucesso('Transferência estornada. Os lançamentos OFX vinculados voltaram para pendente.');
       await carregarConciliacoes();
     } catch (err) {
       setEstornoTransferenciaModal((current) => ({
@@ -2721,7 +2721,7 @@ export default function FinanceiroConciliacao() {
           </button>
         </div>
         <p className="mt-2 text-xs text-[var(--c-muted)]">
-          Deixe a conta em branco para o sistema identificar cada OFX pela Identificacao OFX cadastrada na conta bancaria. Se selecionar uma conta, todos os arquivos serao importados nela.
+          Deixe a conta em branco para o sistema identificar cada OFX pela Identificação OFX cadastrada na conta bancária. Se selecionar uma conta, todos os arquivos serão importados nela.
         </p>
       </form>
 
@@ -2730,7 +2730,7 @@ export default function FinanceiroConciliacao() {
           <div className="w-full max-w-2xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-2xl">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Resultado da importacao</h2>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Resultado da importação</h2>
                 <p className="mt-1 text-xs text-[var(--c-muted)]">Confira quais OFX foram importados e quais precisam de ajuste cadastral.</p>
               </div>
               <span className="rounded-full bg-[var(--sem-neutral-bg)] px-3 py-1 text-xs font-semibold text-[var(--c-text)]">
@@ -2787,7 +2787,7 @@ export default function FinanceiroConciliacao() {
                   className="input w-full input-sm"
                   value={dashboardFilters.busca}
                   onChange={(e) => setDashboardFilters((current) => ({ ...current, busca: e.target.value }))}
-                  placeholder="Banco, conta, agencia ou empresa"
+                  placeholder="Banco, conta, agência ou empresa"
                 />
               </label>
               <label className="app-filter-field">
@@ -2803,18 +2803,16 @@ export default function FinanceiroConciliacao() {
               </label>
               <label className="app-filter-field">
                 <span className="app-filter-label">Data inicial</span>
-                <input
+                <DateInputBR
                   className="input w-full input-sm"
-                  type="date"
                   value={dashboardFilters.data_inicial}
                   onChange={(e) => setDashboardFilters((current) => ({ ...current, data_inicial: e.target.value }))}
                 />
               </label>
               <label className="app-filter-field">
                 <span className="app-filter-label">Data final</span>
-                <input
+                <DateInputBR
                   className="input w-full input-sm"
-                  type="date"
                   value={dashboardFilters.data_final}
                   onChange={(e) => setDashboardFilters((current) => ({ ...current, data_final: e.target.value }))}
                 />
@@ -2839,12 +2837,12 @@ export default function FinanceiroConciliacao() {
               <div className="flex flex-1 flex-col">
                 <span className="text-xs uppercase tracking-wide text-[var(--c-muted)]">Contas exibidas</span>
                 <span className="text-sm font-bold text-[var(--c-text)]">{resumoDashboard.contas}</span>
-                <span className="text-xs text-[var(--c-muted)]">com conciliacao no filtro</span>
+                <span className="text-xs text-[var(--c-muted)]">com conciliação no filtro</span>
               </div>
               <div className="flex flex-1 flex-col">
                 <span className="text-xs uppercase tracking-wide text-[var(--sem-warning)]">Pendentes</span>
                 <span className="text-sm font-bold text-[var(--sem-warning)]">{resumoDashboard.pendentes}</span>
-                <span className="text-xs text-[var(--c-muted)]">aguardando conferencia</span>
+                <span className="text-xs text-[var(--c-muted)]">aguardando conferência</span>
               </div>
               <div className="flex flex-1 flex-col">
                 <span className="text-xs uppercase tracking-wide text-[var(--sem-success)]">Conciliados</span>
@@ -2857,7 +2855,7 @@ export default function FinanceiroConciliacao() {
                 <span className="text-xs text-[var(--c-muted)]">descartados</span>
               </div>
               <div className="flex flex-1 flex-col">
-                <span className="text-xs uppercase tracking-wide text-[var(--c-muted)]">Movimentacao bruta</span>
+                <span className="text-xs uppercase tracking-wide text-[var(--c-muted)]">Movimentação bruta</span>
                 <span className="text-sm font-bold text-[var(--c-text)]">{formatCurrency(resumoDashboard.valor_absoluto_total)}</span>
                 <span className="text-xs text-[var(--c-muted)]">soma absoluta do filtro</span>
               </div>
@@ -2865,7 +2863,7 @@ export default function FinanceiroConciliacao() {
           </div>
 
           {loadingContas || loadingContasResumo ? (
-            <div className="app-empty-card sol-surface-card">Carregando contas bancarias...</div>
+            <div className="app-empty-card sol-surface-card">Carregando contas bancárias...</div>
           ) : contasResumo.length === 0 ? (
             <div className="app-empty-card sol-surface-card">Nenhuma conta encontrada com os filtros atuais.</div>
           ) : (
@@ -2905,7 +2903,7 @@ export default function FinanceiroConciliacao() {
 
                     <div className="mt-4 flex items-end justify-between gap-3">
                       <div>
-                        <span className="block text-xs uppercase tracking-wide text-[var(--c-muted)]">Movimentacao bruta</span>
+                        <span className="block text-xs uppercase tracking-wide text-[var(--c-muted)]">Movimentação bruta</span>
                         <strong className="text-lg text-[var(--c-text)]">{formatCurrency(resumo.valor_absoluto_total)}</strong>
                       </div>
                       <button type="button" className="btn btn-primary btn-sm" onClick={() => abrirConferenciaManual(conta)}>
@@ -2942,12 +2940,12 @@ export default function FinanceiroConciliacao() {
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial}
+            <DateInputBR className="input w-full input-sm" value={filters.data_inicial}
               onChange={(e) => setFilters((c) => ({ ...c, data_inicial: e.target.value }))} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final}
+            <DateInputBR className="input w-full input-sm" value={filters.data_final}
               onChange={(e) => setFilters((c) => ({ ...c, data_final: e.target.value }))} />
           </label>
           <div className="flex gap-2 shrink-0">
@@ -3013,15 +3011,15 @@ export default function FinanceiroConciliacao() {
                     {conciliacoesSelecionadasItens.length} lancamento(s) selecionado(s)
                   </p>
                   <p className="text-xs text-[var(--c-muted)]">
-                    Use para baixar um unico titulo com pagamentos parciais em uma ou mais datas do extrato.
+                    Use para baixar um único título com pagamentos parciais em uma ou mais datas do extrato.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className="btn btn-outline btn-sm" onClick={() => setConciliacoesSelecionadas([])}>
-                    Limpar selecao
+                    Limpar seleção
                   </button>
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => setBaixaExtratosModalOpen(true)}>
-                    Baixar titulo com selecionados
+                    Baixar título com selecionados
                   </button>
                 </div>
               </div>
@@ -3105,9 +3103,9 @@ export default function FinanceiroConciliacao() {
           >
             <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] pb-4">
               <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Estornar transferencia conciliada</h2>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Estornar transferência conciliada</h2>
                 <p className="mt-1 text-sm text-[var(--c-muted)]">
-                  A transferencia sera cancelada e todos os lancamentos OFX vinculados voltarao para pendente.
+                  A transferência será cancelada e todos os lançamentos OFX vinculados voltarao para pendente.
                 </p>
               </div>
               <button
@@ -3127,7 +3125,7 @@ export default function FinanceiroConciliacao() {
                 maxLength={255}
                 value={estornoTransferenciaModal.motivo}
                 onChange={(event) => setEstornoTransferenciaModal((current) => ({ ...current, motivo: event.target.value, error: '' }))}
-                placeholder="Ex.: transferencia conciliada na conta incorreta"
+                placeholder="Ex.: transferência conciliada na conta incorreta"
               />
             </label>
             {estornoTransferenciaModal.error && (
@@ -3190,9 +3188,9 @@ export default function FinanceiroConciliacao() {
           <div className="w-full max-w-xl rounded-2xl bg-[var(--c-surface)] p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
               <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Conciliar transferencia</h2>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Conciliar transferência</h2>
                 <p className="mt-1 text-sm text-[var(--c-muted)]">
-                  Informe a outra conta envolvida. O sistema define origem e destino pelo sinal do lancamento bancario.
+                  Informe a outra conta envolvida. O sistema define origem e destino pelo sinal do lançamento bancário.
                 </p>
                 {transferenciaModal.item && (
                   <div className="mt-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
@@ -3279,7 +3277,7 @@ export default function FinanceiroConciliacao() {
                 </>
               ) : null}
               <label className="text-sm">
-                <span className="mb-1 block text-[var(--c-muted)]">Descricao</span>
+                <span className="mb-1 block text-[var(--c-muted)]">Descrição</span>
                 <input
                   className="input w-full"
                   value={transferenciaModal.descricao}
@@ -3391,7 +3389,7 @@ export default function FinanceiroConciliacao() {
                   <span className="text-[var(--sem-warning)]">Falta {formatCurrency(Math.max(associacaoResumo.diferenca, 0))}</span>
                 ) : null}
                 {associacaoResumo.ultrapassou ? (
-                  <span className="text-[var(--sem-danger)]">Selecao acima do valor pago.</span>
+                  <span className="text-[var(--sem-danger)]">Seleção acima do valor pago.</span>
                 ) : null}
               </div>
               <button
@@ -3421,7 +3419,7 @@ export default function FinanceiroConciliacao() {
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
               <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Associar fatura de cartao</h2>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Associar fatura de cartão</h2>
                 <p className="mt-1 text-sm text-[var(--c-muted)]">
                   Use esta opcao quando o lancamento bancario pagar uma fatura inteira; os titulos da fatura serao baixados individualmente.
                 </p>
@@ -3441,7 +3439,7 @@ export default function FinanceiroConciliacao() {
               {[
                 { label: 'Data inicial', field: 'data_inicial', type: 'date' },
                 { label: 'Data final', field: 'data_final', type: 'date' },
-                { label: 'Texto / cartao', field: 'documento', type: 'text', placeholder: 'Cartao, titular ou competencia' },
+                { label: 'Texto / cartão', field: 'documento', type: 'text', placeholder: 'Cartão, titular ou competência' },
                 { label: 'Valor inicial', field: 'valor_inicial', type: 'number' },
                 { label: 'Valor final', field: 'valor_final', type: 'number' }
               ].map(({ label, field, type, placeholder }) => (

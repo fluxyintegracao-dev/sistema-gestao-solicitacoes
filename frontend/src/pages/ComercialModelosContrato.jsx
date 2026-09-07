@@ -22,7 +22,7 @@ import {
 const DESCRICAO = 'Modelos DOCX por empreendimento para gerar contrato e quadro resumo com o papel timbrado correto.';
 
 const TIPOS_DOCUMENTO_MODELO = [
-  { value: 'CONTRATO', label: 'Contrato padrao' },
+  { value: 'CONTRATO', label: 'Contrato padrão' },
   { value: 'QUADRO_RESUMO', label: 'Quadro resumo' }
 ];
 
@@ -318,7 +318,7 @@ export default function ComercialModelosContrato() {
               />
             </CampoForm>
             <CampoForm
-              label="Descricao"
+              label="Descrição"
               tipo="texto-longo"
               hint="Observacao para identificar quando usar este modelo."
             >
@@ -340,7 +340,7 @@ export default function ComercialModelosContrato() {
 
       <BlocoConteudo
         titulo="Modelos cadastrados"
-        descricao="Revise quais arquivos ficam disponiveis para cada empreendimento."
+        descricao="Revise quais arquivos ficam disponíveis para cada empreendimento."
         variante="primario"
         cor="var(--module-comercial)"
       >
@@ -351,7 +351,7 @@ export default function ComercialModelosContrato() {
           busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((prev) => ({ ...prev, q: valor })),
-            placeholder: 'Buscar por nome, descricao ou empreendimento'
+            placeholder: 'Buscar por nome, descrição ou empreendimento'
           } : null}
           filtros={[
             {

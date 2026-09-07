@@ -5,6 +5,7 @@ import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import { usePosicaoFlutuante } from '../../hooks/usePosicaoFlutuante';
 import { TIPO_COLUNAS, TIPO_VISUAL, usePreferenciaDeLista } from '../../contexts/PreferenciasContext';
 import EmptyState from '../ui/EmptyState';
+import { ehToken } from '../../utils/token';
 
 function useEhMovel() {
   const [ehMovel, setEhMovel] = useState(
@@ -100,12 +101,40 @@ const TIPOS_COLUNA = {
   numero: { largura: 120, alinhar: 'right', valor: true },
   data:   { largura: 110 },                          // 22/08/2026
   /*
-    132px, não 96 (medido no preview em 02/09): com 96 a coluna deixava
-    ~72px úteis, e "ESTORNADO"/"CONFIRMADA" em 12px semibold não cabiam —
-    o badge era cortado no meio da palavra. Largura é decisão do
-    componente, então o conserto é aqui e vale para toda tela.
+    221px, não 132 (medido em 06/09; antes disso 132 em vez de 96, medido
+    em 02/09 pelo mesmo motivo, com o mesmo erro de método).
+
+    O ERRO DE MÉTODO: nas duas vezes a largura saiu do rótulo mais largo que
+    a pessoa que consertava TINHA NA MÃO — "ESTORNADO"/"CONFIRMADA" em
+    02/09. Nunca do vocabulário do sistema. Medido agora, com o corpo
+    inteiro (95 rótulos de status colhidos do front e do backend, medidos na
+    pílula real com o CSS real), 132px comportava a MEDIANA: metade dos
+    status do sistema era cortada, em silêncio, nas 146 colunas
+    `tipo: 'status'` que existem hoje.
+
+    O que o revisor viu em `pedidos-compra` a 1920 e a 1366 era isto: todo
+    pedido lia "Fechado com", de "Fechado com o fornecedor" — a pílula
+    precisa de 195px e tinha 106px úteis. Ao lado, na mesma tabela, a coluna
+    FORNECEDOR ficava com 682px (38% do contêiner de 1793px) contra 7,4% do
+    STATUS, e PEDIDO MINIMO exibia "-" em 190px.
+
+    221px = 195px (a pílula de "Fechado com o fornecedor", o rótulo mais
+    largo que o sistema INSTALA — `pedidoCompraStatusConfig.js`) + 26px que
+    a célula gasta em recuo. Medido, não estimado.
+
+    O QUE ESTA LARGURA NÃO RESOLVE, e por que ela não tenta: seis rótulos do
+    corpo passam de 221px (o maior, "AGUARDANDO CONFIRMACAO BAIXA", pede
+    264px) e o administrador pode cadastrar um nome de status maior ainda em
+    Configurações. Largura fixa nenhuma cobre isso. Quem cobre é a pílula,
+    que passou a QUEBRAR EM LINHAS em vez de cortar (`.fx-badge`, em
+    `design-tokens.css`) — e por isso esta largura pôde ser escolhida pelo
+    vocabulário instalado em vez de pelo pior caso imaginável.
+
+    Efeito colateral medido, e é a favor: a 1920 a linha da tabela ficou
+    MAIS BAIXA (86px → 50px), porque a pílula que quebrava em duas linhas
+    passou a caber numa.
   */
-  status: { largura: 132, alinhar: 'center' },
+  status: { largura: 221, alinhar: 'center' },
   badge:  { largura: 120, alinhar: 'center' }
 };
 
@@ -1112,7 +1141,9 @@ export default function TabelaPadrao({
         aceitável. Célula com espaço continua quebrando entre palavras.
       */
       const texto = td.innerText.trim();
-      td.classList.toggle('app-celula-token', texto.length > 0 && !/\s/.test(texto));
+      /* A definição de token mora em `utils/token.js` — o ladrilho de dado
+         usa a mesma para decidir onde o texto pode quebrar. */
+      td.classList.toggle('app-celula-token', ehToken(texto));
     });
   });
 

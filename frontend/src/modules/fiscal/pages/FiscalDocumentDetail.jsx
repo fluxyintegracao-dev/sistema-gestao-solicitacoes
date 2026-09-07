@@ -30,15 +30,15 @@ import {
 } from '../services/fiscalApi';
 
 const LINK_SEARCH_TYPES = [
-  { value: 'solicitacao', label: 'Solicitacao', field: 'solicitacao_id' },
-  { value: 'solicitacao_compra', label: 'Solicitacao de compra', field: 'solicitacao_compra_id' },
+  { value: 'solicitacao', label: 'Solicitação', field: 'solicitacao_id' },
+  { value: 'solicitacao_compra', label: 'Solicitação de compra', field: 'solicitacao_compra_id' },
   { value: 'pedido', label: 'Pedido', field: 'pedido_id' },
   { value: 'pedido_item', label: 'Item do pedido', field: 'pedido_item_id' },
-  { value: 'titulo', label: 'Titulo financeiro', field: 'financeiro_titulo_id' },
+  { value: 'titulo', label: 'Título financeiro', field: 'financeiro_titulo_id' },
   { value: 'obra', label: 'Obra', field: 'obra_id' },
   { value: 'fornecedor', label: 'Fornecedor', field: 'fornecedor_id' },
   { value: 'centro_custo', label: 'Centro de custo', field: 'centro_custo_id' },
-  { value: 'apropriacao', label: 'Apropriacao', field: 'apropriacao_id' },
+  { value: 'apropriacao', label: 'Apropriação', field: 'apropriacao_id' },
   { value: 'plano_financeiro', label: 'Plano financeiro', field: 'plano_financeiro_id' }
 ];
 
@@ -367,7 +367,7 @@ export default function FiscalDocumentDetail() {
     setUpdatingLinkId(alvo.id);
     try {
       setDocumento(await updateFiscalDocumentLink(id, alvo.id, { status: 'confirmed' }));
-      avisar.sucesso('Sugestao confirmada.');
+      avisar.sucesso('Sugestão confirmada.');
     } catch (err) {
       avisar.erro(err.message || 'Erro ao atualizar vinculo fiscal');
     } finally {
@@ -381,7 +381,7 @@ export default function FiscalDocumentDetail() {
     const alvo = link;
     const referencia = referenciasDoVinculo(alvo) || `vinculo #${alvo.id}`;
     const { ok } = await confirmar({
-      titulo: 'Rejeitar vinculo sugerido',
+      titulo: 'Rejeitar vínculo sugerido',
       mensagem: `Rejeitar a sugestao de vinculo (${referencia})? O documento volta a ficar sem essa amarracao.`,
       rotuloConfirmar: 'Rejeitar vinculo',
       destrutiva: true
@@ -391,7 +391,7 @@ export default function FiscalDocumentDetail() {
     setUpdatingLinkId(alvo.id);
     try {
       setDocumento(await updateFiscalDocumentLink(id, alvo.id, { status: 'rejected' }));
-      avisar.sucesso('Sugestao rejeitada.');
+      avisar.sucesso('Sugestão rejeitada.');
     } catch (err) {
       avisar.erro(err.message || 'Erro ao atualizar vinculo fiscal');
     } finally {
@@ -406,7 +406,7 @@ export default function FiscalDocumentDetail() {
   const submitDivergence = async (event) => {
     event.preventDefault();
     if (!String(divergenceForm.description || '').trim()) {
-      avisar.erro('Informe a descricao da divergencia fiscal.');
+      avisar.erro('Informe a descrição da divergência fiscal.');
       return;
     }
 
@@ -418,7 +418,7 @@ export default function FiscalDocumentDetail() {
     try {
       setDocumento(await createFiscalDivergence(id, payload));
       setDivergenceForm(DIVERGENCE_FORM_VAZIO);
-      avisar.sucesso('Divergencia fiscal registrada.');
+      avisar.sucesso('Divergência fiscal registrada.');
     } catch (err) {
       avisar.erro(err.message || 'Erro ao registrar divergencia fiscal');
     } finally {
@@ -431,7 +431,7 @@ export default function FiscalDocumentDetail() {
     setUpdatingDivergenceId(alvo.id);
     try {
       setDocumento(await updateFiscalDivergence(id, alvo.id, { status: 'resolved' }));
-      avisar.sucesso('Divergencia resolvida.');
+      avisar.sucesso('Divergência resolvida.');
     } catch (err) {
       avisar.erro(err.message || 'Erro ao atualizar divergencia fiscal');
     } finally {
@@ -445,7 +445,7 @@ export default function FiscalDocumentDetail() {
     const alvo = divergence;
     const tipo = DIVERGENCE_TYPES.find((item) => item.value === alvo.divergence_type)?.label || alvo.divergence_type;
     const { ok } = await confirmar({
-      titulo: 'Ignorar divergencia',
+      titulo: 'Ignorar divergência',
       mensagem: `Ignorar a divergencia "${tipo}" deste documento? Ela deixa de aparecer como pendencia e esta tela nao reabre a marcacao.`,
       rotuloConfirmar: 'Ignorar divergencia',
       destrutiva: true
@@ -455,7 +455,7 @@ export default function FiscalDocumentDetail() {
     setUpdatingDivergenceId(alvo.id);
     try {
       setDocumento(await updateFiscalDivergence(id, alvo.id, { status: 'ignored' }));
-      avisar.sucesso('Divergencia ignorada.');
+      avisar.sucesso('Divergência ignorada.');
     } catch (err) {
       avisar.erro(err.message || 'Erro ao atualizar divergencia fiscal');
     } finally {
@@ -477,7 +477,7 @@ export default function FiscalDocumentDetail() {
     setLinking(true);
     try {
       setDocumento(await linkFiscalDocument(id, payload));
-      avisar.sucesso('Vinculo manual registrado com sucesso.');
+      avisar.sucesso('Vínculo manual registrado com sucesso.');
       setLinkForm(LINK_FORM_VAZIO);
       setLinkSearchResults([]);
     } catch (err) {
@@ -600,11 +600,11 @@ export default function FiscalDocumentDetail() {
             { label: 'Empresa monitorada', valor: documento.company?.razao_social, span: 2 },
             { label: 'Fornecedor', valor: documento.issuer_name || documento.issuer_cnpj, span: 2 },
             { label: 'CNPJ fornecedor', valor: documento.issuer_cnpj },
-            { label: 'Destinatario', valor: documento.recipient_name || documento.recipient_cnpj },
-            { label: 'Emissao', valor: formatDate(documento.emission_date) },
+            { label: 'Destinatário', valor: documento.recipient_name || documento.recipient_cnpj },
+            { label: 'Emissão', valor: formatDate(documento.emission_date) },
             { label: 'Valor total', valor: formatMoney(documento.total_value) },
-            { label: 'Serie', valor: documento.series },
-            { label: 'Numero', valor: documento.document_number },
+            { label: 'Série', valor: documento.series },
+            { label: 'Número', valor: documento.document_number },
             {
               label: 'Status fiscal',
               valor: documento.document_status ? <StatusBadge status={documento.document_status} /> : null
@@ -690,8 +690,8 @@ export default function FiscalDocumentDetail() {
         declarado. Nenhum dado saiu.
       */}
       <BlocoConteudo
-        titulo="Vinculos"
-        descricao="Amarracao do documento com solicitacao, pedido, titulo, obra e apropriacao."
+        titulo="Vínculos"
+        descricao="Amarracao do documento com solicitação, pedido, título, obra e apropriação."
         acoes={(
           <button
             className="btn btn-outline btn-sm"
@@ -711,7 +711,7 @@ export default function FiscalDocumentDetail() {
           colunas={[
             {
               id: 'situacao',
-              titulo: 'Situacao',
+              titulo: 'Situação',
               tipo: 'status',
               noCard: 'titulo',
               render: (link) => <StatusBadge status={link.link_status || 'suggested'} />
@@ -730,7 +730,7 @@ export default function FiscalDocumentDetail() {
             },
             {
               id: 'referencias',
-              titulo: 'Referencias',
+              titulo: 'Referências',
               tipo: 'texto',
               render: (link) => {
                 const referencias = referenciasDoVinculo(link);
@@ -751,7 +751,7 @@ export default function FiscalDocumentDetail() {
           itens={links}
           storageKey="tabela:documento-fiscal:vinculos"
           rotuloRolagem="Vinculos"
-          vazio="Nenhum vinculo registrado nesta fase."
+          vazio="Nenhum vínculo registrado nesta fase."
           larguraAcoes={220}
           acoesLinha={(link) => (link.link_status === 'suggested' ? (
             <>
@@ -778,8 +778,8 @@ export default function FiscalDocumentDetail() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Divergencias"
-        descricao="Pendencias apontadas entre o documento fiscal e o que o sistema esperava."
+        titulo="Divergências"
+        descricao="Pendências apontadas entre o documento fiscal e o que o sistema esperava."
       >
         <TabelaPadrao
           semIdentidade
@@ -810,7 +810,7 @@ export default function FiscalDocumentDetail() {
             },
             {
               id: 'descricao',
-              titulo: 'Descricao',
+              titulo: 'Descrição',
               tipo: 'texto',
               render: (item) => (
                 <span title={item.description || undefined}>{item.description || '-'}</span>
@@ -831,7 +831,7 @@ export default function FiscalDocumentDetail() {
           itens={divergences}
           storageKey="tabela:documento-fiscal:divergencias"
           rotuloRolagem="Divergencias"
-          vazio="Nenhuma divergencia registrada."
+          vazio="Nenhuma divergência registrada."
           larguraAcoes={220}
           acoesLinha={(item) => (item.status === 'open' ? (
             <>
@@ -857,14 +857,14 @@ export default function FiscalDocumentDetail() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Registrar divergencia manual"
+        titulo="Registrar divergência manual"
         variante="secundario"
         recolhivel
         recolhidoPadrao
       >
         <form onSubmit={submitDivergence}>
           <FormSecao colunas={3}>
-            <CampoForm label="Tipo da divergencia">
+            <CampoForm label="Tipo da divergência">
               <select
                 className="input w-full"
                 value={divergenceForm.divergence_type}
@@ -884,7 +884,7 @@ export default function FiscalDocumentDetail() {
               </select>
             </CampoForm>
 
-            <CampoForm label="ID do vinculo fiscal" hint="Opcional.">
+            <CampoForm label="ID do vínculo fiscal" hint="Opcional.">
               <input
                 className="input w-full"
                 inputMode="numeric"
@@ -909,12 +909,12 @@ export default function FiscalDocumentDetail() {
               />
             </CampoForm>
 
-            <CampoForm label="Descricao" obrigatorio tipo="texto-longo">
+            <CampoForm label="Descrição" obrigatorio tipo="texto-longo">
               {/* R10: a altura vem da folha do sistema (textarea.input), não
                   do `min-h-[84px]` que estava aqui. */}
               <textarea
                 className="input w-full"
-                placeholder="Descricao da divergencia"
+                placeholder="Descrição da divergência"
                 value={divergenceForm.description}
                 onChange={(event) => updateDivergenceField('description', event.target.value)}
               />
@@ -930,7 +930,7 @@ export default function FiscalDocumentDetail() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Registrar vinculo manual"
+        titulo="Registrar vínculo manual"
         variante="secundario"
         recolhivel
         recolhidoPadrao={links.length > 0}
@@ -960,7 +960,7 @@ export default function FiscalDocumentDetail() {
             <CampoForm label="Busca" span={2}>
               <input
                 className="input w-full"
-                placeholder="Busque por nome, codigo, descricao, documento ou ID"
+                placeholder="Busque por nome, código, descrição, documento ou ID"
                 value={linkSearchQuery}
                 onChange={(event) => setLinkSearchQuery(event.target.value)}
               />
@@ -1013,7 +1013,7 @@ export default function FiscalDocumentDetail() {
             />
           ) : null}
 
-          <FormSecao legenda="Identificadores do vinculo" colunas={3}>
+          <FormSecao legenda="Identificadores do vínculo" colunas={3}>
             {LINK_SEARCH_TYPES.map((tipo) => (
               <CampoForm key={tipo.field} label={`ID ${tipo.label.toLowerCase()}`}>
                 <input
@@ -1025,7 +1025,7 @@ export default function FiscalDocumentDetail() {
               </CampoForm>
             ))}
 
-            <CampoForm label="Motivo ou observacao do vinculo" tipo="texto-longo">
+            <CampoForm label="Motivo ou observação do vínculo" tipo="texto-longo">
               <textarea
                 className="input w-full"
                 value={linkForm.matched_reason}
@@ -1076,7 +1076,7 @@ export default function FiscalDocumentDetail() {
             },
             {
               id: 'descricao',
-              titulo: 'Descricao',
+              titulo: 'Descrição',
               tipo: 'texto',
               render: (event) => (
                 <span title={event.event_description || undefined}>{event.event_description || '-'}</span>
@@ -1092,7 +1092,7 @@ export default function FiscalDocumentDetail() {
 
       <BlocoConteudo
         titulo="Dados extraidos"
-        descricao="Conteudo bruto lido do XML, para conferencia tecnica."
+        descricao="Conteudo bruto lido do XML, para conferência técnica."
         variante="secundario"
         recolhivel
         recolhidoPadrao

@@ -346,7 +346,7 @@ export default function SstCrudPage() {
     return (
       <Pagina className="sst-page">
         <PageHeader titulo={config.title} voltar={{ to: '/sst', title: 'Voltar ao painel SST' }} />
-        <div className="app-alert">Voce nao tem permissao para visualizar esta area do SST.</div>
+        <div className="app-alert">Você não tem permissão para visualizar esta área do SST.</div>
       </Pagina>
     );
   }
@@ -382,7 +382,7 @@ export default function SstCrudPage() {
     event.preventDefault();
     const cpfErro = getCpfCnpjError(form.responsavel_tecnico_cpf, {
       type: 'cpf',
-      label: 'CPF do responsavel tecnico'
+      label: 'CPF do responsável técnico'
     });
     setErroCpf(cpfErro || '');
     if (cpfErro) {
@@ -588,7 +588,7 @@ export default function SstCrudPage() {
           variante="primario"
           cor="var(--sem-info)"
           acoes={editing ? (
-            <button type="button" className="btn btn-outline btn-sm" onClick={resetForm}>Cancelar edicao</button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={resetForm}>Cancelar edição</button>
           ) : null}
         >
           <form onSubmit={submit}>
@@ -631,7 +631,7 @@ export default function SstCrudPage() {
           busca={visibilidadeFiltros.ehVisivel('search') ? {
             valor: filters.search,
             aoMudar: (valor) => setFilters((current) => ({ ...current, search: valor })),
-            placeholder: 'Nome, titulo, mensagem...'
+            placeholder: 'Nome, título, mensagem...'
           } : null}
           campos={(statusOpcoes.length ? [] : [{
             id: 'status',

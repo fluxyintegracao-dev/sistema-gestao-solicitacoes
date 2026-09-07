@@ -3,6 +3,7 @@ import { API_URL, authHeaders } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import OverlayModal from '../../components/ui/OverlayModal';
 import { Avisos, useAvisos, FormSecao, CampoForm } from '../../components/padrao';
+import DateInputBR from '../../components/DateInputBR';
 
 /**
  * R9 — atribuir responsável INTERROMPE o trabalho principal (a lista de
@@ -70,7 +71,7 @@ export default function ModalAtribuirResponsavel({
 
   async function salvar() {
     if (!usuarioSelecionado) {
-      avisar.erro('Selecione um usuario');
+      avisar.erro('Selecione um usuário');
       return;
     }
     if (exigirPrazoCompra && !prazoCompra) {
@@ -108,11 +109,11 @@ export default function ModalAtribuirResponsavel({
         `onSucesso()` (recarga) continua disparando no mesmo instante.
       */
       setSalvo(true);
-      avisar.sucesso('Responsavel atribuido com sucesso.', undefined, { persistente: true });
+      avisar.sucesso('Responsável atribuído com sucesso.', undefined, { persistente: true });
       onSucesso();
     } catch (erro) {
       console.error(erro);
-      avisar.erro('Erro ao atribuir responsavel');
+      avisar.erro('Erro ao atribuir responsável');
     } finally {
       setSalvando(false);
     }
@@ -122,13 +123,13 @@ export default function ModalAtribuirResponsavel({
 
   return (
     <OverlayModal
-      rotulo="Atribuir responsavel"
+      rotulo="Atribuir responsável"
       largura="var(--modal-max-w-sm, 480px)"
       onFechar={onClose}
     >
       <div data-modal="cabecalho" className="border-b border-[var(--c-border)] p-4">
         <h2 className="text-lg font-semibold text-[var(--c-text)]">
-          Atribuir responsavel
+          Atribuir responsável
         </h2>
         {regraSetor && (
           /*
@@ -147,14 +148,14 @@ export default function ModalAtribuirResponsavel({
         <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
         <FormSecao colunas={1}>
-          <CampoForm label="Responsavel" obrigatorio linha>
+          <CampoForm label="Responsável" obrigatorio linha>
             <select
               className="input"
               value={usuarioSelecionado}
               onChange={e => setUsuarioSelecionado(e.target.value)}
               disabled={salvo}
             >
-              <option value="">Selecione um usuario</option>
+              <option value="">Selecione um usuário</option>
 
               {usuarios.map(u => (
                 <option key={u.id} value={u.id}>
@@ -171,9 +172,8 @@ export default function ModalAtribuirResponsavel({
               linha
               hint="Este prazo alimenta a Delegacao de Compras."
             >
-              <input
+              <DateInputBR
                 className="input"
-                type="date"
                 value={prazoCompra}
                 onChange={e => setPrazoCompra(e.target.value)}
                 disabled={salvo}

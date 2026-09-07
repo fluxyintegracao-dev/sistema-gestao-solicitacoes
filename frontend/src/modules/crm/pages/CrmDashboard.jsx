@@ -72,7 +72,7 @@ export default function CrmDashboard() {
       <PageHeader
         titulo="Dashboard CRM"
         contagem={loading ? null : `${texto(leads.ativos)} lead(s) ativo(s)`}
-        descricao="Visao operacional em tempo real."
+        descricao="Visão operacional em tempo real."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -91,7 +91,7 @@ export default function CrmDashboard() {
             <StatTile label="Recebidos hoje" valor={texto(leads.hoje)} />
             <StatTile label="Recebidos esta semana" valor={texto(leads.semana)} />
             <StatTile label="Convertidos (total)" valor={texto(leads.convertidos)} tom="success" />
-            <StatTile label="Conversoes (7 dias)" valor={texto(leads.conversoesUltimos7Dias)} tom="success" />
+            <StatTile label="Conversões (7 dias)" valor={texto(leads.conversoesUltimos7Dias)} tom="success" />
             <StatTile label="Perdidos (total)" valor={texto(leads.perdidos)} tom="danger" />
           </StatGrid>
 
@@ -147,7 +147,7 @@ export default function CrmDashboard() {
               TabelaPadrao com o papel de cada coluna declarado.
             */}
             <BlocoConteudo
-              titulo="Distribuicao por status"
+              titulo="Distribuição por status"
               descricao="Onde a carteira esta parada no ciclo de vida do lead."
             >
               <TabelaPadrao
@@ -172,21 +172,21 @@ export default function CrmDashboard() {
                 itens={distribuicaoLifecycle}
                 semIdentidade
                 getId={(item) => item.lifecycle_status}
-                vazio="Nenhum dado disponivel."
+                vazio="Nenhum dado disponível."
                 storageKey="tabela:crm-dashboard:distribuicao-status"
                 rotuloRolagem="Distribuicao por status"
               />
             </BlocoConteudo>
 
             <BlocoConteudo
-              titulo="Backlog por responsavel"
-              descricao="Carteira ativa atribuida a cada usuario."
+              titulo="Backlog por responsável"
+              descricao="Carteira ativa atribuída a cada usuário."
             >
               <TabelaPadrao
                 colunas={[
                   {
                     id: 'responsavel',
-                    titulo: 'Responsavel',
+                    titulo: 'Responsável',
                     tipo: 'identidade',
                     noCard: 'titulo',
                     render: (item) => item.usuario?.nome || '—'
@@ -200,7 +200,7 @@ export default function CrmDashboard() {
                 ]}
                 itens={backlogPorResponsavel}
                 getId={(item) => item.usuario?.id || item.usuario?.nome}
-                vazio="Nenhum responsavel atribuido."
+                vazio="Nenhum responsável atribuído."
                 storageKey="tabela:crm-dashboard:backlog-responsavel"
                 rotuloRolagem="Backlog por responsavel"
               />

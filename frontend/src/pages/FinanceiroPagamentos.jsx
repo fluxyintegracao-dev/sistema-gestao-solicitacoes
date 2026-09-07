@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
@@ -57,10 +58,10 @@ import {
 } from '../components/padrao';
 
 const TABS = [
-  { id: 'titulos', label: 'Titulos elegiveis' },
+  { id: 'titulos', label: 'Títulos elegíveis' },
   { id: 'lotes', label: 'Lotes' },
   { id: 'baixas', label: 'Confirmar baixa', requiresConfirmBaixa: true },
-  { id: 'auditoria', label: 'Auditoria tecnica', requiresAudit: true }
+  { id: 'auditoria', label: 'Auditoria técnica', requiresAudit: true }
 ];
 
 const PAYMENT_EVENT_TYPES = [
@@ -73,7 +74,7 @@ const PAYMENT_EVENT_STATUSES = ['PENDENTE', 'PROCESSADO', 'ERRO'];
 
 const BATCH_STEPS = [
   { statuses: ['RASCUNHO'], label: 'Rascunho' },
-  { statuses: ['PENDENTE_APROVACAO'], label: 'Aprovacao' },
+  { statuses: ['PENDENTE_APROVACAO'], label: 'Aprovação' },
   { statuses: ['APROVADO', 'ENFILEIRADO', 'ENVIANDO'], label: 'Aprovado' },
   { statuses: ['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'ENVIO_INDETERMINADO'], label: 'Banco' },
   { statuses: ['AGUARDANDO_CONFIRMACAO_BAIXA', 'BAIXADO'], label: 'Baixa' }
@@ -685,11 +686,11 @@ export default function FinanceiroPagamentos() {
   async function handleCriarLote() {
     try {
       if (!selectedIds.length) {
-        avisar.erro('Selecione ao menos um titulo elegivel.');
+        avisar.erro('Selecione ao menos um título elegível.');
         return;
       }
       if (selectedTitulosAccountPendencies.length > 0) {
-        avisar.erro('Remova da selecao os titulos com pendencia operacional antes de gerar o lote.');
+        avisar.erro('Remova da seleção os títulos com pendência operacional antes de gerar o lote.');
         return;
       }
       setActionLoading('criar-lote');
@@ -793,7 +794,7 @@ export default function FinanceiroPagamentos() {
     const lote = selectedBatch;
     if (!lote?.id) return;
     if (cancelRequiresMfa && !String(mfaCode || '').trim()) {
-      avisar.erro('Informe o codigo MFA para cancelar lote pendente de aprovacao ou aprovado.');
+      avisar.erro('Informe o código MFA para cancelar lote pendente de aprovação ou aprovado.');
       return;
     }
 
@@ -821,7 +822,7 @@ export default function FinanceiroPagamentos() {
       mensagem: `O lote ${lote.codigo} — ${lote.quantidade_itens} item(ns), ${formatCurrency(lote.valor_total)} — será rejeitado e não segue para o banco. Esta ação não pode ser desfeita: depois dela o lote só volta ao fluxo por reprocessamento.`,
       rotuloConfirmar: 'Rejeitar lote',
       destrutiva: true,
-      campo: { rotulo: 'Motivo da rejeicao', obrigatorio: true, multilinha: true }
+      campo: { rotulo: 'Motivo da rejeição', obrigatorio: true, multilinha: true }
     });
     if (!ok) return;
 
@@ -875,7 +876,7 @@ export default function FinanceiroPagamentos() {
       <PageHeader
         titulo="Pagamentos em Massa"
         contagem={loading ? null : `${batches.length} lote(s)`}
-        descricao="Motor interno para lotes PIX por chave, com aprovacao por MFA, integracao Banco do Brasil e baixa semiautomatica."
+        descricao="Motor interno para lotes PIX por chave, com aprovação por MFA, integração Banco do Brasil e baixa semiautomatica."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar',
           onClick: loadBase,
@@ -889,7 +890,7 @@ export default function FinanceiroPagamentos() {
       <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
       <div className="solicitacoes-toolbar">
-        <div className="finance-category-toggle-group" role="tablist" aria-label="Navegacao de pagamentos">
+        <div className="finance-category-toggle-group" role="tablist" aria-label="Navegação de pagamentos">
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}
@@ -910,7 +911,7 @@ export default function FinanceiroPagamentos() {
           contexto que ninguém pode perder de vista, porque separa "sai
           dinheiro de verdade" de "mock interno".
         */}
-        <span className={isBbSandbox ? 'badge badge-success' : 'badge badge-muted'} title={`Modo de envio bancario: ${isBbSandbox ? bbModoLabel : 'mock interno'}`}>
+        <span className={isBbSandbox ? 'badge badge-success' : 'badge badge-muted'} title={`Modo de envio bancário: ${isBbSandbox ? bbModoLabel : 'mock interno'}`}>
           {isBbSandbox ? bbAmbienteLabel : 'MOCK'}
         </span>
       </div>
@@ -935,7 +936,7 @@ export default function FinanceiroPagamentos() {
             className="card sol-surface-card text-left transition hover:-translate-y-0.5 hover:border-[var(--c-primary)]"
             onClick={() => setActiveTab(canAudit ? 'auditoria' : 'lotes')}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Aguardando aprovacao</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">Aguardando aprovação</p>
             <p className="mt-2 text-lg font-semibold text-[var(--c-text)]">{paymentOverview.pendingApprovalCount}</p>
             <p className="mt-1 text-sm text-[var(--c-muted)]">{formatCurrency(paymentOverview.pendingApprovalValue)} pendente de dupla conferencia.</p>
           </button>
@@ -1002,18 +1003,18 @@ export default function FinanceiroPagamentos() {
                 avisa que a lista só muda ali.
               */}
               <BlocoConteudo
-                titulo="Selecao para lote"
+                titulo="Seleção para lote"
                 variante="secundario"
-                descricao="Contas a pagar abertas/parciais aparecem para conferencia; so entram no lote os titulos com favorecido PIX completo e conta pagadora valida. Os filtros abaixo sao rascunho: a lista so muda quando voce clicar em Buscar elegiveis."
+                descricao="Contas a pagar abertas/parciais aparecem para conferência; so entram no lote os títulos com favorecido PIX completo e conta pagadora valida. Os filtros abaixo são rascunho: a lista so muda quando você clicar em Buscar elegíveis."
               >
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
                   <label className="sol-filter-field xl:col-span-2">
-                    <span className="sol-filter-label">Vencimento inicio</span>
-                    <input className="input w-full" type="date" value={filters.vencimento_inicial} onChange={(e) => setFilters((c) => ({ ...c, vencimento_inicial: e.target.value }))} />
+                    <span className="sol-filter-label">Vencimento início</span>
+                    <DateInputBR className="input w-full" value={filters.vencimento_inicial} onChange={(e) => setFilters((c) => ({ ...c, vencimento_inicial: e.target.value }))} />
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
                     <span className="sol-filter-label">Vencimento fim</span>
-                    <input className="input w-full" type="date" value={filters.vencimento_final} onChange={(e) => setFilters((c) => ({ ...c, vencimento_final: e.target.value }))} />
+                    <DateInputBR className="input w-full" value={filters.vencimento_final} onChange={(e) => setFilters((c) => ({ ...c, vencimento_final: e.target.value }))} />
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
                     <span className="sol-filter-label">Parceiro ID</span>
@@ -1094,7 +1095,7 @@ export default function FinanceiroPagamentos() {
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
                     <span className="sol-filter-label">Data pagamento</span>
-                    <input className="input w-full" type="date" min={today()} value={batchForm.data_programada} onChange={(e) => setBatchForm((c) => ({ ...c, data_programada: e.target.value }))} />
+                    <DateInputBR className="input w-full" min={today()} value={batchForm.data_programada} onChange={(e) => setBatchForm((c) => ({ ...c, data_programada: e.target.value }))} />
                   </label>
                 </div>
                 {canPrepare && (
@@ -1115,7 +1116,7 @@ export default function FinanceiroPagamentos() {
                 )}
                 {selectedTitulosAccountPendencies.length > 0 && (
                   <div className="mt-3 rounded-lg border border-[var(--sem-danger-border)] bg-[var(--sem-danger-bg)] px-3 py-2 text-sm text-[var(--sem-danger)]">
-                    Remova da selecao os titulos com pendencia operacional antes de gerar o lote:
+                    Remova da seleção os títulos com pendência operacional antes de gerar o lote:
                     {' '}
                     {selectedTitulosAccountPendencies.map(({ titulo }) => getTituloCodigo(titulo)).join(', ')}.
                   </div>
@@ -1127,7 +1128,7 @@ export default function FinanceiroPagamentos() {
                       <strong className="text-[var(--c-text)]">{titulosOverview.total}</strong>
                     </div>
                     <div>
-                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Elegiveis</span>
+                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Elegíveis</span>
                       <strong className="text-[var(--sem-success)]">{titulosOverview.eligibleCount}</strong>
                     </div>
                     <div>
@@ -1135,7 +1136,7 @@ export default function FinanceiroPagamentos() {
                       <strong className={titulosOverview.operationalBlockedCount ? 'text-[var(--sem-warning)]' : 'text-[var(--sem-success)]'}>{titulosOverview.compatibleCount}</strong>
                     </div>
                     <div>
-                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Com pendencia</span>
+                      <span className="block text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Com pendência</span>
                       <strong className={titulosOverview.blockedCount ? 'text-[var(--sem-warning)]' : 'text-[var(--c-text)]'}>{titulosOverview.blockedCount}</strong>
                     </div>
                     <div>
@@ -1147,14 +1148,14 @@ export default function FinanceiroPagamentos() {
               </BlocoConteudo>
 
               <BlocoConteudo
-                titulo="Titulos elegiveis"
+                titulo="Títulos elegíveis"
                 variante="primario"
                 cor="var(--module-financeiro)"
                 contagem={titulos.length ? `${titulos.length} titulo(s)` : null}
-                descricao="Marque os titulos que realmente devem ser pagos neste lote."
+                descricao="Marque os títulos que realmente devem ser pagos neste lote."
               >
                 {titulos.length === 0 ? (
-                  <div className="app-empty-card">Busque titulos a pagar para montar o primeiro lote.</div>
+                  <div className="app-empty-card">Busque títulos a pagar para montar o primeiro lote.</div>
                 ) : (
                   <>
                     {/* O "selecionar todos" morava no <th>; o cabeçalho da
@@ -1164,12 +1165,12 @@ export default function FinanceiroPagamentos() {
                     <label className="mb-3 flex items-center gap-2 text-sm text-[var(--c-muted)]">
                       <input
                         type="checkbox"
-                        aria-label="Selecionar todos os titulos elegiveis"
+                        aria-label="Selecionar todos os títulos elegíveis"
                         checked={allSelectableTitulosSelected}
                         disabled={!selectableTitulosIds.length}
                         onChange={toggleTodosTitulosElegiveis}
                       />
-                      Selecionar todos os titulos elegiveis
+                      Selecionar todos os títulos elegíveis
                     </label>
                     <TabelaPadrao
                       colunas={[
@@ -1185,13 +1186,13 @@ export default function FinanceiroPagamentos() {
                               checked={selectedIds.map(String).includes(String(titulo.id))}
                               disabled={!(titulo.elegivel_pagamento && getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount).length === 0)}
                               onChange={() => toggleTitulo(titulo.id)}
-                              aria-label={`Selecionar titulo ${getTituloCodigo(titulo)}`}
+                              aria-label={`Selecionar título ${getTituloCodigo(titulo)}`}
                             />
                           )
                         },
                         {
                           id: 'titulo',
-                          titulo: 'Titulo',
+                          titulo: 'Título',
                           tipo: 'codigo',
                           render: (titulo) => (
                             <div>
@@ -1230,7 +1231,7 @@ export default function FinanceiroPagamentos() {
                       // A linha destacada em âmbar do markup antigo: título com
                       // pendência vira tarja de atenção da própria tabela.
                       urgencia={(titulo) => (titulo.elegivel_pagamento && getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount).length === 0 ? null : 'warning')}
-                      vazio="Busque titulos a pagar para montar o primeiro lote."
+                      vazio="Busque títulos a pagar para montar o primeiro lote."
                       storageKey="tabela:financeiro-pagamentos:titulos"
                       rotuloRolagem="Titulos a pagar elegiveis"
                     />
@@ -1278,7 +1279,7 @@ export default function FinanceiroPagamentos() {
                 descricao={selectedBatch ? null : 'Escolha um lote na lista ao lado.'}
               >
                 {!selectedBatch ? (
-                  <div className="app-empty-card">Selecione um lote para revisar aprovacoes, envio e itens.</div>
+                  <div className="app-empty-card">Selecione um lote para revisar aprovações, envio e itens.</div>
                 ) : (
                   <div className="space-y-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1316,7 +1317,7 @@ export default function FinanceiroPagamentos() {
                     <div className="grid gap-3 md:grid-cols-[minmax(180px,260px)_1fr]">
                       <input
                         className="input w-full"
-                        placeholder="Codigo MFA"
+                        placeholder="Código MFA"
                         value={mfaCode}
                         onChange={(e) => setMfaCode(e.target.value)}
                       />
@@ -1385,16 +1386,16 @@ export default function FinanceiroPagamentos() {
                     )}
                     {selectedBatch.status === 'APROVADO' && !batchCapabilities.is_creator && (
                       <div className="app-note">
-                        Somente o usuario que criou este lote pode envia-lo ao banco depois da aprovacao.
+                        Somente o usuário que criou este lote pode envia-lo ao banco depois da aprovação.
                       </div>
                     )}
 
                     <div className="grid gap-4 lg:grid-cols-2">
                       <div>
-                        <h3 className="text-sm font-semibold text-[var(--c-text)]">Aprovacoes</h3>
+                        <h3 className="text-sm font-semibold text-[var(--c-text)]">Aprovações</h3>
                         <div className="mt-2 app-list-stack">
                           {(selectedBatch.approvals || []).length === 0 ? (
-                            <div className="app-note">Nenhuma aprovacao registrada.</div>
+                            <div className="app-note">Nenhuma aprovação registrada.</div>
                           ) : selectedBatch.approvals.map((approval) => (
                             <div key={approval.id} className="app-list-card text-sm">
                               <div className="flex justify-between gap-3">
@@ -1407,7 +1408,7 @@ export default function FinanceiroPagamentos() {
                         </div>
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-[var(--c-text)]">Tentativas tecnicas</h3>
+                        <h3 className="text-sm font-semibold text-[var(--c-text)]">Tentativas técnicas</h3>
                         <div className="mt-2 app-list-stack">
                           {(bbTransactions.length ? bbTransactions : selectedBatch.transactions || []).length === 0 ? (
                             <div className="app-note">Nenhuma tentativa registrada.</div>
@@ -1427,7 +1428,7 @@ export default function FinanceiroPagamentos() {
                     <TabelaPadrao
                       colunas={[
                         { id: 'item', titulo: 'Item', tipo: 'numero', render: (item) => item.sequencia },
-                        { id: 'titulo', titulo: 'Titulo', tipo: 'codigo', render: (item) => getTituloCodigo(item.intent?.titulo) },
+                        { id: 'titulo', titulo: 'Título', tipo: 'codigo', render: (item) => getTituloCodigo(item.intent?.titulo) },
                         {
                           id: 'favorecido',
                           titulo: 'Favorecido',
@@ -1478,7 +1479,7 @@ export default function FinanceiroPagamentos() {
               variante="primario"
               cor="var(--module-financeiro)"
               contagem={`${awaitingBaixa.length} pagamento(s)`}
-              descricao="Somente pagamentos confirmados pelo banco viram baixa financeira no titulo."
+              descricao="Somente pagamentos confirmados pelo banco viram baixa financeira no título."
             >
               {awaitingBaixa.length === 0 ? (
                 <div className="app-empty-card">Nenhum pagamento confirmado pelo banco aguardando baixa.</div>
@@ -1529,9 +1530,9 @@ export default function FinanceiroPagamentos() {
                 no clique de "Consultar eventos".
               */}
               <BlocoConteudo
-                titulo="Eventos tecnicos"
+                titulo="Eventos técnicos"
                 variante="secundario"
-                descricao="Consulta para investigar provider, webhook, polling e respostas bancarias sem acionar baixa financeira. Os filtros abaixo sao rascunho: a lista so muda quando voce clicar em Consultar eventos."
+                descricao="Consulta para investigar provider, webhook, polling e respostas bancárias sem acionar baixa financeira. Os filtros abaixo são rascunho: a lista so muda quando você clicar em Consultar eventos."
               >
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
                   <label className="sol-filter-field xl:col-span-2">
@@ -1566,11 +1567,11 @@ export default function FinanceiroPagamentos() {
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
                     <span className="sol-filter-label">Recebido de</span>
-                    <input className="input w-full" type="date" value={eventFilters.data_inicio} onChange={(e) => setEventFilters((c) => ({ ...c, data_inicio: e.target.value }))} />
+                    <DateInputBR className="input w-full" value={eventFilters.data_inicio} onChange={(e) => setEventFilters((c) => ({ ...c, data_inicio: e.target.value }))} />
                   </label>
                   <label className="sol-filter-field xl:col-span-2">
-                    <span className="sol-filter-label">Recebido ate</span>
-                    <input className="input w-full" type="date" value={eventFilters.data_fim} onChange={(e) => setEventFilters((c) => ({ ...c, data_fim: e.target.value }))} />
+                    <span className="sol-filter-label">Recebido até</span>
+                    <DateInputBR className="input w-full" value={eventFilters.data_fim} onChange={(e) => setEventFilters((c) => ({ ...c, data_fim: e.target.value }))} />
                   </label>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -1601,14 +1602,14 @@ export default function FinanceiroPagamentos() {
               </BlocoConteudo>
 
               <BlocoConteudo
-                titulo="Trilha tecnica"
+                titulo="Trilha técnica"
                 variante="primario"
                 cor="var(--module-financeiro)"
                 contagem={paymentEvents.length ? `${paymentEvents.length} evento(s)` : null}
-                descricao="Evento tecnico nao substitui baixa financeira."
+                descricao="Evento técnico não substitui baixa financeira."
               >
                 {paymentEvents.length === 0 ? (
-                  <div className="app-empty-card">Nenhum evento tecnico encontrado para os filtros atuais.</div>
+                  <div className="app-empty-card">Nenhum evento técnico encontrado para os filtros atuais.</div>
                 ) : (
                   <TabelaPadrao
                     colunas={[
@@ -1639,7 +1640,7 @@ export default function FinanceiroPagamentos() {
                       },
                       {
                         id: 'referencia',
-                        titulo: 'Referencia',
+                        titulo: 'Referência',
                         tipo: 'codigo',
                         render: (event) => (
                           <div>
@@ -1665,7 +1666,7 @@ export default function FinanceiroPagamentos() {
                       { id: 'resumo', titulo: 'Resumo', tipo: 'texto', render: (event) => <span className="text-[var(--c-muted)]">{getEventPayloadSummary(event)}</span> }
                     ]}
                     itens={paymentEvents}
-                    vazio="Nenhum evento tecnico encontrado para os filtros atuais."
+                    vazio="Nenhum evento técnico encontrado para os filtros atuais."
                     storageKey="tabela:financeiro-pagamentos:eventos"
                     rotuloRolagem="Eventos tecnicos de pagamento"
                   />

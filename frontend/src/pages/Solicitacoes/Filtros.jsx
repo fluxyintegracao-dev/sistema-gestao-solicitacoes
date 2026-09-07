@@ -79,14 +79,14 @@ const FILTROS_DISPONIVEIS = [
   { id: 'status', rotulo: 'Status' },
   { id: 'obra_ids', rotulo: 'Obra' },
   { id: 'area', rotulo: 'Setor' },
-  { id: 'tipo_solicitacao_id', rotulo: 'Tipo de solicitacao' },
-  { id: 'codigo', rotulo: 'Codigo da solicitacao', padrao: false },
-  { id: 'numero_sienge', rotulo: 'Numero do pedido', padrao: false },
-  { id: 'valor_min', rotulo: 'Valor minimo', padrao: false },
-  { id: 'valor_max', rotulo: 'Valor maximo', padrao: false },
+  { id: 'tipo_solicitacao_id', rotulo: 'Tipo de solicitação' },
+  { id: 'codigo', rotulo: 'Código da solicitação', padrao: false },
+  { id: 'numero_sienge', rotulo: 'Número do pedido', padrao: false },
+  { id: 'valor_min', rotulo: 'Valor mínimo', padrao: false },
+  { id: 'valor_max', rotulo: 'Valor máximo', padrao: false },
   { id: 'data_registro', rotulo: 'Data de registro', padrao: false },
-  { id: 'data_vencimento', rotulo: 'Periodo Data Resposta/Pagamento', padrao: false },
-  { id: 'responsavel', rotulo: 'Responsavel', padrao: false }
+  { id: 'data_vencimento', rotulo: 'Período Data Resposta/Pagamento', padrao: false },
+  { id: 'responsavel', rotulo: 'Responsável', padrao: false }
 ];
 
 /* A identidade da lista no banco. Sem o usuário no nome, e isso é o

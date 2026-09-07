@@ -19,6 +19,7 @@ import {
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 import { canViewFinanceiroRelatorio, hasPermissao } from '../utils/acessoProduto';
+import DateInputBR from '../components/DateInputBR';
 
 const FinanceiroExecutivoGrupo = lazy(() => import('./FinanceiroExecutivoGrupo'));
 const FinanceiroFluxoConsolidado = lazy(() => import('./FinanceiroFluxoConsolidado'));
@@ -347,7 +348,7 @@ function FluxoComparativoCard({ serie }) {
               className={`finance-chart-toggle ${mode === 'SALDO' ? 'finance-chart-toggle--active' : ''}`}
               onClick={() => setMode('SALDO')}
             >
-              Saldo do periodo
+              Saldo do período
             </button>
           </div>
 
@@ -365,7 +366,7 @@ function FluxoComparativoCard({ serie }) {
       </div>
 
       {!serie.length ? (
-        <div className="finance-chart-empty">Nenhum movimento encontrado no periodo selecionado.</div>
+        <div className="finance-chart-empty">Nenhum movimento encontrado no período selecionado.</div>
       ) : (
         <>
           <div className="finance-chart-stats">
@@ -396,7 +397,7 @@ function FluxoComparativoCard({ serie }) {
               viewBox={`0 0 ${geometry.width} ${geometry.height}`}
               className="finance-chart-svg"
               role="img"
-              aria-label={`${modeConfig.title} em formato de grafico`}
+              aria-label={`${modeConfig.title} em formato de gráfico`}
             >
               <defs>
                 <filter id="finance-chart-previsto-glow" x="-30%" y="-30%" width="160%" height="160%">
@@ -605,13 +606,13 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
           </label>
           <label className="app-filter-field min-w-32">
             <span className="app-filter-label">Data inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial}
+            <DateInputBR className="input w-full input-sm" value={filters.data_inicial}
               disabled={filters.periodo !== 'PERSONALIZADO'}
               onChange={(e) => setFilters((c) => ({ ...c, data_inicial: e.target.value }))} />
           </label>
           <label className="app-filter-field min-w-32">
             <span className="app-filter-label">Data final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final}
+            <DateInputBR className="input w-full input-sm" value={filters.data_final}
               disabled={filters.periodo !== 'PERSONALIZADO'}
               onChange={(e) => setFilters((c) => ({ ...c, data_final: e.target.value }))} />
           </label>
@@ -677,7 +678,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
           detail={`${relatorio.resumo.titulos_previstos} titulo(s) no periodo`}
         />
         <RelatorioMetric
-          label="Saidas previstas"
+          label="Saídas previstas"
           value={formatCurrency(relatorio.resumo.saidas_previstas)}
           detail="Baseado no saldo atual dos titulos"
         />
@@ -699,7 +700,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
           detail="Recebimentos baixados"
         />
         <RelatorioMetric
-          label="Saidas realizadas"
+          label="Saídas realizadas"
           value={formatCurrency(relatorio.resumo.saidas_realizadas)}
           detail="Pagamentos baixados"
         />
@@ -734,7 +735,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
 
       {loading ? (
         <div className="app-empty-card">
-          Carregando relatorio de fluxo de caixa...
+          Carregando relatório de fluxo de caixa...
         </div>
       ) : (
         <>
@@ -745,17 +746,17 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
           {isVisible('financeiro.fluxo_caixa.detalhamento') ? (
           <section className="card sol-surface-card app-table-shell">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Detalhamento por periodo</h2>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Detalhamento por período</h2>
               <p className="text-sm text-[var(--c-muted)]">
-                Serie consolidada para acompanhar entradas, saidas e saldo acumulado.
+                Série consolidada para acompanhar entradas, saídas e saldo acumulado.
               </p>
             </div>
 
             <TabelaPadrao
               colunas={[
-                { id: 'periodo', titulo: 'Periodo', tipo: 'data', noCard: 'titulo', render: (item) => item.label },
+                { id: 'periodo', titulo: 'Período', tipo: 'data', noCard: 'titulo', render: (item) => item.label },
                 { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (item) => formatCurrency(item.entradas_previstas) },
-                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (item) => formatCurrency(item.saidas_previstas) },
+                { id: 'saidas_previstas', titulo: 'Saídas previstas', tipo: 'valor', render: (item) => formatCurrency(item.saidas_previstas) },
                 {
                   id: 'saldo_previsto',
                   titulo: 'Saldo previsto',
@@ -768,7 +769,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
                 },
                 { id: 'acumulado_previsto', titulo: 'Acumulado previsto', tipo: 'valor', render: (item) => formatCurrency(item.saldo_previsto_acumulado) },
                 { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (item) => formatCurrency(item.entradas_realizadas) },
-                { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (item) => formatCurrency(item.saidas_realizadas) },
+                { id: 'saidas_realizadas', titulo: 'Saídas realizadas', tipo: 'valor', render: (item) => formatCurrency(item.saidas_realizadas) },
                 {
                   id: 'saldo_realizado',
                   titulo: 'Saldo realizado',
@@ -785,7 +786,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
               getId={(item) => item.referencia}
               storageKey="tabela:financeiro-relatorios:detalhamento-periodo"
               rotuloRolagem="Detalhamento por periodo"
-              vazio="Nenhum dado encontrado para o periodo selecionado."
+              vazio="Nenhum dado encontrado para o período selecionado."
               // R17: linha e periodo x totais da serie — nao existe registro
               // nomeado nesta tabela, so a competencia temporal.
               semIdentidade
@@ -829,15 +830,15 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
     <form className="card sol-surface-card p-4 financeiro-conta-report-filters" onSubmit={onSubmit}>
       <div className="financeiro-conta-report-filter-grid">
         <label className="field">
-          <span>Periodo</span>
+          <span>Período</span>
           <select
             value={filters.periodo}
             onChange={(event) => setFilters((current) => ({ ...current, periodo: event.target.value }))}
           >
-            <option value="MES_ATUAL">Mes atual</option>
+            <option value="MES_ATUAL">Mês atual</option>
             <option value="HOJE">Hoje</option>
-            <option value="30_DIAS">Proximos 30 dias</option>
-            <option value="90_DIAS">Proximos 90 dias</option>
+            <option value="30_DIAS">Próximos 30 dias</option>
+            <option value="90_DIAS">Próximos 90 dias</option>
             <option value="PERSONALIZADO">Personalizado</option>
           </select>
         </label>
@@ -854,26 +855,26 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
               </select>
             </label>
             <label className="field">
-              <span>Tipo de vinculo</span>
+              <span>Tipo de vínculo</span>
               <select value={filters.tipo_conciliacao} onChange={(event) => setFilters((current) => ({ ...current, tipo_conciliacao: event.target.value }))}>
                 <option value="TODOS">Todos os tipos</option>
-                <option value="TRANSFERENCIA">Transferencias</option>
-                <option value="TITULO">Titulos</option>
-                <option value="FATURA_CARTAO">Faturas de cartao</option>
-                <option value="TARIFA">Tarifas bancarias</option>
+                <option value="TRANSFERENCIA">Transferências</option>
+                <option value="TITULO">Títulos</option>
+                <option value="FATURA_CARTAO">Faturas de cartão</option>
+                <option value="TARIFA">Tarifas bancárias</option>
                 <option value="ESTORNO_TARIFA">Estornos de tarifa</option>
-                <option value="ESTORNO_BANCARIO">Estornos bancarios</option>
-                <option value="CREDITO_ROTATIVO">Credito rotativo</option>
+                <option value="ESTORNO_BANCARIO">Estornos bancários</option>
+                <option value="CREDITO_ROTATIVO">Crédito rotativo</option>
                 <option value="MOVIMENTO">Outros movimentos</option>
-                <option value="SEM_VINCULO">Sem vinculo</option>
+                <option value="SEM_VINCULO">Sem vínculo</option>
               </select>
             </label>
             <label className="field">
               <span>Natureza</span>
               <select value={filters.natureza} onChange={(event) => setFilters((current) => ({ ...current, natureza: event.target.value }))}>
-                <option value="TODAS">Entradas e saidas</option>
+                <option value="TODAS">Entradas e saídas</option>
                 <option value="ENTRADA">Entradas</option>
-                <option value="SAIDA">Saidas</option>
+                <option value="SAIDA">Saídas</option>
               </select>
             </label>
             <label className="field md:col-span-2">
@@ -881,7 +882,7 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
               <input
                 type="search"
                 value={filters.busca}
-                placeholder="Descricao, documento ou identificador OFX"
+                placeholder="Descrição, documento ou identificador OFX"
                 onChange={(event) => setFilters((current) => ({ ...current, busca: event.target.value }))}
               />
             </label>
@@ -889,8 +890,7 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
         ) : null}
         <label className="field">
           <span>Data inicial</span>
-          <input
-            type="date"
+          <DateInputBR
             value={filters.data_inicial}
             disabled={filters.periodo !== 'PERSONALIZADO'}
             onChange={(event) => setFilters((current) => ({ ...current, data_inicial: event.target.value }))}
@@ -898,15 +898,14 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
         </label>
         <label className="field">
           <span>Data final</span>
-          <input
-            type="date"
+          <DateInputBR
             value={filters.data_final}
             disabled={filters.periodo !== 'PERSONALIZADO'}
             onChange={(event) => setFilters((current) => ({ ...current, data_final: event.target.value }))}
           />
         </label>
         <label className="field">
-          <span>Conta bancaria</span>
+          <span>Conta bancária</span>
           <select
             value={filters.conta_bancaria_id}
             onChange={(event) => setFilters((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
@@ -1054,13 +1053,13 @@ function ContaReportShell({ title, subtitle, type }) {
                 <RelatorioMetric label="Conciliados" value={resumo.conciliados || 0} positive />
                 <RelatorioMetric label="Pendentes" value={resumo.pendentes || 0} positive={Number(resumo.pendentes || 0) === 0} />
                 <RelatorioMetric label="Ignorados/removidos" value={`${resumo.ignorados || 0}/${resumo.removidos || 0}`} />
-                <RelatorioMetric label="Transferencias" value={resumo.transferencias || 0} />
+                <RelatorioMetric label="Transferências" value={resumo.transferencias || 0} />
               </>
             ) : (
               <>
                 <RelatorioMetric label="Entradas" value={formatCurrency(resumo.entradas)} positive />
-                <RelatorioMetric label="Saidas" value={formatCurrency(resumo.saidas)} positive={false} />
-                <RelatorioMetric label="Saldo liquido" value={formatCurrency(resumo.saldo_liquido)} positive={Number(resumo.saldo_liquido || 0) >= 0} />
+                <RelatorioMetric label="Saídas" value={formatCurrency(resumo.saidas)} positive={false} />
+                <RelatorioMetric label="Saldo líquido" value={formatCurrency(resumo.saldo_liquido)} positive={Number(resumo.saldo_liquido || 0) >= 0} />
                 <RelatorioMetric label="Permutas" value={formatCurrency(resumo.permutas)} detail="Separadas do caixa bancario" />
               </>
             )}
@@ -1068,7 +1067,7 @@ function ContaReportShell({ title, subtitle, type }) {
 
           <section className="card sol-surface-card p-4 financeiro-report-card">
             <div className="mb-3">
-              <h3 className="text-lg font-semibold text-[var(--c-text)]">Sintetico por conta</h3>
+              <h3 className="text-lg font-semibold text-[var(--c-text)]">Sintético por conta</h3>
               <p className="text-xs text-[var(--c-muted)]">{relatorio.filtro?.descricao || 'Periodo selecionado'}</p>
             </div>
             <TabelaPadrao
@@ -1104,7 +1103,7 @@ function ContaReportShell({ title, subtitle, type }) {
                 },
                 {
                   id: 'status',
-                  titulo: 'Observacao',
+                  titulo: 'Observação',
                   tipo: 'texto',
                   render: (item) => <span className="text-[var(--c-muted)]">{observacaoSintetico(item, type)}</span>
                 }
@@ -1118,7 +1117,7 @@ function ContaReportShell({ title, subtitle, type }) {
           </section>
 
           <section className="card sol-surface-card p-4 financeiro-report-card">
-            <h3 className="mb-3 text-lg font-semibold text-[var(--c-text)]">Analitico</h3>
+            <h3 className="mb-3 text-lg font-semibold text-[var(--c-text)]">Analítico</h3>
             <TabelaPadrao
               colunas={[
                 { id: 'data', titulo: 'Data', tipo: 'data', render: (item) => formatDate(item.data_movimento) },
@@ -1172,7 +1171,7 @@ function ContaReportShell({ title, subtitle, type }) {
                   tipo: 'valor',
                   render: (item) => <span className={`font-semibold ${getCurrencyTone(item.saldo_movimento)}`}>{formatCurrency(item.saldo_movimento)}</span>
                 }] : []),
-                { id: 'descricao', titulo: 'Descricao', tipo: 'texto', render: (item) => descricaoAnalitico(item) }
+                { id: 'descricao', titulo: 'Descrição', tipo: 'texto', render: (item) => descricaoAnalitico(item) }
               ]}
               itens={analitico}
               storageKey={`tabela:financeiro-relatorios:${type}-analitico`}
@@ -1205,7 +1204,7 @@ function ContaReportShell({ title, subtitle, type }) {
       */}
       {estornoModal.open ? (
         <OverlayModal
-          rotulo="Estornar conciliacao bancaria"
+          rotulo="Estornar conciliação bancária"
           largura="var(--modal-max-w-md, 640px)"
           onFechar={estornoModal.processing
             ? undefined
@@ -1220,7 +1219,7 @@ function ContaReportShell({ title, subtitle, type }) {
             que é exatamente para isto.
           */}
           <div data-modal="cabecalho" className="border-b border-[var(--c-border)] p-4">
-            <h3 className="text-lg font-semibold text-[var(--c-text)]">Estornar conciliacao bancaria</h3>
+            <h3 className="text-lg font-semibold text-[var(--c-text)]">Estornar conciliação bancária</h3>
             <p className="mt-1 text-sm text-[var(--c-muted)]">
               {estornoModal.item?.tipo_conciliacao === 'TRANSFERENCIA'
                   ? 'A transferencia sera cancelada e os lancamentos OFX vinculados voltarao para pendente.'
@@ -1245,7 +1244,7 @@ function ContaReportShell({ title, subtitle, type }) {
                 </span>
               </div>
               <p className="text-sm text-[var(--c-muted)]">
-                O estorno fica registrado na auditoria e nao pode ser desfeito por esta tela.
+                O estorno fica registrado na auditoria e não pode ser desfeito por esta tela.
               </p>
               <label className="block text-sm">
                 <span className="mb-1 block font-medium">Motivo do estorno *</span>
@@ -1274,7 +1273,7 @@ function MovimentacaoContasRelatorioConteudo() {
   return (
     <ContaReportShell
       type="movimentacao"
-      title="Movimentacao de contas"
+      title="Movimentação de contas"
       subtitle="Relatorio sintetico e analitico das movimentacoes por conta bancaria, separando permutas do caixa."
     />
   );
@@ -1284,7 +1283,7 @@ function ConciliacaoContasRelatorioConteudo() {
   return (
     <ContaReportShell
       type="conciliacao"
-      title="Conciliacao bancaria"
+      title="Conciliação bancária"
       subtitle="Relatorio sintetico e analitico dos movimentos importados, conciliados, pendentes, ignorados e removidos."
     />
   );
@@ -1503,12 +1502,12 @@ export default function FinanceiroRelatorios() {
     return (
       <Pagina className="financeiro-relatorios-page">
         <PageHeader
-          titulo="Relatorios Financeiros"
-          descricao="Nenhum relatorio liberado para o seu acesso."
+          titulo="Relatórios Financeiros"
+          descricao="Nenhum relatório liberado para o seu acesso."
         />
         <div className="empty-state">
-          <strong>Nenhum relatorio financeiro liberado.</strong>
-          <span>Solicite ao administrador a permissao granular para acessar relatorios financeiros.</span>
+          <strong>Nenhum relatório financeiro liberado.</strong>
+          <span>Solicite ao administrador a permissão granular para acessar relatórios financeiros.</span>
         </div>
       </Pagina>
     );
@@ -1545,7 +1544,7 @@ export default function FinanceiroRelatorios() {
         />
 
         <div className="financeiro-relatorios-content">
-          <Suspense fallback={<div className="app-empty-card">Carregando relatorio...</div>}>
+          <Suspense fallback={<div className="app-empty-card">Carregando relatório...</div>}>
             <SelectedReportComponent isVisible={isVisible} embutido />
           </Suspense>
         </div>
@@ -1579,15 +1578,15 @@ export default function FinanceiroRelatorios() {
         redirecionamento.
       */}
       <PageHeader
-        titulo="Relatorios Financeiros"
-        contagem={`${availableReports.length} relatorio(s) liberado(s)`}
-        descricao="Escolha um relatorio na coluna lateral e trabalhe no painel principal sem perder contexto."
+        titulo="Relatórios Financeiros"
+        contagem={`${availableReports.length} relatório(s) liberado(s)`}
+        descricao="Escolha um relatório na coluna lateral e trabalhe no painel principal sem perder contexto."
       />
 
       <div className="financeiro-relatorios-layout grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="card sol-surface-card financeiro-relatorios-sidebar h-fit xl:sticky xl:top-4">
           <div className="border-b border-[var(--c-border)] px-4 py-4">
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Relatorios</h2>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Relatórios</h2>
             {/*
               R16/F1 — UMA busca por contexto, ocupando a largura da faixa
               do bloco (.app-busca: cresce entre 220 e 480px). A contagem
@@ -1598,8 +1597,8 @@ export default function FinanceiroRelatorios() {
             <input
               type="search"
               className="input app-busca mt-3 w-full input-sm"
-              aria-label="Buscar relatorio"
-              placeholder="Buscar relatorio..."
+              aria-label="Buscar relatório"
+              placeholder="Buscar relatório..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -1617,7 +1616,7 @@ export default function FinanceiroRelatorios() {
               ))
             ) : (
               <div className="rounded-2xl border border-dashed border-[var(--c-border)] px-4 py-6 text-sm text-[var(--c-muted)]">
-                Nenhum relatorio encontrado para essa busca.
+                Nenhum relatório encontrado para essa busca.
               </div>
             )}
           </div>
@@ -1644,7 +1643,7 @@ export default function FinanceiroRelatorios() {
             título escrito duas vezes (R16/B3). Quem não conhece a prop
             simplesmente a ignora — nenhum contrato muda (R21).
           */}
-          <Suspense fallback={<div className="app-empty-card">Carregando relatorio...</div>}>
+          <Suspense fallback={<div className="app-empty-card">Carregando relatório...</div>}>
             <SelectedReportComponent isVisible={isVisible} embutido />
           </Suspense>
         </section>

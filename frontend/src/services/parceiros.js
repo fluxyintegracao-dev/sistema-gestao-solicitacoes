@@ -1,9 +1,10 @@
 import { API_URL, authHeaders } from './api';
+import { mensagemDeErro } from './erroDeResposta';
 
 async function parseJson(response, fallbackMessage) {
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(text || fallbackMessage);
+    throw new Error(mensagemDeErro(text, fallbackMessage, response.status));
   }
 
   return text ? JSON.parse(text) : null;
@@ -17,7 +18,7 @@ function getFilenameFromDisposition(disposition, fallback) {
 async function downloadResponse(response, fallbackName, fallbackMessage) {
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || fallbackMessage);
+    throw new Error(mensagemDeErro(text, fallbackMessage, response.status));
   }
 
   const blob = await response.blob();

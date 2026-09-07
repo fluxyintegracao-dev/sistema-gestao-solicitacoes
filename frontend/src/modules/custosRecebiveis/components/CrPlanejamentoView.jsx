@@ -1,3 +1,4 @@
+import DateInputBR from '../../../components/DateInputBR';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   HiOutlineCheckCircle,
@@ -1742,8 +1743,7 @@ export default function CrPlanejamentoView({
                     tipo: 'texto',
                     render: (item) => (item.__vazio ? null : (
                       <>
-                        <input
-                          type="date"
+                        <DateInputBR
                           aria-label="Data da medição"
                           value={item.data_medicao || ''}
                           disabled={!permissions.measurement}

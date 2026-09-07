@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -1243,7 +1244,7 @@ export default function NovaSolicitacao() {
       }
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao buscar referencia de contrato');
+      avisar.erro('Erro ao buscar referência de contrato');
     }
   }
 
@@ -1427,7 +1428,7 @@ export default function NovaSolicitacao() {
     // Apropriação automática da obra: não há campo na tela (ela é resolvida
     // pelo servidor a partir da obra + tipo).
     if (usaApropriacaoAutomaticaObra && apropriacaoAutomatica.status === 'loading') {
-      avisar.alerta('Aguarde a conferencia da apropriacao automatica da obra.');
+      avisar.alerta('Aguarde a conferência da apropriação automática da obra.');
       return;
     }
     if (usaApropriacaoAutomaticaObra && !apropriacaoAutomatica.apropriacao) {
@@ -1538,19 +1539,19 @@ export default function NovaSolicitacao() {
       // Os dados de pagamento sao cobrados aqui tambem para a pessoa nao descobrir depois de montar
       // a medicao inteira. Quem recusa de verdade e o servidor.
       const pgto = medicaoContratoDados?.pagamento || {};
-      if (!pgto.forma_pagamento_id) { avisar.alerta('Informe a forma de pagamento da medicao.'); return; }
-      if (!pgto.favorecido_id) { avisar.alerta('Informe o favorecido desta medicao.'); return; }
+      if (!pgto.forma_pagamento_id) { avisar.alerta('Informe a forma de pagamento da medição.'); return; }
+      if (!pgto.favorecido_id) { avisar.alerta('Informe o favorecido desta medição.'); return; }
       if (pgto.via_pix && !String(pgto.favorecido_chave_pix || '').trim()) {
         avisar.alerta('Informe a chave PIX do favorecido.'); return;
       }
       if (pgto.via_boleto && !String(pgto.boleto_anexo_nome || '').trim()) {
-        avisar.alerta('Anexe o boleto desta medicao.'); return;
+        avisar.alerta('Anexe o boleto desta medição.'); return;
       }
       if (!pgto.via_pix && !pgto.via_boleto && !String(pgto.favorecido_contato || '').trim()) {
-        avisar.alerta('Informe os dados para pagamento desta medicao.'); return;
+        avisar.alerta('Informe os dados para pagamento desta medição.'); return;
       }
       if (!pgto.dados_confirmados) {
-        avisar.alerta('Confirme que os dados de pagamento estao corretos antes de enviar a medicao.'); return;
+        avisar.alerta('Confirme que os dados de pagamento estão corretos antes de enviar a medição.'); return;
       }
     }
 
@@ -1677,7 +1678,7 @@ export default function NovaSolicitacao() {
       // backend cobra de novo na aprovacao — este aviso existe para a pessoa nao descobrir depois
       // de o contrato ja estar criado.
       if (!d.negociacao_arquivo) {
-        avisar.alerta('Anexe o documento da negociacao detalhada: ele e obrigatorio em todo contrato.'); return;
+        avisar.alerta('Anexe o documento da negociação detalhada: ele e obrigatório em todo contrato.'); return;
       }
       if (acimaDoLimite) {
         const documentosObrigatorios = [
@@ -1733,7 +1734,7 @@ export default function NovaSolicitacao() {
           const cpfConjugeErro = getCpfCnpjError(conjuge.cpf, {
             required: true,
             type: 'cpf',
-            label: 'CPF do conjuge'
+            label: 'CPF do cônjuge'
           });
           if (cpfConjugeErro) {
             avisar.alerta(cpfConjugeErro); return;
@@ -2311,7 +2312,7 @@ export default function NovaSolicitacao() {
                     Cadastrar credor
                   </button>
                 ) : (
-                  <span>Solicite ao setor de Gerencia de Processo o cadastro do credor.</span>
+                  <span>Solicite ao setor de Gerência de Processo o cadastro do credor.</span>
                 )}
               </div>
             )}
@@ -2908,7 +2909,7 @@ export default function NovaSolicitacao() {
                   background: 'var(--sem-warning-bg)',
                   color: 'var(--c-text)'
                 }}
-                aria-label="Medicao aguardando retorno da solicitacao"
+                aria-label="Medição aguardando retorno da solicitação"
                 data-testid="contrato-medicao-fora-setor"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2954,7 +2955,7 @@ export default function NovaSolicitacao() {
                 {!contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente
                   && !contratoSelecionado?.contexto_interacao?.pode_solicitar_retorno && (
                   <p className="mt-2 border-t pt-2 text-xs" style={{ borderColor: 'var(--sem-warning-border)' }}>
-                    Seu usuario pode visualizar o contrato, mas nao possui permissao para solicitar o retorno.
+                    Seu usuário pode visualizar o contrato, mas não possui permissão para solicitar o retorno.
                   </p>
                 )}
 
@@ -2971,7 +2972,7 @@ export default function NovaSolicitacao() {
                           motivo: event.target.value,
                           erro: ''
                         }))}
-                        placeholder="Ex.: preciso registrar a medicao deste periodo e anexar os documentos."
+                        placeholder="Ex.: preciso registrar a medição deste período e anexar os documentos."
                         maxLength={2000}
                         autoFocus
                       />
@@ -3010,7 +3011,7 @@ export default function NovaSolicitacao() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-[var(--c-text)]">
-                      Apropriacoes do contrato
+                      Apropriações do contrato
                       {apropriacoesContratoObrigatorias ? <span className="text-[var(--c-danger)]"> *</span> : null}
                     </p>
                     <p className="text-xs text-[var(--c-muted)]">
@@ -3026,7 +3027,7 @@ export default function NovaSolicitacao() {
 
                 {apropriacoesContratoRateio.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
-                    Este contrato ainda nao possui apropriacoes estruturadas cadastradas.
+                    Este contrato ainda não possui apropriações estruturadas cadastradas.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -3061,7 +3062,7 @@ export default function NovaSolicitacao() {
                             alterarApropriacaoContratoRateio(index, 'percentual', e.target.value);
                           }}
                           placeholder="%"
-                          aria-label={`Percentual da apropriacao ${item.codigo || item.apropriacao_id}`}
+                          aria-label={`Percentual da apropriação ${item.codigo || item.apropriacao_id}`}
                           disabled={!item.selecionado}
                         />
                         <input
@@ -3072,7 +3073,7 @@ export default function NovaSolicitacao() {
                             atualizarValorRateioContrato(index, e.target.value);
                           }}
                           placeholder="Valor R$"
-                          aria-label={`Valor em reais da apropriacao ${item.codigo || item.apropriacao_id}`}
+                          aria-label={`Valor em reais da apropriação ${item.codigo || item.apropriacao_id}`}
                           disabled={!item.selecionado}
                         />
                       </div>
@@ -3114,7 +3115,7 @@ export default function NovaSolicitacao() {
         {podeSolicitarAditivo && (
           <BlocoConteudo
             titulo="Termo aditivo"
-            descricao="Acrescenta valor ao contrato selecionado, com limite de 25% do valor original. Entra como pendente e nao interfere nesta medicao."
+            descricao="Acrescenta valor ao contrato selecionado, com limite de 25% do valor original. Entra como pendente e não interfere nesta medição."
           >
             <div className="app-actionbar">
               <button
@@ -3189,7 +3190,7 @@ export default function NovaSolicitacao() {
 
               {exibirCampoApropriacao && (
                 <CampoForm
-                  label="Apropriacao da Solicitacao na Obra"
+                  label="Apropriação da Solicitação na Obra"
                   obrigatorio={exigeApropriacaoPrincipal}
                   linha
                   erro={errosCampo.apropriacao}
@@ -3220,7 +3221,7 @@ export default function NovaSolicitacao() {
                     />
                   )}
                   {form.obra_id && apropriacoes.length === 0 && (
-                    <span className="form-hint">Nenhuma apropriacao ativa encontrada para esta obra.</span>
+                    <span className="form-hint">Nenhuma apropriação ativa encontrada para esta obra.</span>
                   )}
                 </CampoForm>
               )}
@@ -3296,7 +3297,7 @@ export default function NovaSolicitacao() {
                         }));
                       }}
                     />
-                    <span>Confirmo que esta e uma despesa pontual, esporadica e nao recorrente.</span>
+                    <span>Confirmo que esta e uma despesa pontual, esporadica e não recorrente.</span>
                   </label>
                   <label className="flex items-start gap-2 text-sm">
                     <input
@@ -3310,7 +3311,7 @@ export default function NovaSolicitacao() {
                         }));
                       }}
                     />
-                    <span>Confirmo que a despesa nao caracteriza vinculo ou necessidade de contrato.</span>
+                    <span>Confirmo que a despesa não caracteriza vínculo ou necessidade de contrato.</span>
                   </label>
                   <label className="flex items-start gap-2 text-sm">
                     <input
@@ -3324,7 +3325,7 @@ export default function NovaSolicitacao() {
                         }));
                       }}
                     />
-                    <span>Confirmo que a despesa nao foi fracionada para se enquadrar no limite.</span>
+                    <span>Confirmo que a despesa não foi fracionada para se enquadrar no limite.</span>
                   </label>
                   {errosCampo.despesa_declaracoes ? (
                     <p className="form-error" role="alert">{errosCampo.despesa_declaracoes}</p>
@@ -3338,9 +3339,8 @@ export default function NovaSolicitacao() {
                   obrigatorio={dataVencimentoExigida}
                   erro={errosCampo.data_vencimento}
                 >
-                  <input
+                  <DateInputBR
                     name="data_vencimento"
-                    type="date"
                     onChange={handleChange}
                     className="input input-sm"
                     value={form.data_vencimento}
@@ -3352,13 +3352,12 @@ export default function NovaSolicitacao() {
 
               {exibirDataDemissao && (
                 <CampoForm
-                  label="Data de demissao"
+                  label="Data de demissão"
                   obrigatorio={dataDemissaoObrigatoria}
                   erro={errosCampo.data_demissao}
                 >
-                  <input
+                  <DateInputBR
                     name="data_demissao"
-                    type="date"
                     onChange={handleChange}
                     className="input input-sm"
                     value={form.data_demissao}
@@ -3396,9 +3395,8 @@ export default function NovaSolicitacao() {
                     obrigatorio={medicaoObrigatoria}
                     erro={errosCampo.periodo_medicao}
                   >
-                    <input
+                    <DateInputBR
                       name="data_inicio_medicao"
-                      type="date"
                       onChange={(event) => { limparErroCampo('periodo_medicao'); handleChange(event); }}
                       className="input input-sm"
                       value={form.data_inicio_medicao}
@@ -3406,9 +3404,8 @@ export default function NovaSolicitacao() {
                     />
                   </CampoForm>
                   <CampoForm label="Data final (Medição)" obrigatorio={medicaoObrigatoria}>
-                    <input
+                    <DateInputBR
                       name="data_fim_medicao"
-                      type="date"
                       onChange={(event) => { limparErroCampo('periodo_medicao'); handleChange(event); }}
                       className="input input-sm"
                       value={form.data_fim_medicao}
@@ -3569,7 +3566,7 @@ export default function NovaSolicitacao() {
           <div className="mt-3 rounded-lg border border-[var(--c-border)]">
           {credoresContratoModalFiltrados.length === 0 ? (
             <div className="p-4 text-sm text-[var(--c-muted)]">
-              Nenhum credor disponivel para a busca informada.
+              Nenhum credor disponível para a busca informada.
             </div>
           ) : (
             credoresContratoModalFiltrados.map((credor) => {
@@ -3624,7 +3621,7 @@ export default function NovaSolicitacao() {
             Informe os dados principais para vincular o credor a esta solicitação.
           </p>
 
-          <FormSecao legenda="Identificacao" colunas={2}>
+          <FormSecao legenda="Identificação" colunas={2}>
             <CampoForm label="CPF/CNPJ" obrigatorio>
               <input
                 className="input input-sm"
@@ -3661,8 +3658,8 @@ export default function NovaSolicitacao() {
               evita que o contrato acima do limite pare na conferencia depois. */}
           <BlocoConteudo
             variante="secundario"
-            titulo="Endereco do credor"
-            descricao="Obrigatorio: contrato acima do limite vai ao Juridico, e a minuta precisa identificar e localizar a parte."
+            titulo="Endereço do credor"
+            descricao="Obrigatório: contrato acima do limite vai ao Jurídico, e a minuta precisa identificar e localizar a parte."
           >
             <FormSecao colunas={3}>
               <CampoForm label="Logradouro" obrigatorio span={2}>
@@ -3670,7 +3667,7 @@ export default function NovaSolicitacao() {
                   value={novoParceiro.endereco}
                   onChange={e => setNovoParceiro(prev => ({ ...prev, endereco: e.target.value }))} />
               </CampoForm>
-              <CampoForm label="Numero" obrigatorio>
+              <CampoForm label="Número" obrigatorio>
                 <input className="input input-sm" name="novo_credor_numero"
                   value={novoParceiro.numero}
                   onChange={e => setNovoParceiro(prev => ({ ...prev, numero: e.target.value }))} />
@@ -3706,7 +3703,7 @@ export default function NovaSolicitacao() {
           <BlocoConteudo
             variante="secundario"
             titulo="Chaves PIX opcionais"
-            descricao="Cadastre ate duas chaves fixas e uma chave variavel para uso financeiro."
+            descricao="Cadastre até duas chaves fixas e uma chave variável para uso financeiro."
           >
             <FormSecao colunas={2}>
               <CampoForm label="Chave PIX fixa 1 — tipo">
@@ -3749,7 +3746,7 @@ export default function NovaSolicitacao() {
                 />
               </CampoForm>
 
-              <CampoForm label="Chave PIX variavel — tipo">
+              <CampoForm label="Chave PIX variável — tipo">
                 <select
                   className="input input-sm"
                   value={novoParceiro.pix_chave_variavel_tipo}
@@ -3760,7 +3757,7 @@ export default function NovaSolicitacao() {
                   ))}
                 </select>
               </CampoForm>
-              <CampoForm label="Chave PIX variavel">
+              <CampoForm label="Chave PIX variável">
                 <input
                   className="input input-sm"
                   value={novoParceiro.pix_chave_variavel}
@@ -3780,15 +3777,15 @@ export default function NovaSolicitacao() {
             forçada para maiúsculas; lá em cima, não). Remover é decisão do
             cliente, então ficam; o defeito vai no relatório.
           */}
-          <FormSecao legenda="Endereco (segunda entrada, ja existente na tela)" colunas={2}>
-            <CampoForm label="Endereco">
+          <FormSecao legenda="Endereço (segunda entrada, já existente na tela)" colunas={2}>
+            <CampoForm label="Endereço">
               <input
                 className="input input-sm"
                 value={novoParceiro.endereco}
                 onChange={e => setNovoParceiro(prev => ({ ...prev, endereco: e.target.value }))}
               />
             </CampoForm>
-            <CampoForm label="Numero">
+            <CampoForm label="Número">
               <input
                 className="input input-sm"
                 value={novoParceiro.numero}

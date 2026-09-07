@@ -85,8 +85,8 @@ function extractErrorMessage(error) {
   pedido.
 */
 const FILTROS_DA_TELA = [
-  { id: 'data_inicio', rotulo: 'Cotacao criada de' },
-  { id: 'data_fim', rotulo: 'Cotacao criada ate' },
+  { id: 'data_inicio', rotulo: 'Cotação criada de' },
+  { id: 'data_fim', rotulo: 'Cotação criada até' },
   { id: 'obra_id', rotulo: 'Obra / Centro de custo' }
 ];
 
@@ -252,9 +252,9 @@ export default function ComprasRelatorioPendenciasCotacoes() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Pendencias de Cotacoes"
-        contagem="Compras / Relatorios"
-        descricao="Cotacoes sem minimo de respostas e fornecedores com prazo vencido sem resposta."
+        titulo="Pendências de Cotações"
+        contagem="Compras / Relatórios"
+        descricao="Cotações sem mínimo de respostas e fornecedores com prazo vencido sem resposta."
         /* R11: o caminho de volta ao hub de relatórios continua existindo,
            mas na seta do cabeçalho — não como botão na barra de ações, onde
            navegação se veste de ação (C6). */
@@ -274,14 +274,14 @@ export default function ComprasRelatorioPendenciasCotacoes() {
           campos={[
             {
               id: 'data_inicio',
-              rotulo: 'Cotacao criada de',
+              rotulo: 'Cotação criada de',
               tipo: 'date',
               valor: filtros.data_inicio,
               aoMudar: (valor) => mudarCampo('data_inicio', valor)
             },
             {
               id: 'data_fim',
-              rotulo: 'Cotacao criada ate',
+              rotulo: 'Cotação criada até',
               tipo: 'date',
               valor: filtros.data_fim,
               aoMudar: (valor) => mudarCampo('data_fim', valor)
@@ -296,23 +296,23 @@ export default function ComprasRelatorioPendenciasCotacoes() {
       </BlocoConteudo>
 
       <StatGrid colunas={5}>
-        <StatTile label="Cotacoes" valor={formatNumber(resumo.cotacoes)} sub="Com fornecedores enviados" />
+        <StatTile label="Cotações" valor={formatNumber(resumo.cotacoes)} sub="Com fornecedores enviados" />
         <StatTile
-          label="Sem minimo"
+          label="Sem mínimo"
           valor={formatNumber(resumo.cotacoes_sem_minimo)}
-          sub={`Minimo atual: ${formatNumber(resumo.minimo_cotacoes)}`}
+          sub={`Mínimo atual: ${formatNumber(resumo.minimo_cotacoes)}`}
           tom={Number(resumo.cotacoes_sem_minimo || 0) > 0 ? 'warning' : undefined}
         />
         <StatTile
           label="Prazo vencido"
           valor={formatNumber(resumo.cotacoes_com_prazo_vencido)}
-          sub="Cotacoes com fornecedor atrasado"
+          sub="Cotações com fornecedor atrasado"
           tom={Number(resumo.cotacoes_com_prazo_vencido || 0) > 0 ? 'danger' : undefined}
         />
         <StatTile
           label="Fornecedores vencidos"
           valor={formatNumber(resumo.fornecedores_vencidos_sem_resposta)}
-          sub="Sem resposta ate o prazo"
+          sub="Sem resposta até o prazo"
           tom={Number(resumo.fornecedores_vencidos_sem_resposta || 0) > 0 ? 'danger' : undefined}
         />
         <StatTile label="Taxa resposta" valor={formatPercent(resumo.taxa_resposta)} sub="Respondidos sobre enviados" />
@@ -332,9 +332,9 @@ export default function ComprasRelatorioPendenciasCotacoes() {
             coluna fixa — sem erro nenhum no console. O BlocoConteudo não
             recorta; onde precisar cortar, o idioma é `overflow: clip`. */}
         <BlocoConteudo
-          titulo="Cotacoes com pendencias"
+          titulo="Cotações com pendências"
           contagem="Top 100"
-          descricao="Cotacoes priorizadas por prazo vencido e falta de respostas minimas."
+          descricao="Cotações priorizadas por prazo vencido e falta de respostas mínimas."
           variante="primario"
           cor="var(--c-primary)"
         >
@@ -342,7 +342,7 @@ export default function ComprasRelatorioPendenciasCotacoes() {
             colunas={[
               {
                 id: 'cotacao',
-                titulo: 'Cotacao',
+                titulo: 'Cotação',
                 // R17: a cotacao (SC) NOMEIA o registro.
                 tipo: 'identidade',
                 noCard: 'titulo',
@@ -352,7 +352,7 @@ export default function ComprasRelatorioPendenciasCotacoes() {
                   </Link>
                 )
               },
-              { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
+              { id: 'titulo', titulo: 'Título', tipo: 'texto', render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.titulo || '-'}</span> },
               { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
               {
                 id: 'status',
@@ -364,7 +364,7 @@ export default function ComprasRelatorioPendenciasCotacoes() {
               { id: 'respostas', titulo: 'Respostas', tipo: 'numero', render: (item) => `${formatNumber(item.fornecedores_respondidos)} / ${formatNumber(item.minimo_cotacoes)}` },
               {
                 id: 'pendencias',
-                titulo: 'Pendencias',
+                titulo: 'Pendências',
                 tipo: 'badge',
                 /*
                   R25: o `PendenciaBadge` local cravava a paleta do Tailwind
@@ -388,7 +388,7 @@ export default function ComprasRelatorioPendenciasCotacoes() {
             carregando={loading}
             storageKey="tabela:compras-pendencias-cotacoes:cotacoes"
             rotuloRolagem="Cotacoes com pendencias"
-            vazio="Sem cotacoes com fornecedores nos filtros."
+            vazio="Sem cotações com fornecedores nos filtros."
           />
         </BlocoConteudo>
 
@@ -401,7 +401,7 @@ export default function ComprasRelatorioPendenciasCotacoes() {
               colunas={[
                 {
                   id: 'cotacao',
-                  titulo: 'Cotacao',
+                  titulo: 'Cotação',
                   tipo: 'codigo',
                   render: (item) => (
                     <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.cotacao_id}`}>
@@ -432,8 +432,8 @@ export default function ComprasRelatorioPendenciasCotacoes() {
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Pendencias por obra/centro"
-            descricao="Onde estao concentradas cotacoes sem minimo e com prazo vencido."
+            titulo="Pendências por obra/centro"
+            descricao="Onde estão concentradas cotações sem mínimo e com prazo vencido."
           >
             <TabelaPadrao
               colunas={[
@@ -445,8 +445,8 @@ export default function ComprasRelatorioPendenciasCotacoes() {
                   noCard: 'titulo',
                   render: (item) => item.obra_nome
                 },
-                { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes) },
-                { id: 'sem_minimo', titulo: 'Sem minimo', tipo: 'numero', render: (item) => formatNumber(item.sem_minimo) },
+                { id: 'cotacoes', titulo: 'Cotações', tipo: 'numero', render: (item) => formatNumber(item.cotacoes) },
+                { id: 'sem_minimo', titulo: 'Sem mínimo', tipo: 'numero', render: (item) => formatNumber(item.sem_minimo) },
                 { id: 'vencidas', titulo: 'Vencidas', tipo: 'numero', render: (item) => formatNumber(item.vencidas) }
               ]}
               itens={obrasResumo}
@@ -454,7 +454,7 @@ export default function ComprasRelatorioPendenciasCotacoes() {
               carregando={loading}
               storageKey="tabela:compras-pendencias-cotacoes:obras"
               rotuloRolagem="Pendencias por obra/centro"
-              vazio="Sem pendencias por obra/centro."
+              vazio="Sem pendências por obra/centro."
             />
           </BlocoConteudo>
         </div>

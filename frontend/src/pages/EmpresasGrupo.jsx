@@ -235,7 +235,7 @@ export default function EmpresasGrupo() {
       <PageHeader
         titulo="Empresas do Grupo"
         contagem={carregando ? null : `${empresas.length} empresa(s)`}
-        descricao="Cadastro central usado por financeiro, pagamentos, RH/DP e demais modulos multiempresa."
+        descricao="Cadastro central usado por financeiro, pagamentos, RH/DP e demais módulos multiempresa."
         acaoPrincipal={{ rotulo: 'Nova empresa', onClick: abrirNovaEmpresa }}
       />
 

@@ -444,7 +444,7 @@ export default function CustosRecebiveis() {
       (plano) => Number(plano.id) === Number(planId)
     )?.versao;
     const { ok } = await confirmar({
-      titulo: 'Publicar versao do plano micro',
+      titulo: 'Publicar versão do plano micro',
       mensagem: `Publicar ${versaoAlvo ? `a versao v${versaoAlvo}` : 'esta versao'} da obra ${obraAlvo?.nome || obraAlvo?.codigo || 'selecionada'}? Ela substitui a versao vigente para todos que consultam custos, recebiveis e medicoes desta obra.`,
       rotuloConfirmar: 'Publicar versao'
     });
@@ -542,20 +542,20 @@ export default function CustosRecebiveis() {
       */
       <Pagina className="cr-page">
         <PageHeader
-          titulo="Custos e Recebiveis"
+          titulo="Custos e Recebíveis"
           /* C2 (matriz): mesmo o estado sem area liberada carrega apoio na
              faixa — quem chega aqui precisa saber POR QUE a tela esta vazia,
              e o apoio e o unico lugar que sobrevive a rolagem. A contagem e
              um NUMERO (zero areas), nao um adjetivo: e o que a C2 mede. */
-          contagem="0 area(s) liberada(s)"
-          descricao="Solicite ao administrador pelo menos uma permissao de visualizacao deste modulo."
+          contagem="0 área(s) liberada(s)"
+          descricao="Solicite ao administrador pelo menos uma permissão de visualização deste módulo."
         />
-        <BlocoConteudo titulo="Nenhuma area do modulo foi liberada">
+        <BlocoConteudo titulo="Nenhuma área do módulo foi liberada">
           <div className="cr-empty-state cr-empty-state--large">
             {/* R10: `h-7 w-7` (28px) não é degrau da escala — 24px é. */}
             <HiOutlineChartBarSquare className="h-6 w-6" />
-            <strong>Nenhuma area do modulo foi liberada</strong>
-            <span>Solicite ao administrador pelo menos uma permissao de visualizacao.</span>
+            <strong>Nenhuma área do módulo foi liberada</strong>
+            <span>Solicite ao administrador pelo menos uma permissão de visualização.</span>
           </div>
         </BlocoConteudo>
       </Pagina>
@@ -587,7 +587,7 @@ export default function CustosRecebiveis() {
         onde a pessoa está, sem ocupar o lugar de um número que não é.
       */}
       <PageHeader
-        titulo="Custos e Recebiveis"
+        titulo="Custos e Recebíveis"
         contagem={`${obras.length} obra(s)`}
         descricao={`${abaAtual?.label ? `${abaAtual.label} · ` : ''}Planeje o mes, acompanhe medicoes e compare com os lancamentos financeiros.`}
         secundarias={[{
@@ -699,8 +699,8 @@ export default function CustosRecebiveis() {
         título dizendo o que ele governa.
       */
       <BlocoConteudo
-        titulo="Contexto do modulo"
-        descricao="Obra e competencia valem para as areas abaixo."
+        titulo="Contexto do módulo"
+        descricao="Obra e competência valem para as áreas abaixo."
       >
       <section className="cr-context-bar" aria-label="Contexto do módulo">
         <label className="cr-field">

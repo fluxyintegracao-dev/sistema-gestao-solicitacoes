@@ -244,7 +244,7 @@ export default function CrmAdminNumeros() {
         await criarNumeroCrm(form);
       }
       resetForm();
-      avisar.sucesso('Numero salvo.');
+      avisar.sucesso('Número salvo.');
       await load();
     } catch (err) {
       avisar.erro(err.message || 'Erro ao salvar numero');
@@ -268,7 +268,7 @@ export default function CrmAdminNumeros() {
     const numero = item;
     const identificacao = `${numero.label || ''} ${numero.country_code || ''} ${numero.phone_number || ''}`.trim();
     const { ok } = await confirmar({
-      titulo: 'Excluir numero CRM',
+      titulo: 'Excluir número CRM',
       mensagem: `Excluir o numero ${identificacao}? Mensagens e ligacoes que chegavam por ele deixam de ser recebidas. Esta acao nao pode ser desfeita.`,
       rotuloConfirmar: 'Excluir numero',
       destrutiva: true
@@ -276,7 +276,7 @@ export default function CrmAdminNumeros() {
     if (!ok) return;
     try {
       await excluirNumeroCrm(numero.id);
-      avisar.sucesso('Numero excluido.');
+      avisar.sucesso('Número excluído.');
       await load();
     } catch (err) {
       avisar.erro(err.message || 'Erro ao excluir numero');
@@ -292,7 +292,7 @@ export default function CrmAdminNumeros() {
   const colunas = [
     {
       id: 'numero',
-      titulo: 'Numero',
+      titulo: 'Número',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (item) => (
@@ -361,7 +361,7 @@ export default function CrmAdminNumeros() {
     },
     {
       id: 'notes',
-      titulo: 'Observacoes',
+      titulo: 'Observações',
       tipo: 'texto',
       // T6: texto longo trunca com o texto completo no tooltip.
       render: (item) => <span title={item.notes || undefined}>{item.notes || '-'}</span>
@@ -383,10 +383,10 @@ export default function CrmAdminNumeros() {
     <Pagina>
       {/* R13/R5/C1: título, contagem e apoio na faixa fixa do PageHeader. */}
       <PageHeader
-        titulo="Numeros CRM"
+        titulo="Números CRM"
         contagem={loading ? null : `${listaFiltrada.length} numero(s)`}
-        descricao="Separe numero institucional, operacional, tracking e destino."
-        acaoPrincipal={{ rotulo: 'Novo numero', onClick: novoNumero }}
+        descricao="Separe número institucional, operacional, tracking e destino."
+        acaoPrincipal={{ rotulo: 'Novo número', onClick: novoNumero }}
         secundarias={[{ rotulo: 'Atualizar', onClick: load, desabilitada: loading }]}
       />
 
@@ -399,14 +399,14 @@ export default function CrmAdminNumeros() {
       */}
       <BlocoConteudo titulo={editingId ? 'Editar numero' : 'Novo numero'}>
         <form onSubmit={submit} className="space-y-4">
-          <FormSecao legenda="Identificacao" colunas={4}>
-            <CampoForm label="Identificacao" obrigatorio>
+          <FormSecao legenda="Identificação" colunas={4}>
+            <CampoForm label="Identificação" obrigatorio>
               <input ref={campoLabelRef} className="input w-full" value={form.label} onChange={updateField('label')} required />
             </CampoForm>
             <CampoForm label="DDI">
               <input className="input w-full" value={form.country_code} onChange={updateField('country_code')} />
             </CampoForm>
-            <CampoForm label="Numero" obrigatorio>
+            <CampoForm label="Número" obrigatorio>
               <input className="input w-full" value={form.phone_number} onChange={updateField('phone_number')} required />
             </CampoForm>
             <CampoForm label="Papel">
@@ -437,7 +437,7 @@ export default function CrmAdminNumeros() {
             <CampoForm label="Encaminhar para">
               <input className="input w-full" value={form.forward_to_phone} onChange={updateField('forward_to_phone')} />
             </CampoForm>
-            <CampoForm label="Observacoes">
+            <CampoForm label="Observações">
               <input className="input w-full" value={form.notes} onChange={updateField('notes')} />
             </CampoForm>
 
@@ -470,15 +470,15 @@ export default function CrmAdminNumeros() {
               {saving ? 'Salvando...' : editingId ? 'Salvar numero' : 'Criar numero'}
             </button>
             {editingId ? (
-              <button type="button" className="btn btn-outline" onClick={resetForm}>Cancelar edicao</button>
+              <button type="button" className="btn btn-outline" onClick={resetForm}>Cancelar edição</button>
             ) : null}
           </div>
         </form>
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Numeros cadastrados"
-        descricao="Base de numeros que o CRM usa para receber, rastrear e encaminhar."
+        titulo="Números cadastrados"
+        descricao="Base de números que o CRM usa para receber, rastrear e encaminhar."
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -487,7 +487,7 @@ export default function CrmAdminNumeros() {
           busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((prev) => ({ ...prev, q: valor })),
-            placeholder: 'Buscar identificacao, numero, provider ou observacao'
+            placeholder: 'Buscar identificação, número, provider ou observação'
           } : null}
           filtros={[
             {

@@ -12,15 +12,15 @@ import {
 
 const CRITERIOS = [
   { value: 'menor_total', label: 'Menor total da proposta' },
-  { value: 'menor_item', label: 'Menor preco por item' },
+  { value: 'menor_item', label: 'Menor preço por item' },
   { value: 'fornecedor_preferencial', label: 'Fornecedor preferencial' }
 ];
 
 const CONDICOES_PAGAMENTO = [
   { value: 'PIX', label: 'PIX' },
   { value: 'BOLETO', label: 'Boleto' },
-  { value: 'TRANSFERENCIA', label: 'Transferencia' },
-  { value: 'CARTAO', label: 'Cartao' },
+  { value: 'TRANSFERENCIA', label: 'Transferência' },
+  { value: 'CARTAO', label: 'Cartão' },
   { value: 'CHEQUE', label: 'Cheque' },
   { value: 'DINHEIRO', label: 'Dinheiro' },
   { value: 'FATURADO', label: 'Faturado' },

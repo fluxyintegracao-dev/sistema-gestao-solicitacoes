@@ -39,8 +39,8 @@ import {
 
 const STATUS = [
   { value: 'MATCH_EXATO', label: 'Correspondencia exata' },
-  { value: 'AMBIGUO', label: 'Mais de um titulo' },
-  { value: 'SEM_TITULO', label: 'Sem titulo localizado' },
+  { value: 'AMBIGUO', label: 'Mais de um título' },
+  { value: 'SEM_TITULO', label: 'Sem título localizado' },
   { value: 'DIVERGENTE', label: 'Dados divergentes' },
   { value: 'VINCULADO', label: 'Vinculado' },
   { value: 'IGNORADO', label: 'Ignorado' }
@@ -88,7 +88,7 @@ function date(value) {
 const FILTROS_DA_TELA = [
   { id: 'q', rotulo: 'Busca', obrigatorio: true },
   { id: 'data_inicio', rotulo: 'Vencimento de' },
-  { id: 'data_fim', rotulo: 'Vencimento ate' },
+  { id: 'data_fim', rotulo: 'Vencimento até' },
   { id: 'status', rotulo: 'Status' }
 ];
 
@@ -256,7 +256,7 @@ export default function FinanceiroDda() {
       <PageHeader
         titulo="DDA Banco do Brasil"
         contagem={`${total} documento(s)`}
-        descricao="Conferencia de boletos apresentados, correspondencia com contas a pagar e trilha de decisao."
+        descricao="Conferência de boletos apresentados, correspondencia com contas a pagar e trilha de decisão."
         acaoPrincipal={canSync ? {
           rotulo: actionId === 'sync' ? 'Sincronizando...' : 'Sincronizar BB',
           onClick: sync,
@@ -287,7 +287,7 @@ export default function FinanceiroDda() {
         cor="var(--sem-warning)"
       >
         <p className="text-sm text-[var(--c-muted)]">
-          A consulta real sera habilitada quando o adapter DDA estiver configurado com os
+          A consulta real será habilitada quando o adapter DDA estiver configurado com os
           endpoints e escopos liberados na aplicacao BB existente. Nenhum titulo e criado,
           vinculado ou pago automaticamente.
         </p>
@@ -300,7 +300,7 @@ export default function FinanceiroDda() {
         <StatTile label="Valor apresentado" valor={currency(summary.valor_total)} />
         <StatTile label="Match exato" valor={String(statusCount('MATCH_EXATO'))} tom="success" />
         <StatTile label="Ambiguos" valor={String(statusCount('AMBIGUO'))} tom="warning" />
-        <StatTile label="Sem titulo" valor={String(statusCount('SEM_TITULO'))} tom="warning" />
+        <StatTile label="Sem título" valor={String(statusCount('SEM_TITULO'))} tom="warning" />
         <StatTile label="Divergentes" valor={String(statusCount('DIVERGENTE'))} tom="danger" />
       </StatGrid>
 
@@ -312,7 +312,7 @@ export default function FinanceiroDda() {
           busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filters.q,
             aoMudar: (valor) => setFilters((prior) => ({ ...prior, q: valor, page: 1 })),
-            placeholder: 'Beneficiario, CPF/CNPJ, nosso numero ou linha digitavel'
+            placeholder: 'Beneficiario, CPF/CNPJ, nosso número ou linha digitável'
           } : null}
           campos={[
             {
@@ -324,7 +324,7 @@ export default function FinanceiroDda() {
             },
             {
               id: 'data_fim',
-              rotulo: 'Vencimento ate',
+              rotulo: 'Vencimento até',
               tipo: 'date',
               valor: filters.data_fim,
               aoMudar: (valor) => setFilters((prior) => ({ ...prior, data_fim: valor, page: 1 }))
@@ -375,7 +375,7 @@ export default function FinanceiroDda() {
             },
             {
               id: 'titulo',
-              titulo: 'Titulo',
+              titulo: 'Título',
               tipo: 'codigo',
               render: (row) => (row.titulo
                 ? <Link className="font-semibold text-[var(--c-primary)] hover:underline whitespace-nowrap" to={`/financeiro/titulos/${row.titulo.id}`}>{row.titulo.codigo || `#${row.titulo.id}`}</Link>
@@ -419,13 +419,13 @@ export default function FinanceiroDda() {
           (`modal-open`, `modal-box`, `btn-square`, `modal-backdrop`). */}
       {candidateModal && (
         <OverlayModal
-          rotulo="Vincular titulo a pagar"
+          rotulo="Vincular título a pagar"
           largura="var(--modal-max-w-xl, 1080px)"
           onFechar={() => setCandidateModal(null)}
         >
           <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] p-4">
             <div>
-              <h2 className="app-confirmacao-titulo">Vincular titulo a pagar</h2>
+              <h2 className="app-confirmacao-titulo">Vincular título a pagar</h2>
               <p className="text-sm text-[var(--c-muted)]">
                 {candidateModal.boleto.beneficiario_nome} · {currency(candidateModal.boleto.valor_atual)} · origem {candidateModal.origem || '-'}
               </p>
@@ -438,7 +438,7 @@ export default function FinanceiroDda() {
           <div className="min-h-0 overflow-y-auto p-4">
             <TabelaPadrao
               colunas={[
-                { id: 'codigo', titulo: 'Titulo', tipo: 'codigo', render: (title) => title.codigo || `#${title.id}` },
+                { id: 'codigo', titulo: 'Título', tipo: 'codigo', render: (title) => title.codigo || `#${title.id}` },
                 {
                   id: 'credor',
                   titulo: 'Credor',
@@ -452,7 +452,7 @@ export default function FinanceiroDda() {
                 { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (title) => title.empresa?.nome || title.empresa?.razao_social || '-' }
               ]}
               itens={candidateModal.rows}
-              vazio="Nenhum titulo elegivel localizado pelos dados do documento."
+              vazio="Nenhum título elegível localizado pelos dados do documento."
               storageKey="tabela:financeiro-dda:candidatos"
               rotuloRolagem="Titulos candidatos ao documento"
               larguraAcoes={140}
@@ -466,7 +466,7 @@ export default function FinanceiroDda() {
                     if (ok) setCandidateModal(null);
                   }}
                 >
-                  Usar titulo
+                  Usar título
                 </button>
               )}
             />

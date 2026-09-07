@@ -212,7 +212,7 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
   return (
     <BlocoConteudo
       titulo="Conversa"
-      descricao="Comentar e anexar sao um ato so: um dos dois basta."
+      descricao="Comentar e anexar são um ato so: um dos dois basta."
       recolhivel
       recolhidoPadrao
       id="sol-detail-conversa"
@@ -226,7 +226,7 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
         onChange={e => setTexto(e.target.value)}
         rows={5}
         className="input w-full mb-2 sol-detail-comment-textarea"
-        placeholder={'Escreva um comentario e/ou anexe arquivos...\nEnter cria uma nova linha; o historico mantem a formatacao.'}
+        placeholder={'Escreva um comentário e/ou anexe arquivos...\nEnter cria uma nova linha; o histórico mantém a formatacao.'}
       />
 
       {/* Barra compacta: anexar, mencionar e a contagem no mesmo nivel —
@@ -271,13 +271,13 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
             value={buscaUsuario}
             onChange={e => setBuscaUsuario(e.target.value)}
             className="input w-full mb-2"
-            placeholder="Buscar usuario por nome ou email"
+            placeholder="Buscar usuário por nome ou email"
           />
 
           <div className="max-h-48 overflow-y-auto space-y-1">
             {usuariosDisponiveis.length === 0 && (
               <p className="text-sm text-[var(--c-muted)] px-2 py-2">
-                Nenhum usuario disponivel.
+                Nenhum usuário disponível.
               </p>
             )}
 

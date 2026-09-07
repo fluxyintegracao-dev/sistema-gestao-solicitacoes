@@ -3,6 +3,7 @@ import { Pagina, PageHeader, TabelaPadrao, CelulaDupla } from '../components/pad
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getDreComparativoEmpresasFinanceiro, getDreComparativoFinanceiro, getDreFinanceira } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
+import DateInputBR from '../components/DateInputBR';
 
 const DEFAULT_FILTERS = {
   periodo: 'MES_ATUAL',
@@ -140,7 +141,7 @@ function DreCategoriasDetalhe({ categorias, comparativo = false }) {
     ...(comparativo ? [
       {
         id: 'resultado_proprio',
-        titulo: 'Resultado proprio',
+        titulo: 'Resultado próprio',
         tipo: 'valor',
         render: (categoria) => (
           <span style={{ color: metricColor(categoria.resultado_operacional_proprio) }}>
@@ -197,7 +198,7 @@ function DreCategoriasDetalhe({ categorias, comparativo = false }) {
         ? 'tabela:financeiro-dre:categorias-comparativo'
         : 'tabela:financeiro-dre:categorias'}
       rotuloRolagem="Composicao por categoria financeira"
-      vazio="Nenhuma categoria financeira compoe esta linha."
+      vazio="Nenhuma categoria financeira compõe esta linha."
     />
   );
 }
@@ -217,7 +218,7 @@ function DreComparativoCard({ comparativo }) {
         <div>
           <h2 className="text-lg font-semibold text-[var(--c-text)]">Comparativo mensal</h2>
           <p className="text-sm text-[var(--c-muted)]">
-            Serie mensal por competencia real, usando as mesmas regras da DRE do periodo.
+            Série mensal por competência real, usando as mesmas regras da DRE do período.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
@@ -241,7 +242,7 @@ function DreComparativoCard({ comparativo }) {
       </div>
 
       {serie.length === 0 ? (
-        <div className="app-empty-card">Nenhum mes encontrado para o comparativo.</div>
+        <div className="app-empty-card">Nenhum mês encontrado para o comparativo.</div>
       ) : (
         <>
           <div className="grid grid-cols-6 items-end gap-2 md:grid-cols-12">
@@ -276,14 +277,14 @@ function DreComparativoCard({ comparativo }) {
               colunas={[
                 {
                   id: 'mes',
-                  titulo: 'Mes',
+                  titulo: 'Mês',
                   tipo: 'texto',
                   noCard: 'titulo',
                   render: (item) => <span className="font-semibold text-[var(--c-text)]">{item.label}</span>
                 },
                 {
                   id: 'receita_liquida',
-                  titulo: 'Receita liquida',
+                  titulo: 'Receita líquida',
                   tipo: 'valor',
                   render: (item) => formatCurrency(item.receita_liquida)
                 },
@@ -297,7 +298,7 @@ function DreComparativoCard({ comparativo }) {
                 },
                 {
                   id: 'lucro_prejuizo',
-                  titulo: 'Lucro/Prejuizo',
+                  titulo: 'Lucro/Prejuízo',
                   tipo: 'valor',
                   render: (item) => (
                     <strong style={{ color: metricColor(item.lucro_prejuizo_liquido) }}>
@@ -317,7 +318,7 @@ function DreComparativoCard({ comparativo }) {
                 },
                 {
                   id: 'titulos',
-                  titulo: 'Titulos',
+                  titulo: 'Títulos',
                   tipo: 'numero',
                   render: (item) => item.titulos_considerados
                 }
@@ -326,7 +327,7 @@ function DreComparativoCard({ comparativo }) {
               getId={(item) => String(item.referencia)}
               storageKey="tabela:financeiro-dre:comparativo-mensal"
               rotuloRolagem="Comparativo mensal da DRE"
-              vazio="Nenhum mes encontrado para o comparativo."
+              vazio="Nenhum mês encontrado para o comparativo."
               // R17: serie temporal — a linha e um MES de competencia, nao um
               // registro nomeado; a ausencia de identidade e declarada.
               semIdentidade
@@ -347,19 +348,19 @@ function DreComparativoEmpresasCard({ comparativo }) {
       <div className="border-b border-[var(--c-border)] px-4 py-3">
         <h2 className="text-lg font-semibold text-[var(--c-text)]">Comparativo por empresa</h2>
         <p className="text-sm text-[var(--c-muted)]">
-          Resultado operacional proprio sem movimentos entre empresas, efeito entre empresas e resultado final por empresa.
+          Resultado operacional próprio sem movimentos entre empresas, efeito entre empresas e resultado final por empresa.
         </p>
       </div>
 
       <div className="grid gap-3 p-4 md:grid-cols-4">
         <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
-          <span className="block text-xs uppercase text-[var(--c-muted)]">Resultado proprio</span>
+          <span className="block text-xs uppercase text-[var(--c-muted)]">Resultado próprio</span>
           <strong style={{ color: metricColor(comparativo?.resumo?.resultado_operacional_proprio) }}>
             {formatCompactCurrency(comparativo?.resumo?.resultado_operacional_proprio)}
           </strong>
         </div>
         <div className="rounded-lg border border-[var(--c-border)] px-3 py-2">
-          <span className="block text-xs uppercase text-[var(--c-muted)]">Entre Empresas liquido</span>
+          <span className="block text-xs uppercase text-[var(--c-muted)]">Entre Empresas líquido</span>
           <strong style={{ color: metricColor(comparativo?.resumo?.intercompany_liquido) }}>
             {formatCompactCurrency(comparativo?.resumo?.intercompany_liquido)}
           </strong>
@@ -417,7 +418,7 @@ function DreComparativoEmpresasCard({ comparativo }) {
           },
           {
             id: 'resultado_proprio',
-            titulo: 'Resultado proprio',
+            titulo: 'Resultado próprio',
             tipo: 'valor',
             render: (empresa) => (
               <strong style={{ color: metricColor(empresa.resultado_operacional_proprio) }}>
@@ -427,7 +428,7 @@ function DreComparativoEmpresasCard({ comparativo }) {
           },
           {
             id: 'intercompany_liquido',
-            titulo: 'Entre Empresas liquido',
+            titulo: 'Entre Empresas líquido',
             tipo: 'valor',
             render: (empresa) => (
               <strong style={{ color: metricColor(empresa.intercompany_liquido) }}>
@@ -599,17 +600,17 @@ export default function FinanceiroDre({ embutido = false }) {
         <PageHeader
           titulo="DRE Gerencial"
           contagem={`${resumo.empresas_com_movimento || 0} empresa(s) com movimento`}
-          descricao="Resultado por competencia da Holding, empresas, obras e centros de custo."
+          descricao="Resultado por competência da Holding, empresas, obras e centros de custo."
         />
       )}
 
       <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           <label className="app-filter-field">
-            <span className="app-filter-label">Periodo</span>
+            <span className="app-filter-label">Período</span>
             <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
-              <option value="MES_ATUAL">Mes atual</option>
-              <option value="PROXIMO_MES">Proximo mes</option>
+              <option value="MES_ATUAL">Mês atual</option>
+              <option value="PROXIMO_MES">Próximo mês</option>
               <option value="HOJE">Hoje</option>
               <option value="30_DIAS">30 dias</option>
               <option value="90_DIAS">90 dias</option>
@@ -618,11 +619,11 @@ export default function FinanceiroDre({ embutido = false }) {
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_inicial} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Data final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
+            <DateInputBR className="input w-full input-sm" value={filters.data_final} disabled={filters.periodo !== 'PERSONALIZADO'} onChange={(event) => updateFilter('data_final', event.target.value)} />
           </label>
           <label className="app-filter-field">
             <span className="app-filter-label">Holding</span>
@@ -657,7 +658,7 @@ export default function FinanceiroDre({ embutido = false }) {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
             <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
-            Excluir movimentacoes entre empresas
+            Excluir movimentações entre empresas
           </label>
           <div className="flex flex-wrap items-center gap-2">
             {/*
@@ -678,7 +679,7 @@ export default function FinanceiroDre({ embutido = false }) {
 
       <div className="app-summary-grid">
         <div className="app-summary-card">
-          <span className="app-summary-label">Receita liquida</span>
+          <span className="app-summary-label">Receita líquida</span>
           <strong className="app-summary-value">{formatCurrency(resumo.receita_liquida)}</strong>
           <span className="app-summary-subvalue">Receita bruta menos deducoes</span>
         </div>
@@ -690,14 +691,14 @@ export default function FinanceiroDre({ embutido = false }) {
           <span className="app-summary-subvalue">Margem {formatPercent(resumo.margem_ebitda)}</span>
         </div>
         <div className="app-summary-card">
-          <span className="app-summary-label">Lucro/Prejuizo liquido</span>
+          <span className="app-summary-label">Lucro/Prejuízo líquido</span>
           <strong className="app-summary-value" style={{ color: metricColor(resultadoPositivo ? 1 : -1) }}>
             {formatCurrency(resumo.lucro_prejuizo_liquido ?? resumo.resultado)}
           </strong>
           <span className="app-summary-subvalue">{resultadoPositivo ? 'Gerando patrimonio' : 'Destruindo patrimonio'}</span>
         </div>
         <div className="app-summary-card">
-          <span className="app-summary-label">Margem liquida</span>
+          <span className="app-summary-label">Margem líquida</span>
           <strong className="app-summary-value">{formatPercent(resumo.margem_liquida ?? resumo.margem_resultado)}</strong>
           <span className="app-summary-subvalue">{resumo.empresas_com_movimento || 0} empresa(s) com movimento</span>
         </div>
@@ -745,7 +746,7 @@ export default function FinanceiroDre({ embutido = false }) {
               key={chaveFiltros}
               storageKey="tabela:financeiro-dre:estruturada"
               rotuloRolagem="DRE estruturada"
-              vazio="Nenhum titulo encontrado."
+              vazio="Nenhum título encontrado."
               rotuloDetalhe={(linha) => linha.label}
               // Linha CALCULADA (receita liquida, EBITDA, lucro...) nao tem
               // composicao propria: sem detalhe, a tabela nao mostra seta.
@@ -775,7 +776,7 @@ export default function FinanceiroDre({ embutido = false }) {
                   },
                   {
                     id: 'titulos',
-                    titulo: 'Titulos',
+                    titulo: 'Títulos',
                     tipo: 'numero',
                     render: (linha) => linha.titulos
                   },
@@ -796,7 +797,7 @@ export default function FinanceiroDre({ embutido = false }) {
                 key={chaveFiltros}
                 storageKey="tabela:financeiro-dre:linhas-gerenciais"
                 rotuloRolagem="Linhas gerenciais da DRE"
-                vazio="Nenhum titulo encontrado."
+                vazio="Nenhum título encontrado."
                 rotuloDetalhe={(linha) => [linha.grupo, linha.subgrupo].filter(Boolean).join(' / ')}
                 linhaExpansivel={(linha) => <DreCategoriasDetalhe categorias={linha.categorias} />}
               />
@@ -805,7 +806,7 @@ export default function FinanceiroDre({ embutido = false }) {
             <section className="card sol-surface-card app-table-shell">
               <div className="border-b border-[var(--c-border)] px-4 py-3">
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Resultado por empresa</h2>
-                <p className="text-sm text-[var(--c-muted)]">Visao isolada para comparar empresas abaixo da Holding.</p>
+                <p className="text-sm text-[var(--c-muted)]">Visão isolada para comparar empresas abaixo da Holding.</p>
               </div>
               <TabelaPadrao
                 colunas={[
@@ -831,7 +832,7 @@ export default function FinanceiroDre({ embutido = false }) {
                   },
                   {
                     id: 'receita_liquida',
-                    titulo: 'Receita liquida',
+                    titulo: 'Receita líquida',
                     tipo: 'valor',
                     render: (empresa) => formatCurrency(empresa.receita_liquida)
                   },
@@ -845,7 +846,7 @@ export default function FinanceiroDre({ embutido = false }) {
                   },
                   {
                     id: 'lucro_prejuizo',
-                    titulo: 'Lucro/Prejuizo',
+                    titulo: 'Lucro/Prejuízo',
                     tipo: 'valor',
                     ordenavel: true,
                     ordemInicial: 'desc',
@@ -858,7 +859,7 @@ export default function FinanceiroDre({ embutido = false }) {
                   },
                   {
                     id: 'margem_liquida',
-                    titulo: 'Margem liquida',
+                    titulo: 'Margem líquida',
                     tipo: 'numero',
                     render: (empresa) => formatPercent(empresa.margem_liquida ?? empresa.margem_resultado)
                   }

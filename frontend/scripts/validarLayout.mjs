@@ -693,6 +693,12 @@ export function validarLayout() {
   const r34 = validarBlocoControladoSemOuvinte();
   falhas.push(...r34.falhas);
 
+  // R35 — campo de data nativo: o formato sai do idioma do navegador, e a
+  // mesma tela vira mm/dd/yyyy numa máquina e dd/mm/aaaa noutra.
+  const r35 = validarDatasNativas();
+  falhas.push(...r35.falhas);
+  avisos.push(...r35.avisos);
+
   // R25 — cor fora do sistema de tokens (decisão do cliente, 03/09).
   const r25 = validarCoresForaDoToken();
   falhas.push(...r25.falhas);
@@ -1657,6 +1663,90 @@ function validarUsoDaConfirmacao() {
  *   - arquivo do trinco que diminui             → passa, e o trinco aperta.
  * O número só anda para baixo. Cada leva zera os arquivos que tocar.
  */
+/*
+  R35 — CAMPO DE DATA NATIVO (06/09).
+
+  `<input type="date">` e desenhado pelo NAVEGADOR, e a ordem dos campos sai
+  do idioma da INTERFACE dele. Nao do `lang="pt-BR"` da pagina, nao do
+  `Accept-Language`, nao de nenhum atributo que o HTML possa escrever.
+
+  MEDIDO no Chromium, mesmo HTML, mesmo valor `2026-03-04`:
+
+    contexto de pagina pt-BR      -> a pessoa le 03/04/2026
+    contexto de pagina de-DE      -> a pessoa le 03/04/2026
+    processo com LANG=pt_BR.UTF-8 -> a pessoa le 04/03/2026
+
+  Quer dizer: a MESMA tela mostra `mm/dd/yyyy` na maquina de um usuario e
+  `dd/mm/aaaa` na de outro. Foi assim que seis telas apareceram em formato
+  americano nas capturas do preview, nas tres larguras. Nao e defeito de
+  CSS nem de fonte, e nao ha atributo que conserte: o unico conserto e
+  trocar o campo.
+
+  O substituto ja existia no sistema (`components/DateInputBR.jsx`): texto
+  com mascara DD/MM/AAAA, valor externo em ISO, `min`/`max` cobrados por
+  `setCustomValidity`. Esta regra existe para o 125o jeito nao nascer.
+
+  Trinco, no mesmo molde da R19:
+    - arquivo NOVO com type="date"               -> FALHA;
+    - arquivo do trinco que AUMENTA a contagem   -> FALHA;
+    - arquivo do trinco que diminui              -> passa, e o trinco aperta.
+*/
+function validarDatasNativas() {
+  const falhas = [];
+  const avisos = [];
+  const caminhoTrinco = path.join(frontendRoot, 'scripts', 'trinco-datas.json');
+  const trinco = fs.existsSync(caminhoTrinco)
+    ? JSON.parse(fs.readFileSync(caminhoTrinco, 'utf8'))
+    : { arquivos: {} };
+  const herdado = trinco.arquivos || {};
+  const padrao = /type\s*=\s*"date"|type\s*=\s*'date'|type=\{\s*['"`]date['"`]\s*\}/g;
+  const contagens = {};
+
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      if (item.isFile() && ehFixtureDeOutraProva(item.name, rel)) continue;
+      if (item.isDirectory()) {
+        if (item.name === 'node_modules' || item.name === 'dist') continue;
+        varrer(caminho);
+        continue;
+      }
+      if (!/\.(jsx?|tsx?)$/.test(item.name)) continue;
+      /* Comentario nao e codigo: o proprio DateInputBR CITA `type="date"`
+         para explicar o que substitui. Contar a citacao faria o trinco
+         afirmar que o substituto e o defeito. (Mesma correcao da R19.) */
+      const codigo = fs.readFileSync(caminho, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (trecho) => trecho.replace(/[^\n]/g, ' '));
+      const total = [...codigo.matchAll(padrao)].length;
+      if (total > 0) contagens[rel] = total;
+    }
+  };
+  varrer(path.join(frontendRoot, 'src'));
+
+  for (const [rel, quantidade] of Object.entries(contagens)) {
+    const limite = herdado[rel];
+    if (limite === undefined) {
+      falhas.push(`${rel} [R35] ${quantidade} campo(s) \`<input type="date">\` em arquivo NOVO para a regra — o formato do campo nativo vem do idioma do NAVEGADOR (medido: mm/dd/yyyy numa maquina, dd/mm/aaaa noutra) e a pagina nao decide. Use \`DateInputBR\` de components/DateInputBR.jsx (mascara DD/MM/AAAA, valor em ISO, aceita min/max).`);
+      continue;
+    }
+    if (quantidade > limite) {
+      falhas.push(`${rel} [R35] campo(s) de data nativo(s) AUMENTOU de ${limite} para ${quantidade} — o trinco só aperta: troque por DateInputBR.`);
+      continue;
+    }
+    if (quantidade < limite) {
+      avisos.push(`${rel} [R35] passivo herdado caiu de ${limite} para ${quantidade} campo(s) — atualize scripts/trinco-datas.json para apertar o trinco.`);
+    }
+  }
+  for (const rel of Object.keys(herdado)) {
+    if (contagens[rel] === undefined) {
+      avisos.push(`${rel} [R35] zerou os campos de data nativos — remova a linha de scripts/trinco-datas.json.`);
+    }
+  }
+  return { falhas, avisos };
+}
+
 function validarDialogosDoNavegador() {
   const falhas = [];
   const avisos = [];

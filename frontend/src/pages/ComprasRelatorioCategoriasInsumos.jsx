@@ -100,7 +100,7 @@ function BarraProporcao({ valor, maximo }) {
 */
 const FILTROS_DA_TELA = [
   { id: 'data_inicio', rotulo: 'Pedido criado de' },
-  { id: 'data_fim', rotulo: 'Pedido criado ate' },
+  { id: 'data_fim', rotulo: 'Pedido criado até' },
   { id: 'obra_id', rotulo: 'Obra / Centro de custo' }
 ];
 
@@ -263,7 +263,7 @@ export default function ComprasRelatorioCategoriasInsumos() {
         contagem={`${formatNumber(categorias.length)} categoria(s) no recorte`}
         /* R23: agregacao pesada sobre itens de pedido — o recorte e
            RASCUNHO ate o clique, e a regra exige que a tela AVISE isso. */
-        descricao="Valor pedido por categoria, insumo e obra/centro com base nos itens reais dos pedidos de compra. Marque o recorte e clique em Atualizar relatorio."
+        descricao="Valor pedido por categoria, insumo e obra/centro com base nos itens reais dos pedidos de compra. Marque o recorte e clique em Atualizar relatório."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
           onClick: aplicarFiltros,
@@ -286,7 +286,7 @@ export default function ComprasRelatorioCategoriasInsumos() {
             },
             {
               id: 'data_fim',
-              rotulo: 'Pedido criado ate',
+              rotulo: 'Pedido criado até',
               tipo: 'date',
               valor: filtros.data_fim,
               aoMudar: (valor) => atualizarCampo('data_fim', valor)
@@ -318,9 +318,9 @@ export default function ComprasRelatorioCategoriasInsumos() {
       <StatGrid colunas={5}>
         <StatTile label="Itens" valor={formatNumber(resumo.itens)} sub="Itens de pedidos" />
         <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Pedidos com itens" />
-        <StatTile label="Categorias" valor={formatNumber(resumo.categorias)} sub="Com movimentacao" />
+        <StatTile label="Categorias" valor={formatNumber(resumo.categorias)} sub="Com movimentação" />
         <StatTile label="Valor total" valor={formatMoney(resumo.valor_total)} sub="Valor dos itens" />
-        <StatTile label="Ticket medio item" valor={formatMoney(resumo.ticket_medio_item)} sub="Valor medio por item" />
+        <StatTile label="Ticket médio item" valor={formatMoney(resumo.ticket_medio_item)} sub="Valor médio por item" />
       </StatGrid>
 
       {/*
@@ -334,12 +334,12 @@ export default function ComprasRelatorioCategoriasInsumos() {
       <BlocosPersonalizaveis chave="blocos:compras-relatorio-categorias-insumos" larguraPadrao="total">
         <BlocoConteudo
           titulo="Compras por categoria"
-          descricao="Top 10 categorias por valor efetivamente pedido no periodo filtrado."
+          descricao="Top 10 categorias por valor efetivamente pedido no período filtrado."
         >
           {loading ? (
             <div className="app-empty-card">Carregando categorias...</div>
           ) : topCategorias.length === 0 ? (
-            <div className="app-empty-card">Sem itens de pedido para montar o grafico.</div>
+            <div className="app-empty-card">Sem itens de pedido para montar o gráfico.</div>
           ) : (
             <div className="grid gap-3">
               {topCategorias.map((item, index) => (
@@ -390,13 +390,13 @@ export default function ComprasRelatorioCategoriasInsumos() {
               carregando={loading}
               storageKey="tabela:compras-categorias-insumos:categorias"
               rotuloRolagem="Compras por categoria"
-              vazio="Sem itens de pedido no periodo."
+              vazio="Sem itens de pedido no período."
             />
           </BlocoConteudo>
 
           <BlocoConteudo
             titulo="Por obra/centro"
-            descricao="Concentracao de valor pedido por origem operacional."
+            descricao="Concentração de valor pedido por origem operacional."
             variante="secundario"
           >
             <TabelaPadrao
@@ -418,7 +418,7 @@ export default function ComprasRelatorioCategoriasInsumos() {
               carregando={loading}
               storageKey="tabela:compras-categorias-insumos:obras"
               rotuloRolagem="Compras por obra/centro"
-              vazio="Sem itens de pedido no periodo."
+              vazio="Sem itens de pedido no período."
             />
           </BlocoConteudo>
         </div>
@@ -451,7 +451,7 @@ export default function ComprasRelatorioCategoriasInsumos() {
             carregando={loading}
             storageKey="tabela:compras-categorias-insumos:insumos"
             rotuloRolagem="Compras por insumo/item"
-            vazio="Sem itens de pedido no periodo."
+            vazio="Sem itens de pedido no período."
           />
         </BlocoConteudo>
       </BlocosPersonalizaveis>

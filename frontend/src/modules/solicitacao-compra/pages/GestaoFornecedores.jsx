@@ -111,7 +111,7 @@ const FILTROS_DA_TELA = [
   { id: 'q', rotulo: 'Busca', obrigatorio: true },
   { id: 'estado', rotulo: 'Estado' },
   { id: 'categoria', rotulo: 'Categoria' },
-  { id: 'situacao', rotulo: 'Situacao' }
+  { id: 'situacao', rotulo: 'Situação' }
 ];
 
 export default function GestaoFornecedores() {
@@ -471,7 +471,7 @@ export default function GestaoFornecedores() {
       <PageHeader
         titulo="Fornecedores"
         contagem={loading ? null : `${fornecedores.length} fornecedor(es)`}
-        descricao="Cadastro de fornecedores para cotacoes de compra."
+        descricao="Cadastro de fornecedores para cotações de compra."
         acaoPrincipal={canManage ? { rotulo: 'Novo fornecedor', onClick: novoFornecedor } : undefined}
       />
 
@@ -506,14 +506,14 @@ export default function GestaoFornecedores() {
       {canManage && (
         <BlocoConteudo titulo={form.id ? 'Editar fornecedor' : 'Novo fornecedor'}>
           <form className="space-y-4" onSubmit={handleSalvar}>
-            <FormSecao legenda="Identificacao" colunas={2}>
+            <FormSecao legenda="Identificação" colunas={2}>
               <CampoForm label="Nome" obrigatorio>
                 <input
                   ref={campoNomeRef}
                   className="input w-full"
                   value={form.nome}
                   onChange={(e) => atualizarCampo('nome', e.target.value)}
-                  placeholder="Razao social ou nome fantasia"
+                  placeholder="Razão social ou nome fantasia"
                   required
                 />
               </CampoForm>
@@ -551,18 +551,18 @@ export default function GestaoFornecedores() {
                   className="input w-full"
                   value={form.contato}
                   onChange={(e) => atualizarCampo('contato', e.target.value)}
-                  placeholder="Responsavel comercial"
+                  placeholder="Responsável comercial"
                 />
               </CampoForm>
             </FormSecao>
 
-            <FormSecao legenda="Endereco" colunas={3}>
+            <FormSecao legenda="Endereço" colunas={3}>
               <CampoForm label="Cidade">
                 <input
                   className="input w-full"
                   value={form.cidade}
                   onChange={(e) => atualizarCampo('cidade', e.target.value)}
-                  placeholder="Sao Paulo"
+                  placeholder="São Paulo"
                 />
               </CampoForm>
 
@@ -600,7 +600,7 @@ export default function GestaoFornecedores() {
               <div className="form-group form-campo--linha">
                 <span className="form-label">Categorias de insumos atendidos</span>
                 <span className="form-hint">
-                  Define quais categorias este fornecedor atende. Usado para filtrar fornecedores ao enviar cotacoes.
+                  Define quais categorias este fornecedor atende. Usado para filtrar fornecedores ao enviar cotações.
                 </span>
 
                 {form.categoria_insumos.length > 0 && (
@@ -655,13 +655,13 @@ export default function GestaoFornecedores() {
                 </div>
               </div>
 
-              <CampoForm label="Observacoes" tipo="texto-longo" span={2}>
+              <CampoForm label="Observações" tipo="texto-longo" span={2}>
                 <textarea
                   className="input w-full"
                   rows={3}
                   value={form.observacoes}
                   onChange={(e) => atualizarCampo('observacoes', e.target.value)}
-                  placeholder="Condicoes comerciais, prazo padrao, etc."
+                  placeholder="Condições comerciais, prazo padrão, etc."
                 />
               </CampoForm>
             </FormSecao>
@@ -685,7 +685,7 @@ export default function GestaoFornecedores() {
 
       <BlocoConteudo
         titulo="Fornecedores cadastrados"
-        descricao="Localize por identificacao, regiao ou categoria atendida."
+        descricao="Localize por identificação, regiao ou categoria atendida."
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -710,7 +710,7 @@ export default function GestaoFornecedores() {
             },
             {
               id: 'situacao',
-              rotulo: 'Situacao',
+              rotulo: 'Situação',
               unico: true,
               opcoes: [{ valor: 'inativos', rotulo: 'Incluir inativos' }]
             }

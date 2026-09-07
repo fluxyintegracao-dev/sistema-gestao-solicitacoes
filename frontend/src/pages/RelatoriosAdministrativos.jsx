@@ -32,7 +32,7 @@ const ACTION_OPTIONS = [
   { value: 'ITEM_ADICIONADO', label: 'Item adicionado' },
   { value: 'ITEM_ADICIONADO_FORNECEDOR', label: 'Item adicionado do fornecedor' },
   { value: 'ITEM_ADICIONADO_MANUAL', label: 'Item adicionado manualmente' },
-  { value: 'GERADO_DA_COTACAO', label: 'Gerado da cotacao' },
+  { value: 'GERADO_DA_COTACAO', label: 'Gerado da cotação' },
   { value: 'REMOVIDO', label: 'Item removido' }
 ];
 
@@ -249,7 +249,7 @@ const FILTROS_DA_TELA = [
   { id: 'pedido_id', rotulo: 'Pedido' },
   { id: 'item_id', rotulo: 'Item' },
   { id: 'obra_id', rotulo: 'Obra' },
-  { id: 'acao', rotulo: 'Acao' }
+  { id: 'acao', rotulo: 'Ação' }
 ];
 
 export default function RelatoriosAdministrativos() {
@@ -356,7 +356,7 @@ export default function RelatoriosAdministrativos() {
     },
     {
       id: 'acao',
-      rotulo: 'Acao',
+      rotulo: 'Ação',
       unico: true,
       opcoes: ACTION_OPTIONS.map((opcao) => ({ valor: opcao.value, rotulo: opcao.label }))
     }
@@ -471,7 +471,7 @@ export default function RelatoriosAdministrativos() {
           busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => atualizarFiltro('q', valor),
-            placeholder: 'Pedido, item, obra, usuario ou descricao'
+            placeholder: 'Pedido, item, obra, usuário ou descrição'
           } : null}
           campos={[
             {
@@ -501,11 +501,11 @@ export default function RelatoriosAdministrativos() {
 
       {/* Bloco 2 — CONTEXTO: o que o recorte devolveu. */}
       <StatGrid>
-        <StatTile label="Registros" valor={resumo.total} sub="Movimentacoes listadas" />
-        <StatTile label="Pedidos afetados" valor={resumo.pedidos} sub="Pedidos com log visivel" />
-        <StatTile label="Itens afetados" valor={resumo.itens} sub="Itens com historico no filtro" />
+        <StatTile label="Registros" valor={resumo.total} sub="Movimentações listadas" />
+        <StatTile label="Pedidos afetados" valor={resumo.pedidos} sub="Pedidos com log visível" />
+        <StatTile label="Itens afetados" valor={resumo.itens} sub="Itens com histórico no filtro" />
         <StatTile
-          label="Ultima movimentacao"
+          label="Última movimentação"
           valor={formatDateTime(resumo.ultimaMovimentacao)}
           sub="Ordenacao decrescente por data"
         />
@@ -513,8 +513,8 @@ export default function RelatoriosAdministrativos() {
 
       {/* Bloco 3 — HISTORICO, por ultimo (ordem de blocos decidida pelo cliente). */}
       <BlocoConteudo
-        titulo="Historico de alteracoes"
-        descricao="Esta area sera expandida para relatorios operacionais, de compras e financeiros sem misturar o fluxo transacional das telas operacionais."
+        titulo="Histórico de alterações"
+        descricao="Esta área será expandida para relatórios operacionais, de compras e financeiros sem misturar o fluxo transacional das telas operacionais."
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -533,7 +533,7 @@ export default function RelatoriosAdministrativos() {
               },
               {
                 id: 'acao',
-                titulo: 'Acao',
+                titulo: 'Ação',
                 tipo: 'badge',
                 render: (registro) => (
                   <span className={actionClassName(registro.acao)}>{formatActionLabel(registro.acao)}</span>
@@ -565,7 +565,7 @@ export default function RelatoriosAdministrativos() {
               },
               {
                 id: 'usuario',
-                titulo: 'Usuario',
+                titulo: 'Usuário',
                 tipo: 'texto',
                 render: (registro) => registro.usuario?.nome || 'Sistema'
               },

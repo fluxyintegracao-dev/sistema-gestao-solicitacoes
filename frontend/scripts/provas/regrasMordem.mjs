@@ -226,6 +226,30 @@ const CASOS_ARQUIVO_INTEIRO = [
     naoPodeReprovar: true,
     arquivo: `import { useState } from 'react';\nimport { Pagina, BlocoConteudo } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  const [recolhido, setRecolhido] = useState(true);\n  return (\n    <Pagina>\n      <BlocoConteudo titulo="Nasce recolhido" recolhivel recolhidoPadrao>\n        <p>corpo</p>\n      </BlocoConteudo>\n      <BlocoConteudo titulo="Par completo" recolhivel recolhido={recolhido} aoAlternarRecolhido={setRecolhido}>\n        <p>corpo</p>\n      </BlocoConteudo>\n    </Pagina>\n  );\n}\n`
   },
+  /*
+    R35 — CAMPO DE DATA NATIVO (06/09).
+
+    O positivo e o defeito que o revisor viu no preview: `mm/dd/yyyy` em
+    seis telas. A causa nao esta no HTML — o formato do `<input type="date">`
+    vem do idioma da INTERFACE do navegador, medido: contexto de pagina
+    pt-BR deu Month/Day/Year e so `LANG=pt_BR.UTF-8` deu Dia/Mes/Ano.
+
+    O NEGATIVO importa tanto quanto: o proprio `DateInputBR` cita
+    `type="date"` no comentario que explica o que ele substitui, e uma
+    regra que contasse comentario acusaria justamente o conserto. Foi o
+    erro que a R19 ja teve de desfazer uma vez; aqui ele nasce coberto.
+  */
+  {
+    regra: 'R35',
+    porque: 'campo de data nativo (formato sai do idioma do navegador)',
+    arquivo: `import { Pagina } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  return (\n    <Pagina>\n      <input type="date" value="" onChange={() => {}} />\n    </Pagina>\n  );\n}\n`
+  },
+  {
+    regra: 'R35',
+    porque: 'NEGATIVO: DateInputBR e a MENCAO a type="date" em comentario — o conserto nao pode reprovar',
+    naoPodeReprovar: true,
+    arquivo: `import { Pagina } from '../components/padrao';\nimport DateInputBR from '../components/DateInputBR';\n\nexport default function ProvaDeRegra() {\n  // trocado: antes era type="date", que muda de formato conforme a maquina\n  return (\n    <Pagina>\n      <DateInputBR name="data" value="" onChange={() => {}} />\n    </Pagina>\n  );\n}\n`
+  },
   {
     regra: 'R22',
     porque: 'hook usado sem import',

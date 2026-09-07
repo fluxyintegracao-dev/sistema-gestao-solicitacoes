@@ -29,6 +29,7 @@ import {
   useAvisos
 } from '../components/padrao';
 import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
+import DateInputBR from '../components/DateInputBR';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -431,7 +432,7 @@ export default function FinanceiroCaixas() {
           acoes={<span className={statusClass('FECHADO')}>FECHADO</span>}
         >
           <form className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end" onSubmit={handleAbrir}>
-            <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Data de abertura *</span><input className="input w-full" type="date" value={abrirForm.data_abertura} onChange={(event) => setAbrirForm((current) => ({ ...current, data_abertura: event.target.value }))} required /></label>
+            <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Data de abertura *</span><DateInputBR className="input w-full" value={abrirForm.data_abertura} onChange={(event) => setAbrirForm((current) => ({ ...current, data_abertura: event.target.value }))} required /></label>
             <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Saldo inicial</span><input className="input input-moeda w-full" inputMode="decimal" placeholder="Ex.: 500,00" value={abrirForm.saldo_abertura} onChange={(event) => setAbrirForm((current) => ({ ...current, saldo_abertura: event.target.value }))} /></label>
             <label className="sol-filter-field sm:col-span-2 xl:col-span-6"><span className="sol-filter-label">Observação de abertura</span><input className="input w-full" maxLength={4000} placeholder="Opcional" value={abrirForm.observacoes} onChange={(event) => setAbrirForm((current) => ({ ...current, observacoes: event.target.value }))} /></label>
             {/* D3: os dois pesos visíveis — "Abrir caixa" é a primária sólida,
@@ -470,7 +471,7 @@ export default function FinanceiroCaixas() {
             <form className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleMovimento}>
               {/* R12: select de FORMULÁRIO (entrada de dado do lançamento). */}
               <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Natureza *</span><select className="input mt-auto w-full" value={movimentoForm.natureza} onChange={(event) => setMovimentoForm((current) => ({ ...current, natureza: event.target.value }))}><option value="ENTRADA">Entrada</option><option value="SAIDA">Saída</option></select></label>
-              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data *</span><input className="input mt-auto w-full" type="date" value={movimentoForm.data_movimento} onChange={(event) => setMovimentoForm((current) => ({ ...current, data_movimento: event.target.value }))} required /></label>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data *</span><DateInputBR className="input mt-auto w-full" value={movimentoForm.data_movimento} onChange={(event) => setMovimentoForm((current) => ({ ...current, data_movimento: event.target.value }))} required /></label>
               <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Valor *</span><input className="input input-moeda mt-auto w-full" type="text" inputMode="decimal" value={movimentoForm.valor} onChange={(event) => setMovimentoForm((current) => ({ ...current, valor: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
               <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-3"><span className="sol-filter-label">Descrição *</span><input className="input mt-auto w-full" minLength={3} maxLength={4000} placeholder="Ex.: compra emergencial de material" value={movimentoForm.descricao} onChange={(event) => setMovimentoForm((current) => ({ ...current, descricao: event.target.value }))} required /></label>
               <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-2"><span className="sol-filter-label">Documento / referência</span><input className="input mt-auto w-full" maxLength={120} placeholder="Recibo, NF ou controle" value={movimentoForm.documento_referencia} onChange={(event) => setMovimentoForm((current) => ({ ...current, documento_referencia: event.target.value }))} /></label>
@@ -552,7 +553,7 @@ export default function FinanceiroCaixas() {
           descricao={`${caixaFisico ? 'Conte o dinheiro físico e informe o saldo encontrado.' : 'Confira o saldo operacional e informe o valor apurado.'} Divergências ficam registradas com justificativa.`}
         >
           <form className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleFechar}>
-            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><input className="input mt-auto w-full" type="date" min={dataMinimaFechamento} value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
+            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><DateInputBR className="input mt-auto w-full" min={dataMinimaFechamento} value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
             <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input input-moeda mt-auto w-full" type="text" inputMode="decimal" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
             <div className="xl:col-span-2">
               <StatTile

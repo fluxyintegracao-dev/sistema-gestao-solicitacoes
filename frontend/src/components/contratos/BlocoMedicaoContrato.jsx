@@ -399,7 +399,7 @@ export default function BlocoMedicaoContrato({
                     />
                     {foiReajustadaNaProjecao && (
                       <span className="text-xs" style={{ display: 'block', color: 'var(--c-primary)' }}>
-                        reajustado nesta medicao
+                        reajustado nesta medição
                       </span>
                     )}
                   </>
@@ -468,7 +468,7 @@ export default function BlocoMedicaoContrato({
           formas; PIX acrescenta a chave e boleto acrescenta o arquivo. */}
       <div className="space-y-2" style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }}>
         <div className="text-xs" style={{ fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--c-muted)' }}>
-          Pagamento desta medicao
+          Pagamento desta medição
         </div>
 
         <label className="grid max-w-md gap-1 text-sm">
@@ -569,7 +569,7 @@ export default function BlocoMedicaoContrato({
 
             {!favorecidoEfetivo && (
               <p className="text-xs" style={{ color: 'var(--c-danger, #b00020)' }}>
-                Selecione o favorecido desta medicao.
+                Selecione o favorecido desta medição.
               </p>
             )}
 
@@ -608,7 +608,7 @@ export default function BlocoMedicaoContrato({
                   maxLength={180}
                   value={contato}
                   onChange={(e) => { setContato(e.target.value); setConfirmado(false); }}
-                  placeholder="Ex.: banco, agencia, conta, tipo de conta ou outra instrucao necessaria"
+                  placeholder="Ex.: banco, agência, conta, tipo de conta ou outra instrucao necessária"
                 />
               </label>
             )}
@@ -656,7 +656,7 @@ export default function BlocoMedicaoContrato({
               checked={confirmado}
               onChange={(e) => setConfirmado(e.target.checked)}
             />
-            <span>Confirmo que os dados de pagamento acima estao corretos *</span>
+            <span>Confirmo que os dados de pagamento acima estão corretos *</span>
           </label>
         )}
       </div>

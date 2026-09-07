@@ -215,7 +215,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
       <html lang="pt-BR">
         <head>
           <meta charset="UTF-8" />
-          <title>Pre-visualizacao - Solicitacao de Compra</title>
+          <title>Pre-visualização - Solicitação de Compra</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
             h1 { margin: 0 0 8px; font-size: 24px; }
@@ -242,7 +242,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
           <div class="meta"><strong>${modoCompraDireta ? 'Data de vencimento' : 'Necessario para'}:</strong> ${escapeHtml(
             formatarData(draft.payload?.necessario_para)
           )}</div>
-          <div class="meta"><strong>Observacoes:</strong> ${escapeHtml(draft.payload?.observacoes || '-')}</div>
+          <div class="meta"><strong>Observações:</strong> ${escapeHtml(draft.payload?.observacoes || '-')}</div>
           <div class="meta"><strong>Link geral:</strong> ${escapeHtml(draft.payload?.link_geral || '-')}</div>
           <table>
             <thead>
@@ -252,8 +252,8 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
                 <th>Unidade</th>
                 <th>Quantidade</th>
                 ${modoCompraDireta ? '<th>Valor unit.</th><th>Valor total</th>' : ''}
-                ${modoCompraDireta ? '' : '<th>Especificacao</th>'}
-                <th>Apropriacao</th>
+                ${modoCompraDireta ? '' : '<th>Especificação</th>'}
+                <th>Apropriação</th>
                 ${modoCompraDireta ? '' : '<th>Necessario para</th><th>Link</th><th>Arquivo</th>'}
               </tr>
             </thead>
@@ -307,7 +307,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
     try {
       const url = await obterUrlAssinadaCompra(item?.arquivo_url);
       if (!url) {
-        avisar.erro('Arquivo nao encontrado.');
+        avisar.erro('Arquivo não encontrado.');
         return;
       }
 
@@ -328,12 +328,12 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
     }
 
     if (!confirmado) {
-      avisar.alerta('Confirme que revisou os dados antes de criar a solicitacao.');
+      avisar.alerta('Confirme que revisou os dados antes de criar a solicitação.');
       return;
     }
 
     if (!previewVisualizado) {
-      avisar.alerta('Abra a pre-visualizacao do PDF antes de confirmar a criacao da solicitacao.');
+      avisar.alerta('Abra a pre-visualização do PDF antes de confirmar a criação da solicitação.');
       return;
     }
 
@@ -408,7 +408,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
       contexto: temDescontoCompraDireta
     },
     {
-      label: 'Valor liquido dos itens',
+      label: 'Valor líquido dos itens',
       valor: formatarMoeda(valorLiquidoItensCompraDireta),
       contexto: modoCompraDireta
     },
@@ -435,7 +435,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
       contexto: modoCompraDireta && freteTipoCompraDireta === 'TERCEIRO'
     },
     {
-      label: 'Valor total da solicitacao',
+      label: 'Valor total da solicitação',
       valor: formatarMoeda(valorTotalCompraDireta),
       tom: 'info',
       contexto: modoCompraDireta
@@ -445,7 +445,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
       valor: `${draft.resumo?.anexos_cabecalho?.length || 0} arquivo(s)`,
       contexto: modoCompraDireta
     },
-    { label: 'Observacoes', valor: draft.payload?.observacoes, span: 2 }
+    { label: 'Observações', valor: draft.payload?.observacoes, span: 2 }
   ];
 
   return (
@@ -483,19 +483,19 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
         variante="primario"
         cor={prontoParaCriar ? 'var(--sem-success)' : 'var(--sem-warning)'}
         titulo="Checklist de envio"
-        descricao="O envio so libera quando o PDF foi aberto e a confirmacao estiver marcada."
+        descricao="O envio so libera quando o PDF foi aberto e a confirmação estiver marcada."
       >
         <StatGrid colunas={2}>
           <StatTile
             label="PDF revisado"
             valor={previewVisualizado ? 'OK' : 'Pendente'}
-            sub="Abra a pre-visualizacao para validar o documento que sera anexado ao historico."
+            sub="Abra a pre-visualização para validar o documento que será anexado ao histórico."
             tom={previewVisualizado ? 'success' : 'warning'}
           />
           <StatTile
-            label="Autorizacao marcada"
+            label="Autorização marcada"
             valor={confirmado ? 'OK' : 'Pendente'}
-            sub="Confirme que os dados estao corretos antes de criar a solicitacao."
+            sub="Confirme que os dados estão corretos antes de criar a solicitação."
             tom={confirmado ? 'success' : 'warning'}
           />
         </StatGrid>
@@ -519,11 +519,11 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
         proíbe (critério de 05/09: faixa fica com o total, bloco com os
         recortes).
       */}
-      <BlocoConteudo variante="secundario" titulo="Composicao dos itens">
+      <BlocoConteudo variante="secundario" titulo="Composição dos itens">
         <StatGrid colunas={modoCompraDireta ? 4 : 3}>
           {modoCompraDireta ? (
             <StatTile
-              label="Total da solicitacao"
+              label="Total da solicitação"
               valor={formatarMoeda(valorTotalCompraDireta)}
               sub={freteTipoCompraDireta !== 'SEM_FRETE'
                 ? `Itens ${formatarMoeda(valorLiquidoItensCompraDireta)} + frete ${formatarMoeda(freteValorCompraDireta)}`
@@ -535,7 +535,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
           ) : null}
           <StatTile label="Com arquivo" valor={estatisticas.comArquivo} sub="Itens com documento anexado" />
           <StatTile label="Com link" valor={estatisticas.comLink} sub="Itens com link de produto" />
-          <StatTile label="Manuais" valor={estatisticas.manuais} sub="Itens fora do cadastro padrao" />
+          <StatTile label="Manuais" valor={estatisticas.manuais} sub="Itens fora do cadastro padrão" />
         </StatGrid>
       </BlocoConteudo>
 
@@ -548,7 +548,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
 
       <BlocoConteudo
         titulo="Itens revisados"
-        descricao="Confira quantidade, rateio de apropriacao, prazo e acessos de compra em uma lista unica."
+        descricao="Confira quantidade, rateio de apropriação, prazo e acessos de compra em uma lista única."
       >
         <TabelaPadrao
           colunas={[
@@ -597,7 +597,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
             }] : []),
             {
               id: 'apropriacao',
-              titulo: 'Apropriacao',
+              titulo: 'Apropriação',
               tipo: 'texto',
               render: (item) => (
                 <span className="text-[var(--c-muted)]">{montarTextoResumoApropriacao(item)}</span>
@@ -612,7 +612,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
               },
               {
                 id: 'especificacao',
-                titulo: 'Especificacao',
+                titulo: 'Especificação',
                 tipo: 'texto',
                 render: (item) => (
                   <div className="whitespace-pre-wrap text-[var(--c-text)]">

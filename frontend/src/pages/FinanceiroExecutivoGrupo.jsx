@@ -309,16 +309,16 @@ export default function FinanceiroExecutivoGrupo() {
       <BlocosPersonalizaveis chave="blocos:financeiro-executivo-grupo" larguraPadrao="total">
         <BlocoConteudo
           titulo="Recorte do painel"
-          descricao="Porta de entrada executiva: o detalhe fica nos relatorios vinculados. O painel so muda ao atualizar."
+          descricao="Porta de entrada executiva: o detalhe fica nos relatórios vinculados. O painel so muda ao atualizar."
           variante="secundario"
         >
           <form onSubmit={aplicarFiltros}>
             <div className="grid gap-3 md:grid-cols-3">
               <label className="app-filter-field">
-                <span className="app-filter-label">Periodo</span>
+                <span className="app-filter-label">Período</span>
                 <select className="input w-full input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
-                  <option value="MES_ATUAL">Mes atual</option>
-                  <option value="PROXIMO_MES">Proximo mes</option>
+                  <option value="MES_ATUAL">Mês atual</option>
+                  <option value="PROXIMO_MES">Próximo mês</option>
                   <option value="HOJE">Hoje</option>
                   <option value="30_DIAS">30 dias</option>
                   <option value="90_DIAS">90 dias</option>
@@ -370,12 +370,12 @@ export default function FinanceiroExecutivoGrupo() {
               <StatTile
                 label="Saldo previsto"
                 valor={<Previsto>{formatCurrency(executivoResumo.saldo_previsto)}</Previsto>}
-                sub="Entradas previstas menos saidas previstas"
+                sub="Entradas previstas menos saídas previstas"
               />
               <StatTile
                 label="Caixa consolidado realizado"
                 valor={<Realizado>{formatCurrency(executivoResumo.caixa_realizado)}</Realizado>}
-                sub={`${fluxo?.resumo?.movimentos_realizados || 0} baixa(s) no periodo`}
+                sub={`${fluxo?.resumo?.movimentos_realizados || 0} baixa(s) no período`}
               />
               <StatTile
                 label="Necessidade futura de caixa"
@@ -389,12 +389,12 @@ export default function FinanceiroExecutivoGrupo() {
                 sub={`Margem ${formatPercent(executivoResumo.margem_ebitda)}`}
               />
               <StatTile
-                label="Lucro/Prejuizo liquido"
+                label="Lucro/Prejuízo líquido"
                 valor={formatCurrency(lucroLiquido)}
                 sub={Number(lucroLiquido || 0) >= 0 ? 'Geracao patrimonial' : 'Consumo patrimonial'}
               />
               <StatTile
-                label="Pendencias de consistencia"
+                label="Pendências de consistencia"
                 valor={String(executivoResumo.pendencias_dados || 0)}
                 sub={`${executivoResumo.pendencias_criticas || 0} critica(s), ${executivoResumo.pendencias_altas || 0} alta(s)`}
                 tom={Number(executivoResumo.pendencias_criticas || 0) > 0
@@ -437,7 +437,7 @@ export default function FinanceiroExecutivoGrupo() {
                 <BlocoConteudo
                   titulo="Empresas por caixa realizado"
                   contagem={`${topEmpresasCaixa.length} de ${empresasFluxo.length}`}
-                  descricao="Usa a empresa informada na baixa financeira. Maiores caixas realizados do periodo, em modulo."
+                  descricao="Usa a empresa informada na baixa financeira. Maiores caixas realizados do período, em módulo."
                   variante={blocoPrimario === 'caixa_empresas' ? 'primario' : 'secundario'}
                   cor="var(--module-financeiro)"
                   className="app-table-shell xl:col-span-2"
@@ -453,7 +453,7 @@ export default function FinanceiroExecutivoGrupo() {
                         render: (empresa) => empresa.empresa_nome
                       },
                       { id: 'entradas', titulo: 'Entradas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.entradas_realizadas)}</Realizado> },
-                      { id: 'saidas', titulo: 'Saidas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
+                      { id: 'saidas', titulo: 'Saídas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
                       {
                         id: 'saldo',
                         titulo: 'Saldo',
@@ -467,14 +467,14 @@ export default function FinanceiroExecutivoGrupo() {
                     getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
                     storageKey="tabela:financeiro-executivo-grupo:empresas-caixa"
                     rotuloRolagem="Empresas por caixa realizado"
-                    vazio="Nenhuma empresa com movimento realizado no periodo."
+                    vazio="Nenhuma empresa com movimento realizado no período."
                   />
                 </BlocoConteudo>
               ) : null}
 
               {isVisible('financeiro.grupo_consolidado.riscos') ? (
                 <BlocoConteudo
-                  titulo="Riscos do periodo"
+                  titulo="Riscos do período"
                   contagem={`${riscos.length} risco(s)`}
                   descricao="Calculados pelo backend sobre os dados reais cadastrados."
                   variante={blocoPrimario === 'riscos' ? 'primario' : 'secundario'}
@@ -483,7 +483,7 @@ export default function FinanceiroExecutivoGrupo() {
                   <div className="grid gap-3">
                     {riscos.length === 0 ? (
                       <div className="app-empty-card">
-                        Nenhum risco executivo automatico encontrado para os filtros atuais. Ainda assim,
+                        Nenhum risco executivo automático encontrado para os filtros atuais. Ainda assim,
                         valide a DRE e o diagnostico antes de fechamento oficial.
                       </div>
                     ) : (
@@ -518,7 +518,7 @@ export default function FinanceiroExecutivoGrupo() {
                 <BlocoConteudo
                   titulo="Resultado por empresa"
                   contagem={`${topEmpresasResultado.length} de ${empresasDre.length}`}
-                  descricao="Ordenado pelas empresas com MENOR resultado liquido — as que mais pesam contra o grupo."
+                  descricao="Ordenado pelas empresas com MENOR resultado líquido — as que mais pesam contra o grupo."
                   variante="secundario"
                   className="app-table-shell"
                 >
@@ -543,7 +543,7 @@ export default function FinanceiroExecutivoGrupo() {
                     getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
                     storageKey="tabela:financeiro-executivo-grupo:resultado-empresas"
                     rotuloRolagem="Resultado por empresa"
-                    vazio="Nenhuma empresa na DRE do periodo."
+                    vazio="Nenhuma empresa na DRE do período."
                   />
                 </BlocoConteudo>
               ) : null}
@@ -556,7 +556,7 @@ export default function FinanceiroExecutivoGrupo() {
                      filtro nenhum — nao recebe o periodo nem a holding da faixa
                      acima. Ler estes numeros como "no periodo filtrado" e a
                      leitura natural e esta errada, entao a tela avisa. */
-                  descricao="Recebido menos executado na base ATUAL de obras, ordenado do pior para o melhor. Esta lista nao respeita o periodo nem a holding do recorte acima."
+                  descricao="Recebido menos executado na base ATUAL de obras, ordenado do pior para o melhor. Esta lista não respeita o período nem a holding do recorte acima."
                   variante="secundario"
                   className="app-table-shell"
                 >
@@ -587,7 +587,7 @@ export default function FinanceiroExecutivoGrupo() {
 
               {isVisible('financeiro.grupo_consolidado.intercompany') ? (
                 <BlocoConteudo
-                  titulo="Maiores relacoes internas"
+                  titulo="Maiores relações internas"
                   contagem={`${Math.min(relacoesIntercompany.length, 6)} de ${relacoesIntercompany.length}`}
                   /* ORDENACAO x ROTULO: o backend ordena as relacoes pelo maior
                      valor PREVISTO, e a coluna unica mostrava o realizado com
@@ -603,7 +603,7 @@ export default function FinanceiroExecutivoGrupo() {
                     colunas={[
                       {
                         id: 'relacao',
-                        titulo: 'Relacao',
+                        titulo: 'Relação',
                         // R17: o par origem -> destino NOMEIA a relacao interna.
                         tipo: 'identidade',
                         noCard: 'titulo',
@@ -626,7 +626,7 @@ export default function FinanceiroExecutivoGrupo() {
                     getId={(relacao) => `${relacao.empresa_origem_id || 'origem'}-${relacao.empresa_destino_id || 'destino'}`}
                     storageKey="tabela:financeiro-executivo-grupo:intercompany"
                     rotuloRolagem="Maiores relacoes internas"
-                    vazio="Nenhuma relacao entre empresas no periodo."
+                    vazio="Nenhuma relação entre empresas no período."
                   />
                 </BlocoConteudo>
               ) : null}

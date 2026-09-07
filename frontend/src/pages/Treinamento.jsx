@@ -189,7 +189,7 @@ function primeiroValor(conjunto) {
 const FILTROS_DA_TELA = [
   { id: 'busca', rotulo: 'Busca', obrigatorio: true },
   { id: 'tipo', rotulo: 'Tipo' },
-  { id: 'modulo', rotulo: 'Modulo' },
+  { id: 'modulo', rotulo: 'Módulo' },
   { id: 'status', rotulo: 'Status' }
 ];
 
@@ -477,7 +477,7 @@ export default function Treinamento() {
     const alvo = item;
     try {
       await marcarTreinamentoLeitura(alvo.id, true);
-      avisar.sucesso('Registro de leitura concluido.');
+      avisar.sucesso('Registro de leitura concluído.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao registrar conclusao.');
@@ -521,7 +521,7 @@ export default function Treinamento() {
     },
     {
       id: 'modulo',
-      titulo: 'Modulo',
+      titulo: 'Módulo',
       tipo: 'codigo',
       render: (item) => item.modulo || 'GERAL'
     },
@@ -553,7 +553,7 @@ export default function Treinamento() {
     },
     {
       id: 'publicacao',
-      titulo: 'Publicacao',
+      titulo: 'Publicação',
       tipo: 'texto',
       render: (item) => (
         <CelulaDupla
@@ -600,7 +600,7 @@ export default function Treinamento() {
       <PageHeader
         titulo="Central de Treinamento"
         contagem={resumo ? `${resumo.total || 0} conteudo(s)` : null}
-        descricao="Base operacional para perguntas frequentes, videos e guias de uso do FLUXY. Os arquivos ficam privados no S3 e sao abertos por URL assinada."
+        descricao="Base operacional para perguntas frequentes, videos e guias de uso do FLUXY. Os arquivos ficam privados no S3 e são abertos por URL assinada."
         {...acoesCabecalho}
       />
 
@@ -620,7 +620,7 @@ export default function Treinamento() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Conteudos disponiveis"
+        titulo="Conteudos disponíveis"
         // O rótulo diz a VERDADE sobre o número: a consulta traz no máximo
         // 300 itens do recorte, então este é o que está LISTADO, não o
         // total da base (que vive na faixa, e vem do resumo do servidor).
@@ -632,13 +632,13 @@ export default function Treinamento() {
           busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: busca,
             aoMudar: setBusca,
-            placeholder: 'Buscar por pergunta, titulo, modulo ou tag'
+            placeholder: 'Buscar por pergunta, título, módulo ou tag'
           } : null}
           filtros={[
             { id: 'tipo', rotulo: 'Tipo', unico: true, opcoes: TIPOS },
             {
               id: 'modulo',
-              rotulo: 'Modulo',
+              rotulo: 'Módulo',
               unico: true,
               opcoes: modulos.map((modulo) => ({ valor: modulo, rotulo: modulo }))
             },
@@ -714,7 +714,7 @@ export default function Treinamento() {
           ) : null}
         >
           <form onSubmit={salvarConteudo}>
-            <FormSecao legenda="Classificacao" colunas={4}>
+            <FormSecao legenda="Classificação" colunas={4}>
               <CampoForm label="Tipo" obrigatorio>
                 {/* R12: select de FORMULÁRIO (entrada de dado do registro).
                     O recorte da LISTA, esse sim, virou marcação. */}
@@ -730,7 +730,7 @@ export default function Treinamento() {
                   <option value="PUBLICADO">Publicado</option>
                 </select>
               </CampoForm>
-              <CampoForm label="Modulo">
+              <CampoForm label="Módulo">
                 <input className="input w-full" value={form.modulo} onChange={(event) => handleChange('modulo', event.target.value.toUpperCase())} />
               </CampoForm>
               <CampoForm label="Publico alvo">
@@ -739,7 +739,7 @@ export default function Treinamento() {
             </FormSecao>
 
             <FormSecao legenda="Conteudo" colunas={2}>
-              <CampoForm label="Titulo" obrigatorio span={2}>
+              <CampoForm label="Título" obrigatorio span={2}>
                 <input className="input w-full" value={form.titulo} onChange={(event) => handleChange('titulo', event.target.value)} required />
               </CampoForm>
 
@@ -765,9 +765,9 @@ export default function Treinamento() {
               </CampoForm>
             </FormSecao>
 
-            <FormSecao legenda="Organizacao e midia" colunas={4}>
+            <FormSecao legenda="Organização e midia" colunas={4}>
               <CampoForm label="Tags">
-                <input className="input w-full" value={form.tags} onChange={(event) => handleChange('tags', event.target.value)} placeholder="financeiro, titulos" />
+                <input className="input w-full" value={form.tags} onChange={(event) => handleChange('tags', event.target.value)} placeholder="financeiro, títulos" />
               </CampoForm>
               <CampoForm label="Ordem">
                 <input className="input w-full" type="number" value={form.ordem} onChange={(event) => handleChange('ordem', event.target.value)} />
@@ -838,7 +838,7 @@ export default function Treinamento() {
 
             {form.id && (
               <p className="text-sm text-[var(--c-muted)]">
-                Arquivos ja salvos ficam privados no S3 e sao abertos por URL assinada.
+                Arquivos já salvos ficam privados no S3 e são abertos por URL assinada.
               </p>
             )}
           </form>

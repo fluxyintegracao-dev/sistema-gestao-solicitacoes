@@ -36,7 +36,7 @@ export default function ItemCompraDetalhe({
     <div id={detalheId} className="compra-item-table-detail">
       <div className="compra-item-expanded-head">
         <div className="compra-item-expanded-spec">
-          <span>Especificacao do item</span>
+          <span>Especificação do item</span>
           <strong>{item.especificacao || 'Sem especificacao adicional'}</strong>
         </div>
 
@@ -68,7 +68,7 @@ export default function ItemCompraDetalhe({
         <div className="compra-item-cataloged-banner">
           <span>Cadastro oficial vinculado</span>
           <strong>{item.insumoCatalogado.codigo || `ID ${item.insumoCatalogado.id}`} — {item.insumoCatalogado.nome}</strong>
-          <small>O item original desta solicitacao continua preservado.</small>
+          <small>O item original desta solicitação continua preservado.</small>
         </div>
       ) : null}
 
@@ -77,7 +77,7 @@ export default function ItemCompraDetalhe({
       ) : null}
 
       {item.tipo === 'MANUAL' && !podeCatalogar && !item.insumo_catalogado_id ? (
-        <div className="compra-item-permission-note">Item pendente de cadastro. Somente usuarios com permissao de catalogacao podem trata-lo.</div>
+        <div className="compra-item-permission-note">Item pendente de cadastro. Somente usuários com permissão de catalogacao podem trata-lo.</div>
       ) : null}
     </div>
   );

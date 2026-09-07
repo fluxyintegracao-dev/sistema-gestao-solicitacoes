@@ -125,10 +125,10 @@ const FILTROS_DA_TELA = [
   { id: 'has_xml', rotulo: 'XML' },
   { id: 'has_pdf', rotulo: 'PDF' },
   { id: 'issuer_cnpj', rotulo: 'CNPJ fornecedor' },
-  { id: 'emission_start', rotulo: 'Emissao de' },
-  { id: 'emission_end', rotulo: 'Emissao ate' },
-  { id: 'min_value', rotulo: 'Valor minimo' },
-  { id: 'max_value', rotulo: 'Valor maximo' }
+  { id: 'emission_start', rotulo: 'Emissão de' },
+  { id: 'emission_end', rotulo: 'Emissão até' },
+  { id: 'min_value', rotulo: 'Valor mínimo' },
+  { id: 'max_value', rotulo: 'Valor máximo' }
 ];
 
 export default function FiscalDocuments() {
@@ -322,9 +322,9 @@ export default function FiscalDocuments() {
     try {
       await navigator.clipboard.writeText(text);
       // Retorno trivial de clipboard: nada foi gravado, o texto ja esta na area de transferencia.
-      avisar.sucesso('Lista de erros copiada para a area de transferencia.', undefined, { efemero: true });
+      avisar.sucesso('Lista de erros copiada para a área de transferência.', undefined, { efemero: true });
     } catch {
-      avisar.erro('Nao foi possivel copiar a lista de erros automaticamente.');
+      avisar.erro('Não foi possível copiar a lista de erros automaticamente.');
     }
   };
 
@@ -339,7 +339,7 @@ export default function FiscalDocuments() {
       <PageHeader
         titulo="Documentos fiscais"
         contagem={loading ? null : `${documents.length} documento(s)`}
-        descricao="Caixa de documentos DFe com importacao manual de XMLs individuais ou ZIP exportado por outro sistema."
+        descricao="Caixa de documentos DFe com importação manual de XMLs individuais ou ZIP exportado por outro sistema."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -353,7 +353,7 @@ export default function FiscalDocuments() {
       */}
       <BlocoConteudo
         titulo="Importar XML/ZIP"
-        descricao="Aceita XMLs individuais ou um ZIP exportado por outro sistema. Documentos ja existentes sao atualizados."
+        descricao="Aceita XMLs individuais ou um ZIP exportado por outro sistema. Documentos já existentes são atualizados."
       >
         <form onSubmit={submitUpload}>
           <FormSecao colunas={2}>
@@ -404,7 +404,7 @@ export default function FiscalDocuments() {
       {importReport ? (
         <BlocoConteudo
           variante="secundario"
-          titulo="Relatorio de importacao"
+          titulo="Relatório de importação"
           descricao={`${Number(importReport.total || 0)} XML(s) lido(s), ${Number(importReport.imported_count || 0)} processado(s), ${Number(importReport.duplicate_count || 0)} reimportado(s) e ${Number(importReport.failed_count || 0)} com erro.`}
           acoes={(
             <>
@@ -456,7 +456,7 @@ export default function FiscalDocuments() {
               getId={(item) => item.original_name}
               storageKey="tabela:documentos-fiscais:falhas-importacao"
               rotuloRolagem="Falhas de importacao"
-              vazio="Nenhuma falha de importacao."
+              vazio="Nenhuma falha de importação."
             />
           ) : null}
         </BlocoConteudo>
@@ -477,14 +477,14 @@ export default function FiscalDocuments() {
           busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filters.q,
             aoMudar: (valor) => updateFilter('q', valor),
-            placeholder: 'Buscar por chave, fornecedor ou numero'
+            placeholder: 'Buscar por chave, fornecedor ou número'
           } : null}
           campos={[
             { id: 'issuer_cnpj', rotulo: 'CNPJ fornecedor', tipo: 'text', valor: filters.issuer_cnpj, aoMudar: (valor) => updateFilter('issuer_cnpj', valor) },
-            { id: 'emission_start', rotulo: 'Emissao de', tipo: 'date', valor: filters.emission_start, aoMudar: (valor) => updateFilter('emission_start', valor) },
-            { id: 'emission_end', rotulo: 'Emissao ate', tipo: 'date', valor: filters.emission_end, aoMudar: (valor) => updateFilter('emission_end', valor) },
-            { id: 'min_value', rotulo: 'Valor minimo', tipo: 'number', valor: filters.min_value, aoMudar: (valor) => updateFilter('min_value', valor) },
-            { id: 'max_value', rotulo: 'Valor maximo', tipo: 'number', valor: filters.max_value, aoMudar: (valor) => updateFilter('max_value', valor) }
+            { id: 'emission_start', rotulo: 'Emissão de', tipo: 'date', valor: filters.emission_start, aoMudar: (valor) => updateFilter('emission_start', valor) },
+            { id: 'emission_end', rotulo: 'Emissão até', tipo: 'date', valor: filters.emission_end, aoMudar: (valor) => updateFilter('emission_end', valor) },
+            { id: 'min_value', rotulo: 'Valor mínimo', tipo: 'number', valor: filters.min_value, aoMudar: (valor) => updateFilter('min_value', valor) },
+            { id: 'max_value', rotulo: 'Valor máximo', tipo: 'number', valor: filters.max_value, aoMudar: (valor) => updateFilter('max_value', valor) }
           ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
           filtros={[
             {
@@ -533,7 +533,7 @@ export default function FiscalDocuments() {
           colunas={[
             {
               id: 'emissao',
-              titulo: 'Emissao',
+              titulo: 'Emissão',
               tipo: 'data',
               render: (item) => (item.emission_date ? new Date(item.emission_date).toLocaleDateString('pt-BR') : '-')
             },
@@ -562,7 +562,7 @@ export default function FiscalDocuments() {
             },
             {
               id: 'numero',
-              titulo: 'Numero',
+              titulo: 'Número',
               tipo: 'codigo',
               render: (item) => item.document_number || '-'
             },
@@ -639,7 +639,7 @@ export default function FiscalDocuments() {
                 </>
               ) : null}
               {!item.xml_storage_key && !item.pdf_storage_key && !item.danfe_storage_key ? (
-                <span className="text-xs text-[var(--c-muted)]">Indisponivel</span>
+                <span className="text-xs text-[var(--c-muted)]">Indisponível</span>
               ) : null}
             </>
           )}

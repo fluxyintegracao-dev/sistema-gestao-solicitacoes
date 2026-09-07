@@ -108,7 +108,7 @@ function ObraBloco({ obra }) {
           <StatTile label="Planilha geral" valor={<Previsto>{formatCurrency(obra.planilha_geral)}</Previsto>} />
         ) : null}
         {orcamento != null ? (
-          <StatTile label="Orcamento" valor={<Previsto>{formatCurrency(orcamento)}</Previsto>} />
+          <StatTile label="Orçamento" valor={<Previsto>{formatCurrency(orcamento)}</Previsto>} />
         ) : null}
         <StatTile
           label="Executado (pago)"
@@ -124,10 +124,10 @@ function ObraBloco({ obra }) {
           valor={<Realizado>{formatCurrency(recebido)}</Realizado>}
         />
         <StatTile label="Falta receber" valor={formatCurrency(faltaReceber)} />
-        <StatTile label="Lucro/Prejuizo" valor={formatCurrency(lucroPrejuizo)} sub="Recebido menos executado" />
+        <StatTile label="Lucro/Prejuízo" valor={formatCurrency(lucroPrejuizo)} sub="Recebido menos executado" />
         {margemRealizada != null ? (
           <StatTile
-            label="Custo / Referencia"
+            label="Custo / Referência"
             valor={`${margemRealizada}%`}
             sub={`meta ${formatPercent(obra.margem_custo_esperada)}`}
           />
@@ -142,7 +142,7 @@ function ObraBloco({ obra }) {
               <span>
                 <span className="texto-realizado">Executado</span>
                 {' / '}
-                <span className="texto-previsto">Orcamento</span>
+                <span className="texto-previsto">Orçamento</span>
               </span>
               <span className="tabular-nums">{pctExecutado.toFixed(1)}%</span>
             </div>
@@ -169,7 +169,7 @@ function ObraBloco({ obra }) {
 
 const DIMENSAO_CLASSIFICACAO = {
   id: 'classificacao',
-  rotulo: 'Classificacao',
+  rotulo: 'Classificação',
   opcoes: [
     { valor: 'PRIVADA', rotulo: 'Privada' },
     { valor: 'PUBLICA', rotulo: 'Publica' }
@@ -253,7 +253,7 @@ export default function FinanceiroResultadoObras() {
       <PageHeader
         titulo="Resultado de Obras"
         contagem={loading ? 'Carregando…' : `${obrasFiltradas.length} obra(s)`}
-        descricao="Visao financeira consolidada por obra — orcado, executado e recebimento."
+        descricao="Visão financeira consolidada por obra — orçado, executado e recebimento."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -286,13 +286,13 @@ export default function FinanceiroResultadoObras() {
         cor="var(--module-financeiro)"
       >
         <StatGrid colunas={3}>
-          <StatTile label="Orcamento" valor={<Previsto>{formatCurrency(resumo.orcamento)}</Previsto>} />
+          <StatTile label="Orçamento" valor={<Previsto>{formatCurrency(resumo.orcamento)}</Previsto>} />
           <StatTile label="Executado" valor={<Realizado>{formatCurrency(resumo.executado)}</Realizado>} />
           <StatTile label="Total a receber" valor={<Previsto>{formatCurrency(resumo.totalReceber)}</Previsto>} />
           <StatTile label="Recebido" valor={<Realizado>{formatCurrency(resumo.recebido)}</Realizado>} />
           <StatTile label="Falta receber" valor={formatCurrency(resumo.faltaReceber)} />
           <StatTile
-            label="Lucro/Prejuizo"
+            label="Lucro/Prejuízo"
             valor={formatCurrency(resumo.lucroPrejuizo)}
             sub="Recebido menos executado"
           />

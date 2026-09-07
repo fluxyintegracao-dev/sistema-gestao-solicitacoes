@@ -91,7 +91,7 @@ function linhaVazia(colaborador) {
 */
 const FILTROS_DA_TELA = [
   { id: 'competencia', rotulo: 'Competência' },
-  { id: 'diasBase', rotulo: 'Dias base do mes' },
+  { id: 'diasBase', rotulo: 'Dias base do mês' },
   { id: 'obra', rotulo: 'Obra' },
   { id: 'empresa', rotulo: 'Empresa do grupo' }
 ];
@@ -187,7 +187,7 @@ export default function RhDpJornada() {
 
   const carregar = useCallback(async () => {
     if (!obra || !competencia) {
-      avisar.erro('Escolha a obra e a competencia.');
+      avisar.erro('Escolha a obra e a competência.');
       return;
     }
     setCarregando(true);
@@ -206,7 +206,7 @@ export default function RhDpJornada() {
           + `${futuros.length} colaborador(es) comecam depois — eles aparecem abaixo, sem campos.`
         );
       } else if (!comecaram.length) {
-        avisar.alerta('Nenhum colaborador esteve nesta obra nesta competencia.');
+        avisar.alerta('Nenhum colaborador esteve nesta obra nesta competência.');
       }
     } catch (error) {
       avisar.erro(error.message || 'Não foi possível montar a lista.');
@@ -293,7 +293,7 @@ export default function RhDpJornada() {
 
     if (jaInformados) {
       const { ok } = await confirmar({
-        titulo: 'Substituir a jornada ja informada',
+        titulo: 'Substituir a jornada já informada',
         mensagem: `Ja existe jornada informada nesta obra em ${competencia}. O envio novo `
           + 'SUBSTITUI o anterior — ele nao soma. O envio anterior fica guardado como historico. '
           + 'Enviar mesmo assim?',
@@ -373,7 +373,7 @@ export default function RhDpJornada() {
             },
             {
               id: 'diasBase',
-              rotulo: 'Dias base do mes',
+              rotulo: 'Dias base do mês',
               tipo: 'number',
               valor: diasBase,
               aoMudar: setDiasBase,
@@ -397,7 +397,7 @@ export default function RhDpJornada() {
             </button>
             {linhas.length ? (
               <button type="button" className="btn btn-outline" onClick={preencherMesCheio}>
-                Preencher mes cheio
+                Preencher mês cheio
               </button>
             ) : null}
           </div>
@@ -427,7 +427,7 @@ export default function RhDpJornada() {
       {linhas.length ? (
         <form onSubmit={enviar} className="rh-form-com-tabela space-y-4">
           <BlocoConteudo
-            titulo="Lancamento por colaborador"
+            titulo="Lançamento por colaborador"
             variante="primario"
             cor="var(--c-primary)"
             contagem={`${linhas.length} colaborador(es)`}
@@ -466,7 +466,7 @@ export default function RhDpJornada() {
                 },
                 {
                   id: 'salario',
-                  titulo: 'Salario',
+                  titulo: 'Salário',
                   tipo: 'valor',
                   render: (linha) => (linha.salario_base ? formatCurrencyInput(String(linha.salario_base)) : '—')
                 },
@@ -521,12 +521,12 @@ export default function RhDpJornada() {
                 },
                 {
                   id: 'acrescimos',
-                  titulo: 'Acrescimos',
+                  titulo: 'Acréscimos',
                   tipo: 'valor',
                   render: (linha) => (linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
                     <input
                       className="form-control rh-jornada-numero"
-                      aria-label={`Acrescimos de ${linha.nome}`}
+                      aria-label={`Acréscimos de ${linha.nome}`}
                       value={linha.adicionais}
                       onChange={(e) => alterar(linha.__indice, 'adicionais', formatCurrencyInput(e.target.value))}
                     />
@@ -547,12 +547,12 @@ export default function RhDpJornada() {
                 },
                 {
                   id: 'observacao',
-                  titulo: 'Observacao',
+                  titulo: 'Observação',
                   tipo: 'texto',
                   render: (linha) => (linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
                     <input
                       className="form-control"
-                      aria-label={`Observacao de ${linha.nome}`}
+                      aria-label={`Observação de ${linha.nome}`}
                       value={linha.observacoes}
                       onChange={(e) => alterar(linha.__indice, 'observacoes', e.target.value)}
                     />
@@ -569,7 +569,7 @@ export default function RhDpJornada() {
                 if (Number(linha.dias_trabalhados || 0) + Number(linha.faltas || 0) > Number(diasBase)) return 'danger';
                 return linha.aindaNaoComecou ? 'warning' : null;
               }}
-              vazio="Nenhum colaborador nesta obra e competencia."
+              vazio="Nenhum colaborador nesta obra e competência."
             />
           </BlocoConteudo>
 
@@ -585,7 +585,7 @@ export default function RhDpJornada() {
                 {salvando ? 'Enviando...' : 'Enviar jornada'}
               </button>
             ) : (
-              <p className="app-bloco-lead" title="Voce nao tem permissao para enviar jornada.">Voce nao tem permissao para enviar jornada.</p>
+              <p className="app-bloco-lead" title="Você não tem permissão para enviar jornada.">Você não tem permissão para enviar jornada.</p>
             )}
           </div>
         </form>

@@ -2,7 +2,10 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { getTemaSistema, salvarTemaSistema } from '../services/configuracoesSistema';
 import { useAuth } from './AuthContext';
 
-const ThemeContext = createContext();
+/* Exportado para as fixtures de prova montarem os componentes reais com o
+   tema padrão sem subir o provider inteiro (que busca API e depende do
+   AuthContext) — mesmo caminho que o `PreferenciasContext` já usa. */
+export const ThemeContext = createContext();
 
 export const TEMA_PADRAO = {
   palette: {

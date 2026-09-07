@@ -96,7 +96,7 @@ function extractErrorMessage(error) {
 */
 const FILTROS_DA_TELA = [
   { id: 'data_inicio', rotulo: 'Pedido criado de' },
-  { id: 'data_fim', rotulo: 'Pedido criado ate' },
+  { id: 'data_fim', rotulo: 'Pedido criado até' },
   { id: 'obra_id', rotulo: 'Obra / Centro de custo' }
 ];
 
@@ -262,9 +262,9 @@ export default function ComprasRelatorioPrecosInsumos() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Precos por Insumo"
-        contagem="Compras / Relatorios"
-        descricao="Preco medio de compra por insumo e fornecedor, calculado pelos itens reais dos pedidos."
+        titulo="Preços por Insumo"
+        contagem="Compras / Relatórios"
+        descricao="Preço médio de compra por insumo e fornecedor, calculado pelos itens reais dos pedidos."
         /* R11: o retorno ao hub de relatórios mora na seta do cabeçalho. */
         voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
         acaoPrincipal={{
@@ -289,7 +289,7 @@ export default function ComprasRelatorioPrecosInsumos() {
             },
             {
               id: 'data_fim',
-              rotulo: 'Pedido criado ate',
+              rotulo: 'Pedido criado até',
               tipo: 'date',
               valor: filtros.data_fim,
               aoMudar: (valor) => mudarCampo('data_fim', valor)
@@ -306,8 +306,8 @@ export default function ComprasRelatorioPrecosInsumos() {
       <StatGrid colunas={3}>
         <StatTile label="Itens lancados" valor={formatNumber(resumo.itens_lancados)} sub="Itens reais de pedidos" />
         <StatTile label="Itens distintos" valor={formatNumber(resumo.itens_distintos)} sub="Insumos ou manuais agrupados" />
-        <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com itens no periodo" />
-        <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Pedidos usados no calculo" />
+        <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com itens no período" />
+        <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Pedidos usados no cálculo" />
         <StatTile label="Valor analisado" valor={formatMoney(resumo.valor_total)} sub="Soma dos itens" />
         <StatTile label="Mais de um fornecedor" valor={formatNumber(resumo.itens_com_mais_de_um_fornecedor)} sub="Itens comparaveis" />
       </StatGrid>
@@ -333,8 +333,8 @@ export default function ComprasRelatorioPrecosInsumos() {
           célula: agora é o componente, que já traz o par de tons por token.
         */}
         <BlocoConteudo
-          titulo="Insumos por preco medio"
-          descricao="Resumo por item comprado, com menor preco medio observado entre fornecedores."
+          titulo="Insumos por preço médio"
+          descricao="Resumo por item comprado, com menor preço médio observado entre fornecedores."
           variante="primario"
           cor="var(--c-primary)"
         >
@@ -358,10 +358,10 @@ export default function ComprasRelatorioPrecosInsumos() {
               { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
               { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
               { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
-              { id: 'preco_medio', titulo: 'Preco medio', tipo: 'valor', render: (item) => formatMoney(item.preco_medio_geral) },
+              { id: 'preco_medio', titulo: 'Preço médio', tipo: 'valor', render: (item) => formatMoney(item.preco_medio_geral) },
               {
                 id: 'melhor',
-                titulo: 'Melhor fornecedor medio',
+                titulo: 'Melhor fornecedor médio',
                 tipo: 'texto',
                 render: (item) => (
                   <CelulaDupla
@@ -383,7 +383,7 @@ export default function ComprasRelatorioPrecosInsumos() {
         <div data-bloco-id="comparativo-por-fornecedor" data-bloco-rotulo="Comparativo por fornecedor" className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <BlocoConteudo
             titulo="Comparativo por fornecedor"
-            descricao="Cada linha compara o preco medio do fornecedor contra o menor preco medio do mesmo item."
+            descricao="Cada linha compara o preço médio do fornecedor contra o menor preço médio do mesmo item."
           >
             <TabelaPadrao
               colunas={[
@@ -401,11 +401,11 @@ export default function ComprasRelatorioPrecosInsumos() {
                 { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
                 { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
                 { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
-                { id: 'preco', titulo: 'Preco medio', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.preco_medio)}</span> },
-                { id: 'menor', titulo: 'Menor medio', tipo: 'valor', render: (item) => formatMoney(item.menor_preco_medio_item) },
+                { id: 'preco', titulo: 'Preço médio', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.preco_medio)}</span> },
+                { id: 'menor', titulo: 'Menor médio', tipo: 'valor', render: (item) => formatMoney(item.menor_preco_medio_item) },
                 {
                   id: 'diferenca',
-                  titulo: 'Diferenca',
+                  titulo: 'Diferença',
                   tipo: 'valor',
                   /*
                     R25: `text-amber-700` / `text-emerald-700` viravam a única
@@ -432,7 +432,7 @@ export default function ComprasRelatorioPrecosInsumos() {
                     />
                   )
                 },
-                { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
+                { id: 'ultimo', titulo: 'Último pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
               ]}
               itens={comparativo}
               getId={(item) => `${item.item_key}-${item.fornecedor_id || 'sem'}`}

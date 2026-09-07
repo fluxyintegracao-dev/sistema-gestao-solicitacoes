@@ -151,7 +151,7 @@ export default function GestaoCategoriasMacro() {
       <PageHeader
         titulo="Categorias Macro"
         contagem={loading ? null : `${categorias.length} categoria(s)`}
-        descricao="Base de classificacao do modulo de provisionamento."
+        descricao="Base de classificação do módulo de provisionamento."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -165,7 +165,7 @@ export default function GestaoCategoriasMacro() {
       */}
       <BlocoConteudo titulo="Nova categoria macro">
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <FormSecao legenda="Identificacao" colunas={2}>
+          <FormSecao legenda="Identificação" colunas={2}>
             <CampoForm label="Nome" obrigatorio>
               <input
                 className="input w-full"
@@ -175,7 +175,7 @@ export default function GestaoCategoriasMacro() {
               />
             </CampoForm>
 
-            <CampoForm label="Ordem de exibicao" hint="Define a posicao da categoria nas listas do modulo.">
+            <CampoForm label="Ordem de exibição" hint="Define a posicao da categoria nas listas do modulo.">
               <input
                 className="input w-full"
                 type="number"
@@ -184,7 +184,7 @@ export default function GestaoCategoriasMacro() {
               />
             </CampoForm>
 
-            <CampoForm label="Descricao" tipo="texto-longo" span={2}>
+            <CampoForm label="Descrição" tipo="texto-longo" span={2}>
               {/* R10: a altura do textarea vem da folha do sistema
                   (textarea.input), não do `min-h-[96px]` que estava aqui. */}
               <textarea
@@ -211,7 +211,7 @@ export default function GestaoCategoriasMacro() {
         /* C2 × B3: o TOTAL está na faixa; aqui fica o RECORTE que só este
            bloco sabe — quantas estão ativas e quantas foram desativadas. */
         contagem={loading ? null : `${ativas} ativa(s) · ${inativas} inativa(s)`}
-        descricao="Categoria desativada some das listas de escolha, mas continua nas provisoes ja classificadas."
+        descricao="Categoria desativada some das listas de escolha, mas continua nas provisões já classificadas."
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -237,13 +237,13 @@ export default function GestaoCategoriasMacro() {
               // TRAVADAS (05/09): fora do modo de edicao mostram texto, mas e aqui que o
               // campo vira editavel — esconder tira o editar, nao o dado.
               sempreVisivel: true,
-              titulo: 'Descricao',
+              titulo: 'Descrição',
               tipo: 'texto',
               render: (categoria) => (editId === categoria.id ? (
                 <textarea
                   className="input w-full"
                   value={editForm.descricao}
-                  aria-label="Descricao da categoria macro"
+                  aria-label="Descrição da categoria macro"
                   onChange={(event) => setEditForm((atual) => ({ ...atual, descricao: event.target.value }))}
                 />
               ) : (
@@ -261,7 +261,7 @@ export default function GestaoCategoriasMacro() {
                   className="input w-full"
                   type="number"
                   value={editForm.ordem_exibicao}
-                  aria-label="Ordem de exibicao"
+                  aria-label="Ordem de exibição"
                   onChange={(event) => setEditForm((atual) => ({ ...atual, ordem_exibicao: event.target.value }))}
                 />
               ) : (categoria.ordem_exibicao ?? '-'))

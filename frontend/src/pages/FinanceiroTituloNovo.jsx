@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
@@ -357,7 +358,7 @@ function getParceiroPixOptions(parceiro) {
     },
     {
       id: 'pix_chave_variavel',
-      label: 'Chave variavel',
+      label: 'Chave variável',
       tipo: parceiro.pix_chave_variavel_tipo,
       chave: parceiro.pix_chave_variavel
     }
@@ -1526,7 +1527,7 @@ export default function FinanceiroTituloNovo() {
         mensagem: quantidadeCriada > 1
           ? `${quantidadeCriada} titulos foram criados a partir deste cadastro (uma por parcela/forma de pagamento), somando ${resumoValor}, para ${nomeParceiro}. O primeiro deles e o ${codigoTitulo}.`
           : `Titulo ${codigoTitulo} criado no valor de ${resumoValor} para ${nomeParceiro}.`,
-        rotuloConfirmar: quantidadeCriada > 1 ? 'Abrir o primeiro titulo' : 'Abrir o titulo criado',
+        rotuloConfirmar: quantidadeCriada > 1 ? 'Abrir o primeiro titulo' : 'Abrir o título criado',
         rotuloCancelar: `Voltar para ${tituloListLabel}`
       });
       navigate(abrirTitulo ? `/financeiro/titulos/${titulo.id}` : tituloListPath);
@@ -1570,7 +1571,7 @@ export default function FinanceiroTituloNovo() {
     <Pagina>
       <PageHeader
         titulo={form.tipo === 'RECEBER' ? 'Nova conta a receber' : 'Nova conta a pagar'}
-        descricao="Conta manual, que nao nasceu de solicitacao nem de contrato de venda."
+        descricao="Conta manual, que não nasceu de solicitação nem de contrato de venda."
         voltar={{ to: tituloListPath, title: `Voltar para ${tituloListLabel}` }}
       />
 
@@ -1585,11 +1586,11 @@ export default function FinanceiroTituloNovo() {
           <BlocoConteudo
             variante="primario"
             cor="var(--module-financeiro)"
-            descricao="Em previsao, aberto ou parcial a conta ja entra no previsto, mesmo sem solicitacao vinculada."
+            descricao="Em previsão, aberto ou parcial a conta já entra no previsto, mesmo sem solicitação vinculada."
           >
             <div className="space-y-4">
 
-              <FormSecao legenda="Identificacao da conta" colunas={3}>
+              <FormSecao legenda="Identificação da conta" colunas={3}>
                 <CampoForm label="Tipo" obrigatorio>
                   <select
                     className="input w-full"
@@ -1612,7 +1613,7 @@ export default function FinanceiroTituloNovo() {
                     onChange={(event) => updateField('status', event.target.value)}
                   >
                     <option value="ABERTO">Aberto</option>
-                    <option value="PREVISAO">Previsao</option>
+                    <option value="PREVISAO">Previsão</option>
                   </select>
                 </CampoForm>
 
@@ -1773,7 +1774,7 @@ export default function FinanceiroTituloNovo() {
                   </span>
                 </div>
 
-                <CampoForm label="Descricao" obrigatorio span={2}>
+                <CampoForm label="Descrição" obrigatorio span={2}>
                   <input
                     className="input w-full"
                     placeholder="Ex.: Aluguel administrativo, recebimento de cliente, ajuste de caixa"
@@ -1783,10 +1784,10 @@ export default function FinanceiroTituloNovo() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Numero do documento">
+                <CampoForm label="Número do documento">
                   <input
                     className="input w-full"
-                    placeholder="NF, boleto, recibo ou referencia interna"
+                    placeholder="NF, boleto, recibo ou referência interna"
                     value={form.numero_documento}
                     onChange={(event) => updateField('numero_documento', event.target.value)}
                   />
@@ -1797,7 +1798,7 @@ export default function FinanceiroTituloNovo() {
                   alinhado à direita, tabular-nums. Inclusive os campos de
                   LEITURA (líquido e total das formas): número de dinheiro que
                   não alinha com o de cima obriga a conferir com o dedo. */}
-              <FormSecao legenda="Valores do titulo" colunas={3}>
+              <FormSecao legenda="Valores do título" colunas={3}>
                 <CampoForm label="Valor" obrigatorio>
                   <input
                     className="input input-moeda w-full"
@@ -1821,7 +1822,7 @@ export default function FinanceiroTituloNovo() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Valor liquido previsto" hint="Valor menos retencoes e desconto, mais acrescimos.">
+                <CampoForm label="Valor líquido previsto" hint="Valor menos retencoes e desconto, mais acrescimos.">
                   <div className="valor-tabular input-moeda flex min-h-12 items-center justify-end rounded-lg border border-[var(--c-border)] bg-[var(--ui-surface-2)] px-3 py-2 text-sm text-[var(--c-muted)]">
                     {formatCurrency(valorLiquidoPrevisto)}
                   </div>
@@ -1851,15 +1852,14 @@ export default function FinanceiroTituloNovo() {
                     </span>
                   </div>
                   <span className="form-hint">
-                    A soma das formas tem de ser igual ao valor do titulo para salvar.
+                    A soma das formas tem de ser igual ao valor do título para salvar.
                   </span>
                 </div>
               </FormSecao>
 
-              <FormSecao legenda="Datas e competencia" colunas={3}>
-                <CampoForm label="Data de emissao">
-                  <input
-                    type="date"
+              <FormSecao legenda="Datas e competência" colunas={3}>
+                <CampoForm label="Data de emissão">
+                  <DateInputBR
                     className="input w-full"
                     value={form.data_emissao}
                     onChange={(event) => updateField('data_emissao', event.target.value)}
@@ -1867,14 +1867,13 @@ export default function FinanceiroTituloNovo() {
                 </CampoForm>
 
                 <CampoForm
-                  label="Competencia DRE"
+                  label="Competência DRE"
                   obrigatorio={isCategoriaClassificadaParaDre(categoriaSelecionada)}
                   hint={isCategoriaClassificadaParaDre(categoriaSelecionada)
                     ? 'Obrigatoria para DRE. Use o mes do fato gerador, nao o vencimento.'
                     : 'Opcional quando o titulo nao entra na DRE.'}
                 >
-                  <input
-                    type="date"
+                  <DateInputBR
                     className="input w-full"
                     value={form.competencia_data}
                     onChange={(event) => updateField('competencia_data', event.target.value)}
@@ -1884,7 +1883,7 @@ export default function FinanceiroTituloNovo() {
 
                 {moduloApropriacoesHabilitado && obraSelecionadaEhObra && (
                   <CampoForm
-                    label="Item de apropriacao"
+                    label="Item de apropriação"
                     hint={!form.obra_id
                       ? 'Selecione uma obra para ver os itens.'
                       : loadingApropriacoes
@@ -1899,7 +1898,7 @@ export default function FinanceiroTituloNovo() {
                       onChange={(event) => updateField('apropriacao_id', event.target.value)}
                       disabled={!form.obra_id || loadingApropriacoes}
                     >
-                      <option value="">Sem apropriacao</option>
+                      <option value="">Sem apropriação</option>
                       {apropriacoes.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.codigo ? `${item.codigo} — ${item.descricao}` : item.descricao}
@@ -1913,7 +1912,7 @@ export default function FinanceiroTituloNovo() {
               <BlocoConteudo
                 titulo="Formas de pagamento"
                 variante="secundario"
-                descricao="Combine pix, cartao, boleto ou cheque ate fechar o valor total do titulo."
+                descricao="Combine pix, cartão, boleto ou cheque até fechar o valor total do título."
                 contagem={`${quantidadePagamentos} forma(s)`}
               >
                 <div className="space-y-3">
@@ -1961,7 +1960,7 @@ export default function FinanceiroTituloNovo() {
                           <div className="rounded-2xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] p-3">
                             <div className="form-group">
                               <span className="form-label form-label--required">
-                                {form.tipo === 'RECEBER' ? 'Cliente deste titulo' : 'Credor deste titulo'}
+                                {form.tipo === 'RECEBER' ? 'Cliente deste titulo' : 'Credor deste título'}
                               </span>
                               <input
                                 className="input w-full"
@@ -2001,7 +2000,7 @@ export default function FinanceiroTituloNovo() {
 
                         {quantidadePagamentos > 1 && (
                           <CategoriaFinanceiraAutocomplete
-                            label="Categoria financeira deste titulo"
+                            label="Categoria financeira deste título"
                             value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
                             options={categoriasFiltradas}
                             onChange={(categoriaId) => updatePagamento(pagamentoIndex, {
@@ -2018,7 +2017,7 @@ export default function FinanceiroTituloNovo() {
                               value={pagamento.forma_pagamento_id}
                               onChange={(event) => updateFormaPagamento(pagamentoIndex, event.target.value)}
                             >
-                              <option value="">Nao informar</option>
+                              <option value="">Não informar</option>
                               {formasPagamento.filter((item) => item.ativo !== false).map((item) => (
                                 <option key={item.id} value={item.id}>{item.nome}</option>
                               ))}
@@ -2066,9 +2065,8 @@ export default function FinanceiroTituloNovo() {
 
                           {usaCartao ? (
                             <CampoForm label="Data da compra">
-                              <input
+                              <DateInputBR
                                 className="input w-full"
-                                type="date"
                                 value={pagamento.data_compra}
                                 onChange={(event) => updatePagamento(pagamentoIndex, { data_compra: event.target.value })}
                               />
@@ -2079,9 +2077,8 @@ export default function FinanceiroTituloNovo() {
                             </CampoForm>
                           ) : (
                             <CampoForm label="Vencimento" obrigatorio>
-                              <input
+                              <DateInputBR
                                 className="input w-full"
-                                type="date"
                                 value={pagamento.data_vencimento}
                                 onChange={(event) => updatePagamento(pagamentoIndex, { data_vencimento: event.target.value })}
                                 required
@@ -2091,7 +2088,7 @@ export default function FinanceiroTituloNovo() {
 
                           {forma?.exige_cartao && (
                             <CampoForm
-                              label="Cartao"
+                              label="Cartão"
                               span={2}
                               hint="A conta vinculada ao cartao define a empresa da movimentacao bancaria."
                             >
@@ -2100,7 +2097,7 @@ export default function FinanceiroTituloNovo() {
                                 value={pagamento.cartao_id || ''}
                                 onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
                               >
-                                <option value="">Selecione o cartao</option>
+                                <option value="">Selecione o cartão</option>
                                 {cartoesFiltrados.map((cartao) => {
                                   const empresaCartao = cartao?.contaBancaria?.empresa;
                                   const nomeEmpresa = empresaCartao?.nome || empresaCartao?.razao_social;
@@ -2155,9 +2152,8 @@ export default function FinanceiroTituloNovo() {
                                     />
                                   </CampoForm>
                                   <CampoForm label="Vencimento" obrigatorio>
-                                    <input
+                                    <DateInputBR
                                       className="input w-full"
-                                      type="date"
                                       value={parcela.data_vencimento || ''}
                                       onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'data_vencimento', event.target.value)}
                                       required
@@ -2166,7 +2162,7 @@ export default function FinanceiroTituloNovo() {
 
                                   {formaAceitaDadosBoletoOuGuia(forma) && (
                                     <>
-                                      <CampoForm label="Documento ou referencia" span={2}>
+                                      <CampoForm label="Documento ou referência" span={2}>
                                         <input
                                           className="input w-full"
                                           value={parcela.numero_documento || ''}
@@ -2174,7 +2170,7 @@ export default function FinanceiroTituloNovo() {
                                           placeholder={isFormaOutros(forma) ? 'Referencia da guia ou pagamento' : 'Nosso numero ou referencia'}
                                         />
                                       </CampoForm>
-                                      <CampoForm label="Codigo do banco">
+                                      <CampoForm label="Código do banco">
                                         <input
                                           className="input w-full"
                                           inputMode="numeric"
@@ -2185,20 +2181,20 @@ export default function FinanceiroTituloNovo() {
                                           placeholder="Ex.: 001, 104, 237"
                                         />
                                       </CampoForm>
-                                      <CampoForm label="Linha digitavel">
+                                      <CampoForm label="Linha digitável">
                                         <input
                                           className="input w-full"
                                           value={parcela.linha_digitavel || ''}
                                           onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'linha_digitavel', event.target.value)}
-                                          placeholder="Linha digitavel, se houver"
+                                          placeholder="Linha digitável, se houver"
                                         />
                                       </CampoForm>
-                                      <CampoForm label="Codigo de barras" span={2}>
+                                      <CampoForm label="Código de barras" span={2}>
                                         <input
                                           className="input w-full"
                                           value={parcela.codigo_barras || ''}
                                           onChange={(event) => updateParcela(pagamentoIndex, parcelaIndex, 'codigo_barras', event.target.value)}
-                                          placeholder="Codigo de barras, se houver"
+                                          placeholder="Código de barras, se houver"
                                         />
                                       </CampoForm>
                                     </>
@@ -2207,7 +2203,7 @@ export default function FinanceiroTituloNovo() {
 
                                 {isFormaCheque(forma) && (
                                   <div className="mt-3 rounded-xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] px-3 py-2 text-xs text-[var(--sem-warning)]">
-                                    Os dados do cheque serao informados na baixa, quando o instrumento real for definido.
+                                    Os dados do cheque serão informados na baixa, quando o instrumento real for definido.
                                   </div>
                                 )}
                               </div>
@@ -2222,14 +2218,14 @@ export default function FinanceiroTituloNovo() {
 
               {form.tipo === 'RECEBER' && (
                 <BlocoConteudo
-                  titulo="Cobranca bancaria"
+                  titulo="Cobrança bancária"
                   variante="secundario"
-                  descricao="Opcional. Preencha quando a cobranca deste recebimento for controlada por boleto, pix ou outro instrumento emitido."
+                  descricao="Opcional. Preencha quando a cobrança deste recebimento for controlada por boleto, pix ou outro instrumento emitido."
                   recolhivel
                   recolhidoPadrao={!form.forma_cobranca}
                 >
                   <FormSecao colunas={3}>
-                    <CampoForm label="Forma de cobranca">
+                    <CampoForm label="Forma de cobrança">
                       <select
                         className="input w-full"
                         value={form.forma_cobranca}
@@ -2239,7 +2235,7 @@ export default function FinanceiroTituloNovo() {
                           status_cobranca: event.target.value ? (current.status_cobranca || 'PENDENTE_EMISSAO') : 'PENDENTE_EMISSAO'
                         }))}
                       >
-                        <option value="">Nao controlar</option>
+                        <option value="">Não controlar</option>
                         {FORMAS_COBRANCA.map((item) => (
                           <option key={item} value={item}>{item}</option>
                         ))}
@@ -2247,7 +2243,7 @@ export default function FinanceiroTituloNovo() {
                     </CampoForm>
 
                     <CampoForm
-                      label="Status da cobranca"
+                      label="Status da cobrança"
                       hint={form.forma_cobranca ? undefined : 'Escolha uma forma de cobranca para liberar este campo.'}
                     >
                       <select
@@ -2262,7 +2258,7 @@ export default function FinanceiroTituloNovo() {
                       </select>
                     </CampoForm>
 
-                    <CampoForm label="Codigo do banco da cobranca">
+                    <CampoForm label="Código do banco da cobrança">
                       <input
                         className="input w-full"
                         inputMode="numeric"
@@ -2275,15 +2271,14 @@ export default function FinanceiroTituloNovo() {
                     </CampoForm>
 
                     <CampoForm label="Emitido em">
-                      <input
-                        type="date"
+                      <DateInputBR
                         className="input w-full"
                         value={form.boleto_emitido_em}
                         onChange={(event) => updateField('boleto_emitido_em', event.target.value)}
                       />
                     </CampoForm>
 
-                    <CampoForm label="Nosso numero">
+                    <CampoForm label="Nosso número">
                       <input
                         className="input w-full"
                         value={form.nosso_numero}
@@ -2294,13 +2289,13 @@ export default function FinanceiroTituloNovo() {
                     <CampoForm label="Identificador externo">
                       <input
                         className="input w-full"
-                        placeholder="ID da cobranca no banco"
+                        placeholder="ID da cobrança no banco"
                         value={form.identificador_externo}
                         onChange={(event) => updateField('identificador_externo', event.target.value)}
                       />
                     </CampoForm>
 
-                    <CampoForm label="Linha digitavel" span={2}>
+                    <CampoForm label="Linha digitável" span={2}>
                       <input
                         className="input w-full"
                         value={form.linha_digitavel}
@@ -2308,7 +2303,7 @@ export default function FinanceiroTituloNovo() {
                       />
                     </CampoForm>
 
-                    <CampoForm label="Codigo de barras" span={2}>
+                    <CampoForm label="Código de barras" span={2}>
                       <input
                         className="input w-full"
                         value={form.codigo_barras}
@@ -2320,9 +2315,9 @@ export default function FinanceiroTituloNovo() {
               )}
 
               <BlocoConteudo
-                titulo="Movimentacao entre empresas do grupo"
+                titulo="Movimentação entre empresas do grupo"
                 variante="secundario"
-                descricao="Opcional. Use nas formas sem cartao — para cartoes, a conta vinculada ja define as empresas envolvidas."
+                descricao="Opcional. Use nas formas sem cartão — para cartões, a conta vinculada já define as empresas envolvidas."
                 recolhivel
                 recolhidoPadrao={!form.intercompany}
               >
@@ -2335,9 +2330,9 @@ export default function FinanceiroTituloNovo() {
                       onChange={(event) => updateField('intercompany', event.target.checked)}
                     />
                     <span className="grid gap-1">
-                      <span className="font-medium">Este titulo e uma movimentacao entre empresas do grupo</span>
+                      <span className="font-medium">Este título e uma movimentação entre empresas do grupo</span>
                       <span className="app-note">
-                        Ao marcar, informe empresa origem, empresa destino e o tipo da movimentacao.
+                        Ao marcar, informe empresa origem, empresa destino e o tipo da movimentação.
                       </span>
                     </span>
                   </label>
@@ -2378,7 +2373,7 @@ export default function FinanceiroTituloNovo() {
                       </select>
                     </CampoForm>
 
-                    <CampoForm label="Tipo da movimentacao" obrigatorio={Boolean(form.intercompany)}>
+                    <CampoForm label="Tipo da movimentação" obrigatorio={Boolean(form.intercompany)}>
                       <select
                         className="input w-full"
                         value={form.tipo_intercompany}
@@ -2392,7 +2387,7 @@ export default function FinanceiroTituloNovo() {
                       </select>
                     </CampoForm>
 
-                    <CampoForm label="Grupo da movimentacao" hint="Opcional. Amarra varias movimentacoes na mesma operacao.">
+                    <CampoForm label="Grupo da movimentação" hint="Opcional. Amarra varias movimentacoes na mesma operacao.">
                       <input
                         className="input w-full"
                         value={form.intercompany_group_id}
@@ -2408,7 +2403,7 @@ export default function FinanceiroTituloNovo() {
                         value={form.motivo_intercompany}
                         onChange={(event) => updateField('motivo_intercompany', event.target.value)}
                         disabled={!form.intercompany}
-                        placeholder="Por que a movimentacao aconteceu"
+                        placeholder="Por que a movimentação aconteceu"
                       />
                     </CampoForm>
                   </FormSecao>
@@ -2418,7 +2413,7 @@ export default function FinanceiroTituloNovo() {
               <BlocoConteudo
                 titulo="Rateio por obra/centro de custo"
                 variante="secundario"
-                descricao="Opcional. Use quando o mesmo titulo precisa compor mais de uma obra no financeiro de obras."
+                descricao="Opcional. Use quando o mesmo título precisa compor mais de uma obra no financeiro de obras."
                 contagem={(form.rateios || []).length === 0
                   ? 'Sem rateio'
                   : `${formatCurrency(totalRateioValor)} · ${totalRateioPercentual.toFixed(2)}%`}
@@ -2501,7 +2496,7 @@ export default function FinanceiroTituloNovo() {
                           </CampoForm>
                         )}
 
-                        <CampoForm label="Observacoes do rateio">
+                        <CampoForm label="Observações do rateio">
                           <input
                             className="input w-full"
                             placeholder="Opcional"
@@ -2529,10 +2524,10 @@ export default function FinanceiroTituloNovo() {
               </BlocoConteudo>
 
               <BlocoConteudo
-                titulo="Impostos, retencoes e descontos"
+                titulo="Impostos, retenções e descontos"
                 variante="secundario"
-                descricao="Opcional. Registre os valores que explicam a diferenca entre o bruto e o liquido do titulo."
-                contagem={`Liquido previsto: ${formatCurrency(valorLiquidoPrevisto)}`}
+                descricao="Opcional. Registre os valores que explicam a diferença entre o bruto e o líquido do título."
+                contagem={`Líquido previsto: ${formatCurrency(valorLiquidoPrevisto)}`}
                 recolhivel
                 recolhidoPadrao={(form.impostos || []).length === 0}
               >
@@ -2552,8 +2547,8 @@ export default function FinanceiroTituloNovo() {
                             value={imposto.natureza}
                             onChange={(event) => updateImposto(impostoIndex, 'natureza', event.target.value)}
                           >
-                            <option value="RETENCAO">Retencao/desconto</option>
-                            <option value="ACRESCIMO">Acrescimo</option>
+                            <option value="RETENCAO">Retenção/desconto</option>
+                            <option value="ACRESCIMO">Acréscimo</option>
                           </select>
                         </CampoForm>
 
@@ -2566,7 +2561,7 @@ export default function FinanceiroTituloNovo() {
                           />
                         </CampoForm>
 
-                        <CampoForm label="Base de calculo">
+                        <CampoForm label="Base de cálculo">
                           <input
                             className="input input-moeda w-full"
                             inputMode="decimal"
@@ -2640,7 +2635,7 @@ export default function FinanceiroTituloNovo() {
                       <span className="grid gap-1">
                         <span className="font-medium">Preparar PIX para este credor</span>
                         <span className="app-note">
-                          O favorecido vinculado e o cadastro bancario rastreado usado no lote PIX. Pode ser o proprio credor do titulo ou um favorecido separado, com snapshot travado quando o lote for criado.
+                          O favorecido vinculado e o cadastro bancário rastreado usado no lote PIX. Pode ser o próprio credor do título ou um favorecido separado, com snapshot travado quando o lote for criado.
                         </span>
                       </span>
                     </label>
@@ -2672,7 +2667,7 @@ export default function FinanceiroTituloNovo() {
                         </div>
 
                         <CampoForm
-                          label="Favorecido bancario vinculado"
+                          label="Favorecido bancário vinculado"
                           span={2}
                           hint="Se nao houver favorecido salvo, use o proprio credor ou informe os dados abaixo."
                         >
@@ -2784,9 +2779,8 @@ export default function FinanceiroTituloNovo() {
                         </CampoForm>
 
                         <CampoForm label="Data de pagamento">
-                          <input
+                          <DateInputBR
                             className="input w-full"
-                            type="date"
                             value={paymentDraft.data_pagamento || form.data_vencimento}
                             onChange={(event) => setPaymentDraft((current) => ({ ...current, data_pagamento: event.target.value }))}
                           />
@@ -2794,7 +2788,7 @@ export default function FinanceiroTituloNovo() {
 
                         <div className="form-group form-campo--linha">
                           <span className="app-note">
-                            O titulo guarda o parceiro como origem. O lote futuro cria snapshot imutavel do favorecido, valor e conta pagadora.
+                            O título guarda o parceiro como origem. O lote futuro cria snapshot imutavel do favorecido, valor e conta pagadora.
                           </span>
                         </div>
                       </FormSecao>
@@ -2807,10 +2801,10 @@ export default function FinanceiroTituloNovo() {
                   e repetir "Observações" duas vezes é a mesma informação
                   aparecendo duas vezes na tela. */}
               <FormSecao>
-                <CampoForm label="Observacoes" tipo="observacao">
+                <CampoForm label="Observações" tipo="observacao">
                   <textarea
                     className="input w-full"
-                    placeholder="Informacoes adicionais para a operacao financeira"
+                    placeholder="Informações adicionais para a operação financeira"
                     value={form.observacoes}
                     onChange={(event) => updateField('observacoes', event.target.value)}
                   />
@@ -2871,7 +2865,7 @@ export default function FinanceiroTituloNovo() {
               <div>
                 <h2 className="app-bloco-titulo">Selecionar categoria financeira</h2>
                 <p className="text-xs text-[var(--c-muted)]">
-                  Todas as categorias compativeis com o tipo do titulo. Filtre por ID, nome, grupo, subgrupo ou descricao.
+                  Todas as categorias compativeis com o tipo do título. Filtre por ID, nome, grupo, subgrupo ou descrição.
                 </p>
               </div>
               <button
@@ -2885,7 +2879,7 @@ export default function FinanceiroTituloNovo() {
 
             <input
               className="input app-busca w-full"
-              placeholder="Filtrar por ID, nome, grupo, subgrupo ou descricao"
+              placeholder="Filtrar por ID, nome, grupo, subgrupo ou descrição"
               value={categoriaModalBusca}
               onChange={(event) => setCategoriaModalBusca(event.target.value)}
               autoFocus

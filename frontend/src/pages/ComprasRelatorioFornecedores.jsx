@@ -93,7 +93,7 @@ function respostaBadge(item) {
     return { label: 'Baixa resposta', className: 'badge badge-danger' };
   }
   if (classificacao === 'ATENCAO') {
-    return { label: 'Atencao', className: 'badge badge-warning' };
+    return { label: 'Atenção', className: 'badge badge-warning' };
   }
   if (classificacao === 'RESPONSIVO') {
     return { label: 'Responsivo', className: 'badge badge-success' };
@@ -286,7 +286,7 @@ export default function ComprasRelatorioFornecedores() {
            recorte e RASCUNHO ate o clique, e a regra exige que a tela
            AVISE isso; sem o aviso a etiqueta marcada e lida como filtro
            ja aplicado. */
-        descricao="Analise de participacao, resposta e vitorias por fornecedor no processo de cotacao. Marque o recorte e clique em Atualizar relatorio."
+        descricao="Analise de participação, resposta e vitorias por fornecedor no processo de cotação. Marque o recorte e clique em Atualizar relatório."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
           onClick: aplicarFiltros,
@@ -339,12 +339,12 @@ export default function ComprasRelatorioFornecedores() {
         <StatTile
           label="Fornecedores"
           valor={formatNumber(resumo.fornecedores)}
-          sub="Com cotacoes no periodo"
+          sub="Com cotações no período"
         />
         <StatTile
-          label="Cotacoes enviadas"
+          label="Cotações enviadas"
           valor={formatNumber(resumo.cotacoes_enviadas)}
-          sub="Participacoes registradas"
+          sub="Participações registradas"
         />
         <StatTile
           label="Taxa de resposta"
@@ -355,13 +355,13 @@ export default function ComprasRelatorioFornecedores() {
         <StatTile
           label="Sem resposta"
           valor={formatNumber(resumo.cotacoes_sem_resposta)}
-          sub="Participacoes sem retorno"
+          sub="Participações sem retorno"
           tom={Number(resumo.cotacoes_sem_resposta || 0) > 0 ? 'warning' : undefined}
         />
         <StatTile
           label="Baixa resposta"
           valor={formatNumber(resumo.fornecedores_baixa_resposta)}
-          sub="Fornecedor(es) com amostra minima"
+          sub="Fornecedor(es) com amostra mínima"
           tom={Number(resumo.fornecedores_baixa_resposta || 0) > 0 ? 'danger' : undefined}
         />
         <StatTile
@@ -386,7 +386,7 @@ export default function ComprasRelatorioFornecedores() {
             recorta nada. */}
         <BlocoConteudo
           titulo="Fornecedores com menor taxa de resposta"
-          descricao="Ranking gerado apenas por cotacoes enviadas e respostas registradas. Fornecedores com menos de 2 participacoes ficam fora desta lista."
+          descricao="Ranking gerado apenas por cotações enviadas e respostas registradas. Fornecedores com menos de 2 participações ficam fora desta lista."
         >
           <TabelaPadrao
             colunas={[
@@ -409,9 +409,9 @@ export default function ComprasRelatorioFornecedores() {
               },
               { id: 'taxa_resposta', titulo: 'Taxa resposta', tipo: 'numero', render: (item) => <strong>{formatPercent(item.taxa_resposta)}</strong> },
               { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_sem_resposta) },
-              { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
-              { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
-              { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
+              { id: 'cotacoes', titulo: 'Cotações', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
+              { id: 'visualizacao', titulo: 'Visualização', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
+              { id: 'ultima_cotacao', titulo: 'Última cotação', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
               {
                 id: 'sinal',
                 titulo: 'Sinal',
@@ -432,8 +432,8 @@ export default function ComprasRelatorioFornecedores() {
         </BlocoConteudo>
 
         <BlocoConteudo
-          titulo="Base analitica de fornecedores"
-          descricao="Participacao completa em cotacoes, respostas, itens e valores por fornecedor."
+          titulo="Base analítica de fornecedores"
+          descricao="Participação completa em cotações, respostas, itens e valores por fornecedor."
           variante="primario"
           cor="var(--c-primary)"
         >
@@ -456,7 +456,7 @@ export default function ComprasRelatorioFornecedores() {
                   </div>
                 )
               },
-              { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
+              { id: 'cotacoes', titulo: 'Cotações', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_enviadas) },
               {
                 id: 'resposta',
                 titulo: 'Resposta',
@@ -472,13 +472,13 @@ export default function ComprasRelatorioFornecedores() {
                 )
               },
               { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => formatNumber(item.cotacoes_sem_resposta) },
-              { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
-              { id: 'prazo', titulo: 'Prazo medio', tipo: 'numero', render: (item) => formatHours(item.prazo_medio_resposta_horas) },
+              { id: 'visualizacao', titulo: 'Visualização', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
+              { id: 'prazo', titulo: 'Prazo médio', tipo: 'numero', render: (item) => formatHours(item.prazo_medio_resposta_horas) },
               { id: 'itens_respondidos', titulo: 'Itens respondidos', tipo: 'numero', render: (item) => formatNumber(item.itens_respondidos) },
               { id: 'itens_vencedores', titulo: 'Itens vencedores', tipo: 'numero', render: (item) => formatNumber(item.itens_vencedores) },
               { id: 'valor_cotado', titulo: 'Valor cotado', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_cotado)}</span> },
               { id: 'valor_vencedor', titulo: 'Valor vencedor', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_vencedor)}</span> },
-              { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
+              { id: 'ultima_cotacao', titulo: 'Última cotação', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
               {
                 id: 'sinal',
                 titulo: 'Sinal',

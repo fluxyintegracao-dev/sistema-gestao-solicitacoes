@@ -150,21 +150,21 @@ export default function CrmRelatorioExecutivo() {
         saem da barra de ações — menu e Ctrl+K resolvem.
       */}
       <PageHeader
-        titulo="Relatorio Executivo CRM"
+        titulo="Relatório Executivo CRM"
         contagem={loading ? null : `${leitura.leadsAtivos} lead(s) ativo(s)`}
-        descricao="Leitura consolidada de conversao, carteira, SLA e distribuicao comercial."
+        descricao="Leitura consolidada de conversão, carteira, SLA e distribuição comercial."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Recorte executivo"
-        descricao="A janela altera os indicadores de entrada, conversao e redistribuicao."
+        descricao="A janela altera os indicadores de entrada, conversão e redistribuicao."
       >
         <BarraFiltros
           filtros={[{
             id: 'dias',
-            rotulo: 'Periodo',
+            rotulo: 'Período',
             unico: true,
             // O relatorio SEMPRE tem um periodo: nao ha "sem recorte" para
             // onde voltar. A etiqueta e o estado atual, nao um filtro que se
@@ -178,24 +178,24 @@ export default function CrmRelatorioExecutivo() {
       </BlocoConteudo>
 
       {loading ? (
-        <BlocoConteudo>Carregando relatorio executivo CRM...</BlocoConteudo>
+        <BlocoConteudo>Carregando relatório executivo CRM...</BlocoConteudo>
       ) : (
         <>
           {isVisible('crm.relatorio_executivo.metricas') ? (
             <StatGrid colunas={3}>
               <StatTile
-                label="Entradas no periodo"
+                label="Entradas no período"
                 valor={String(gerencial?.kpis?.leadsPeriodo || 0)}
                 sub={`${dias} dia(s)`}
               />
               <StatTile
-                label="Taxa de conversao"
+                label="Taxa de conversão"
                 valor={`${gerencial?.kpis?.taxaConversaoPeriodo || 0}%`}
                 sub={`${gerencial?.kpis?.convertidosPeriodo || 0} convertido(s)`}
                 tom="success"
               />
               <StatTile
-                label="Leads sem responsavel"
+                label="Leads sem responsável"
                 valor={String(distribuicao?.kpis?.leadsSemResponsavel || 0)}
                 sub="Exige saneamento operacional"
                 tom={distribuicao?.kpis?.leadsSemResponsavel > 0 ? 'danger' : 'success'}
@@ -209,7 +209,7 @@ export default function CrmRelatorioExecutivo() {
               <StatTile
                 label="Conversas em fila"
                 valor={String((sla?.kpis?.conversasAbertas || 0) + (sla?.kpis?.conversasPendentes || 0))}
-                sub={`${sla?.kpis?.mensagensNaoLidas || 0} nao lida(s)`}
+                sub={`${sla?.kpis?.mensagensNaoLidas || 0} não lida(s)`}
               />
             </StatGrid>
           ) : null}
@@ -221,7 +221,7 @@ export default function CrmRelatorioExecutivo() {
               titulo="Leitura executiva"
               variante="primario"
               cor="var(--sem-info)"
-              descricao="Os numeros vem dos dashboards operacionais do CRM. Esta tela apenas consolida a leitura para diretoria."
+              descricao="Os números vem dos dashboards operacionais do CRM. Esta tela apenas consolida a leitura para diretoria."
             >
               <p className="text-sm text-[var(--c-text)]">{leitura.saudeOperacional}</p>
             </BlocoConteudo>
@@ -253,15 +253,15 @@ export default function CrmRelatorioExecutivo() {
                 valueGetter={(row) => row.total}
               />
               <BlocoDistribuicao
-                titulo="Carteira por responsavel"
-                descricao="Backlog ativo por usuario."
+                titulo="Carteira por responsável"
+                descricao="Backlog ativo por usuário."
                 rows={gerencial?.leadsPorResponsavel || []}
                 labelGetter={(row) => row.usuario?.nome || row.chave || '-'}
                 valueGetter={(row) => row.total}
               />
               <BlocoDistribuicao
                 titulo="Redistribuicoes por ator"
-                descricao="Movimentacoes executadas no periodo."
+                descricao="Movimentações executadas no período."
                 rows={distribuicao?.redistribuicoesPorAtor || []}
                 labelGetter={(row) => row.usuario?.nome || '-'}
                 valueGetter={(row) => row.total}

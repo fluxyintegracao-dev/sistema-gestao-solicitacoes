@@ -37,11 +37,11 @@ import {
 import { authHeaders } from '../../../services/api';
 
 const TABS = [
-  { key: 'executiva', label: 'Visao Executiva' },
+  { key: 'executiva', label: 'Visão Executiva' },
   { key: 'adocao', label: 'Adocao' },
-  { key: 'eficiencia', label: 'Eficiencia' },
+  { key: 'eficiencia', label: 'Eficiência' },
   { key: 'auditoria', label: 'Auditoria' },
-  { key: 'saude', label: 'Saude Tecnica' },
+  { key: 'saude', label: 'Saúde Técnica' },
   { key: 'produto', label: 'Produto' }
 ];
 
@@ -217,9 +217,9 @@ export default function GovernancaSistema() {
         "⋯" de ações raras, e não para uma barra própria.
       */}
       <PageHeader
-        titulo="Governanca do Sistema"
+        titulo="Governança do Sistema"
         contagem={abaAtual ? abaAtual.label : null}
-        descricao="Visao institucional de adocao, eficiencia, auditoria, saude tecnica e evolucao do produto."
+        descricao="Visão institucional de adocao, eficiência, auditoria, saúde técnica e evolução do produto."
         acaoPrincipal={canManage ? {
           rotulo: saving ? 'Gerando...' : 'Gerar snapshot',
           onClick: handleSnapshot,
@@ -251,7 +251,7 @@ export default function GovernancaSistema() {
         estado fica legível sem abrir nada.
       */}
       <BlocoConteudo>
-        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Recortes da governanca do sistema">
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Recortes da governança do sistema">
           {visibleTabs.map((tab) => (
             <button
               key={tab.key}
@@ -284,15 +284,15 @@ export default function GovernancaSistema() {
       <BlocosPersonalizaveis chave="blocos:governanca-sistema" larguraPadrao="total">
         {!loading && activeTab === 'executiva' ? (
           <BlocoConteudo
-            titulo="Visao executiva"
+            titulo="Visão executiva"
             descricao="Volume institucional consolidado do sistema."
             variante="primario"
             cor="var(--sem-info)"
           >
             <StatGrid>
-              <Metrica label="Usuarios ativos" value={executive.usuarios_ativos} detail={`${formatNumber(executive.usuarios_totais)} usuarios cadastrados`} icon={HiOutlineShieldCheck} />
+              <Metrica label="Usuários ativos" value={executive.usuarios_ativos} detail={`${formatNumber(executive.usuarios_totais)} usuarios cadastrados`} icon={HiOutlineShieldCheck} />
               <Metrica label="Processos abertos" value={executive.processos_abertos} detail="Solicitacoes em andamento" icon={HiOutlineDocumentText} />
-              <Metrica label="Processos concluidos" value={executive.processos_concluidos} detail="Historico institucional" icon={HiOutlineCheckCircle} />
+              <Metrica label="Processos concluídos" value={executive.processos_concluidos} detail="Historico institucional" icon={HiOutlineCheckCircle} />
               <Metrica label="Documentos" value={executive.documentos} detail={`${formatNumber(executive.modulos_ativos)} modulos ativos`} icon={HiOutlineChartBar} />
               <Metrica label="Empresas do grupo" value={executive.empresas_ativas} />
               <Metrica label="Obras / centros" value={executive.obras_ativas} />
@@ -309,8 +309,8 @@ export default function GovernancaSistema() {
           >
             <StatGrid colunas={3}>
               <Metrica label="Taxa de adocao" value={adoption.taxa_adocao_usuarios} detail="% de usuarios ativos em 30 dias" />
-              <Metrica label="Usuarios ativos 30d" value={adoption.usuarios_ativos_30d} />
-              <Metrica label="Acessos governanca 30d" value={adoption.acessos_governanca_30d} />
+              <Metrica label="Usuários ativos 30d" value={adoption.usuarios_ativos_30d} />
+              <Metrica label="Acessos governança 30d" value={adoption.acessos_governanca_30d} />
             </StatGrid>
             <div className="mt-4 flex flex-wrap gap-2">
               {(adoption.modulos_em_uso || []).map((item) => (
@@ -322,15 +322,15 @@ export default function GovernancaSistema() {
 
         {!loading && activeTab === 'eficiencia' ? (
           <BlocoConteudo
-            titulo="Eficiencia operacional"
-            descricao="Conclusao de processos e movimento financeiro medido."
+            titulo="Eficiência operacional"
+            descricao="Conclusão de processos e movimento financeiro medido."
             variante="primario"
             cor="var(--sem-info)"
           >
             <StatGrid colunas={4}>
-              <Metrica label="Indice de conclusao" value={efficiency.indice_conclusao} detail="% dos processos medidos" />
-              <Metrica label="Titulos abertos" value={efficiency.titulos_abertos} />
-              <Metrica label="Titulos baixados" value={efficiency.titulos_baixados} />
+              <Metrica label="Índice de conclusão" value={efficiency.indice_conclusao} detail="% dos processos medidos" />
+              <Metrica label="Títulos abertos" value={efficiency.titulos_abertos} />
+              <Metrica label="Títulos baixados" value={efficiency.titulos_baixados} />
               <Metrica label="Pedidos de compra" value={efficiency.pedidos_compra} />
             </StatGrid>
           </BlocoConteudo>
@@ -338,15 +338,15 @@ export default function GovernancaSistema() {
 
         {!loading && activeTab === 'auditoria' ? (
           <BlocoConteudo
-            titulo="Auditoria e governanca"
+            titulo="Auditoria e governança"
             contagem={`${(audit.logs || []).length} registro(s) recentes`}
-            descricao="Acessos ao modulo e eventos de seguranca agregados."
+            descricao="Acessos ao módulo e eventos de seguranca agregados."
             variante="primario"
             cor="var(--sem-info)"
           >
             <StatGrid colunas={2}>
               <Metrica label="Eventos de seguranca" value={audit.eventos_seguranca} />
-              <Metrica label="Acessos governanca" value={audit.acessos_governanca} />
+              <Metrica label="Acessos governança" value={audit.acessos_governanca} />
             </StatGrid>
             {/*
               R18: o wrapper deste bloco era `overflow-hidden` — cria
@@ -364,14 +364,14 @@ export default function GovernancaSistema() {
                 },
                 {
                   id: 'acao',
-                  titulo: 'Acao',
+                  titulo: 'Ação',
                   tipo: 'texto',
                   noCard: 'titulo',
                   render: (log) => log.acao
                 },
                 {
                   id: 'usuario',
-                  titulo: 'Usuario',
+                  titulo: 'Usuário',
                   tipo: 'codigo',
                   render: (log) => `#${log.usuario_id || '-'}`
                 },
@@ -398,14 +398,14 @@ export default function GovernancaSistema() {
               semIdentidade
               storageKey="tabela:governanca-sistema:auditoria"
               rotuloRolagem="Logs de governanca"
-              vazio="Nenhum log de governanca registrado ainda."
+              vazio="Nenhum log de governança registrado ainda."
             />
           </BlocoConteudo>
         ) : null}
 
         {!loading && activeTab === 'saude' ? (
           <BlocoConteudo
-            titulo="Saude tecnica"
+            titulo="Saúde técnica"
             descricao={`Latencia medida: ${health.latency_ms || 0}ms. Uptime: ${formatNumber(health.uptime_seconds)}s.`}
             variante="primario"
             cor="var(--sem-info)"
@@ -428,18 +428,18 @@ export default function GovernancaSistema() {
 
         {!loading && activeTab === 'produto' ? (
           <BlocoConteudo
-            titulo="Evolucao do produto"
+            titulo="Evolução do produto"
             descricao="Leitura executiva do roadmap e dos snapshots consolidados."
             variante="primario"
             cor="var(--sem-info)"
           >
             <StatGrid colunas={2}>
-              <Metrica label="Modulos consolidados" value={product.modulos_consolidados} />
-              <Metrica label="Snapshots historicos" value={(product.snapshots || []).length} />
+              <Metrica label="Módulos consolidados" value={product.modulos_consolidados} />
+              <Metrica label="Snapshots históricos" value={(product.snapshots || []).length} />
             </StatGrid>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <div>
-                <p className="text-xs text-muted mb-3">Modulos ativos</p>
+                <p className="text-xs text-muted mb-3">Módulos ativos</p>
                 <div className="flex flex-wrap gap-2">
                   {(product.modulos || []).map((module) => (
                     <span key={module} className="badge badge-muted">{module}</span>
@@ -447,7 +447,7 @@ export default function GovernancaSistema() {
                 </div>
               </div>
               <div>
-                <p className="text-xs text-muted mb-3">Proximas frentes</p>
+                <p className="text-xs text-muted mb-3">Próximas frentes</p>
                 <ul className="text-sm">
                   {(product.proximas_frentes || []).map((item) => <li key={item}>- {item}</li>)}
                 </ul>

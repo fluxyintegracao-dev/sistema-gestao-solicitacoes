@@ -196,7 +196,7 @@ export default function ComercialMapaUnidades() {
             onde ela distingue um registro do outro.
           */}
           <StatGrid colunas={4}>
-            <StatTile label="Disponiveis" valor={String(resumo.disponivel)} />
+            <StatTile label="Disponíveis" valor={String(resumo.disponivel)} />
             <StatTile label="Reservadas" valor={String(resumo.reservada)} />
             <StatTile label="Vendidas" valor={String(resumo.vendida)} />
             <StatTile label="Bloqueadas" valor={String(resumo.bloqueada)} />

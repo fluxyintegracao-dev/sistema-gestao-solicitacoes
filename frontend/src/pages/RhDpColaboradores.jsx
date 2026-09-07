@@ -40,6 +40,7 @@ import {
   canManageRhDpDocumentos
 } from '../utils/acessoProduto';
 import { formatCurrencyInput, getCpfCnpjError, maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
+import DateInputBR from '../components/DateInputBR';
 
 function emptyForm() {
   return {
@@ -318,7 +319,7 @@ const FILTROS_DOCUMENTOS_DA_TELA = [
   { id: 'tipo_documento_id', rotulo: 'Tipo' },
   { id: 'status', rotulo: 'Status' },
   { id: 'validade_status', rotulo: 'Validade' },
-  { id: 'incluir_historico', rotulo: 'Historico' }
+  { id: 'incluir_historico', rotulo: 'Histórico' }
 ];
 
 export default function RhDpColaboradores() {
@@ -754,7 +755,7 @@ export default function RhDpColaboradores() {
       <PageHeader
         titulo="Colaboradores"
         contagem={carregando ? null : `${colaboradores.length} colaborador(es)`}
-        descricao="Base cadastral com empresa do grupo, obra, vinculo, dados pessoais e dados de pagamento."
+        descricao="Base cadastral com empresa do grupo, obra, vínculo, dados pessoais e dados de pagamento."
         acaoPrincipal={podeEditar ? { rotulo: 'Novo colaborador', onClick: abrirNovoColaborador } : undefined}
         mais={podeEditar ? [
           { rotulo: 'Baixar modelo', onClick: downloadModeloColaboradores },
@@ -790,7 +791,7 @@ export default function RhDpColaboradores() {
           busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: busca,
             aoMudar: setBusca,
-            placeholder: 'Buscar por nome, CPF ou matricula'
+            placeholder: 'Buscar por nome, CPF ou matrícula'
           } : null}
           filtros={[
             {
@@ -848,7 +849,7 @@ export default function RhDpColaboradores() {
             },
             {
               id: 'matricula',
-              titulo: 'Matricula',
+              titulo: 'Matrícula',
               tipo: 'codigo',
               render: (item) => item.matricula || '-'
             },
@@ -952,7 +953,7 @@ export default function RhDpColaboradores() {
                     onChange={(e) => setForm((prev) => ({ ...prev, obra_id: e.target.value }))}
                     disabled={!podeEditar}
                   >
-                    <option value="">Nao vinculada</option>
+                    <option value="">Não vinculada</option>
                     {obras.map((item) => (
                       <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
                     ))}
@@ -978,7 +979,7 @@ export default function RhDpColaboradores() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Matricula">
+                <CampoForm label="Matrícula">
                   <input
                     className="form-control"
                     value={form.matricula}
@@ -993,7 +994,7 @@ export default function RhDpColaboradores() {
                     onChange={(e) => setForm((prev) => ({ ...prev, setor_id: e.target.value }))}
                     disabled={!podeEditar}
                   >
-                    <option value="">Nao vinculado</option>
+                    <option value="">Não vinculado</option>
                     {setores.map((item) => (
                       <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
                     ))}
@@ -1016,7 +1017,7 @@ export default function RhDpColaboradores() {
                     disabled={!podeEditar}
                   >
                     <option value="CLT">CLT</option>
-                    <option value="NAO_CLT">Nao CLT</option>
+                    <option value="NAO_CLT">Não CLT</option>
                   </select>
                 </CampoForm>
 
@@ -1044,8 +1045,7 @@ export default function RhDpColaboradores() {
 
               <FormSecao colunas={3}>
                 <CampoForm label="Data de admissão">
-                  <input
-                    type="date"
+                  <DateInputBR
                     className="form-control"
                     value={form.data_admissao}
                     onChange={(e) => setForm((prev) => ({ ...prev, data_admissao: e.target.value, data_inicio: e.target.value }))}
@@ -1053,8 +1053,7 @@ export default function RhDpColaboradores() {
                   />
                 </CampoForm>
                 <CampoForm label="Data de demissão">
-                  <input
-                    type="date"
+                  <DateInputBR
                     className="form-control"
                     value={form.data_demissao}
                     onChange={(e) => setForm((prev) => ({ ...prev, data_demissao: e.target.value }))}
@@ -1062,8 +1061,7 @@ export default function RhDpColaboradores() {
                   />
                 </CampoForm>
                 <CampoForm label="Data de nascimento">
-                  <input
-                    type="date"
+                  <DateInputBR
                     className="form-control"
                     value={form.data_nascimento}
                     onChange={(e) => setForm((prev) => ({ ...prev, data_nascimento: e.target.value }))}
@@ -1091,7 +1089,7 @@ export default function RhDpColaboradores() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Salario base">
+                <CampoForm label="Salário base">
                   <input
                     className="form-control"
                     inputMode="decimal"
@@ -1139,7 +1137,7 @@ export default function RhDpColaboradores() {
                     disabled={!podeEditar}
                   />
                 </CampoForm>
-                <CampoForm label="Agencia">
+                <CampoForm label="Agência">
                   <input
                     className="form-control"
                     value={form.pagamento.agencia}
@@ -1184,7 +1182,7 @@ export default function RhDpColaboradores() {
                       disabled={!podeEditar}
                     />
                   </CampoForm>
-                  <CampoForm label="Chave PIX variavel">
+                  <CampoForm label="Chave PIX variável">
                     <input
                       className="form-control"
                       value={form.pagamento.chave_pix_variavel}
@@ -1197,12 +1195,12 @@ export default function RhDpColaboradores() {
                 </div>
 
                 <p className="app-note form-campo--linha">
-                  A chave principal e usada por padrao nos titulos RH/DP. Na conferencia da apuracao e possivel trocar para uma das chaves cadastradas.
+                  A chave principal e usada por padrão nos títulos RH/DP. Na conferência da apuração e possível trocar para uma das chaves cadastradas.
                 </p>
               </FormSecao>
 
               <FormSecao colunas={2}>
-                <CampoForm label="Observacoes" tipo="observacao">
+                <CampoForm label="Observações" tipo="observacao">
                   <textarea
                     className="form-control"
                     rows={4}
@@ -1222,7 +1220,7 @@ export default function RhDpColaboradores() {
               {form.id && (
                 <BlocoConteudo
                   titulo="Documentos do colaborador"
-                  descricao="Pasta digital do colaborador com checklist por vinculo, validade e historico de substituicao."
+                  descricao="Pasta digital do colaborador com checklist por vínculo, validade e histórico de substituição."
                   variante="secundario"
                   acoes={(
                     <Link to={`/rh-dp/documentos?q=${encodeURIComponent(form.nome || '')}`} className="btn btn-outline btn-sm">
@@ -1232,16 +1230,16 @@ export default function RhDpColaboradores() {
                 >
                   <StatGrid colunas={4}>
                     <StatTile label="Anexados" valor={resumoDocumentos?.total_documentos_anexados || 0} />
-                    <StatTile label="Validos" valor={resumoDocumentos?.documentos_validos || 0} tom="success" />
+                    <StatTile label="Válidos" valor={resumoDocumentos?.documentos_validos || 0} tom="success" />
                     <StatTile label="Vencidos" valor={resumoDocumentos?.documentos_vencidos || 0} tom="danger" />
-                    <StatTile label="Obrigatorios pendentes" valor={resumoDocumentos?.obrigatorios_pendentes || 0} tom="warning" />
+                    <StatTile label="Obrigatórios pendentes" valor={resumoDocumentos?.obrigatorios_pendentes || 0} tom="warning" />
                   </StatGrid>
 
                   <BarraFiltros
                     busca={visibilidadeFiltrosDocumentos.ehVisivel('busca_documentos') ? {
                       valor: buscaDocumentos,
                       aoMudar: setBuscaDocumentos,
-                      placeholder: 'Buscar por arquivo ou observacao'
+                      placeholder: 'Buscar por arquivo ou observação'
                     } : null}
                     filtros={[
                       {
@@ -1258,7 +1256,7 @@ export default function RhDpColaboradores() {
                           { valor: 'ENVIADO', rotulo: 'Enviado' },
                           { valor: 'CONFERIDO', rotulo: 'Conferido' },
                           { valor: 'REJEITADO', rotulo: 'Rejeitado' },
-                          { valor: 'SUBSTITUIDO', rotulo: 'Substituido' }
+                          { valor: 'SUBSTITUIDO', rotulo: 'Substituído' }
                         ]
                       },
                       {
@@ -1274,8 +1272,8 @@ export default function RhDpColaboradores() {
                       },
                       {
                         id: 'incluir_historico',
-                        rotulo: 'Historico',
-                        opcoes: [{ valor: 'sim', rotulo: 'Incluir historico' }]
+                        rotulo: 'Histórico',
+                        opcoes: [{ valor: 'sim', rotulo: 'Incluir histórico' }]
                       }
                     ].filter((dim) => visibilidadeFiltrosDocumentos.ehVisivel(dim.id))}
                     ativos={marcadosDocumentos}
@@ -1299,14 +1297,13 @@ export default function RhDpColaboradores() {
                         </select>
                       </CampoForm>
                       <CampoForm label="Validade">
-                        <input
-                          type="date"
+                        <DateInputBR
                           className="form-control"
                           value={novoDocumento.validade}
                           onChange={(e) => setNovoDocumento((prev) => ({ ...prev, validade: e.target.value }))}
                         />
                       </CampoForm>
-                      <CampoForm label="Situacao do documento">
+                      <CampoForm label="Situação do documento">
                         <select
                           className="form-control"
                           value={novoDocumento.status}
@@ -1331,11 +1328,11 @@ export default function RhDpColaboradores() {
                           />
                         </label>
                       </div>
-                      <CampoForm label="Observacoes do documento" tipo="observacao">
+                      <CampoForm label="Observações do documento" tipo="observacao">
                         <textarea
                           className="form-control"
                           rows={3}
-                          placeholder="Observacoes do documento"
+                          placeholder="Observações do documento"
                           value={novoDocumento.observacoes}
                           onChange={(e) => setNovoDocumento((prev) => ({ ...prev, observacoes: e.target.value }))}
                         />

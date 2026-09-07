@@ -67,8 +67,8 @@ export default function SstExecutivo() {
       um registro que a lista pudesse trocar durante o modal.
     */
     const { ok } = await confirmar({
-      titulo: 'Sincronizar notificacoes SST',
-      mensagem: 'Cria as notificacoes pendentes de vencimento, bloqueio e pendencia critica para os responsaveis. Deseja continuar?',
+      titulo: 'Sincronizar notificações SST',
+      mensagem: 'Cria as notificações pendentes de vencimento, bloqueio e pendência critica para os responsáveis. Deseja continuar?',
       rotuloConfirmar: 'Sincronizar'
     });
     if (!ok) return;
@@ -89,8 +89,8 @@ export default function SstExecutivo() {
       <PageHeader
         titulo="Inteligencia operacional SST"
         contagem={loading ? 'Carregando' : `${obras.length} obra(s) critica(s)`}
-        descricao="Score, pendencias, bloqueios, obras criticas e prontidao preditiva sem transmissao real ao eSocial."
-        secundarias={[{ rotulo: 'Sincronizar notificacoes', onClick: syncNotifications }]}
+        descricao="Score, pendências, bloqueios, obras críticas e prontidão preditiva sem transmissão real ao eSocial."
+        secundarias={[{ rotulo: 'Sincronizar notificações', onClick: syncNotifications }]}
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -105,7 +105,7 @@ export default function SstExecutivo() {
       */}
       <BlocosPersonalizaveis chave="blocos:sst-executivo" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Compliance e pendencias"
+          titulo="Compliance e pendências"
           variante="primario"
           cor="var(--module-sst)"
           descricao={data?.nivel ? `Nivel atual: ${data.nivel}.` : 'Recorte corporativo do modulo.'}
@@ -118,8 +118,8 @@ export default function SstExecutivo() {
               tom={(data?.compliance_geral ?? 100) < 50 ? 'danger' : 'success'}
             />
             <StatTile label="Colaboradores avaliados" valor={cards.colaboradores_avaliados || 0} sub="Score SST" tom="info" />
-            <StatTile label="Pendencias" valor={cards.pendencias_total || 0} sub="Abertas ou detectadas" tom={cards.pendencias_total ? 'warning' : 'success'} />
-            <StatTile label="Pendencias criticas" valor={cards.pendencias_criticas || 0} sub="Exigem acao" tom={cards.pendencias_criticas ? 'danger' : 'success'} />
+            <StatTile label="Pendências" valor={cards.pendencias_total || 0} sub="Abertas ou detectadas" tom={cards.pendencias_total ? 'warning' : 'success'} />
+            <StatTile label="Pendências críticas" valor={cards.pendencias_criticas || 0} sub="Exigem ação" tom={cards.pendencias_criticas ? 'danger' : 'success'} />
             <StatTile label="Bloqueios abertos" valor={cards.bloqueios_abertos || 0} sub="Motor operacional" tom={cards.bloqueios_abertos ? 'danger' : 'success'} />
           </StatGrid>
         </BlocoConteudo>
@@ -140,9 +140,9 @@ export default function SstExecutivo() {
           críticas que ele desenha.
         */}
         <BlocoConteudo
-          titulo="Obras criticas"
+          titulo="Obras críticas"
           contagem={`${obras.length} item(ns)`}
-          descricao="Ordenadas pelo indice de risco calculado no backend."
+          descricao="Ordenadas pelo índice de risco calculado no backend."
           acoes={<Link to="/sst/relatorios/heatmap" className="btn btn-outline btn-sm">Abrir mapa</Link>}
         >
           <div className="grid gap-3 md:grid-cols-2">
@@ -152,11 +152,11 @@ export default function SstExecutivo() {
                 variante="secundario"
                 className={`tarja tarja--${familiaCriticidade(item.criticidade)}`}
                 titulo={item.obra}
-                descricao={`Indice de risco ${item.indice_risco}`}
+                descricao={`Índice de risco ${item.indice_risco}`}
                 acoes={<StatusBadge status={item.criticidade || 'SEM NIVEL'} kind={familiaCriticidade(item.criticidade)} />}
               >
                 <StatGrid colunas={1}>
-                  <StatTile label="Pendencias" valor={item.pendencias ?? 0} tom={item.pendencias ? 'warning' : undefined} />
+                  <StatTile label="Pendências" valor={item.pendencias ?? 0} tom={item.pendencias ? 'warning' : undefined} />
                 </StatGrid>
               </BlocoConteudo>
             ))}
@@ -165,19 +165,19 @@ export default function SstExecutivo() {
         </BlocoConteudo>
 
         <BlocoConteudo
-          titulo="Prontidao preditiva e IA documental"
-          descricao="Contratos futuros ja estruturados; nada e transmitido nesta fase."
+          titulo="Prontidão preditiva e IA documental"
+          descricao="Contratos futuros já estruturados; nada e transmitido nesta fase."
         >
           <StatGrid colunas={2}>
             <StatTile
-              label="Prontidao preditiva"
+              label="Prontidão preditiva"
               valor={data?.predicao?.status || 'PREPARADO_ARQUITETURALMENTE'}
               sub="Motor preditivo preparado, sem IA ativa nesta fase."
             />
             <StatTile
               label="IA documental"
               valor={data?.ia_documental?.status || 'PIPELINE_DOCUMENTAL_PREPARADO'}
-              sub="OCR e classificacao documental estruturados como contratos futuros."
+              sub="OCR e classificação documental estruturados como contratos futuros."
             />
           </StatGrid>
         </BlocoConteudo>

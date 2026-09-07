@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Avisos,
@@ -343,7 +344,7 @@ export default function ComercialTabelasPreco() {
     },
     {
       id: 'vigencia',
-      titulo: 'Vigencia',
+      titulo: 'Vigência',
       tipo: 'texto',
       flex: false,
       render: (item) => (
@@ -380,10 +381,10 @@ export default function ComercialTabelasPreco() {
   if (loading) {
     return (
       <Pagina>
-        <PageHeader titulo="Tabelas de preco" descricao={DESCRICAO} />
+        <PageHeader titulo="Tabelas de preço" descricao={DESCRICAO} />
         <Avisos avisos={avisos} aoFechar={fechar} />
         <BlocoConteudo titulo="Tabelas cadastradas" variante="primario" cor="var(--module-comercial)">
-          <p className="app-note">Carregando tabelas de preco...</p>
+          <p className="app-note">Carregando tabelas de preço...</p>
         </BlocoConteudo>
       </Pagina>
     );
@@ -395,7 +396,7 @@ export default function ComercialTabelasPreco() {
           superfície própria — o <p class="page-subtitle"> solto sobre o
           canvas saiu. O ritmo vertical da raiz é do Pagina (R10). */}
       <PageHeader
-        titulo="Tabelas de preco"
+        titulo="Tabelas de preço"
         contagem={`${tabelasFiltradas.length} de ${tabelas.length} tabela(s)`}
         descricao={DESCRICAO}
         acaoPrincipal={{ rotulo: 'Nova tabela', onClick: irParaCadastro }}
@@ -436,7 +437,7 @@ export default function ComercialTabelasPreco() {
                 required
               />
             </CampoForm>
-            <CampoForm label="Codigo">
+            <CampoForm label="Código">
               <input
                 className="input w-full"
                 value={form.codigo}
@@ -465,24 +466,22 @@ export default function ComercialTabelasPreco() {
             </CampoForm>
           </FormSecao>
 
-          <FormSecao legenda="Vigencia" colunas={2}>
-            <CampoForm label="Vigencia inicial">
-              <input
+          <FormSecao legenda="Vigência" colunas={2}>
+            <CampoForm label="Vigência inicial">
+              <DateInputBR
                 className="input w-full"
-                type="date"
                 value={form.vigencia_inicio}
                 onChange={(e) => setForm((current) => ({ ...current, vigencia_inicio: e.target.value }))}
               />
             </CampoForm>
-            <CampoForm label="Vigencia final" hint="Em branco = sem prazo de fim.">
-              <input
+            <CampoForm label="Vigência final" hint="Em branco = sem prazo de fim.">
+              <DateInputBR
                 className="input w-full"
-                type="date"
                 value={form.vigencia_fim}
                 onChange={(e) => setForm((current) => ({ ...current, vigencia_fim: e.target.value }))}
               />
             </CampoForm>
-            <CampoForm label="Observacoes" tipo="observacao">
+            <CampoForm label="Observações" tipo="observacao">
               <textarea
                 className="input w-full"
                 rows={3}
@@ -554,7 +553,7 @@ export default function ComercialTabelasPreco() {
                             placeholder="R$ 0,00"
                           />
                         </CampoForm>
-                        <CampoForm label="Valor minimo">
+                        <CampoForm label="Valor mínimo">
                           <input
                             className="input input-moeda w-full"
                             inputMode="decimal"
@@ -564,7 +563,7 @@ export default function ComercialTabelasPreco() {
                             placeholder="R$ 0,00"
                           />
                         </CampoForm>
-                        <CampoForm label="Observacoes">
+                        <CampoForm label="Observações">
                           <input
                             className="input w-full"
                             value={item.observacoes}
@@ -602,7 +601,7 @@ export default function ComercialTabelasPreco() {
 
       <BlocoConteudo
         titulo="Tabelas cadastradas"
-        descricao="Ative a tabela vigente e mantenha o historico comercial por empreendimento."
+        descricao="Ative a tabela vigente e mantenha o histórico comercial por empreendimento."
         variante="primario"
         cor="var(--module-comercial)"
       >
@@ -613,7 +612,7 @@ export default function ComercialTabelasPreco() {
           busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((prev) => ({ ...prev, q: valor })),
-            placeholder: 'Buscar por nome, codigo ou empreendimento'
+            placeholder: 'Buscar por nome, código ou empreendimento'
           } : null}
           filtros={[
             {

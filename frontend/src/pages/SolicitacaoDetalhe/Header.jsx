@@ -273,13 +273,13 @@ export default function Header({
       valor: solicitacao?.favorecido_chave_pix || null,
       span: 2
     },
-    { label: 'Responsavel', contexto: temContrato, valor: contratoDoFluxo?.responsavel?.nome || null },
+    { label: 'Responsável', contexto: temContrato, valor: contratoDoFluxo?.responsavel?.nome || null },
     { label: 'Obra', valor: solicitacao?.obra?.nome || null, span: 2 },
     { label: 'Criado em', valor: formatarDataHora(solicitacao?.createdAt) },
     { label: 'Justificativa', contexto: !temContrato, valor: solicitacao?.justificativa || null, span: 4 },
-    { label: 'Data de demissao', valor: formatarData(solicitacao?.data_demissao) },
-    { label: 'Inicio da medicao', valor: formatarData(solicitacao?.data_inicio_medicao) },
-    { label: 'Fim da medicao', valor: formatarData(solicitacao?.data_fim_medicao) },
+    { label: 'Data de demissão', valor: formatarData(solicitacao?.data_demissao) },
+    { label: 'Início da medição', valor: formatarData(solicitacao?.data_inicio_medicao) },
+    { label: 'Fim da medição', valor: formatarData(solicitacao?.data_fim_medicao) },
     { label: 'Subtipo', valor: subtipoSolicitacao, span: 2 },
     // Quem recebe o pagamento e a chave para pagar. A chave segue a ordem definida pelo
     // cliente (19/08): fixa 1, senao fixa 2, senao a variavel — a escolha e feita no backend,

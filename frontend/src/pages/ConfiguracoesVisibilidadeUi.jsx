@@ -218,7 +218,7 @@ export default function ConfiguracoesVisibilidadeUi() {
       <PageHeader
         titulo="Visibilidade de Dashboards e Tabelas"
         contagem={loading ? null : `${allKeys.length} componente(s)`}
-        descricao="Controle quais blocos aparecem nas telas sem alterar a permissao de acesso dos usuarios."
+        descricao="Controle quais blocos aparecem nas telas sem alterar a permissão de acesso dos usuários."
         acaoPrincipal={{
           rotulo: saving ? 'Salvando...' : 'Salvar visibilidade',
           onClick: salvar,
@@ -250,17 +250,17 @@ export default function ConfiguracoesVisibilidadeUi() {
       */}
       <section className="grid gap-3 md:grid-cols-3">
         <div className="app-summary-card">
-          <span className="app-summary-label">Visiveis</span>
+          <span className="app-summary-label">Visíveis</span>
           <strong className="app-summary-value text-[var(--sem-success)]">{loading ? '—' : visibleCount}</strong>
-          <span className="app-summary-subvalue">Aparecem para quem ja tem permissao no modulo</span>
+          <span className="app-summary-subvalue">Aparecem para quem já tem permissão no módulo</span>
         </div>
         <div className="app-summary-card">
           <span className="app-summary-label">Ocultos</span>
           <strong className="app-summary-value text-[var(--sem-warning)]">{loading ? '—' : hiddenCount}</strong>
-          <span className="app-summary-subvalue">Nao aparecem nas telas configuradas</span>
+          <span className="app-summary-subvalue">Não aparecem nas telas configuradas</span>
         </div>
         <div className="app-summary-card">
-          <span className="app-summary-label">Modulos com bloco oculto</span>
+          <span className="app-summary-label">Módulos com bloco oculto</span>
           <strong className="app-summary-value">{loading ? '—' : modulosComOculto}</strong>
           <span className="app-summary-subvalue">
             {loading ? 'Carregando modulos...' : `de ${registry.length} modulo(s) mapeado(s)`}
@@ -268,11 +268,11 @@ export default function ConfiguracoesVisibilidadeUi() {
         </div>
       </section>
 
-      <BlocoConteudo titulo="Governanca" variante="secundario">
+      <BlocoConteudo titulo="Governança" variante="secundario">
         {/* R25: era border-sky-200 / bg-sky-50 / text-sky-800 — paleta crua
             sem par no tema escuro. Tom informativo = tokens --sem-info-*. */}
         <p className="rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] p-4 text-sm text-[var(--sem-info)]">
-          Esta configuracao nao concede acesso. Primeiro o usuario precisa ter permissao de modulo/area.
+          Esta configuração não concede acesso. Primeiro o usuário precisa ter permissão de módulo/área.
           Depois disso, estes controles definem quais blocos ficam visiveis na experiencia.
         </p>
       </BlocoConteudo>
@@ -293,8 +293,8 @@ export default function ConfiguracoesVisibilidadeUi() {
         <div className="flex flex-wrap gap-3">
           <input
             className="input app-busca"
-            placeholder="Filtrar por modulo, pagina, tabela ou chave..."
-            aria-label="Filtrar por modulo, pagina, tabela ou chave"
+            placeholder="Filtrar por módulo, página, tabela ou chave..."
+            aria-label="Filtrar por módulo, página, tabela ou chave"
             value={filtro}
             onChange={(event) => setFiltro(event.target.value)}
           />
@@ -342,10 +342,10 @@ export default function ConfiguracoesVisibilidadeUi() {
                               {visiblePageCount}/{pageKeys.length} visiveis
                             </span>
                             <button type="button" className="btn btn-outline btn-sm" onClick={() => setPageVisibility(page, true)}>
-                              Exibir pagina
+                              Exibir página
                             </button>
                             <button type="button" className="btn btn-outline btn-sm" onClick={() => setPageVisibility(page, false)}>
-                              Ocultar pagina
+                              Ocultar página
                             </button>
                           </div>
                         </div>

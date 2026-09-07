@@ -11,7 +11,7 @@ import { getSetorPermissoes, salvarSetorPermissao } from '../services/setorPermi
 
 const MODOS = [
   { value: 'ADMIN_PRIMEIRO', label: 'Admin primeiro (admin atribui)' },
-  { value: 'TODOS_VISIVEIS', label: 'Todos visiveis (usuarios podem assumir/atribuir)' }
+  { value: 'TODOS_VISIVEIS', label: 'Todos visíveis (usuários podem assumir/atribuir)' }
 ];
 
 export default function ComportamentoRecebimentoSetor() {
@@ -34,7 +34,7 @@ export default function ComportamentoRecebimentoSetor() {
       setLista(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao carregar configuracoes de recebimento.');
+      avisar.erro('Erro ao carregar configurações de recebimento.');
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ export default function ComportamentoRecebimentoSetor() {
       <PageHeader
         titulo="Comportamento de Recebimento por Setor"
         contagem={loading ? null : `${lista.length} setor(es)`}
-        descricao="Defina como cada setor recebe as solicitacoes: o admin atribui primeiro ou todos os usuarios enxergam e podem assumir."
+        descricao="Defina como cada setor recebe as solicitações: o admin atribui primeiro ou todos os usuários enxergam e podem assumir."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />

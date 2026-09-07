@@ -1,9 +1,10 @@
 import { API_URL, authHeaders } from './api';
+import { mensagemDeErro } from './erroDeResposta';
 
 function handleJsonResponse(response, fallbackMessage) {
   return response.text().then((text) => {
     if (!response.ok) {
-      throw new Error(text || fallbackMessage);
+      throw new Error(mensagemDeErro(text, fallbackMessage, response.status));
     }
 
     return text ? JSON.parse(text) : null;
@@ -29,7 +30,7 @@ export async function baixarModeloApropriacoes() {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || 'Erro ao baixar modelo de apropriacoes');
+    throw new Error(mensagemDeErro(text, 'Erro ao baixar modelo de apropriacoes', response.status));
   }
 
   const blob = await response.blob();

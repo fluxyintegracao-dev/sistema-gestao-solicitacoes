@@ -159,11 +159,11 @@ export default function SstRelatorioOperacional() {
   return (
     <Pagina className="sst-page">
       <PageHeader
-        titulo="Relatorio operacional SST"
-        descricao="Visao analitica de conformidade, riscos, vencimentos, documentos, acidentes, eventos operacionais e prontidao tecnica para eSocial."
+        titulo="Relatório operacional SST"
+        descricao="Visão analítica de conformidade, riscos, vencimentos, documentos, acidentes, eventos operacionais e prontidão técnica para eSocial."
         acaoPrincipal={{ rotulo: 'Atualizar vencimentos', onClick: syncEvents }}
         secundarias={[
-          { rotulo: 'Atualizar relatorio', onClick: () => load() },
+          { rotulo: 'Atualizar relatório', onClick: () => load() },
           { rotulo: 'Limpar', onClick: limparFiltros }
         ]}
       />
@@ -181,20 +181,20 @@ export default function SstRelatorioOperacional() {
 
       <StatGrid colunas={4}>
         <StatTile label="Compliance score" valor={`${moneyless(cards.compliance_score ?? 100)}%`} sub="Base operacional atual" tom="success" />
-        <StatTile label="Riscos criticos" valor={moneyless(riscosCriticos)} sub="Severidade alta ou critica" tom={riscosCriticos ? 'danger' : 'info'} />
-        <StatTile label="Pendencias criticas" valor={moneyless(pendenciasCriticas)} sub="Motor de conformidade" tom={pendenciasCriticas ? 'danger' : 'success'} />
-        <StatTile label="Pendencias totais" valor={moneyless(conformidade.pendencias_total || cards.pendencias_total)} sub={`${data?.periodo_alerta_dias || 30} dias`} tom="warning" />
+        <StatTile label="Riscos críticos" valor={moneyless(riscosCriticos)} sub="Severidade alta ou critica" tom={riscosCriticos ? 'danger' : 'info'} />
+        <StatTile label="Pendências críticas" valor={moneyless(pendenciasCriticas)} sub="Motor de conformidade" tom={pendenciasCriticas ? 'danger' : 'success'} />
+        <StatTile label="Pendências totais" valor={moneyless(conformidade.pendencias_total || cards.pendencias_total)} sub={`${data?.periodo_alerta_dias || 30} dias`} tom="warning" />
       </StatGrid>
 
       <StatGrid colunas={3}>
-        <StatTile label="Acidentes por obra" valor={analytics.acidentes_por_obra?.length || 0} sub="Agrupamentos com ocorrencias" />
+        <StatTile label="Acidentes por obra" valor={analytics.acidentes_por_obra?.length || 0} sub="Agrupamentos com ocorrências" />
         <StatTile label="Riscos por obra" valor={analytics.riscos_por_obra?.length || 0} sub="Base para mapa operacional" />
         <StatTile label="Colaboradores ativos" valor={conformidade.total_colaboradores_ativos || 0} sub="Analisados na conformidade" />
       </StatGrid>
 
       <BlocoConteudo
-        titulo="Prontidao eSocial SST"
-        descricao="Transmissao permanece bloqueada ate validacao formal dos leiautes/XSDs oficiais dos eventos S-2210, S-2220 e S-2240."
+        titulo="Prontidão eSocial SST"
+        descricao="Transmissão permanece bloqueada até validação formal dos leiautes/XSDs oficiais dos eventos S-2210, S-2220 e S-2240."
         acoes={(
           <StatusBadge
             status={prontidao.bloqueio_produto ? 'Bloqueado para transmissao' : 'Preparado para transmissao'}
@@ -203,10 +203,10 @@ export default function SstRelatorioOperacional() {
         )}
       >
         <StatGrid colunas={3}>
-          <StatTile label="Ambiente" valor={prontidao.ambiente || 'NAO_CONFIGURADO'} sub="Configuracao tecnica" />
+          <StatTile label="Ambiente" valor={prontidao.ambiente || 'NAO_CONFIGURADO'} sub="Configuração técnica" />
           <StatTile label="Eventos preparados" valor={moneyless(prontidao.eventos_preparados)} sub="Registros internos" />
           <StatTile
-            label="Documentacao oficial"
+            label="Documentação oficial"
             valor={prontidao.documentacao_oficial_validada ? 'Validada' : 'Pendente'}
             sub="Leiautes e XSDs SST"
             tom={prontidao.documentacao_oficial_validada ? 'success' : 'warning'}
@@ -214,7 +214,7 @@ export default function SstRelatorioOperacional() {
         </StatGrid>
       </BlocoConteudo>
 
-      {loading ? <div className="app-empty-card">Carregando relatorio...</div> : null}
+      {loading ? <div className="app-empty-card">Carregando relatório...</div> : null}
 
       {/*
         BLOCOS PERSONALIZÁVEIS (05/09). Tela de relatório/painel é o grupo
@@ -226,7 +226,7 @@ export default function SstRelatorioOperacional() {
       */}
       <BlocosPersonalizaveis chave="blocos:sst-relatorio-operacional" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Pendencias de conformidade"
+          titulo="Pendências de conformidade"
           contagem={`${(conformidade.pendencias || []).length} item(ns)`}
           variante="primario"
           cor="var(--sem-danger)"
@@ -285,7 +285,7 @@ export default function SstRelatorioOperacional() {
         </BlocoConteudo>
 
         <BlocoConteudo
-          titulo="Riscos criticos"
+          titulo="Riscos críticos"
           contagem={`${(data?.riscos_criticos || []).length} item(ns)`}
         >
           <TabelaPadrao
@@ -334,7 +334,7 @@ export default function SstRelatorioOperacional() {
         </BlocoConteudo>
 
         <BlocoConteudo
-          titulo="Historico recente SST"
+          titulo="Histórico recente SST"
           contagem={`${(data?.historicos_recentes || []).length} item(ns)`}
           recolhivel
           chavePreferencia="bloco:sst-relatorio-operacional:historico-recente-sst"
@@ -350,7 +350,7 @@ export default function SstRelatorioOperacional() {
                 noCard: 'titulo',
                 render: (row) => row.recurso
               },
-              { id: 'acao', titulo: 'Acao', tipo: 'texto', render: (row) => row.acao },
+              { id: 'acao', titulo: 'Ação', tipo: 'texto', render: (row) => row.acao },
               { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
               { id: 'resumo', titulo: 'Resumo', tipo: 'texto', render: (row) => row.resumo }
             ]}

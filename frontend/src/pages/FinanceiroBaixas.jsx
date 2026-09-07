@@ -1,3 +1,4 @@
+import DateInputBR from '../components/DateInputBR';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -242,7 +243,7 @@ export default function FinanceiroBaixas() {
       await estornarMovimentoFinanceiro(baixa.titulo_financeiro_id, baixa.id, {
         observacoes: texto || 'Estorno realizado pela tela de baixas.'
       });
-      avisar.sucesso('Baixa estornada. O titulo ja pode receber nova baixa conforme saldo atualizado.');
+      avisar.sucesso('Baixa estornada. O título já pode receber nova baixa conforme saldo atualizado.');
       const data = await getBaixasFinanceiras(compact(appliedFilters));
       setBaixas(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -355,15 +356,15 @@ export default function FinanceiroBaixas() {
             </label>
             <label className="app-filter-field xl:col-span-4">
               <span className="app-filter-label">Busca</span>
-              <input className="input w-full input-sm" value={filters.q} onChange={(event) => setFilter('q', event.target.value)} placeholder="Titulo, parceiro, documento ou obra" />
+              <input className="input w-full input-sm" value={filters.q} onChange={(event) => setFilter('q', event.target.value)} placeholder="Título, parceiro, documento ou obra" />
             </label>
             <label className="app-filter-field xl:col-span-2">
               <span className="app-filter-label">Data inicial</span>
-              <input className="input w-full input-sm" type="date" value={filters.data_inicial} onChange={(event) => setFilter('data_inicial', event.target.value)} />
+              <DateInputBR className="input w-full input-sm" value={filters.data_inicial} onChange={(event) => setFilter('data_inicial', event.target.value)} />
             </label>
             <label className="app-filter-field xl:col-span-2">
               <span className="app-filter-label">Data final</span>
-              <input className="input w-full input-sm" type="date" value={filters.data_final} onChange={(event) => setFilter('data_final', event.target.value)} />
+              <DateInputBR className="input w-full input-sm" value={filters.data_final} onChange={(event) => setFilter('data_final', event.target.value)} />
             </label>
             <label className="app-filter-field xl:col-span-3">
               <span className="app-filter-label">Obra</span>
@@ -387,7 +388,7 @@ export default function FinanceiroBaixas() {
               </select>
             </label>
             <label className="app-filter-field xl:col-span-3">
-              <span className="app-filter-label">Conta bancaria</span>
+              <span className="app-filter-label">Conta bancária</span>
               <select className="input w-full input-sm" value={filters.conta_bancaria_id} onChange={(event) => setFilter('conta_bancaria_id', event.target.value)} disabled={loadingOptions}>
                 <option value="">Todas</option>
                 {contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nome}</option>)}
@@ -416,7 +417,7 @@ export default function FinanceiroBaixas() {
         outra função, não a mesma repetida.
       */}
       <StatGrid colunas={4}>
-        <StatTile label="Baixas nesta pagina" valor={String(baixasPaginadas.length)} sub={`${resumo.quantidade} no recorte`} />
+        <StatTile label="Baixas nesta página" valor={String(baixasPaginadas.length)} sub={`${resumo.quantidade} no recorte`} />
         <StatTile label="Valor base do recorte" valor={formatCurrency(resumo.valor)} />
         <StatTile label="Valor quitacao do recorte" valor={formatCurrency(resumo.valor_quitacao)} />
         <StatTile label="Estornadas no recorte" valor={String(resumo.estornadas)} tom={resumo.estornadas ? 'warning' : undefined} />
@@ -426,14 +427,14 @@ export default function FinanceiroBaixas() {
         titulo="Movimentos de baixa"
         variante="primario"
         cor="var(--module-financeiro)"
-        descricao="Estornar libera o titulo para nova baixa, mantendo historico e auditoria."
+        descricao="Estornar libera o título para nova baixa, mantendo histórico e auditoria."
       >
         <TabelaPadrao
           colunas={[
             { id: 'data', titulo: 'Data', tipo: 'data', render: (baixa) => formatDate(baixa.data_movimento) },
             {
               id: 'titulo',
-              titulo: 'Titulo',
+              titulo: 'Título',
               tipo: 'codigo',
               /*
                 A DESCRIÇÃO DO TÍTULO SAIU DA CÉLULA (04/09).
@@ -492,7 +493,7 @@ export default function FinanceiroBaixas() {
           larguraAcoes={140}
           acoesLinha={(baixa) => (
             <>
-              <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${baixa.titulo_financeiro_id}`} title="Abrir titulo">
+              <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${baixa.titulo_financeiro_id}`} title="Abrir título">
                 <HiOutlineEye className="h-4 w-4" />
               </Link>
               <button
@@ -515,7 +516,7 @@ export default function FinanceiroBaixas() {
         */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border)] pt-3">
           <label className="flex items-center gap-2 text-sm text-[var(--c-muted)]">
-            <span>Por pagina</span>
+            <span>Por página</span>
             <select
               className="input input-sm"
               value={pageSize}

@@ -288,7 +288,7 @@ export default function TratamentoItemManual({ item, solicitacaoId, onCatalogado
         <div>
           <span className="compra-item-eyebrow">Catalogacao</span>
           <h4>{item.insumo_catalogado_id ? 'Corrigir vinculo oficial' : 'Tratar item manual'}</h4>
-          <p>O texto original da solicitacao sera preservado.</p>
+          <p>O texto original da solicitação será preservado.</p>
         </div>
         <div className="compra-item-tratamento-choice" role="group" aria-label="Forma de catalogacao">
           <button
@@ -365,7 +365,7 @@ export default function TratamentoItemManual({ item, solicitacaoId, onCatalogado
                   onChange={alterarBusca}
                   onFocus={() => setAutocompleteAberto(true)}
                   onKeyDown={navegarAutocomplete}
-                  placeholder="Nome, codigo ou alias"
+                  placeholder="Nome, código ou alias"
                   role="combobox"
                   aria-autocomplete="list"
                   aria-expanded={autocompleteAberto}
@@ -416,7 +416,7 @@ export default function TratamentoItemManual({ item, solicitacaoId, onCatalogado
                 <HiOutlineCheck aria-hidden="true" />
                 <span>Selecionado: {unidadeInsumo(insumoSelecionado)} · {insumoSelecionado.categoria?.nome || 'Sem categoria'}</span>
               </div>
-            ) : <small className="compra-item-autocomplete-help">Digite para buscar e selecione uma opcao antes de salvar.</small>}
+            ) : <small className="compra-item-autocomplete-help">Digite para buscar e selecione uma opção antes de salvar.</small>}
           </div>
         </div>
       ) : (
@@ -453,12 +453,12 @@ export default function TratamentoItemManual({ item, solicitacaoId, onCatalogado
             </select>
           </label>
           <div className="compra-item-field compra-item-code-preview">
-            <span>Codigo</span>
+            <span>Código</span>
             <strong>Gerado automaticamente</strong>
             <small>Formato INS-000001</small>
           </div>
           <label className="compra-item-field compra-item-field-wide">
-            <span>Descricao do cadastro</span>
+            <span>Descrição do cadastro</span>
             <textarea className="input min-h-24" value={form.descricao} onChange={(event) => setForm((atual) => ({ ...atual, descricao: event.target.value }))} />
           </label>
         </div>

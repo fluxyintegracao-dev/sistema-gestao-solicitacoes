@@ -122,7 +122,7 @@ export default function SstTimeline() {
     try {
       await revisarConformidadeSst(alvoId, { motivo: 'REVISAO_MANUAL_TIMELINE' });
       await avaliarBloqueiosSst(alvoId);
-      avisar.sucesso('Revisao de conformidade e bloqueios executada.');
+      avisar.sucesso('Revisão de conformidade e bloqueios executada.');
       load(alvoId);
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao revisar conformidade SST');
@@ -137,7 +137,7 @@ export default function SstTimeline() {
       <PageHeader
         titulo="Timeline operacional do colaborador"
         contagem={loading ? 'Carregando' : `${timeline.length} evento(s)`}
-        descricao="Historico unico de ASO, exames, treinamentos, EPI, acidentes, exposicoes, pendencias, bloqueios e score."
+        descricao="Histórico único de ASO, exames, treinamentos, EPI, acidentes, exposições, pendências, bloqueios e score."
         acaoPrincipal={{ rotulo: 'Revisar conformidade', onClick: revisar, desabilitada: !selected }}
         secundarias={[{ rotulo: 'Recarregar timeline', onClick: () => load(), desabilitada: !selected }]}
       />
@@ -159,7 +159,7 @@ export default function SstTimeline() {
             id: 'colaborador',
             rotulo: 'Colaborador',
             unico: true,
-            vazio: 'Nenhum colaborador ativo disponivel para consultar a timeline.',
+            vazio: 'Nenhum colaborador ativo disponível para consultar a timeline.',
             opcoes: colaboradores.map((item) => ({ valor: String(item.id), rotulo: optionLabel(item) }))
           }]}
           ativos={{ colaborador: selecionados }}
@@ -181,11 +181,11 @@ export default function SstTimeline() {
       */}
       <BlocosPersonalizaveis chave="blocos:sst-timeline" larguraPadrao="total">
         {data ? (
-          <BlocoConteudo titulo="Resumo do colaborador" descricao="Contagem consolidada do periodo carregado.">
+          <BlocoConteudo titulo="Resumo do colaborador" descricao="Contagem consolidada do período carregado.">
             <StatGrid colunas={3}>
               <StatTile label="Eventos" valor={data.resumo?.eventos_total || 0} />
               <StatTile
-                label="Pendencias abertas"
+                label="Pendências abertas"
                 valor={data.resumo?.pendencias_abertas || 0}
                 tom={data.resumo?.pendencias_abertas ? 'warning' : 'success'}
               />

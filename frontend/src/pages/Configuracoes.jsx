@@ -56,9 +56,9 @@ export default function Configuracoes() {
           topo, em superfície própria e uma linha só. Hub não tem ação
           sobre si mesmo, então a barra de ações fica vazia. */}
       <PageHeader
-        titulo="Configuracoes"
+        titulo="Configurações"
         contagem={`${totalAtalhos} atalhos`}
-        descricao="Gerencie cadastros, regras operacionais e, quando aplicavel, a camada de modulos da instalacao."
+        descricao="Gerencie cadastros, regras operacionais e, quando aplicavel, a camada de módulos da instalacao."
       />
 
       {/* B3 — BLOCO REMOVIDO EM 04/09, por decisão do responsável.

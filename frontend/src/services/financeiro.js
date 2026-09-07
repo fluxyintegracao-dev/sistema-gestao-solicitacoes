@@ -1,21 +1,14 @@
 import { API_URL, authHeaders } from './api';
+import { mensagemDeErro } from './erroDeResposta';
 
+/* A escolha da mensagem é do `erroDeResposta` — uma regra, um arquivo.
+   Aqui ficava a mesma dança de try/JSON.parse/SyntaxError repetida em 30
+   serviços, e o `text ||` do final era o que despejava HTML de servidor na
+   tela (achado A2). */
 async function parseJson(response, fallbackMessage) {
   const text = await response.text();
   if (!response.ok) {
-    if (!text) {
-      throw new Error(fallbackMessage);
-    }
-
-    try {
-      const parsed = JSON.parse(text);
-      throw new Error(parsed?.error || fallbackMessage);
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error(text || fallbackMessage);
-      }
-      throw error;
-    }
+    throw new Error(mensagemDeErro(text, fallbackMessage, response.status));
   }
 
   return text ? JSON.parse(text) : null;
@@ -49,15 +42,7 @@ export async function gerarRelatorioTitulosFinanceirosPdf(params = {}) {
 
   if (!response.ok) {
     const text = await response.text();
-    if (text) {
-      try {
-        const payload = JSON.parse(text);
-        throw new Error(payload?.error || 'Erro ao gerar relatorio de titulos financeiros');
-      } catch (error) {
-        if (!(error instanceof SyntaxError)) throw error;
-      }
-    }
-    throw new Error(text || 'Erro ao gerar relatorio de titulos financeiros');
+    throw new Error(mensagemDeErro(text, 'Erro ao gerar relatorio de titulos financeiros', response.status));
   }
 
   const disposition = response.headers.get('content-disposition') || '';
@@ -673,13 +658,7 @@ export async function exportarModeloImportacaoTitulosPagar() {
 
   if (!response.ok) {
     const text = await response.text();
-    try {
-      const parsed = JSON.parse(text);
-      throw new Error(parsed?.error || 'Erro ao exportar modelo de contas a pagar');
-    } catch (error) {
-      if (error instanceof SyntaxError) throw new Error(text || 'Erro ao exportar modelo de contas a pagar');
-      throw error;
-    }
+    throw new Error(mensagemDeErro(text, 'Erro ao exportar modelo de contas a pagar', response.status));
   }
 
   const blob = await response.blob();
@@ -815,15 +794,7 @@ export async function baixarPdfBoletoTitulo(id, { amostra = false } = {}) {
 
   if (!response.ok) {
     const text = await response.text();
-    try {
-      const parsed = JSON.parse(text);
-      throw new Error(parsed?.error || 'Erro ao baixar PDF do boleto');
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error(text || 'Erro ao baixar PDF do boleto');
-      }
-      throw error;
-    }
+    throw new Error(mensagemDeErro(text, 'Erro ao baixar PDF do boleto', response.status));
   }
 
   const blob = await response.blob();
@@ -872,15 +843,7 @@ export async function gerarBoletoCaixaRemessa({ convenioId, tituloIds = [], bole
 
   if (!response.ok) {
     const text = await response.text();
-    try {
-      const parsed = JSON.parse(text);
-      throw new Error(parsed?.error || 'Erro ao gerar remessa Caixa');
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error(text || 'Erro ao gerar remessa Caixa');
-      }
-      throw error;
-    }
+    throw new Error(mensagemDeErro(text, 'Erro ao gerar remessa Caixa', response.status));
   }
 
   const blob = await response.blob();
@@ -901,15 +864,7 @@ export async function baixarBoletoCaixaRemessa(id) {
 
   if (!response.ok) {
     const text = await response.text();
-    try {
-      const parsed = JSON.parse(text);
-      throw new Error(parsed?.error || 'Erro ao baixar remessa Caixa');
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error(text || 'Erro ao baixar remessa Caixa');
-      }
-      throw error;
-    }
+    throw new Error(mensagemDeErro(text, 'Erro ao baixar remessa Caixa', response.status));
   }
 
   const blob = await response.blob();
@@ -930,15 +885,7 @@ export async function baixarBoletoCaixaHomologacaoCsv(id) {
 
   if (!response.ok) {
     const text = await response.text();
-    try {
-      const parsed = JSON.parse(text);
-      throw new Error(parsed?.error || 'Erro ao baixar relatorio de homologacao Caixa');
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error(text || 'Erro ao baixar relatorio de homologacao Caixa');
-      }
-      throw error;
-    }
+    throw new Error(mensagemDeErro(text, 'Erro ao baixar relatorio de homologacao Caixa', response.status));
   }
 
   const blob = await response.blob();
@@ -957,15 +904,7 @@ export async function baixarBoletoCaixaHomologacaoPacote(id) {
 
   if (!response.ok) {
     const text = await response.text();
-    try {
-      const parsed = JSON.parse(text);
-      throw new Error(parsed?.error || 'Erro ao baixar pacote de homologacao Caixa');
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error(text || 'Erro ao baixar pacote de homologacao Caixa');
-      }
-      throw error;
-    }
+    throw new Error(mensagemDeErro(text, 'Erro ao baixar pacote de homologacao Caixa', response.status));
   }
 
   const blob = await response.blob();

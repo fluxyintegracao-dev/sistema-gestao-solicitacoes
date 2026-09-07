@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import { HiOutlineMagnifyingGlass, HiOutlineXMark } from 'react-icons/hi2';
+import DateInputBR from '../DateInputBR';
 import { FiltroRapido } from '../lista-avancada/ListaAvancada';
 import { useControlesDoBloco } from './BlocoConteudo';
 import PainelFiltrosVisiveis from './PainelFiltrosVisiveis';
@@ -169,6 +170,38 @@ export default function BarraFiltros({
           {campos.map((campo) => (
             <label key={campo.id} className="app-filtros-campo" data-tipo={campo.tipo || 'text'}>
               <span className="app-filtros-campo-rotulo">{campo.rotulo}</span>
+              {/*
+                  `tipo: 'date'` NAO vira mais campo nativo de data (06/09).
+
+                  MEDIDO no Chromium com o mesmo HTML: a ordem dos campos do
+                  campo nativo sai do idioma da INTERFACE do navegador, e nao
+                  do `lang="pt-BR"` da pagina nem do `Accept-Language` —
+                  contexto pt-BR deu `Month/Day/Year`, e so um processo com
+                  `LANG=pt_BR.UTF-8` deu `Dia/Mes/Ano`. Quer dizer: a MESMA
+                  faixa de filtro aparece `mm/dd/yyyy` para um usuario e
+                  `dd/mm/aaaa` para outro, e a tela nao tem como decidir. Foi
+                  assim que as seis telas do relatorio apareceram em
+                  `mm/dd/yyyy` nas capturas do preview, nas tres larguras.
+
+                  Como o formato nao e escolha do HTML, o conserto nao e um
+                  atributo: e trocar o campo. O `DateInputBR` ja existia no
+                  sistema desde a leva de medicao (texto com mascara
+                  DD/MM/AAAA, estado externo em ISO) e era usado em 5 lugares
+                  — isto e unificacao, nao componente novo.
+
+                  O `data-tipo` do label continua `date`: a LARGURA do campo
+                  sai dos tokens --campo-filtro-data-*, e ela nao mudou.
+              */}
+              {campo.tipo === 'date' ? (
+                <DateInputBR
+                  name={campo.id}
+                  value={campo.valor ?? ''}
+                  min={campo.min}
+                  max={campo.max}
+                  placeholder={campo.placeholder}
+                  onChange={(event) => campo.aoMudar(event.target.value)}
+                />
+              ) : (
               <input
                 type={campo.tipo || 'text'}
                 value={campo.valor ?? ''}
@@ -179,6 +212,7 @@ export default function BarraFiltros({
                 list={campo.sugestoes?.length ? `sugestoes-${campo.id}` : undefined}
                 onChange={(event) => campo.aoMudar(event.target.value)}
               />
+              )}
               {campo.sugestoes?.length ? (
                 <datalist id={`sugestoes-${campo.id}`}>
                   {campo.sugestoes.map((sugestao) => (

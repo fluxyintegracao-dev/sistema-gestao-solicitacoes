@@ -287,9 +287,9 @@ export default function GestaoUnidades() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Gestao de unidades"
+        titulo="Gestão de unidades"
         contagem={loading ? null : `${unidades.length} unidade(s)`}
-        descricao="Cadastro e manutencao das unidades de medida do modulo compras."
+        descricao="Cadastro e manutenção das unidades de medida do módulo compras."
         acaoPrincipal={{ rotulo: 'Nova unidade', onClick: () => { limparFormulario(); focarFormulario(); } }}
       />
 
@@ -338,8 +338,8 @@ export default function GestaoUnidades() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Importacao em massa"
-        descricao="Formato Nome|Sigla, uma por linha. O que nao entrar continua na caixa para nova tentativa."
+        titulo="Importação em massa"
+        descricao="Formato Nome|Sigla, uma por linha. O que não entrar continua na caixa para nova tentativa."
         variante="secundario"
         recolhivel
         recolhidoPadrao

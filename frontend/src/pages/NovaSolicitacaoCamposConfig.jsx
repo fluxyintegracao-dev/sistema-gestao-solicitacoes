@@ -269,7 +269,7 @@ export default function NovaSolicitacaoCamposConfig() {
       setSalvando(true);
       const data = await salvarCamposNovaSolicitacao({ regras });
       setRegras(normalizarConfigCamposNovaSolicitacao(data).regras);
-      avisar.sucesso('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuração salva com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao salvar configuracao.');
@@ -289,9 +289,9 @@ export default function NovaSolicitacaoCamposConfig() {
   if (loading) {
     return (
       <Pagina>
-        <PageHeader titulo="Campos da Nova Solicitacao" descricao={DESCRICAO} />
+        <PageHeader titulo="Campos da Nova Solicitação" descricao={DESCRICAO} />
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card">Carregando configuracao dos campos...</div>
+        <div className="app-empty-card">Carregando configuração dos campos...</div>
       </Pagina>
     );
   }
@@ -306,7 +306,7 @@ export default function NovaSolicitacaoCamposConfig() {
           (`.app-page-header`) gruda encostada na topbar e compacta sem
           sumir, entao a acao principal fica sempre a um clique. */}
       <PageHeader
-        titulo="Campos da Nova Solicitacao"
+        titulo="Campos da Nova Solicitação"
         contagem={`${camposDisponiveis.length} campo(s)`}
         descricao={DESCRICAO}
         acaoPrincipal={{
@@ -320,10 +320,10 @@ export default function NovaSolicitacaoCamposConfig() {
 
       <section className="config-summary-card">
         <div>
-          <p className="config-summary-kicker">Regra por area e tipo</p>
-          <h2 className="config-summary-title">O formulario muda conforme a area e o tipo selecionados</h2>
+          <p className="config-summary-kicker">Regra por área e tipo</p>
+          <h2 className="config-summary-title">O formulário muda conforme a área e o tipo selecionados</h2>
           <p className="config-summary-copy">
-            Obra e area responsavel continuam fixas para preservar o fluxo operacional. Os demais campos podem ser exibidos, ocultados ou exigidos por tipo.
+            Obra e área responsável continuam fixas para preservar o fluxo operacional. Os demais campos podem ser exibidos, ocultados ou exigidos por tipo.
           </p>
         </div>
       </section>
@@ -335,7 +335,7 @@ export default function NovaSolicitacaoCamposConfig() {
       <div className="grid gap-4 lg:grid-cols-4">
         <section className="card space-y-3">
           <label className="grid gap-2 text-sm">
-            Area responsavel
+            Área responsável
             <select
               className="input input-sm"
               value={areaSelecionada}
@@ -348,7 +348,7 @@ export default function NovaSolicitacaoCamposConfig() {
           </label>
 
           <label className="grid gap-2 text-sm">
-            Tipo de solicitacao
+            Tipo de solicitação
             <select
               className="input input-sm"
               value={tipoSelecionadoId}
@@ -383,7 +383,7 @@ export default function NovaSolicitacaoCamposConfig() {
           )}
           {tiposDaArea.length === 0 && (
             <p className="text-xs text-[var(--c-muted)]">
-              Nenhum tipo ativo encontrado para esta area.
+              Nenhum tipo ativo encontrado para esta área.
             </p>
           )}
           <button
@@ -392,7 +392,7 @@ export default function NovaSolicitacaoCamposConfig() {
             onClick={restaurarPadraoTipo}
             disabled={!areaSelecionada || !tipoSelecionadoId}
           >
-            Restaurar padrao deste tipo
+            Restaurar padrão deste tipo
           </button>
         </section>
 
@@ -414,7 +414,7 @@ export default function NovaSolicitacaoCamposConfig() {
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-[var(--c-text)]">Regras operacionais deste tipo</h3>
               <p className="mt-1 text-xs text-[var(--c-muted)]">
-                Ajustes que mudam a validacao do fluxo sem alterar a visibilidade dos campos.
+                Ajustes que mudam a validação do fluxo sem alterar a visibilidade dos campos.
               </p>
             </div>
             <div className="grid gap-3">
@@ -467,7 +467,7 @@ export default function NovaSolicitacaoCamposConfig() {
                       )}
                       {controladoAutomaticamente && (
                         <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-1 text-xs text-[var(--c-muted)]">
-                          Controlado pela apropriacao automatica
+                          Controlado pela apropriação automática
                         </span>
                       )}
                     </div>
@@ -495,7 +495,7 @@ export default function NovaSolicitacaoCamposConfig() {
               {
                 id: 'obrigatorio',
                 sempreVisivel: true,
-                titulo: 'Obrigatorio',
+                titulo: 'Obrigatório',
                 tipo: 'status',
                 render: (campo) => {
                   const resolvido = camposResolvidos[campo.id] || {};
@@ -512,7 +512,7 @@ export default function NovaSolicitacaoCamposConfig() {
               },
               {
                 id: 'padrao',
-                titulo: 'Padrao atual',
+                titulo: 'Padrão atual',
                 tipo: 'texto',
                 render: (campo) => {
                   const resolvido = camposResolvidos[campo.id] || {};
@@ -528,7 +528,7 @@ export default function NovaSolicitacaoCamposConfig() {
             getId={(campo) => campo.id}
             storageKey="tabela:nova-solicitacao-campos-config"
             rotuloRolagem="Campos da nova solicitacao"
-            vazio="Nenhum campo disponivel para este tipo."
+            vazio="Nenhum campo disponível para este tipo."
           />
         </section>
       </div>

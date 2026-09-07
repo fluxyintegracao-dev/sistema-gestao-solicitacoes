@@ -113,7 +113,7 @@ export function validarRateiosItem(item) {
 
   const rateios = normalizarRateiosEntrada(item);
   if (!rateios.length) {
-    return { ok: false, mensagem: 'Informe ao menos uma apropriacao.' };
+    return { ok: false, mensagem: 'Informe ao menos uma apropriação.' };
   }
 
   const apropriacoesUsadas = new Set();
@@ -123,11 +123,11 @@ export function validarRateiosItem(item) {
     const quantidade = parseQuantidade(rateio.quantidade_apropriada);
 
     if (!apropriacaoId) {
-      return { ok: false, mensagem: 'Preencha todas as apropriacoes do item.' };
+      return { ok: false, mensagem: 'Preencha todas as apropriações do item.' };
     }
 
     if (apropriacoesUsadas.has(apropriacaoId)) {
-      return { ok: false, mensagem: 'Nao repita a mesma apropriacao no item.' };
+      return { ok: false, mensagem: 'Não repita a mesma apropriação no item.' };
     }
 
     if (quantidade <= 0) {

@@ -1,35 +1,35 @@
 export const CAMPOS_NOVA_SOLICITACAO = [
-  { id: 'obra', label: 'Obra', descricao: 'Vincula a solicitacao a uma obra.', fixo: true },
-  { id: 'area_responsavel', label: 'Area responsavel', descricao: 'Define o setor que recebe a solicitacao.', fixo: true },
+  { id: 'obra', label: 'Obra', descricao: 'Vincula a solicitação a uma obra.', fixo: true },
+  { id: 'area_responsavel', label: 'Área responsável', descricao: 'Define o setor que recebe a solicitação.', fixo: true },
   { id: 'credor', label: 'Credor', descricao: 'Pessoa ou empresa vinculada como credor.' },
-  { id: 'cadastro_credor', label: 'Cadastro de credor', descricao: 'Permite cadastrar um novo credor durante a abertura da solicitacao.', permiteObrigatorio: false },
-  { id: 'favorecido', label: 'Favorecido', descricao: 'Pessoa ou empresa que recebera o pagamento.', excetoFluxoContratoNovo: true },
-  { id: 'forma_pagamento', label: 'Forma de pagamento', descricao: 'Forma prevista para o pagamento da solicitacao.', excetoFluxoContratoNovo: true },
-  { id: 'apropriacao_principal', label: 'Apropriacao principal', descricao: 'Apropriacao da solicitacao na obra.' },
-  { id: 'subtipo', label: 'Subtipo', descricao: 'Subtipo de contrato ou classificacao complementar.' },
-  { id: 'contrato', label: 'Contrato', descricao: 'Referencia e contrato vinculado.' },
-  { id: 'apropriacoes_contrato', label: 'Apropriacoes do contrato', descricao: 'Rateio entre apropriacoes vinculadas ao contrato selecionado.' },
-  { id: 'valor', label: 'Valor', descricao: 'Valor da solicitacao.' },
-  { id: 'data_vencimento', label: 'Data da solicitacao', descricao: 'Prazo operacional exibido como data de resposta ou de pagamento, conforme o tipo.' },
-  { id: 'data_demissao', label: 'Data de demissao', descricao: 'Data efetiva de desligamento do colaborador.' },
-  { id: 'periodo_medicao', label: 'Periodo de medicao', descricao: 'Data inicial e final da medicao.' },
-  { id: 'ref_contrato_abertura', label: 'Ref. contrato abertura', descricao: 'Referencia usada para abertura de contrato.' },
-  { id: 'itens_apropriacao', label: 'Itens de apropriacao', descricao: 'Itens de apropriacao usados na abertura de contrato.' },
+  { id: 'cadastro_credor', label: 'Cadastro de credor', descricao: 'Permite cadastrar um novo credor durante a abertura da solicitação.', permiteObrigatorio: false },
+  { id: 'favorecido', label: 'Favorecido', descricao: 'Pessoa ou empresa que receberá o pagamento.', excetoFluxoContratoNovo: true },
+  { id: 'forma_pagamento', label: 'Forma de pagamento', descricao: 'Forma prevista para o pagamento da solicitação.', excetoFluxoContratoNovo: true },
+  { id: 'apropriacao_principal', label: 'Apropriação principal', descricao: 'Apropriação da solicitação na obra.' },
+  { id: 'subtipo', label: 'Subtipo', descricao: 'Subtipo de contrato ou classificação complementar.' },
+  { id: 'contrato', label: 'Contrato', descricao: 'Referência e contrato vinculado.' },
+  { id: 'apropriacoes_contrato', label: 'Apropriações do contrato', descricao: 'Rateio entre apropriações vinculadas ao contrato selecionado.' },
+  { id: 'valor', label: 'Valor', descricao: 'Valor da solicitação.' },
+  { id: 'data_vencimento', label: 'Data da solicitação', descricao: 'Prazo operacional exibido como data de resposta ou de pagamento, conforme o tipo.' },
+  { id: 'data_demissao', label: 'Data de demissão', descricao: 'Data efetiva de desligamento do colaborador.' },
+  { id: 'periodo_medicao', label: 'Período de medição', descricao: 'Data inicial e final da medição.' },
+  { id: 'ref_contrato_abertura', label: 'Ref. contrato abertura', descricao: 'Referência usada para abertura de contrato.' },
+  { id: 'itens_apropriacao', label: 'Itens de apropriação', descricao: 'Itens de apropriação usados na abertura de contrato.' },
   { id: 'contrato_objeto', label: 'Objeto do contrato', descricao: 'Define o que esta sendo contratado no novo fluxo.', somenteFluxoContratoNovo: true },
-  { id: 'contrato_justificativa', label: 'Justificativa da contratacao', descricao: 'Registra por que a contratacao e necessaria.', somenteFluxoContratoNovo: true },
-  { id: 'contrato_responsavel', label: 'Responsavel pela contratacao', descricao: 'Usuario responsavel pelo acompanhamento da contratacao.', somenteFluxoContratoNovo: true },
-  { id: 'contrato_vigencia_inicio', label: 'Vigencia inicial do contrato', descricao: 'Data de inicio da vigencia contratual.', somenteFluxoContratoNovo: true },
-  { id: 'contrato_vigencia_fim', label: 'Vigencia final do contrato', descricao: 'Data final da vigencia contratual.', somenteFluxoContratoNovo: true },
-  { id: 'descricao', label: 'Titulo', descricao: 'Titulo curto usado para identificar a solicitacao.' },
-  { id: 'justificativa', label: 'Justificativa', descricao: 'Motivo e necessidade da solicitacao.', excetoFluxoContratoNovo: true },
-  { id: 'anexos', label: 'Anexos', descricao: 'Arquivos anexados na abertura da solicitacao.' }
+  { id: 'contrato_justificativa', label: 'Justificativa da contratação', descricao: 'Registra por que a contratação e necessária.', somenteFluxoContratoNovo: true },
+  { id: 'contrato_responsavel', label: 'Responsável pela contratação', descricao: 'Usuário responsável pelo acompanhamento da contratação.', somenteFluxoContratoNovo: true },
+  { id: 'contrato_vigencia_inicio', label: 'Vigência inicial do contrato', descricao: 'Data de início da vigência contratual.', somenteFluxoContratoNovo: true },
+  { id: 'contrato_vigencia_fim', label: 'Vigência final do contrato', descricao: 'Data final da vigência contratual.', somenteFluxoContratoNovo: true },
+  { id: 'descricao', label: 'Título', descricao: 'Título curto usado para identificar a solicitação.' },
+  { id: 'justificativa', label: 'Justificativa', descricao: 'Motivo e necessidade da solicitação.', excetoFluxoContratoNovo: true },
+  { id: 'anexos', label: 'Anexos', descricao: 'Arquivos anexados na abertura da solicitação.' }
 ];
 
 export const OPCOES_NOVA_SOLICITACAO = [
   {
     id: 'permitir_credor_avulso_com_contrato',
     label: 'Credor livre com contrato',
-    descricao: 'Permite selecionar ou cadastrar credor sem vinculo com o contrato selecionado.'
+    descricao: 'Permite selecionar ou cadastrar credor sem vínculo com o contrato selecionado.'
   }
 ];
 

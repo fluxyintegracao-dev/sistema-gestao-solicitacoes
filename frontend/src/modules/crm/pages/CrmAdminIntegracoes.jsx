@@ -59,7 +59,7 @@ function VinculosEvento({ event }) {
   const message = event.processedMessage;
 
   if (!lead && !conversation && !message) {
-    return <span className="text-xs text-muted">Sem vinculo ainda</span>;
+    return <span className="text-xs text-muted">Sem vínculo ainda</span>;
   }
 
   return (
@@ -109,7 +109,7 @@ const COLUNAS_EVENTO = [
   },
   {
     id: 'vinculos',
-    titulo: 'Vinculos',
+    titulo: 'Vínculos',
     tipo: 'texto',
     render: (event) => <VinculosEvento event={event} />
   },
@@ -222,7 +222,7 @@ export default function CrmAdminIntegracoes() {
       const updated = await atualizarIntegracoesCrm(payload);
       setConfig(updated);
       setForm((prev) => ({ ...prev, meta_webhook_secret: '', meta_page_access_token: '', google_webhook_secret: '' }));
-      avisar.sucesso('Configuracoes salvas.');
+      avisar.sucesso('Configurações salvas.');
     } catch (err) {
       avisar.erro(err.message || 'Erro ao salvar integracoes');
     } finally {
@@ -258,7 +258,7 @@ export default function CrmAdminIntegracoes() {
       {/* R13/R5/C1: o apoio saiu do `page-subtitle` solto e foi para a faixa
           fixa do PageHeader, que compacta na rolagem em vez de sumir. */}
       <PageHeader
-        titulo="Integracoes CRM"
+        titulo="Integrações CRM"
         /* C2: o apoio da faixa diz QUANTAS integracoes estao de pe — o numero
            que a pessoa vem conferir, sem depender de achar o bloco certo. */
         contagem={`${[config?.meta_configurado, config?.google_configurado].filter(Boolean).length} de 2 configuradas`}
@@ -281,7 +281,7 @@ export default function CrmAdminIntegracoes() {
       */}
       <BlocoConteudo
         titulo="Credenciais e webhooks"
-        descricao="Os segredos ja gravados nao sao exibidos: o campo mostra apenas se existe um configurado. Preencha somente para trocar."
+        descricao="Os segredos já gravados não são exibidos: o campo mostra apenas se existe um configurado. Preencha somente para trocar."
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -358,7 +358,7 @@ export default function CrmAdminIntegracoes() {
       */}
       <EventosTabela
         titulo="Eventos Meta"
-        descricao="Ultimos eventos recebidos e processados pelo CRM."
+        descricao="Últimos eventos recebidos e processados pelo CRM."
         events={metaEvents}
         loading={loading}
         onReprocess={reprocessMeta}
@@ -366,7 +366,7 @@ export default function CrmAdminIntegracoes() {
       />
       <EventosTabela
         titulo="Eventos Google"
-        descricao="Ultimos eventos recebidos e processados pelo CRM."
+        descricao="Últimos eventos recebidos e processados pelo CRM."
         events={googleEvents}
         loading={loading}
         onReprocess={reprocessGoogle}

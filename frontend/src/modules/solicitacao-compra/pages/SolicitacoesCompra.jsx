@@ -344,14 +344,14 @@ export default function SolicitacoesCompra() {
     )];
 
     if (!alvo.length) {
-      avisar.alerta('Selecione ao menos uma solicitacao de compra.');
+      avisar.alerta('Selecione ao menos uma solicitação de compra.');
       return;
     }
 
     // R21: `confirmar` devolve `{ ok, texto }` — objeto é SEMPRE truthy.
     // Sem desestruturar, o "Cancelar" seguiria com a inativação.
     const { ok } = await confirmar({
-      titulo: 'Inativar solicitacoes de compra',
+      titulo: 'Inativar solicitações de compra',
       mensagem: `Inativar ${alvo.length} solicitacao(oes) de compra selecionada(s)? As solicitacoes saem da fila operacional.`,
       rotuloConfirmar: 'Inativar',
       rotuloCancelar: 'Manter',
@@ -370,7 +370,7 @@ export default function SolicitacoesCompra() {
       }
       setSelecionadas([]);
       await carregarSolicitacoes();
-      avisar.sucesso('Solicitacao(oes) de compra inativada(s) com sucesso.');
+      avisar.sucesso('Solicitação(oes) de compra inativada(s) com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao inativar solicitacao de compra');
@@ -388,7 +388,7 @@ export default function SolicitacoesCompra() {
     )];
 
     if (!alvo.length) {
-      avisar.alerta('Selecione ao menos uma solicitacao de compra.');
+      avisar.alerta('Selecione ao menos uma solicitação de compra.');
       return;
     }
 
@@ -410,7 +410,7 @@ export default function SolicitacoesCompra() {
       }
       setSelecionadas([]);
       await carregarSolicitacoes();
-      avisar.sucesso('Solicitacao(oes) enviada(s) para a fila do setor de Compras.');
+      avisar.sucesso('Solicitação(oes) enviada(s) para a fila do setor de Compras.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao enviar solicitacao para Compras');
@@ -422,7 +422,7 @@ export default function SolicitacoesCompra() {
   const colunas = [
     {
       id: 'codigo',
-      titulo: 'Codigo',
+      titulo: 'Código',
       tipo: 'codigo',
       render: (solicitacao) => codigoSolicitacao(solicitacao)
     },
@@ -500,11 +500,11 @@ export default function SolicitacoesCompra() {
   return (
     <Pagina className="compras-solicitacoes-page">
       <PageHeader
-        titulo="Solicitacoes de Compra"
+        titulo="Solicitações de Compra"
         contagem={loading ? null : `${solicitacoesFiltradas.length} solicitacao(oes)`}
-        descricao="Acompanhe as solicitacoes de compra criadas no modulo e gere o PDF quando necessario."
+        descricao="Acompanhe as solicitações de compra criadas no módulo e gere o PDF quando necessário."
         acaoPrincipal={{
-          rotulo: 'Nova solicitacao',
+          rotulo: 'Nova solicitação',
           onClick: () => navigate('/solicitacoes-compra/nova')
         }}
         secundarias={[
@@ -539,7 +539,7 @@ export default function SolicitacoesCompra() {
           busca={visibilidadeFiltros.ehVisivel('busca') ? {
             valor: busca,
             aoMudar: setBusca,
-            placeholder: 'Codigo, obra ou solicitante'
+            placeholder: 'Código, obra ou solicitante'
           } : null}
           filtros={dimensoes.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
@@ -560,7 +560,7 @@ export default function SolicitacoesCompra() {
           colunas={colunas}
           itens={solicitacoesFiltradas}
           carregando={loading}
-          vazio="Nenhuma solicitacao de compra encontrada."
+          vazio="Nenhuma solicitação de compra encontrada."
           storageKey="tabela:solicitacoes-compra"
           rotuloRolagem="Solicitacoes de compra"
           /*
@@ -581,7 +581,7 @@ export default function SolicitacoesCompra() {
                 className="btn btn-outline btn-sm"
                 onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}
                 title="Abrir detalhes"
-                aria-label={`Abrir detalhes da solicitacao ${codigoSolicitacao(solicitacao)}`}
+                aria-label={`Abrir detalhes da solicitação ${codigoSolicitacao(solicitacao)}`}
               >
                 <HiOutlineEye />
               </button>
@@ -590,7 +590,7 @@ export default function SolicitacoesCompra() {
                 className="btn btn-outline btn-sm"
                 onClick={() => handleBaixarPdf(solicitacao.id)}
                 title="Baixar PDF"
-                aria-label={`Baixar PDF da solicitacao ${codigoSolicitacao(solicitacao)}`}
+                aria-label={`Baixar PDF da solicitação ${codigoSolicitacao(solicitacao)}`}
               >
                 <HiOutlineArrowDownTray />
               </button>
@@ -600,7 +600,7 @@ export default function SolicitacoesCompra() {
                   className="btn btn-outline btn-sm"
                   onClick={() => handleEncaminharCompras([solicitacao.id])}
                   title="Enviar para fila de Compras"
-                  aria-label={`Enviar solicitacao ${codigoSolicitacao(solicitacao)} para Compras`}
+                  aria-label={`Enviar solicitação ${codigoSolicitacao(solicitacao)} para Compras`}
                   disabled={encaminhando}
                 >
                   <HiOutlinePaperAirplane />
@@ -611,8 +611,8 @@ export default function SolicitacoesCompra() {
                   type="button"
                   className="btn btn-outline btn-sm btn-perigo-suave"
                   onClick={() => handleInativar([solicitacao.id])}
-                  title="Inativar solicitacao"
-                  aria-label={`Inativar solicitacao ${codigoSolicitacao(solicitacao)}`}
+                  title="Inativar solicitação"
+                  aria-label={`Inativar solicitação ${codigoSolicitacao(solicitacao)}`}
                   disabled={inativando}
                 >
                   <HiOutlineTrash />

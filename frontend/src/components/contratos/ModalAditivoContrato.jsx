@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getOpcoesFormularioContrato, getTetoAditivo, solicitarAditivoContrato } from '../../services/contratos';
 import { formatCurrencyBRL, normalizeCurrencyTyping, parseCurrencyInput } from '../../utils/formatters';
+import DateInputBR from '../DateInputBR';
 
 /**
  * Modal do TERMO ADITIVO (PI-15).
@@ -409,7 +410,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
 
           {teto && !contratoAceita && (
             <div className="app-alert app-alert--error">
-              Este contrato esta encerrado ou inativo e nao aceita termo aditivo.
+              Este contrato esta encerrado ou inativo e não aceita termo aditivo.
             </div>
           )}
 
@@ -515,9 +516,8 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                 separado logo abaixo e pode ultrapassar essa data. */}
             {ehVigencia && (
               <label className="text-sm">Prazo (nova vigência final) *
-                <input
+                <DateInputBR
                   className="input"
-                  type="date"
                   name="aditivo_nova_vigencia_fim"
                   value={campos.nova_vigencia_fim}
                   onChange={campo('nova_vigencia_fim')}
@@ -563,7 +563,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
               </select>
               {usuarios.length === 0 && (
                 <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                  Nenhum usuario ativo esta vinculado a obra/centro de custo deste contrato.
+                  Nenhum usuário ativo esta vinculado a obra/centro de custo deste contrato.
                 </span>
               )}
             </label>
@@ -620,9 +620,8 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                         onChange={(e) => editarValorParcela(parcela.numero, e.target.value)}
                         disabled={!contratoAceita}
                       />
-                      <input
+                      <DateInputBR
                         className="input input-sm"
-                        type="date"
                         aria-label={`Vencimento da parcela ${parcela.numero}`}
                         value={parcela.vencimento || ''}
                         onChange={(e) => editarVencimentoParcela(parcela.numero, e.target.value)}
@@ -660,7 +659,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
               name="aditivo_justificativa"
               value={campos.justificativa}
               onChange={campo('justificativa')}
-              placeholder="Por que este aditivo e necessario"
+              placeholder="Por que este aditivo e necessário"
               disabled={!contratoAceita}
             />
           </label>

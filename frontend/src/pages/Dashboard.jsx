@@ -461,7 +461,7 @@ export default function Dashboard() {
     if (dados.visao.solicitacoes) {
       actions.push({
         to: rotaDe('solicitacoes-lista'),
-        label: 'Abrir solicitacoes',
+        label: 'Abrir solicitações',
         icon: HiOutlineClipboardDocumentList
       });
     }
@@ -477,7 +477,7 @@ export default function Dashboard() {
     if (dados.visao.financeiro && financeiro.conciliacao_pendente_quantidade > 0) {
       actions.push({
         to: rotaDe('fin-conciliacao'),
-        label: 'Revisar conciliacao',
+        label: 'Revisar conciliação',
         icon: HiOutlineArrowPath
       });
     }
@@ -503,7 +503,7 @@ export default function Dashboard() {
     },
     {
       id: 'valor',
-      titulo: 'Exposicao',
+      titulo: 'Exposição',
       tipo: 'valor',
       render: (item) => item.value
     }
@@ -512,7 +512,7 @@ export default function Dashboard() {
   const colunasVencimentos = [
     {
       id: 'titulo',
-      titulo: 'Titulo',
+      titulo: 'Título',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (item) => (
@@ -552,12 +552,12 @@ export default function Dashboard() {
   const colunasContas = [
     {
       id: 'conta',
-      titulo: 'Conta bancaria',
+      titulo: 'Conta bancária',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (item) => item.conta_bancaria_nome || '-'
     },
-    { id: 'pendentes', titulo: 'Pendencias', tipo: 'numero', render: (item) => formatNumber(item.pendentes) },
+    { id: 'pendentes', titulo: 'Pendências', tipo: 'numero', render: (item) => formatNumber(item.pendentes) },
     { id: 'valor', titulo: 'Valor pendente', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
   ];
 
@@ -573,7 +573,7 @@ export default function Dashboard() {
     { id: 'receber', titulo: 'A receber aberto', tipo: 'valor', render: (item) => formatCurrency(item.receber_aberto) },
     {
       id: 'combinado',
-      titulo: 'Exposicao combinada',
+      titulo: 'Exposição combinada',
       tipo: 'valor',
       // Conta exatamente como contava antes (pagar + receber). O nome da
       // coluna passou a dizer o que a soma É — o rótulo anterior ("saldo
@@ -596,12 +596,12 @@ export default function Dashboard() {
   if (erro) {
     return (
       <Pagina>
-        <PageHeader titulo={titulo} descricao="Painel indisponivel no momento." />
-        <BlocoConteudo titulo="Painel indisponivel">
+        <PageHeader titulo={titulo} descricao="Painel indisponível no momento." />
+        <BlocoConteudo titulo="Painel indisponível">
           {/* CONDIÇÃO, não evento: a faixa descreve por que não há painel.
               Fechá-la não traria os dados de volta — por isso é um Alert
               fixo no fluxo, e não um aviso dispensável (useAvisos). */}
-          <Alert type="error" title="Nao foi possivel carregar o painel" message={erro} />
+          <Alert type="error" title="Não foi possível carregar o painel" message={erro} />
           <div className="app-actionbar">
             <button type="button" className="btn btn-primary" onClick={() => carregarDashboard()} disabled={refreshing}>
               {refreshing ? 'Atualizando...' : 'Tentar de novo'}
@@ -630,8 +630,8 @@ export default function Dashboard() {
       */}
       <PageHeader
         titulo={titulo}
-        contagem={`${decisoes.length} ponto(s) de decisao`}
-        descricao={`Centro de decisao · atualizado ${formatDateTime(updatedAt)}`}
+        contagem={`${decisoes.length} ponto(s) de decisão`}
+        descricao={`Centro de decisão · atualizado ${formatDateTime(updatedAt)}`}
         acaoPrincipal={{
           rotulo: refreshing ? 'Atualizando...' : 'Atualizar',
           onClick: () => carregarDashboard(),
@@ -650,8 +650,8 @@ export default function Dashboard() {
       <BlocosPersonalizaveis chave="blocos:dashboard" larguraPadrao="total">
         {dados.visao.financeiro && (
           <BlocoConteudo
-            titulo="Caixa e pendencias"
-            descricao="Os numeros que decidem o dia. Cada ladrilho abre a tela onde a acao acontece."
+            titulo="Caixa e pendências"
+            descricao="Os números que decidem o dia. Cada ladrilho abre a tela onde a ação acontece."
           >
             <StatGrid colunas={4}>
               <Ladrilho
@@ -662,16 +662,16 @@ export default function Dashboard() {
                 href={rotaDe('fin-relatorios')}
               />
               <Ladrilho
-                label="Resultado do mes"
+                label="Resultado do mês"
                 valor={formatCurrency(resultadoMes)}
-                sub="Recebido no mes menos pago no mes"
+                sub="Recebido no mês menos pago no mês"
                 tom={resultadoMes >= 0 ? 'info' : 'warning'}
                 href={rotaDe('fin-relatorios')}
               />
               <Ladrilho
                 label="A pagar vencido"
                 valor={formatCurrency(financeiro.pagar_vencido)}
-                sub={`${financeiro.quantidade_pagar_vencido} titulo(s) a pagar vencido(s)`}
+                sub={`${financeiro.quantidade_pagar_vencido} título(s) a pagar vencido(s)`}
                 tom={financeiro.pagar_vencido > 0 ? 'danger' : 'success'}
                 /* `/financeiro/titulos` sem filtro NAO e destino do menu: o
                    menu oferece "Contas a Pagar" e "a Receber" separados
@@ -682,12 +682,12 @@ export default function Dashboard() {
               <Ladrilho
                 label="A receber vencido"
                 valor={formatCurrency(financeiro.receber_vencido)}
-                sub={`${financeiro.quantidade_receber_vencido} titulo(s) a receber vencido(s)`}
+                sub={`${financeiro.quantidade_receber_vencido} título(s) a receber vencido(s)`}
                 tom={financeiro.receber_vencido > 0 ? 'warning' : 'success'}
                 href="/financeiro/titulos"
               />
               <Ladrilho
-                label="Conciliacao pendente"
+                label="Conciliação pendente"
                 valor={formatNumber(financeiro.conciliacao_pendente_quantidade)}
                 sub={formatCurrency(financeiro.conciliacao_pendente_valor)}
                 tom={financeiro.conciliacao_pendente_quantidade > 0 ? 'warning' : 'success'}
@@ -699,14 +699,14 @@ export default function Dashboard() {
 
         {dados.visao.solicitacoes && !dados.visao.financeiro && (
           <BlocoConteudo
-            titulo="Operacao do setor"
-            descricao="Volume visivel para o seu escopo. Cada ladrilho abre a lista de solicitacoes."
+            titulo="Operação do setor"
+            descricao="Volume visível para o seu escopo. Cada ladrilho abre a lista de solicitações."
           >
             <StatGrid colunas={4}>
-              <Ladrilho label="Solicitacoes abertas" valor={formatNumber(dados.total)} sub="Total operacional visivel" tom="info" href={rotaDe('solicitacoes-lista')} />
-              <Ladrilho label="Aguardando acao" valor={formatNumber(solicitacoesPendentes)} sub="Pendentes e em analise" tom={solicitacoesPendentes > 0 ? 'warning' : 'success'} href={rotaDe('solicitacoes-lista')} />
-              <Ladrilho label="Valor em solicitacoes" valor={formatCurrency(totalSolicitacoesValor)} sub="Base informada nos registros" href={rotaDe('solicitacoes-lista')} />
-              <Ladrilho label="Areas com demanda" valor={formatNumber(topAreas.length)} sub="Setores com solicitacoes abertas" />
+              <Ladrilho label="Solicitações abertas" valor={formatNumber(dados.total)} sub="Total operacional visível" tom="info" href={rotaDe('solicitacoes-lista')} />
+              <Ladrilho label="Aguardando ação" valor={formatNumber(solicitacoesPendentes)} sub="Pendentes e em analise" tom={solicitacoesPendentes > 0 ? 'warning' : 'success'} href={rotaDe('solicitacoes-lista')} />
+              <Ladrilho label="Valor em solicitações" valor={formatCurrency(totalSolicitacoesValor)} sub="Base informada nos registros" href={rotaDe('solicitacoes-lista')} />
+              <Ladrilho label="Áreas com demanda" valor={formatNumber(topAreas.length)} sub="Setores com solicitações abertas" />
             </StatGrid>
           </BlocoConteudo>
         )}
@@ -714,10 +714,10 @@ export default function Dashboard() {
         {/* B2: UM bloco principal por tela, e nesta é a fila de decisão — a
             pergunta central do painel é "por onde começo?". */}
         <BlocoConteudo
-          titulo="Fila de decisao"
+          titulo="Fila de decisão"
           variante="primario"
           cor="var(--sem-danger)"
-          descricao="Lista priorizada por risco financeiro e operacional. Leitura objetiva dos pontos que pedem acao: vencidos, caixa aberto, conciliacao, fila operacional e exposicao por obra. Comece por aqui."
+          descricao="Lista priorizada por risco financeiro e operacional. Leitura objetiva dos pontos que pedem ação: vencidos, caixa aberto, conciliação, fila operacional e exposição por obra. Comece por aqui."
         >
           {decisoes.length ? (
             <TabelaPadrao
@@ -742,7 +742,7 @@ export default function Dashboard() {
               }}
             />
           ) : (
-            <EmptyState title="Sem acao critica agora" message="Nao ha alertas executivos relevantes com os dados atuais." />
+            <EmptyState title="Sem ação critica agora" message="Nao ha alertas executivos relevantes com os dados atuais." />
           )}
         </BlocoConteudo>
 
@@ -750,7 +750,7 @@ export default function Dashboard() {
           /* "Onde a NAVEGAÇÃO mora" (04/09): caminho para OUTRA tela não vai
              na barra de ações nem no menu "⋯" — vai no hub. Esta página é o
              hub de entrada do sistema, então os atalhos moram no corpo. */
-          <BlocoConteudo titulo="Ir direto para" descricao="Atalhos para as telas onde a acao acontece.">
+          <BlocoConteudo titulo="Ir direto para" descricao="Atalhos para as telas onde a ação acontece.">
             <div className="app-actionbar">
               {quickActions.map((action) => {
                 const Icon = action.icon;
@@ -768,33 +768,33 @@ export default function Dashboard() {
         {dados.visao.financeiro && (
           <BlocoConteudo
             titulo="Pulso financeiro"
-            descricao="Compara compromissos, recebiveis e movimento liquidado no mes. A receber e sempre verde e a pagar sempre vermelho, aqui e nas tabelas abaixo (R8: a cor e da serie, nao do componente)."
+            descricao="Compara compromissos, recebíveis e movimento liquidado no mês. A receber e sempre verde e a pagar sempre vermelho, aqui e nas tabelas abaixo (R8: a cor e da série, não do componente)."
           >
             <StatGrid colunas={4}>
               <Ladrilho
                 label="A receber em aberto"
                 valor={formatCurrency(financeiro.total_receber_aberto)}
-                sub={`${financeiro.quantidade_receber_aberto} titulo(s) a receber`}
+                sub={`${financeiro.quantidade_receber_aberto} título(s) a receber`}
                 tom="success"
                 href="/financeiro/titulos"
               />
               <Ladrilho
                 label="A pagar em aberto"
                 valor={formatCurrency(financeiro.total_pagar_aberto)}
-                sub={`${financeiro.quantidade_pagar_aberto} titulo(s) a pagar`}
+                sub={`${financeiro.quantidade_pagar_aberto} título(s) a pagar`}
                 tom="danger"
                 href="/financeiro/titulos"
               />
               <Ladrilho
-                label="Recebido no mes"
+                label="Recebido no mês"
                 valor={formatCurrency(financeiro.movimentado_mes_receber)}
-                sub="Entradas baixadas no periodo atual"
+                sub="Entradas baixadas no período atual"
                 tom="success"
               />
               <Ladrilho
-                label="Pago no mes"
+                label="Pago no mês"
                 valor={formatCurrency(financeiro.movimentado_mes_pagar)}
-                sub="Saidas baixadas no periodo atual"
+                sub="Saídas baixadas no período atual"
                 tom="danger"
               />
             </StatGrid>
@@ -803,7 +803,7 @@ export default function Dashboard() {
 
         <BlocoConteudo
           titulo="Insights do Fluxy"
-          descricao="Leituras objetivas geradas no frontend a partir dos indicadores ja carregados."
+          descricao="Leituras objetivas geradas no frontend a partir dos indicadores já carregados."
         >
           <StatGrid colunas={2}>
             {insights.map((item) => (
@@ -824,9 +824,9 @@ export default function Dashboard() {
       {dados.visao.financeiro && (
         <>
           <BlocoConteudo
-            titulo="Proximos vencimentos"
-            contagem={`${financeiro.proximosVencimentos.length} titulo(s) na agenda curta`}
-            descricao="Agenda curta para antecipar cobranca e pagamento."
+            titulo="Próximos vencimentos"
+            contagem={`${financeiro.proximosVencimentos.length} título(s) na agenda curta`}
+            descricao="Agenda curta para antecipar cobrança e pagamento."
           >
             <TabelaPadrao
               colunas={colunasVencimentos}
@@ -838,7 +838,7 @@ export default function Dashboard() {
               aoClicarLinha={(item) => navigate(`/financeiro/titulos/${item.id}`)}
               acoesLinha={(item) => (
                 <Link to={`/financeiro/titulos/${item.id}`} className="btn btn-outline btn-sm">
-                  Abrir titulo
+                  Abrir título
                 </Link>
               )}
               vazio={{
@@ -849,9 +849,9 @@ export default function Dashboard() {
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Exposicao por obra"
+            titulo="Exposição por obra"
             contagem={`${financeiro.porObra.length} obra(s)`}
-            descricao="Obras que mais podem alterar o caixa aberto. Pagar e receber deixaram de viver numa frase de apoio e viraram colunas proprias, com valor que nunca trunca."
+            descricao="Obras que mais podem alterar o caixa aberto. Pagar e receber deixaram de viver numa frase de apoio e viraram colunas próprias, com valor que nunca trunca."
           >
             <TabelaPadrao
               colunas={colunasObras}
@@ -867,9 +867,9 @@ export default function Dashboard() {
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Conciliacao por conta"
-            contagem={`${financeiro.conciliacaoPorConta.length} conta(s) com pendencia`}
-            descricao="Contas com maior volume pendente de classificacao."
+            titulo="Conciliação por conta"
+            contagem={`${financeiro.conciliacaoPorConta.length} conta(s) com pendência`}
+            descricao="Contas com maior volume pendente de classificação."
           >
             <TabelaPadrao
               colunas={colunasContas}
@@ -881,7 +881,7 @@ export default function Dashboard() {
               aoClicarLinha={() => navigate(rotaDe('fin-conciliacao'))}
               acoesLinha={() => (
                 <Link to={rotaDe('fin-conciliacao')} className="btn btn-outline btn-sm">
-                  Abrir conciliacao
+                  Abrir conciliação
                 </Link>
               )}
               vazio={{
@@ -892,7 +892,7 @@ export default function Dashboard() {
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Maiores exposicoes por parceiro"
+            titulo="Maiores exposições por parceiro"
             contagem={`${financeiro.porParceiro.length} parceiro(s)`}
             descricao="Parceiros com maior volume aberto combinado."
           >
@@ -914,17 +914,17 @@ export default function Dashboard() {
       {dados.visao.solicitacoes && (
         <>
           <BlocoConteudo
-            titulo="Carga operacional por area"
-            contagem={`${topAreas.length} area(s) com demanda`}
-            descricao="Onde a operacao esta concentrada agora."
+            titulo="Carga operacional por área"
+            contagem={`${topAreas.length} área(s) com demanda`}
+            descricao="Onde a operação esta concentrada agora."
           >
             <BarList items={topAreas} labelKey="area" valueKey="total" />
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Status das solicitacoes"
+            titulo="Status das solicitações"
             contagem={`${topStatus.length} status com registro`}
-            descricao="Distribuicao atual para destravar gargalos."
+            descricao="Distribuição atual para destravar gargalos."
           >
             <BarList items={topStatus} labelKey="status" valueKey="total" />
           </BlocoConteudo>

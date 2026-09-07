@@ -107,7 +107,7 @@ function CategoriaChecklist({ title, description, categorias, selectedIds, onCha
       </div>
 
       {(categorias || []).length === 0 && (
-        <div className="app-empty-card">Nenhuma categoria financeira compativel encontrada.</div>
+        <div className="app-empty-card">Nenhuma categoria financeira compatível encontrada.</div>
       )}
     </BlocoConteudo>
   );
@@ -245,7 +245,7 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
               Ativo
             </label>
             <label className="sol-filter-field">
-              <span className="sol-filter-label">Codigo</span>
+              <span className="sol-filter-label">Código</span>
               <input
                 className="input w-full uppercase"
                 value={item.value || ''}
@@ -302,12 +302,12 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
 
       <div className="mt-4">
         <button type="button" className="btn btn-outline" onClick={addItem}>
-          Adicionar opcao
+          Adicionar opção
         </button>
       </div>
 
       {(itens || []).length === 0 && (
-        <div className="app-empty-card mt-4">Nenhuma opcao cadastrada.</div>
+        <div className="app-empty-card mt-4">Nenhuma opção cadastrada.</div>
       )}
 
       {/* Cada bloco tem a sua confirmacao; o OverlayModal sai por portal, e so
@@ -396,7 +396,7 @@ export default function ConfiguracoesComercialCategorias() {
       <Pagina>
         <PageHeader titulo="Categorias comerciais" descricao={DESCRICAO} />
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <BlocoConteudo titulo="Opcoes do contrato de venda" variante="primario" cor="var(--c-primary)">
+        <BlocoConteudo titulo="Opções do contrato de venda" variante="primario" cor="var(--c-primary)">
           <p className="app-note">Carregando categorias comerciais...</p>
         </BlocoConteudo>
       </Pagina>
@@ -432,8 +432,8 @@ export default function ConfiguracoesComercialCategorias() {
           agora a superfície é a do sistema. `secundario` porque ele recua:
           explica de onde vêm os dados, não é o trabalho da tela. */}
       <BlocoConteudo
-        titulo="Origem das configuracoes"
-        descricao="Cadastre e mantenha as categorias no Financeiro. Aqui o Comercial escolhe quais categorias e quais opcoes aparecem no contrato."
+        titulo="Origem das configurações"
+        descricao="Cadastre e mantenha as categorias no Financeiro. Aqui o Comercial escolhe quais categorias e quais opções aparecem no contrato."
         variante="secundario"
       />
 
@@ -452,7 +452,7 @@ export default function ConfiguracoesComercialCategorias() {
       />
 
       <CategoriaSelect
-        title="Comissao (global)"
+        title="Comissão (global)"
         description="Categoria única usada em todos os contratos com corretor. Não é exibida na tela de contratos."
         categorias={config.categorias_comissao || []}
         value={config.comissao_categoria_id || ''}

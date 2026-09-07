@@ -192,7 +192,7 @@ export default function PrioridadesDiretoria() {
       return;
     }
     if (!Number.isFinite(valor) || valor <= 0) {
-      avisar.alerta('Informe um valor disponivel valido.');
+      avisar.alerta('Informe um valor disponível valido.');
       return;
     }
 
@@ -380,7 +380,7 @@ export default function PrioridadesDiretoria() {
       setSelecionados(new Set(titulosSalvos.map(item => String(item.id))));
       setDisponiveis(mesclarItens(disponiveis, titulosSalvos));
       await recarregarLotes();
-      avisar.sucesso('Selecao salva. Voce pode voltar depois para continuar este lote.');
+      avisar.sucesso('Seleção salva. Você pode voltar depois para continuar este lote.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao salvar selecao do lote.');
@@ -397,7 +397,7 @@ export default function PrioridadesDiretoria() {
     if (!lote?.id) return;
     const tituloIds = Array.from(selecionados).map(Number).filter(Boolean);
     if (tituloIds.length === 0) {
-      avisar.alerta('Selecione ao menos um titulo.');
+      avisar.alerta('Selecione ao menos um título.');
       return;
     }
     // R21: desestruturar { ok } — o retorno é objeto e objeto é sempre
@@ -450,7 +450,7 @@ export default function PrioridadesDiretoria() {
       setObrasDisponiveis(Array.isArray(disponiveisData?.obras) ? disponiveisData.obras : []);
       setDisponiveis(mesclarItens(Array.isArray(disponiveisData?.items) ? disponiveisData.items : [], titulosSalvos));
       await recarregarLotes();
-      avisar.sucesso('Lote reaberto para edicao.');
+      avisar.sucesso('Lote reaberto para edição.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao reabrir lote.');
@@ -600,7 +600,7 @@ export default function PrioridadesDiretoria() {
   const colunasTitulos = [
     {
       id: 'titulo',
-      titulo: 'Titulo',
+      titulo: 'Título',
       // R17: o título (código + credor) é o registro desta lista.
       tipo: 'identidade',
       noCard: 'titulo',
@@ -613,7 +613,7 @@ export default function PrioridadesDiretoria() {
     },
     {
       id: 'solicitacao',
-      titulo: 'Solicitacao',
+      titulo: 'Solicitação',
       tipo: 'texto',
       render: item => (
         item.solicitacao ? (
@@ -622,7 +622,7 @@ export default function PrioridadesDiretoria() {
             sub={item.solicitacao.tipo?.nome || item.solicitacao.descricao || '-'}
           />
         ) : (
-          <span className="text-[var(--c-muted)]">Sem solicitacao</span>
+          <span className="text-[var(--c-muted)]">Sem solicitação</span>
         )
       )
     },
@@ -669,7 +669,7 @@ export default function PrioridadesDiretoria() {
       <PageHeader
         titulo="Prioridades Diretoria"
         contagem={loading ? null : `${lotes.length} lote(s)`}
-        descricao="Usuarios autorizados solicitam lotes de prioridade. A diretoria alvo autoriza quais titulos financeiros entram no lote."
+        descricao="Usuários autorizados solicitam lotes de prioridade. A diretoria alvo autoriza quais títulos financeiros entram no lote."
       />
 
       {/* R16: UM dono para a faixa de avisos. */}
@@ -680,7 +680,7 @@ export default function PrioridadesDiretoria() {
            quem tem esta permissão. */
         <BlocoConteudo
           titulo="Solicitar lote"
-          descricao="A diretoria alvo recebe o lote com o valor disponivel informado e monta a selecao de titulos."
+          descricao="A diretoria alvo recebe o lote com o valor disponível informado e monta a seleção de títulos."
         >
           <form
             onSubmit={(event) => { event.preventDefault(); criarLote(); }}
@@ -703,7 +703,7 @@ export default function PrioridadesDiretoria() {
                 </select>
               </CampoForm>
 
-              <CampoForm label="Valor disponivel" obrigatorio>
+              <CampoForm label="Valor disponível" obrigatorio>
                 {/* R6: dinheiro é dimensionado pelo pior caso — .input-moeda
                     garante 180px, alinhamento à direita e tabular-nums. */}
                 <input
@@ -716,7 +716,7 @@ export default function PrioridadesDiretoria() {
                 />
               </CampoForm>
 
-              <CampoForm label="Observacao">
+              <CampoForm label="Observação">
                 <input
                   className="input w-full"
                   value={form.observacao}
@@ -738,7 +738,7 @@ export default function PrioridadesDiretoria() {
         titulo="Lotes"
         variante="primario"
         cor="var(--c-primary)"
-        descricao="Clique num lote para abrir os titulos autorizados."
+        descricao="Clique num lote para abrir os títulos autorizados."
       >
         {/* R12: era um <select> "Todos os status" solto no cabeçalho da
             página — com select o estado do filtro só existe abrindo a
@@ -789,10 +789,10 @@ export default function PrioridadesDiretoria() {
       </BlocoConteudo>
 
       {!loteDetalhe ? (
-        <BlocoConteudo titulo="Titulos do lote">
+        <BlocoConteudo titulo="Títulos do lote">
           {/* B5: o texto tem superfície — não fica solto sobre o canvas. */}
           <p className="text-sm text-[var(--c-muted)]">
-            Selecione um lote na lista acima para visualizar os titulos.
+            Selecione um lote na lista acima para visualizar os títulos.
           </p>
         </BlocoConteudo>
       ) : (
@@ -825,10 +825,10 @@ export default function PrioridadesDiretoria() {
                 usado e itens só existiam no cartão da lista. Aqui eles são
                 o RECORTE deste lote (B3), não a repetição do total da faixa. */}
             <StatGrid colunas={4}>
-              <StatTile label="Valor disponivel" valor={moeda(loteDetalhe.valor_disponivel)} />
+              <StatTile label="Valor disponível" valor={moeda(loteDetalhe.valor_disponivel)} />
               <StatTile label="Valor utilizado" valor={moeda(loteDetalhe.valor_utilizado)} />
               <StatTile
-                label="Saldo disponivel"
+                label="Saldo disponível"
                 valor={moeda(loteDetalhe.saldo_disponivel)}
                 tom={Number(loteDetalhe.saldo_disponivel || 0) < 0 ? 'danger' : undefined}
               />
@@ -841,9 +841,9 @@ export default function PrioridadesDiretoria() {
 
           {loteAberto && (
             <BlocoConteudo
-              titulo="Titulos elegiveis"
+              titulo="Títulos elegíveis"
               contagem={`${selecionados.size} selecionado(s)`}
-              descricao={`Valor selecionado ${moeda(valorSelecionado)}. Marcar um titulo grava rascunho na hora.`}
+              descricao={`Valor selecionado ${moeda(valorSelecionado)}. Marcar um título grava rascunho na hora.`}
             >
               {/* R12/R23: o recorte dos elegíveis é busca larga em cima e
                   marcação abaixo, aplicando na hora. A dimensão Obra é
@@ -854,7 +854,7 @@ export default function PrioridadesDiretoria() {
                 busca={{
                   valor: busca,
                   aoMudar: setBusca,
-                  placeholder: 'Buscar titulo elegivel por titulo, obra, credor ou solicitacao'
+                  placeholder: 'Buscar título elegível por título, obra, credor ou solicitação'
                 }}
                 filtros={[{
                   id: 'obra',
@@ -881,7 +881,7 @@ export default function PrioridadesDiretoria() {
               <div className="app-actionbar">
                 {loteDetalhe.pode_salvar && (
                   <button type="button" className="btn btn-outline" onClick={salvarSelecaoLote} disabled={operando}>
-                    Salvar selecao
+                    Salvar seleção
                   </button>
                 )}
                 {loteDetalhe.pode_finalizar && (
@@ -894,8 +894,8 @@ export default function PrioridadesDiretoria() {
           )}
 
           <BlocoConteudo
-            titulo="Titulos do lote"
-            contagem={`${titulosVisiveis.length} de ${titulosExibidos.length} titulo(s)`}
+            titulo="Títulos do lote"
+            contagem={`${titulosVisiveis.length} de ${titulosExibidos.length} título(s)`}
           >
             {/* R12/R16: contexto próprio deste bloco — esta busca filtra o
                 que JÁ está na tabela (memória), enquanto a busca do bloco
@@ -906,7 +906,7 @@ export default function PrioridadesDiretoria() {
               busca={{
                 valor: filtroItensLote,
                 aoMudar: setFiltroItensLote,
-                placeholder: 'Filtrar titulos ja listados por titulo, obra, credor, solicitacao ou status'
+                placeholder: 'Filtrar títulos já listados por título, obra, credor, solicitação ou status'
               }}
             />
 
@@ -926,7 +926,7 @@ export default function PrioridadesDiretoria() {
               aoClicarLinha={item => item.solicitacao?.id && abrirSolicitacao(item.solicitacao.id)}
               storageKey="tabela:prioridades-diretoria:titulos"
               rotuloRolagem="Titulos do lote"
-              vazio="Nenhum titulo encontrado para este lote."
+              vazio="Nenhum título encontrado para este lote."
             />
           </BlocoConteudo>
         </>

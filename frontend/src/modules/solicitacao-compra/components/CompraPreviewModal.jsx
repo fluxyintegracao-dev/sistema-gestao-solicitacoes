@@ -126,7 +126,7 @@ export default function CompraPreviewModal({ preview, onClose }) {
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-4 rounded-lg border border-[var(--c-border)] bg-white p-6 text-center">
                 <p className="text-sm text-[var(--c-muted)]">
-                  Este tipo de arquivo nao possui pre-visualizacao incorporada.
+                  Este tipo de arquivo não possui pre-visualização incorporada.
                 </p>
                 {preview.url && (
                   <a

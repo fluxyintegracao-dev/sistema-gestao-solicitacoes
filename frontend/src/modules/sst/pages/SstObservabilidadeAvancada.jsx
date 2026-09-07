@@ -182,9 +182,9 @@ export default function SstObservabilidadeAvancada() {
   return (
     <Pagina className="sst-page">
       <PageHeader
-        titulo="Observabilidade avancada"
+        titulo="Observabilidade avançada"
         contagem={readiness.nivel ? String(readiness.nivel).replaceAll('_', ' ') : null}
-        descricao="Painel corporativo para filas, jobs, cache, qualidade, governanca, performance e readiness de escala."
+        descricao="Painel corporativo para filas, jobs, cache, qualidade, governança, performance e readiness de escala."
         acaoPrincipal={{
           rotulo: busy === 'worker' ? 'Processando...' : 'Processar worker',
           onClick: () => runAction('worker', () => processarWorkerSst({ limit: 10 }), (result) => `${fmt(result.processados)} job(s) processado(s).`),
@@ -212,7 +212,7 @@ export default function SstObservabilidadeAvancada() {
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {loading ? <div className="app-empty-card">Carregando observabilidade avancada...</div> : null}
+      {loading ? <div className="app-empty-card">Carregando observabilidade avançada...</div> : null}
 
       <StatGrid colunas={3}>
         <StatTile label="Pendentes" valor={fmt(cards.pendentes)} sub={filas.queue_name || 'sst-default'} />
@@ -243,8 +243,8 @@ export default function SstObservabilidadeAvancada() {
       */}
       <BlocosPersonalizaveis chave="blocos:sst-observabilidade-avancada" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Operacao controlada"
-          descricao="Acoes administrativas para manter a camada enterprise saudavel — os botoes ficam na faixa do cabecalho, sempre a um clique."
+          titulo="Operação controlada"
+          descricao="Ações administrativas para manter a camada enterprise saudavel — os botoes ficam na faixa do cabeçalho, sempre a um clique."
           variante="primario"
           cor="var(--sem-info)"
           acoes={<EtiquetaStatus valor={readiness.nivel} />}
@@ -264,23 +264,23 @@ export default function SstObservabilidadeAvancada() {
           <GradeContadores itens={qualidade.ABERTA || qualidade} />
         </BlocoConteudo>
 
-        <BlocoConteudo titulo="Governanca por acao" recolhivel chavePreferencia="bloco:sst-observabilidade-avancada:governanca-por-acao" recolhidoPadrao>
+        <BlocoConteudo titulo="Governança por ação" recolhivel chavePreferencia="bloco:sst-observabilidade-avancada:governanca-por-acao" recolhidoPadrao>
           <GradeContadores itens={governanca.acoes} />
         </BlocoConteudo>
 
-        <BlocoConteudo titulo="Governanca por criticidade" recolhivel chavePreferencia="bloco:sst-observabilidade-avancada:governanca-por-criticidade" recolhidoPadrao>
+        <BlocoConteudo titulo="Governança por criticidade" recolhivel chavePreferencia="bloco:sst-observabilidade-avancada:governanca-por-criticidade" recolhidoPadrao>
           <GradeContadores itens={governanca.criticidades} />
         </BlocoConteudo>
 
         <BlocoConteudo
           titulo="Performance recente"
-          contagem={`${(data?.performance?.recentes || []).length} metrica(s)`}
+          contagem={`${(data?.performance?.recentes || []).length} métrica(s)`}
         >
           <TabelaPadrao
             colunas={[
               {
                 id: 'metrica',
-                titulo: 'Metrica',
+                titulo: 'Métrica',
                 // R17: a métrica é cadastrada com nome próprio (metric_name) —
                 // é ele que nomeia a linha.
                 tipo: 'identidade',
@@ -307,7 +307,7 @@ export default function SstObservabilidadeAvancada() {
               }
             ]}
             itens={data?.performance?.recentes || []}
-            vazio="Nenhuma metrica recente registrada."
+            vazio="Nenhuma métrica recente registrada."
             storageKey="tabela:sst-observabilidade-avancada:performance"
             rotuloRolagem="Performance recente"
           />

@@ -201,7 +201,7 @@ export default function ComercialEmpreendimentos() {
     },
     {
       id: 'local',
-      titulo: 'Localizacao',
+      titulo: 'Localização',
       tipo: 'texto',
       render: (item) => (
         <CelulaDupla
@@ -212,7 +212,7 @@ export default function ComercialEmpreendimentos() {
     },
     {
       id: 'descricao',
-      titulo: 'Descricao',
+      titulo: 'Descrição',
       tipo: 'texto',
       // T6: texto longo trunca com o texto completo no tooltip.
       render: (item) => (
@@ -221,7 +221,7 @@ export default function ComercialEmpreendimentos() {
     },
     {
       id: 'situacao',
-      titulo: 'Situacao',
+      titulo: 'Situação',
       tipo: 'status',
       // R25: o par bg-emerald-100/text-emerald-700 (e o bg-slate-100 do
       // inativo) era paleta crua — sem par no tema escuro e fora do piso de
@@ -268,7 +268,7 @@ export default function ComercialEmpreendimentos() {
       */}
       <BlocoConteudo titulo={form.id ? 'Editar empreendimento' : 'Novo empreendimento'}>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <FormSecao legenda="Identificacao" colunas={2}>
+          <FormSecao legenda="Identificação" colunas={2}>
             <CampoForm label="Obra vinculada" span={2} hint="Vinculo operacional opcional.">
               {/* R12: select de FORMULÁRIO (entrada de dado do registro),
                   não filtro de lista — segue legítimo. */}
@@ -277,7 +277,7 @@ export default function ComercialEmpreendimentos() {
                 value={form.obra_id}
                 onChange={(event) => setForm((current) => ({ ...current, obra_id: event.target.value }))}
               >
-                <option value="">Sem vinculo operacional</option>
+                <option value="">Sem vínculo operacional</option>
                 {obras.map((obra) => (
                   <option key={obra.id} value={obra.id}>
                     {obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}
@@ -297,7 +297,7 @@ export default function ComercialEmpreendimentos() {
               />
             </CampoForm>
 
-            <CampoForm label="Codigo">
+            <CampoForm label="Código">
               <input
                 className="input w-full"
                 value={form.codigo}
@@ -316,7 +316,7 @@ export default function ComercialEmpreendimentos() {
               />
             </CampoForm>
 
-            <CampoForm label="Descricao" tipo="texto-longo" span={2}>
+            <CampoForm label="Descrição" tipo="texto-longo" span={2}>
               {/* R10: a altura do textarea vem da folha do sistema
                   (textarea.input), não do `min-h-[96px]` que estava aqui. */}
               <textarea
@@ -328,8 +328,8 @@ export default function ComercialEmpreendimentos() {
             </CampoForm>
           </FormSecao>
 
-          <FormSecao legenda="Endereco" colunas={2}>
-            <CampoForm label="Endereco" span={2}>
+          <FormSecao legenda="Endereço" colunas={2}>
+            <CampoForm label="Endereço" span={2}>
               <input
                 className="input w-full"
                 value={form.endereco}
@@ -337,12 +337,12 @@ export default function ComercialEmpreendimentos() {
                 placeholder="Rua / avenida"
               />
             </CampoForm>
-            <CampoForm label="Numero">
+            <CampoForm label="Número">
               <input
                 className="input w-full"
                 value={form.numero}
                 onChange={(event) => setForm((current) => ({ ...current, numero: event.target.value }))}
-                placeholder="Numero"
+                placeholder="Número"
               />
             </CampoForm>
             <CampoForm label="Bairro">
@@ -415,8 +415,8 @@ export default function ComercialEmpreendimentos() {
             className="input app-busca"
             value={busca}
             onChange={(event) => setBusca(event.target.value)}
-            placeholder="Buscar nome, codigo, cidade ou obra"
-            aria-label="Buscar nome, codigo, cidade ou obra"
+            placeholder="Buscar nome, código, cidade ou obra"
+            aria-label="Buscar nome, código, cidade ou obra"
           />
 
           {/* A1: a ação da linha é um <button> focável ("Editar"), e a linha

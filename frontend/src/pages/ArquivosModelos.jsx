@@ -165,7 +165,7 @@ export default function ArquivosModelos() {
     try {
       await excluirArquivoModelo(alvo.id);
       await carregarArquivos(destino);
-      avisar.sucesso('Arquivo excluido com sucesso.');
+      avisar.sucesso('Arquivo excluído com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao excluir arquivo');

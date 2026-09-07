@@ -120,7 +120,7 @@ export default function Setores() {
       carregarSetores();
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao salvar edicao');
+      avisar.erro('Erro ao salvar edição');
     } finally {
       setSaving(false);
     }
@@ -151,7 +151,7 @@ export default function Setores() {
       // TRAVADAS (05/09): em edicao, codigo e capacidades sao os campos do
       // formulario da linha — sem elas o setor nao tem como ser editado.
       sempreVisivel: true,
-      titulo: 'Codigo',
+      titulo: 'Código',
       tipo: 'codigo',
       render: (s) => (
         editId === s.id ? (
@@ -159,7 +159,7 @@ export default function Setores() {
             className="input input-sm w-full"
             value={editCodigo}
             onChange={e => setEditCodigo(e.target.value.toUpperCase())}
-            aria-label="Codigo do setor"
+            aria-label="Código do setor"
           />
         ) : (
           s.codigo
@@ -211,7 +211,7 @@ export default function Setores() {
       <PageHeader
         titulo="Setores"
         contagem={loading ? null : `${setores.length} setor(es)`}
-        descricao="Cadastro e manutencao de setores."
+        descricao="Cadastro e manutenção de setores."
         acaoPrincipal={{ rotulo: 'Novo setor', onClick: abrirNovoSetor }}
       />
 
@@ -230,7 +230,7 @@ export default function Setores() {
           </div>
           <div className="overflow-y-auto px-4 py-3">
             <form className="space-y-4" onSubmit={handleSubmit}>
-              <FormSecao legenda="Identificacao" colunas={2}>
+              <FormSecao legenda="Identificação" colunas={2}>
                 <CampoForm label="Nome do setor" obrigatorio>
                   <input
                     className="input w-full"
@@ -240,7 +240,7 @@ export default function Setores() {
                     required
                   />
                 </CampoForm>
-                <CampoForm label="Codigo" obrigatorio>
+                <CampoForm label="Código" obrigatorio>
                   <input
                     className="input w-full"
                     placeholder="Ex: GEO"

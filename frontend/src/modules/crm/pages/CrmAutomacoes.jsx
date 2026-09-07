@@ -189,7 +189,7 @@ export default function CrmAutomacoes() {
         await criarAutomacaoCrm(payload);
       }
       resetForm();
-      avisar.sucesso('Automacao salva.');
+      avisar.sucesso('Automação salva.');
       load();
     } catch (err) {
       avisar.erro(err.message || 'Erro ao salvar automacao');
@@ -219,7 +219,7 @@ export default function CrmAutomacoes() {
     const estavaAtiva = Boolean(regra.ativo);
     if (estavaAtiva) {
       const { ok } = await confirmar({
-        titulo: 'Desativar automacao',
+        titulo: 'Desativar automação',
         mensagem: `Desativar "${regra.nome}"? O runtime para de executar esta regra: os gatilhos continuam acontecendo, mas nenhuma acao dela sera disparada.`,
         rotuloConfirmar: 'Desativar',
         destrutiva: true
@@ -262,13 +262,13 @@ export default function CrmAutomacoes() {
   const colunasRegras = [
     {
       id: 'automacao',
-      titulo: 'Automacao',
+      titulo: 'Automação',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (item) => (
         <CelulaDupla
           principal={item.nome}
-          sub={`Criado por ${item.criadoPor?.nome || '-'} · Ultima execucao: ${fmtDataHora(item.last_run_at)}`}
+          sub={`Criado por ${item.criadoPor?.nome || '-'} · Última execução: ${fmtDataHora(item.last_run_at)}`}
         />
       )
     },
@@ -347,7 +347,7 @@ export default function CrmAutomacoes() {
     <Pagina>
       {/* R13/R5/C1: título, contagem e apoio na faixa fixa do PageHeader. */}
       <PageHeader
-        titulo="Automacoes CRM"
+        titulo="Automações CRM"
         contagem={loading ? null : `${items.length} regra(s)`}
         descricao="Regras cadastrais para padronizar resposta, SLA e follow-up comercial."
         acaoPrincipal={{
@@ -356,7 +356,7 @@ export default function CrmAutomacoes() {
           desabilitada: runningCycle
         }}
         secundarias={[
-          { rotulo: 'Nova automacao', onClick: novaAutomacao },
+          { rotulo: 'Nova automação', onClick: novaAutomacao },
           { rotulo: 'Atualizar', onClick: load, desabilitada: loading }
         ]}
       />
@@ -388,7 +388,7 @@ export default function CrmAutomacoes() {
       */}
       <BlocoConteudo
         titulo={editingId ? 'Editar automacao' : 'Nova automacao'}
-        descricao="O runtime ja executa regras ativas por evento e por ciclo agendado; use esta tela para calibrar prioridade, condicoes e acoes."
+        descricao="O runtime já executa regras ativas por evento e por ciclo agendado; use esta tela para calibrar prioridade, condições e ações."
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <FormSecao legenda="Gatilho e prioridade" colunas={2}>
@@ -398,7 +398,7 @@ export default function CrmAutomacoes() {
                 className="input w-full"
                 value={form.nome}
                 onChange={updateForm('nome')}
-                placeholder="Ex: Criar tarefa apos lead novo"
+                placeholder="Ex: Criar tarefa após lead novo"
               />
             </CampoForm>
             <CampoForm label="Gatilho">
@@ -419,11 +419,11 @@ export default function CrmAutomacoes() {
             </CampoForm>
           </FormSecao>
 
-          <FormSecao legenda="Condicao e acao" colunas={2}>
+          <FormSecao legenda="Condição e ação" colunas={2}>
             {/* R10: a altura dos textareas vinha de `min-h-[130px]` e
                 `min-h-[150px]` — pixel escrito na tela. A altura mora na
                 folha do sistema (textarea.input). */}
-            <CampoForm label="Condicoes JSON" tipo="texto-longo">
+            <CampoForm label="Condições JSON" tipo="texto-longo">
               <textarea
                 className="input w-full font-mono text-xs"
                 value={form.conditions_json}
@@ -431,7 +431,7 @@ export default function CrmAutomacoes() {
               />
             </CampoForm>
             <CampoForm
-              label="Acoes JSON"
+              label="Ações JSON"
               tipo="texto-longo"
               hint="Acoes suportadas: CREATE_TASK, CHANGE_STAGE, ADD_TAG, ASSIGN_USER, REDISTRIBUTE_LEAD, NOTIFY_MANAGER, NOTIFY_OWNER, CREATE_INTERNAL_NOTE e ARCHIVE_LEAD."
             >
@@ -448,7 +448,7 @@ export default function CrmAutomacoes() {
               {saving ? 'Salvando...' : 'Salvar automacao'}
             </button>
             {editingId ? (
-              <button type="button" className="btn btn-outline" onClick={resetForm}>Cancelar edicao</button>
+              <button type="button" className="btn btn-outline" onClick={resetForm}>Cancelar edição</button>
             ) : null}
           </div>
         </form>
@@ -528,9 +528,9 @@ export default function CrmAutomacoes() {
           contexto para homologação e auditoria — não é o que a tela existe
           para fazer. */}
       <BlocoConteudo
-        titulo="Execucoes recentes"
-        contagem={`${executions.length} execucao(oes)`}
-        descricao="Log operacional do runtime para homologacao e auditoria."
+        titulo="Execuções recentes"
+        contagem={`${executions.length} execução(oes)`}
+        descricao="Log operacional do runtime para homologação e auditoria."
         variante="secundario"
         acoes={(
           <button type="button" className="btn btn-outline btn-sm" onClick={loadExecutions}>

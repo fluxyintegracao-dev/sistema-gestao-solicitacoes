@@ -121,8 +121,8 @@ function BarraProporcao({ valor, maximo }) {
   pedido.
 */
 const FILTROS_DA_TELA = [
-  { id: 'data_inicio', rotulo: 'Criacao inicial' },
-  { id: 'data_fim', rotulo: 'Criacao final' },
+  { id: 'data_inicio', rotulo: 'Criação inicial' },
+  { id: 'data_fim', rotulo: 'Criação final' },
   { id: 'obra_id', rotulo: 'Obra / Centro de custo' }
 ];
 
@@ -190,31 +190,31 @@ export default function ComprasRelatorioCiclo() {
   const etapasCiclo = useMemo(() => ([
     {
       key: 'criacao_liberacao',
-      label: 'Criacao ate liberacao',
+      label: 'Criação até liberacao',
       value: resumo.tempo_medio_criacao_liberacao_horas,
       detail: 'Pedido revisado e liberado para compras'
     },
     {
       key: 'liberacao_envio',
-      label: 'Liberacao ate envio',
+      label: 'Liberacao até envio',
       value: resumo.tempo_medio_liberacao_envio_horas,
       detail: 'Tempo ate primeiro fornecedor receber cotacao'
     },
     {
       key: 'envio_resposta',
-      label: 'Envio ate primeira resposta',
+      label: 'Envio até primeira resposta',
       value: resumo.tempo_medio_envio_primeira_resposta_horas,
       detail: 'Resposta inicial dos fornecedores'
     },
     {
       key: 'criacao_encerramento',
-      label: 'Criacao ate encerramento',
+      label: 'Criação até encerramento',
       value: resumo.tempo_medio_criacao_encerramento_horas,
       detail: 'Tempo medio ate fechar a cotacao'
     },
     {
       key: 'ciclo_pedido',
-      label: 'Ciclo ate pedido',
+      label: 'Ciclo até pedido',
       value: resumo.tempo_medio_ciclo_total_ate_pedido_horas,
       detail: 'Tempo medio ate existir pedido de compra'
     }
@@ -312,12 +312,12 @@ export default function ComprasRelatorioCiclo() {
       <PageHeader
         titulo="Ciclo de Compras"
         voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
-        contagem={`${formatNumber(solicitacoes.length)} solicitacao(oes) no recorte`}
+        contagem={`${formatNumber(solicitacoes.length)} solicitação(oes) no recorte`}
         /* R23: agregacao pesada sobre solicitacao, cotacao e pedido — o
            recorte e RASCUNHO ate o clique, e a regra exige que a tela
            AVISE isso; sem o aviso a etiqueta aparece marcada e a pessoa le
            como filtro ja aplicado. */
-        descricao="Tempo real do processo entre solicitacao, liberacao, cotacao, encerramento e pedido. Marque o recorte e clique em Atualizar relatorio."
+        descricao="Tempo real do processo entre solicitação, liberacao, cotação, encerramento e pedido. Marque o recorte e clique em Atualizar relatório."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
           onClick: aplicarFiltros,
@@ -334,14 +334,14 @@ export default function ComprasRelatorioCiclo() {
           campos={[
             {
               id: 'data_inicio',
-              rotulo: 'Criacao inicial',
+              rotulo: 'Criação inicial',
               tipo: 'date',
               valor: filtros.data_inicio,
               aoMudar: (valor) => atualizarCampo('data_inicio', valor)
             },
             {
               id: 'data_fim',
-              rotulo: 'Criacao final',
+              rotulo: 'Criação final',
               tipo: 'date',
               valor: filtros.data_fim,
               aoMudar: (valor) => atualizarCampo('data_fim', valor)
@@ -368,9 +368,9 @@ export default function ComprasRelatorioCiclo() {
 
       <StatGrid>
         <StatTile
-          label="Solicitacoes"
+          label="Solicitações"
           valor={formatNumber(resumo.solicitacoes)}
-          sub="Criadas no periodo"
+          sub="Criadas no período"
         />
         <StatTile
           label="Resposta fornecedor"
@@ -379,13 +379,13 @@ export default function ComprasRelatorioCiclo() {
           tom="success"
         />
         <StatTile
-          label="Criacao ate encerramento"
+          label="Criação até encerramento"
           valor={formatHours(resumo.tempo_medio_criacao_encerramento_horas)}
-          sub="Tempo medio das cotacoes encerradas"
+          sub="Tempo médio das cotações encerradas"
           tom="warning"
         />
         <StatTile
-          label="Ciclo ate pedido"
+          label="Ciclo até pedido"
           valor={formatHours(resumo.tempo_medio_ciclo_total_ate_pedido_horas)}
           sub={`${formatNumber(resumo.solicitacoes_com_pedido)} com pedido`}
         />
@@ -401,13 +401,13 @@ export default function ComprasRelatorioCiclo() {
       */}
       <BlocosPersonalizaveis chave="blocos:compras-relatorio-ciclo" larguraPadrao="total">
         <BlocoConteudo
-          titulo="Ciclo medio por etapa"
-          descricao="Gargalos do processo calculados pelas datas reais registradas na solicitacao, cotacao e pedido."
+          titulo="Ciclo médio por etapa"
+          descricao="Gargalos do processo calculados pelas datas reais registradas na solicitação, cotação e pedido."
         >
           {loading ? (
             <div className="app-empty-card">Carregando etapas do ciclo...</div>
           ) : etapasCiclo.length === 0 ? (
-            <div className="app-empty-card">Sem datas suficientes para montar o grafico do ciclo.</div>
+            <div className="app-empty-card">Sem datas suficientes para montar o gráfico do ciclo.</div>
           ) : (
             <div className="grid gap-3">
               {etapasCiclo.map((etapa) => (
@@ -429,22 +429,22 @@ export default function ComprasRelatorioCiclo() {
         {/* Estes tres tempos JA aparecem no grafico acima (mesma origem, mesmo
             numero). Ficam porque a reorganizacao e pura — a proposta de
             remover a segunda aparicao esta no relatorio, nao no codigo. */}
-        <BlocoConteudo titulo="Etapas iniciais em numeros" variante="secundario">
+        <BlocoConteudo titulo="Etapas iniciais em números" variante="secundario">
           <StatGrid colunas={3}>
             <StatTile
-              label="Criacao ate liberacao"
+              label="Criação até liberacao"
               valor={formatHours(resumo.tempo_medio_criacao_liberacao_horas)}
-              sub="Tempo medio"
+              sub="Tempo médio"
             />
             <StatTile
-              label="Liberacao ate primeiro envio"
+              label="Liberacao até primeiro envio"
               valor={formatHours(resumo.tempo_medio_liberacao_envio_horas)}
-              sub="Tempo medio"
+              sub="Tempo médio"
             />
             <StatTile
-              label="Envio ate primeira resposta"
+              label="Envio até primeira resposta"
               valor={formatHours(resumo.tempo_medio_envio_primeira_resposta_horas)}
-              sub="Tempo medio"
+              sub="Tempo médio"
             />
           </StatGrid>
         </BlocoConteudo>
@@ -454,8 +454,8 @@ export default function ComprasRelatorioCiclo() {
             cabecalho — sem erro, sem falha de build. O BlocoConteudo nao
             recorta nada; quem precisa rolar e o proprio contêiner da tabela. */}
         <BlocoConteudo
-          titulo="Ciclo por solicitacao"
-          descricao="Cada solicitacao com os tempos reais entre criacao, encerramento e pedido."
+          titulo="Ciclo por solicitação"
+          descricao="Cada solicitação com os tempos reais entre criação, encerramento e pedido."
           variante="primario"
           cor="var(--c-primary)"
         >
@@ -463,7 +463,7 @@ export default function ComprasRelatorioCiclo() {
             colunas={[
               {
                 id: 'solicitacao',
-                titulo: 'Solicitacao',
+                titulo: 'Solicitação',
                 // R17: a solicitacao NOMEIA o registro desta linha.
                 tipo: 'identidade',
                 noCard: 'titulo',
@@ -497,7 +497,7 @@ export default function ComprasRelatorioCiclo() {
                   </>
                 )
               },
-              { id: 'criacao_encerramento', titulo: 'Criacao → encerramento', tipo: 'numero', render: (linha) => formatHours(linha.tempos.criacao_para_encerramento_horas) },
+              { id: 'criacao_encerramento', titulo: 'Criação → encerramento', tipo: 'numero', render: (linha) => formatHours(linha.tempos.criacao_para_encerramento_horas) },
               { id: 'encerramento_pedido', titulo: 'Encerramento → pedido', tipo: 'numero', render: (linha) => formatHours(linha.tempos.encerramento_para_pedido_horas) },
               { id: 'ciclo_total', titulo: 'Ciclo total', tipo: 'numero', render: (linha) => formatHours(linha.tempos.ciclo_total_ate_pedido_horas) }
             ]}
@@ -506,7 +506,7 @@ export default function ComprasRelatorioCiclo() {
             carregando={loading}
             storageKey="tabela:compras-ciclo:solicitacoes"
             rotuloRolagem="Ciclo por solicitacao"
-            vazio="Nenhuma solicitacao encontrada para os filtros selecionados."
+            vazio="Nenhuma solicitação encontrada para os filtros selecionados."
           />
         </BlocoConteudo>
       </BlocosPersonalizaveis>

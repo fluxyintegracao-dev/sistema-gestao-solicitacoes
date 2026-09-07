@@ -263,7 +263,7 @@ export default function SolicitacaoCompraDetalheView() {
   async function handleEncaminharCompras() {
     const { ok } = await confirmar({
       titulo: 'Enviar para Compras',
-      mensagem: 'Concluir a revisao GEO e enviar esta solicitacao para o setor de Compras?',
+      mensagem: 'Concluir a revisão GEO e enviar esta solicitação para o setor de Compras?',
       rotuloConfirmar: 'Enviar para Compras',
       rotuloCancelar: 'Continuar revisando'
     });
@@ -273,7 +273,7 @@ export default function SolicitacaoCompraDetalheView() {
       setEncaminhandoCompras(true);
       const data = await encaminharSolicitacaoCompraParaCompras(id);
       setSolicitacao(data || null);
-      avisar.sucesso('Solicitacao revisada e enviada para o setor de Compras.');
+      avisar.sucesso('Solicitação revisada e enviada para o setor de Compras.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao enviar solicitacao para Compras');
@@ -290,7 +290,7 @@ export default function SolicitacaoCompraDetalheView() {
 
   function abrirModalQuantidade(item) {
     if (!item?.id) {
-      avisar.erro('Item sem identificador para edicao.');
+      avisar.erro('Item sem identificador para edição.');
       return;
     }
     setModalQuantidadeItem(item);
@@ -321,7 +321,7 @@ export default function SolicitacaoCompraDetalheView() {
 
     const motivoNormalizado = String(quantidadeForm.motivo || '').trim();
     if (!motivoNormalizado) {
-      avisar.alerta('Informe o motivo da alteracao.');
+      avisar.alerta('Informe o motivo da alteração.');
       return;
     }
 
@@ -340,7 +340,7 @@ export default function SolicitacaoCompraDetalheView() {
       setModalQuantidadeItem(null);
       setQuantidadeForm({ quantidade: '', motivo: '' });
       abrirModalApropriacao(itemAtualizado || { ...item, quantidade });
-      avisar.sucesso('Quantidade atualizada. Revise obrigatoriamente a apropriacao deste item antes de continuar.');
+      avisar.sucesso('Quantidade atualizada. Revise obrigatoriamente a apropriação deste item antes de continuar.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao atualizar quantidade solicitada');
@@ -388,7 +388,7 @@ export default function SolicitacaoCompraDetalheView() {
     // R26: mesma disciplina da quantidade — alvo fixado antes do await.
     const alvo = modalApropriacaoItem;
     if (!alvo?.id) {
-      avisar.erro('Item sem identificador para edicao.');
+      avisar.erro('Item sem identificador para edição.');
       return;
     }
 
@@ -405,7 +405,7 @@ export default function SolicitacaoCompraDetalheView() {
 
     const motivo = motivoApropriacao.trim();
     if (!motivo) {
-      avisar.alerta('Informe o motivo da alteracao.');
+      avisar.alerta('Informe o motivo da alteração.');
       return;
     }
 
@@ -422,7 +422,7 @@ export default function SolicitacaoCompraDetalheView() {
       });
       setSolicitacao(data || null);
       fecharModalApropriacao();
-      avisar.sucesso('Apropriacoes do item atualizadas com auditoria.');
+      avisar.sucesso('Apropriações do item atualizadas com auditoria.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao atualizar apropriacoes do item');
@@ -462,7 +462,7 @@ export default function SolicitacaoCompraDetalheView() {
       const data = await cancelarSolicitacaoCompra(id, pedido);
       setSolicitacao(data || null);
       setModalCancelamentoAberto(false);
-      avisar.sucesso('Solicitacao de compra cancelada com historico.');
+      avisar.sucesso('Solicitação de compra cancelada com histórico.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao cancelar solicitacao de compra');
@@ -483,7 +483,7 @@ export default function SolicitacaoCompraDetalheView() {
     return (
       <Pagina className="compra-detalhe-page">
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <BlocoConteudo>Solicitacao de compra nao encontrada.</BlocoConteudo>
+        <BlocoConteudo>Solicitação de compra não encontrada.</BlocoConteudo>
       </Pagina>
     );
   }
@@ -525,7 +525,7 @@ export default function SolicitacaoCompraDetalheView() {
         Antes os dois eram `btn btn-primary` lado a lado.
       */}
       <PageHeader
-        titulo={`Solicitacao ${codigoSolicitacao}`}
+        titulo={`Solicitação ${codigoSolicitacao}`}
         contagem={`${itensCombinados.length} item(ns)`}
         descricao={[solicitacao.obra?.nome, solicitacao.solicitante?.nome].filter(Boolean).join(' · ')
           || 'Dados, itens e vinculos operacionais da solicitacao.'}
@@ -549,12 +549,12 @@ export default function SolicitacaoCompraDetalheView() {
       {aguardandoRevisaoGeo && (
         <Alert
           type="warning"
-          title="Aguardando revisao do GEO."
+          title="Aguardando revisão do GEO."
           message="Usuarios autorizados podem conferir quantidades e apropriacoes. A cotacao sera liberada somente depois do envio para Compras."
         />
       )}
 
-      <BlocoConteudo variante="secundario" titulo="Dados da solicitacao">
+      <BlocoConteudo variante="secundario" titulo="Dados da solicitação">
         <CamposComVazios
           colunas={4}
           campos={[
@@ -572,7 +572,7 @@ export default function SolicitacaoCompraDetalheView() {
                 dado que o origina — nunca na barra de ações (decisão de
                 04/09 sobre onde a navegação mora).
               */
-              label: 'Solicitacao principal',
+              label: 'Solicitação principal',
               valor: solicitacao.solicitacaoPrincipal ? (
                 <button
                   type="button"
@@ -583,7 +583,7 @@ export default function SolicitacaoCompraDetalheView() {
                 </button>
               ) : null
             },
-            { label: 'Observacoes', valor: solicitacao.observacoes, span: 2 }
+            { label: 'Observações', valor: solicitacao.observacoes, span: 2 }
           ]}
         />
       </BlocoConteudo>
@@ -632,7 +632,7 @@ export default function SolicitacaoCompraDetalheView() {
             },
             {
               id: 'apropriacao',
-              titulo: 'Apropriacao',
+              titulo: 'Apropriação',
               tipo: 'texto',
               render: (item) => item.apropriacao
             },
@@ -656,7 +656,7 @@ export default function SolicitacaoCompraDetalheView() {
           getId={(item) => `${item.item_tipo}-${item.id}`}
           storageKey="tabela:solicitacao-compra-detalhe:itens"
           rotuloRolagem="Itens da solicitacao de compra"
-          vazio="Nenhum item informado nesta solicitacao."
+          vazio="Nenhum item informado nesta solicitação."
           linhaExpansivel={(item) => {
             const loadingKey = `${item.item_tipo}-${item.id}`;
             return (
@@ -678,7 +678,7 @@ export default function SolicitacaoCompraDetalheView() {
         />
       </BlocoConteudo>
 
-      <BlocoConteudo variante="secundario" titulo="Cotacao">
+      <BlocoConteudo variante="secundario" titulo="Cotação">
         <StatGrid colunas={4}>
           <StatTile label="Fornecedores" valor={resumoCotacao.total} />
           <StatTile label="Respondidos" valor={resumoCotacao.respondidos} tom="success" />
@@ -701,17 +701,17 @@ export default function SolicitacaoCompraDetalheView() {
         </div>
       </BlocoConteudo>
 
-      <BlocoConteudo variante="secundario" titulo="Vinculos operacionais" recolhivel recolhidoPadrao>
+      <BlocoConteudo variante="secundario" titulo="Vínculos operacionais" recolhivel recolhidoPadrao>
         <StatGrid colunas={2}>
           <StatTile
-            label="Solicitacao principal"
+            label="Solicitação principal"
             valor={solicitacao.solicitacaoPrincipal?.codigo}
             vazio={!solicitacao.solicitacaoPrincipal?.codigo}
           />
           <StatTile
-            label="PDF e cotacao"
+            label="PDF e cotação"
             valor="No cabecalho da tela"
-            sub="Use os botoes do cabecalho para abrir o PDF ou gerenciar a cotacao desta compra."
+            sub="Use os botoes do cabeçalho para abrir o PDF ou gerenciar a cotação desta compra."
           />
         </StatGrid>
       </BlocoConteudo>
@@ -720,7 +720,7 @@ export default function SolicitacaoCompraDetalheView() {
         <BlocoConteudo
           variante="secundario"
           titulo="Fornecedores vinculados"
-          contagem={`${solicitacao.fornecedores.length} cotacao(oes)`}
+          contagem={`${solicitacao.fornecedores.length} cotação(oes)`}
         >
           <TabelaPadrao
             colunas={[
@@ -796,7 +796,7 @@ export default function SolicitacaoCompraDetalheView() {
                 />
               </CampoForm>
               <CampoForm
-                label="Motivo da alteracao"
+                label="Motivo da alteração"
                 obrigatorio
                 tipo="observacao"
                 hint="O motivo vai para a trilha de auditoria da solicitacao."
@@ -811,7 +811,7 @@ export default function SolicitacaoCompraDetalheView() {
               </CampoForm>
             </FormSecao>
             <p className="text-sm text-[var(--c-muted)]">
-              Ao salvar, a apropriacao deste item abre em seguida para revisao obrigatoria.
+              Ao salvar, a apropriação deste item abre em seguida para revisão obrigatória.
             </p>
           </div>
 
@@ -840,12 +840,12 @@ export default function SolicitacaoCompraDetalheView() {
 
       {modalApropriacaoItem && (
         <OverlayModal
-          rotulo="Editar apropriacoes do item"
+          rotulo="Editar apropriações do item"
           largura="var(--modal-max-w-xl, 980px)"
           onFechar={fecharModalApropriacao}
         >
           <div data-modal="cabecalho" className="border-b border-[var(--c-border)] p-4">
-            <h2 className="app-bloco-titulo">Editar apropriacoes do item</h2>
+            <h2 className="app-bloco-titulo">Editar apropriações do item</h2>
             <p className="text-sm text-[var(--c-muted)]">
               {modalApropriacaoItem.nome} - quantidade total {formatarQuantidade(modalApropriacaoItem.quantidade)}
             </p>
@@ -855,12 +855,12 @@ export default function SolicitacaoCompraDetalheView() {
             {rateiosModal.map((rateio, rateioIndex) => (
               <div key={`rateio-item-${rateioIndex}`} className="rounded-xl border border-[var(--c-border)] p-3">
                 <FormSecao colunas={3}>
-                  <CampoForm label="Apropriacao" span={2}>
+                  <CampoForm label="Apropriação" span={2}>
                     <ApropriacaoAutocomplete
                       value={rateio.apropriacao_id}
                       options={apropriacoes}
                       onChange={(value) => atualizarRateioModal(rateioIndex, 'apropriacao_id', value)}
-                      placeholder="Digite codigo ou descricao"
+                      placeholder="Digite código ou descrição"
                     />
                   </CampoForm>
                   <CampoForm label="Quantidade">
@@ -887,7 +887,7 @@ export default function SolicitacaoCompraDetalheView() {
 
             <div className="app-actionbar">
               <button type="button" className="btn btn-outline" onClick={adicionarRateioModal}>
-                Adicionar apropriacao
+                Adicionar apropriação
               </button>
             </div>
 
@@ -904,7 +904,7 @@ export default function SolicitacaoCompraDetalheView() {
 
             <FormSecao colunas={2}>
               <CampoForm
-                label="Motivo da alteracao"
+                label="Motivo da alteração"
                 obrigatorio
                 tipo="observacao"
                 hint="O motivo vai para a trilha de auditoria da apropriacao."
@@ -913,7 +913,7 @@ export default function SolicitacaoCompraDetalheView() {
                   className="input"
                   value={motivoApropriacao}
                   onChange={(event) => setMotivoApropriacao(event.target.value)}
-                  placeholder="Explique por que a apropriacao do item foi alterada."
+                  placeholder="Explique por que a apropriação do item foi alterada."
                 />
               </CampoForm>
             </FormSecao>
@@ -939,14 +939,14 @@ export default function SolicitacaoCompraDetalheView() {
 
       {modalCancelamentoAberto && (
         <OverlayModal
-          rotulo="Cancelar solicitacao de compra"
+          rotulo="Cancelar solicitação de compra"
           largura="var(--modal-max-w-lg, 860px)"
           onFechar={fecharModalCancelamento}
         >
           <div data-modal="cabecalho" className="border-b border-[var(--c-border)] p-4">
-            <h2 className="app-bloco-titulo">Cancelar solicitacao de compra</h2>
+            <h2 className="app-bloco-titulo">Cancelar solicitação de compra</h2>
             <p className="text-sm text-[var(--c-muted)]">
-              Esta acao registra historico e remove a compra dos fluxos operacionais em aberto.
+              Esta ação registra histórico e remove a compra dos fluxos operacionais em aberto.
             </p>
           </div>
 
@@ -957,7 +957,7 @@ export default function SolicitacaoCompraDetalheView() {
                   className="input"
                   value={cancelamentoForm.motivo}
                   onChange={(event) => setCancelamentoForm((prev) => ({ ...prev, motivo: event.target.value }))}
-                  placeholder="Explique por que a solicitacao de compra esta sendo cancelada."
+                  placeholder="Explique por que a solicitação de compra esta sendo cancelada."
                   disabled={cancelandoSolicitacao}
                 />
               </CampoForm>
@@ -972,9 +972,9 @@ export default function SolicitacaoCompraDetalheView() {
                 disabled={cancelandoSolicitacao}
               />
               <span>
-                <strong>Cancelar cotacao vinculada</strong>
+                <strong>Cancelar cotação vinculada</strong>
                 <span className="mt-1 block text-[var(--c-muted)]">
-                  Fornecedores e respostas ficam preservados para auditoria, mas a cotacao deixa de ficar ativa.
+                  Fornecedores e respostas ficam preservados para auditoria, mas a cotação deixa de ficar ativa.
                 </span>
               </span>
             </label>
@@ -1001,9 +1001,9 @@ export default function SolicitacaoCompraDetalheView() {
                 disabled={cancelandoSolicitacao}
               />
               <span>
-                <strong>Tambem cancelar a solicitacao principal</strong>
+                <strong>Também cancelar a solicitação principal</strong>
                 <span className="mt-1 block">
-                  O sistema bloqueia esta opcao se ja existir titulo financeiro vinculado.
+                  O sistema bloqueia esta opção se já existir título financeiro vinculado.
                 </span>
               </span>
             </label>

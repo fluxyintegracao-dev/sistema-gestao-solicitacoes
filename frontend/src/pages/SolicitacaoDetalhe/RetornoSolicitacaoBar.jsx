@@ -103,7 +103,7 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
       <section
         className="tarja tarja--warning rounded-xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] px-4 py-3 text-sm text-[var(--sem-warning)]"
 
-        aria-label="Interacoes bloqueadas pelo setor atual"
+        aria-label="Interações bloqueadas pelo setor atual"
         data-testid="barra-retorno-solicitacao"
       >
         <Avisos avisos={avisos} aoFechar={fechar} />
@@ -161,7 +161,7 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
                 className="input w-full resize-y"
                 value={motivo}
                 onChange={(event) => setMotivo(event.target.value)}
-                placeholder="Ex.: preciso registrar a medicao deste periodo e anexar os documentos."
+                placeholder="Ex.: preciso registrar a medição deste período e anexar os documentos."
                 maxLength={2000}
                 autoFocus
               />
@@ -184,7 +184,7 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
     <section
       className="tarja tarja--info rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] px-4 py-3 text-sm text-[var(--sem-info)]"
 
-      aria-label="Pedidos de retorno aguardando decisao"
+      aria-label="Pedidos de retorno aguardando decisão"
       data-testid="pedidos-retorno-decisao"
     >
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -237,12 +237,12 @@ export default function RetornoSolicitacaoBar({ solicitacao, onMudou }) {
 
               {rejeitando && (
                 <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto]">
-                  <CampoForm label="Motivo da rejeicao" obrigatorio>
+                  <CampoForm label="Motivo da rejeição" obrigatorio>
                     <textarea
                       className="input w-full resize-y"
                       value={motivoRejeicao}
                       onChange={(event) => setMotivoRejeicao(event.target.value)}
-                      placeholder="Explique o que precisa ser concluido antes da devolucao."
+                      placeholder="Explique o que precisa ser concluído antes da devolução."
                       maxLength={2000}
                       autoFocus
                     />

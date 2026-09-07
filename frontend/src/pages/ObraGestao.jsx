@@ -31,11 +31,11 @@ import {
 
 const TAB_DEFINITIONS = [
   { id: 'dashboard', label: 'Dashboard', icon: HiOutlineChartBar },
-  { id: 'orcamento', label: 'Orcamento', icon: HiOutlineReceiptPercent },
+  { id: 'orcamento', label: 'Orçamento', icon: HiOutlineReceiptPercent },
   { id: 'custos', label: 'Custos', icon: HiOutlineBanknotes },
   { id: 'parcelas', label: 'Receitas', icon: HiOutlineClipboardDocumentList },
   { id: 'arquivos', label: 'Arquivos', icon: HiOutlineFolderOpen },
-  { id: 'relatorio-final', label: 'Relatorio Final', icon: HiOutlineBuildingOffice2 }
+  { id: 'relatorio-final', label: 'Relatório Final', icon: HiOutlineBuildingOffice2 }
 ];
 
 function formatCurrency(value) {
@@ -179,8 +179,8 @@ export default function ObraGestao() {
 
   async function limparOrcamento() {
     const { ok } = await confirmar({
-      titulo: 'Limpar orcamento',
-      mensagem: 'Deseja zerar o valor orcado de todos os itens desta obra?',
+      titulo: 'Limpar orçamento',
+      mensagem: 'Deseja zerar o valor orçado de todos os itens desta obra?',
       rotuloConfirmar: 'Zerar valores',
       rotuloCancelar: 'Manter valores',
       destrutiva: true
@@ -195,7 +195,7 @@ export default function ObraGestao() {
   async function criarNovoItem() {
     try {
       if (!novoItem.codigo.trim()) {
-        avisar.alerta('Informe o codigo do item.');
+        avisar.alerta('Informe o código do item.');
         return;
       }
 
@@ -217,8 +217,8 @@ export default function ObraGestao() {
 
   async function removerItemOrcamento(itemId) {
     const { ok } = await confirmar({
-      titulo: 'Remover item de orcamento',
-      mensagem: 'Deseja remover este item de orcamento?',
+      titulo: 'Remover item de orçamento',
+      mensagem: 'Deseja remover este item de orçamento?',
       rotuloConfirmar: 'Remover item',
       rotuloCancelar: 'Manter item',
       destrutiva: true
@@ -240,7 +240,7 @@ export default function ObraGestao() {
     try {
       const url = await obterUrlArquivoObra(item.caminho_arquivo);
       if (!url) {
-        avisar.erro('Arquivo indisponivel.');
+        avisar.erro('Arquivo indisponível.');
         return;
       }
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -349,8 +349,8 @@ export default function ObraGestao() {
           <section className="app-summary-grid">
             <KpiCard label="Investimento total" value={formatCurrency(kpis.investimento_total)} serie="prevista" />
             <KpiCard label="Custo executado" value={formatCurrency(kpis.custo_executado)} serie="realizada" />
-            <KpiCard label="Diferenca / saldo" value={formatCurrency(kpis.diferenca_saldo)} />
-            <KpiCard label="Eficiencia" value={percent(kpis.eficiencia)} helper="do orcamento" />
+            <KpiCard label="Diferença / saldo" value={formatCurrency(kpis.diferenca_saldo)} />
+            <KpiCard label="Eficiência" value={percent(kpis.eficiencia)} helper="do orcamento" />
           </section>
 
           {/* Os dois painéis ("Comparativo" e "Status dos Itens Macro") mostravam
@@ -358,7 +358,7 @@ export default function ObraGestao() {
               atenção. Ficou UM painel em largura total; o % de execução — o
               único dado que o segundo painel acrescentava — entrou na linha. */}
           <section className="card px-4 py-3">
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Comparativo Orcado vs Executado por Categoria</h2>
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Comparativo Orçado vs Executado por Categoria</h2>
             <div className="mt-3 space-y-3">
               {dashboardCategorias.length === 0 ? (
                 <div className="text-sm" style={{ color: 'var(--c-muted)' }}>Nenhuma categoria orcamentaria vinculada a obra.</div>
@@ -399,7 +399,7 @@ export default function ObraGestao() {
             <div>
               <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Estrutura Orcamentaria</h2>
               <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
-                A V1 usa as apropriacoes da obra como estrutura base para orcamento, custo executado e relatorio final.
+                A V1 usa as apropriações da obra como estrutura base para orçamento, custo executado e relatório final.
               </p>
             </div>
 
@@ -411,7 +411,7 @@ export default function ObraGestao() {
                 </button>
                 <span className="app-actionbar-apartada">
                   <button type="button" className="btn btn-outline btn-perigo-suave" onClick={limparOrcamento}>
-                    Limpar orcamento
+                    Limpar orçamento
                   </button>
                 </span>
               </div>
@@ -431,7 +431,7 @@ export default function ObraGestao() {
                       id: 'item',
                       // R17: código + descrição SÃO a identidade do item macro.
                       tipo: 'identidade',
-                      titulo: 'Descricao do item macro',
+                      titulo: 'Descrição do item macro',
                       noCard: 'titulo',
                       render: (item) => (
                         <div>
@@ -456,7 +456,7 @@ export default function ObraGestao() {
                       // TRAVADA (05/09): com permissao de editar, este e o unico campo do
                       // orcamento macro — esconder a coluna tira o editar junto com o valor.
                       sempreVisivel: true,
-                      titulo: 'Valor orcado (R$)',
+                      titulo: 'Valor orçado (R$)',
                       tipo: 'valor',
                       render: (item) => (
                         podeEditarApropriacoes ? (
@@ -496,7 +496,7 @@ export default function ObraGestao() {
                   vira resumo apartado abaixo da tabela, mesma soma. */}
               <div className="mt-3 flex justify-end">
                 <div className="rounded-xl border px-3 py-2 text-right" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
-                  <div className="text-xs font-semibold uppercase" style={{ color: 'var(--c-muted)' }}>Total orcado</div>
+                  <div className="text-xs font-semibold uppercase" style={{ color: 'var(--c-muted)' }}>Total orçado</div>
                   <div className="mt-1 text-lg font-bold" style={{ color: 'var(--c-text)' }}>
                     {formatCurrency(
                       orcamentoDraft.reduce((total, item) => total + normalizeMoneyInput(item.valor_orcado), 0)
@@ -522,7 +522,7 @@ export default function ObraGestao() {
             <div>
               <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Custos Executados</h2>
               <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
-                Custos pagos do financeiro vinculados a obra, exibidos por titulo e parceiro.
+                Custos pagos do financeiro vinculados a obra, exibidos por título e parceiro.
               </p>
             </div>
             <div className="rounded-xl border px-3 py-2 text-right" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
@@ -565,7 +565,7 @@ export default function ObraGestao() {
                   },
                   {
                     id: 'codigo_ref',
-                    titulo: 'Codigo ref.',
+                    titulo: 'Código ref.',
                     tipo: 'codigo',
                     render: (item) => item.codigo_referencia
                   },
@@ -592,7 +592,7 @@ export default function ObraGestao() {
             <div>
               <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Receitas</h2>
               <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
-                Titulos a receber em aberto ou parcial vinculados a obra.
+                Títulos a receber em aberto ou parcial vinculados a obra.
               </p>
             </div>
             <div className="rounded-xl border px-3 py-2 text-right" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
@@ -625,7 +625,7 @@ export default function ObraGestao() {
                   },
                   {
                     id: 'descricao',
-                    titulo: 'Descricao',
+                    titulo: 'Descrição',
                     tipo: 'texto',
                     render: (item) => <div className="line-clamp-2 max-w-prose">{item.descricao}</div>
                   },
@@ -651,7 +651,7 @@ export default function ObraGestao() {
                     className="btn btn-outline btn-sm"
                     onClick={() => navigate(`/financeiro/titulos/${item.id}`)}
                   >
-                    Abrir titulo
+                    Abrir título
                   </button>
                 )}
                 larguraAcoes={150}
@@ -730,9 +730,9 @@ export default function ObraGestao() {
       {activeTab === 'relatorio-final' && (
         <section className="space-y-4">
           <div className="card px-4 py-3">
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Relatorio Final</h2>
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Relatório Final</h2>
             <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
-              Consolidacao do custo da obra por apropriacao, somando pedidos, a pagar e pago.
+              Consolidação do custo da obra por apropriação, somando pedidos, a pagar e pago.
             </p>
           </div>
 
@@ -808,9 +808,9 @@ export default function ObraGestao() {
           <div className="card w-full max-w-xl px-6 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Novo item do orcamento</h2>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Novo item do orçamento</h2>
                 <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
-                  O item sera criado como apropriacao da obra e passara a alimentar orcamento, custo e relatorio final.
+                  O item será criado como apropriação da obra e passara a alimentar orçamento, custo e relatório final.
                 </p>
               </div>
               <button
@@ -826,7 +826,7 @@ export default function ObraGestao() {
 
             <div className="mt-4 grid gap-3">
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
-                Codigo
+                Código
                 <input
                   className="input"
                   value={novoItem.codigo}
@@ -834,7 +834,7 @@ export default function ObraGestao() {
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
-                Descricao
+                Descrição
                 <input
                   className="input"
                   value={novoItem.descricao}
@@ -842,7 +842,7 @@ export default function ObraGestao() {
                 />
               </label>
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
-                Valor orcado
+                Valor orçado
                 <input
                   className="input"
                   value={novoItem.valor_orcado}

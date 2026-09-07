@@ -304,7 +304,7 @@ export default function ModalMedicao({
       <OverlayModal
         aberto
         largura="var(--modal-max-w-lg, 860px)"
-        rotulo={`Medicao ${medicao.numero}`}
+        rotulo={`Medição ${medicao.numero}`}
         onFechar={onFechar}
         fecharComEscape={!previewAnexo}
       >
@@ -336,10 +336,10 @@ export default function ModalMedicao({
           <section aria-labelledby="conferencia-medicao">
             <div className="border-b border-[var(--c-border)] pb-2">
               <h4 id="conferencia-medicao" className="text-sm font-semibold text-[var(--c-text)]">
-                Conferencia para aprovacao
+                Conferência para aprovação
               </h4>
               <p className="mt-1 text-xs text-[var(--c-muted)]">
-                Dados informados para o pagamento desta medicao.
+                Dados informados para o pagamento desta medição.
               </p>
             </div>
 
@@ -352,7 +352,7 @@ export default function ModalMedicao({
             {/* Os dados que a pessoa confere antes de liberar o pagamento — ladrilho padrao, com o
                 total desta medicao ao lado, que e o numero que a aprovacao libera. */}
             <StatGrid colunas={2}>
-              <StatTile label="Total desta medicao" valor={moeda(totalDaMedicao)}
+              <StatTile label="Total desta medição" valor={moeda(totalDaMedicao)}
                 sub={`${daMedicao.length} parcela(s)`} />
               <StatTile label="Forma de pagamento" valor={formaPagamento} />
               <StatTile label="Favorecido" valor={favorecido} sub={documentoFavorecido || undefined} />
@@ -370,7 +370,7 @@ export default function ModalMedicao({
             <div className="mt-3 border-t border-[var(--c-border)] pt-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">
-                  Arquivos da medicao
+                  Arquivos da medição
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-[var(--c-muted)]">{anexos.length} arquivo(s)</span>
@@ -400,7 +400,7 @@ export default function ModalMedicao({
               </div>
               {anexos.length === 0 ? (
                 <p className="py-3 text-sm text-[var(--c-muted)]">
-                  Nenhum arquivo vinculado a esta medicao.
+                  Nenhum arquivo vinculado a esta medição.
                   {podeCompletarAnexos && ' Anexe o documento para que GEO possa aprovar.'}
                 </p>
               ) : (
@@ -452,7 +452,7 @@ export default function ModalMedicao({
             <section aria-labelledby="parcelas-medicao">
               <div className="border-b border-[var(--c-border)] pb-2">
                 <h4 id="parcelas-medicao" className="text-sm font-semibold text-[var(--c-text)]">
-                  Parcelas desta medicao
+                  Parcelas desta medição
                 </h4>
               </div>
 
@@ -508,13 +508,13 @@ export default function ModalMedicao({
 
               {medicaoAprovada && (
                 <p className="border-t border-[var(--c-border)] pt-3 text-xs text-[var(--c-muted)]" data-testid="medicao-aprovada-somente-leitura">
-                  Medicao aprovada e liberada para o Financeiro. Valor e vencimento permanecem somente para consulta.
+                  Medição aprovada e liberada para o Financeiro. Valor e vencimento permanecem somente para consulta.
                 </p>
               )}
 
               {!podeEditar && !medicaoAprovada && (
                 <p className="border-t border-[var(--c-border)] pt-3 text-xs text-[var(--c-muted)]" data-testid="medicao-sem-permissao">
-                  Alterar uma medicao exige permissao especifica.
+                  Alterar uma medição exige permissão especifica.
                 </p>
               )}
             </section>
@@ -523,7 +523,7 @@ export default function ModalMedicao({
           {comentarios.length > 0 && (
             <section aria-labelledby="comentarios-medicao">
               <h4 id="comentarios-medicao" className="border-b border-[var(--c-border)] pb-2 text-sm font-semibold text-[var(--c-text)]">
-                Comentarios da medicao
+                Comentários da medição
               </h4>
               <div className="divide-y divide-[var(--c-border)]">
                 {comentarios.map((h) => (

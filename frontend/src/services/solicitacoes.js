@@ -1,4 +1,5 @@
 import { API_URL, authHeaders } from './api';
+import { mensagemDeErro } from './erroDeResposta';
 
 function buildResponseError(status, fallbackMessage, data = null) {
   const details = Array.isArray(data?.errors)
@@ -243,7 +244,7 @@ export async function updateStatusSolicitacao(id, status) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return true;
@@ -257,7 +258,7 @@ export async function aprovarDiretoriaSolicitacao(id) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return true;
@@ -272,7 +273,7 @@ export async function adicionarPagamentoSolicitacao(id, data) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return res.json();
@@ -301,7 +302,7 @@ export async function updateValorSolicitacao(id, valor) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return true;
@@ -358,7 +359,7 @@ export async function updateRefContratoSolicitacao(id, contrato_id) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return true;
@@ -372,7 +373,7 @@ export async function deleteSolicitacao(id) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return true;
@@ -386,7 +387,7 @@ export async function arquivarSolicitacao(id) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return true;
@@ -400,7 +401,7 @@ export async function desarquivarSolicitacao(id) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return true;
@@ -415,7 +416,7 @@ export async function arquivarSolicitacoesEmMassa(solicitacao_ids = []) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text);
+    throw new Error(mensagemDeErro(text, 'Nao foi possivel concluir a operacao.', res.status));
   }
 
   return res.json();

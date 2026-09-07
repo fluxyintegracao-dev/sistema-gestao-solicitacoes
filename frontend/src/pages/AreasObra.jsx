@@ -60,10 +60,10 @@ export default function AreasObra() {
     try {
       setSalvando(true);
       await salvarAreasObra({ areas: Array.from(selecionadas) });
-      avisar.sucesso('Configuracao salva com sucesso');
+      avisar.sucesso('Configuração salva com sucesso');
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao salvar configuracao');
+      avisar.erro('Erro ao salvar configuração');
     } finally {
       setSalvando(false);
     }
@@ -74,9 +74,9 @@ export default function AreasObra() {
       {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
           linha no próprio PageHeader. */}
       <PageHeader
-        titulo="Areas visiveis para OBRA"
+        titulo="Áreas visíveis para OBRA"
         contagem={`${totalMarcadas} de ${setoresOrdenados.length} selecionadas`}
-        descricao="Marque quais areas os usuarios do setor OBRA podem selecionar na tela de Nova Solicitacao."
+        descricao="Marque quais áreas os usuários do setor OBRA podem selecionar na tela de Nova Solicitação."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -87,7 +87,7 @@ export default function AreasObra() {
       <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
-        titulo="Areas selecionaveis"
+        titulo="Áreas selecionaveis"
         variante="primario"
         cor="var(--c-primary)"
         acoes={(
@@ -96,7 +96,7 @@ export default function AreasObra() {
               Selecionar todas
             </button>
             <button type="button" className="btn btn-outline btn-sm" onClick={limparSelecao}>
-              Limpar selecao
+              Limpar seleção
             </button>
           </>
         )}

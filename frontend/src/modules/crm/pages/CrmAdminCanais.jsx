@@ -257,7 +257,7 @@ export default function CrmAdminCanais() {
     if (!ok) return;
     try {
       await excluirCanalCrm(canal.id);
-      avisar.sucesso('Canal excluido.');
+      avisar.sucesso('Canal excluído.');
       await load();
     } catch (err) {
       avisar.erro(err.message || 'Erro ao excluir canal');
@@ -293,7 +293,7 @@ export default function CrmAdminCanais() {
     },
     {
       id: 'numeros',
-      titulo: 'Numeros',
+      titulo: 'Números',
       tipo: 'texto',
       render: (item) => (
         <CelulaDupla
@@ -362,7 +362,7 @@ export default function CrmAdminCanais() {
       */}
       <BlocoConteudo titulo={editingId ? 'Editar canal' : 'Novo canal'}>
         <form onSubmit={submit} className="space-y-4">
-          <FormSecao legenda="Identificacao" colunas={3}>
+          <FormSecao legenda="Identificação" colunas={3}>
             <CampoForm label="Nome interno" obrigatorio>
               <input ref={campoNomeRef} className="input w-full" value={form.nome} onChange={updateField('nome')} required />
             </CampoForm>
@@ -386,11 +386,11 @@ export default function CrmAdminCanais() {
             </CampoForm>
           </FormSecao>
 
-          <FormSecao legenda="Numeros do canal" colunas={4}>
-            <CampoForm label="Numero principal">
+          <FormSecao legenda="Números do canal" colunas={4}>
+            <CampoForm label="Número principal">
               <input className="input w-full" value={form.business_main_phone} onChange={updateField('business_main_phone')} />
             </CampoForm>
-            <CampoForm label="Numero operacional">
+            <CampoForm label="Número operacional">
               <input className="input w-full" value={form.operational_phone} onChange={updateField('operational_phone')} />
             </CampoForm>
             <CampoForm label="Tracking">
@@ -418,7 +418,7 @@ export default function CrmAdminCanais() {
               {saving ? 'Salvando...' : editingId ? 'Salvar canal' : 'Criar canal'}
             </button>
             {editingId ? (
-              <button type="button" className="btn btn-outline" onClick={resetForm}>Cancelar edicao</button>
+              <button type="button" className="btn btn-outline" onClick={resetForm}>Cancelar edição</button>
             ) : null}
           </div>
         </form>
@@ -436,7 +436,7 @@ export default function CrmAdminCanais() {
           busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filtros.q,
             aoMudar: (valor) => setFiltros((prev) => ({ ...prev, q: valor })),
-            placeholder: 'Buscar nome, nome publico, fornecedor ou numero'
+            placeholder: 'Buscar nome, nome publico, fornecedor ou número'
           } : null}
           filtros={[
             {

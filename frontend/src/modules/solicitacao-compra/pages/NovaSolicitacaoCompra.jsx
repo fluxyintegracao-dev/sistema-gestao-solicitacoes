@@ -1,3 +1,4 @@
+import DateInputBR from '../../../components/DateInputBR';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -1375,7 +1376,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     try {
       const url = await obterUrlAssinadaCompra(item.arquivo_url);
       if (!url) {
-        avisar.alerta('Arquivo nao encontrado.');
+        avisar.alerta('Arquivo não encontrado.');
         return;
       }
 
@@ -1668,8 +1669,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
             obrigatorio={modoCompraDireta}
             erro={errosCampo.necessario_para}
           >
-            <input
-              type="date"
+            <DateInputBR
               className="input"
               value={necessarioPara}
               onChange={(event) => { limparErroCampo('necessario_para'); setNecessarioPara(event.target.value); }}
@@ -1843,7 +1843,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 rows={3}
                 value={dadosPagamento}
                 onChange={(event) => setDadosPagamento(event.target.value)}
-                placeholder="Informe linha digitavel, PIX, banco/agencia/conta ou orientacoes para o financeiro."
+                placeholder="Informe linha digitável, PIX, banco/agência/conta ou orientacoes para o financeiro."
               />
             </CampoForm>
           )}
@@ -1980,8 +1980,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 </CampoForm>
 
                 <CampoForm label="Data para pagamento" obrigatorio erro={errosCampo.frete_data_vencimento}>
-                  <input
-                    type="date"
+                  <DateInputBR
                     className="input"
                     value={freteDataVencimento}
                     onChange={(event) => { limparErroCampo('frete_data_vencimento'); setFreteDataVencimento(event.target.value); }}
@@ -2339,8 +2338,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     tipo: 'data',
                     render: (item) => (
                       <>
-                        <input
-                          type="date"
+                        <DateInputBR
                           className="input"
                           style={!item.necessario_para ? { borderColor: 'var(--sem-danger)' } : undefined}
                           aria-label="Data em que o item é necessário"

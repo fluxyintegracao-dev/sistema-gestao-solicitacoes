@@ -258,9 +258,9 @@ export default function GestaoCategorias() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Gestao de categorias"
+        titulo="Gestão de categorias"
         contagem={loading ? null : `${categorias.length} categoria(s)`}
-        descricao="Cadastro e manutencao das categorias do modulo compras."
+        descricao="Cadastro e manutenção das categorias do módulo compras."
         acaoPrincipal={{ rotulo: 'Nova categoria', onClick: () => { limparFormulario(); focarFormulario(); } }}
       />
 
@@ -280,7 +280,7 @@ export default function GestaoCategorias() {
               <input
                 ref={campoNomeRef}
                 className="input w-full"
-                placeholder="Ex.: Material de construcao"
+                placeholder="Ex.: Material de construção"
                 value={nome}
                 onChange={(event) => setNome(event.target.value)}
               />
@@ -301,8 +301,8 @@ export default function GestaoCategorias() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Importacao em massa"
-        descricao="Uma categoria por linha. As linhas que nao entrarem continuam na caixa para nova tentativa."
+        titulo="Importação em massa"
+        descricao="Uma categoria por linha. As linhas que não entrarem continuam na caixa para nova tentativa."
         variante="secundario"
         recolhivel
         recolhidoPadrao

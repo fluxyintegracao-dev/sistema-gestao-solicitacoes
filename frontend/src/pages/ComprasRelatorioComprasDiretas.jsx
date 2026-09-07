@@ -123,7 +123,7 @@ function RankingTable({ title, subtitle, rows, valueLabel = 'Valor', nameKey = '
         getId={(row) => row.key}
         storageKey={storageKey}
         rotuloRolagem={title}
-        vazio="Sem dados no periodo."
+        vazio="Sem dados no período."
       />
     </BlocoConteudo>
   );
@@ -147,7 +147,7 @@ function RankingTable({ title, subtitle, rows, valueLabel = 'Valor', nameKey = '
 const FILTROS_DA_TELA = [
   { id: 'q', rotulo: 'Busca', obrigatorio: true },
   { id: 'data_inicio', rotulo: 'Criada de' },
-  { id: 'data_fim', rotulo: 'Criada ate' },
+  { id: 'data_fim', rotulo: 'Criada até' },
   { id: 'item', rotulo: 'Nome do item comprado' },
   { id: 'limit', rotulo: 'Limite de linhas' },
   { id: 'obra_id', rotulo: 'Obra / Centro de custo' },
@@ -332,7 +332,7 @@ export default function ComprasRelatorioComprasDiretas() {
         /* R23: sete recortes combinaveis sobre uma consulta analitica de ate
            5000 linhas — bem acima do criterio da excecao. O recorte e
            RASCUNHO ate o clique, e a regra exige que a tela AVISE isso. */
-        descricao="Monitore quem solicita, quais credores atendem, quais itens sao comprados e o volume de compras diretas. Marque o recorte e clique em Atualizar relatorio."
+        descricao="Monitore quem solicita, quais credores atendem, quais itens são comprados e o volume de compras diretas. Marque o recorte e clique em Atualizar relatório."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar relatorio',
           onClick: aplicarFiltros,
@@ -362,7 +362,7 @@ export default function ComprasRelatorioComprasDiretas() {
             },
             {
               id: 'data_fim',
-              rotulo: 'Criada ate',
+              rotulo: 'Criada até',
               tipo: 'date',
               valor: filtros.data_fim,
               aoMudar: (valor) => atualizarCampo('data_fim', valor)
@@ -401,14 +401,14 @@ export default function ComprasRelatorioComprasDiretas() {
       />
 
       <StatGrid colunas={5}>
-        <StatTile label="Compras diretas" valor={formatNumber(resumo.compras)} sub="Solicitacoes criadas" />
+        <StatTile label="Compras diretas" valor={formatNumber(resumo.compras)} sub="Solicitações criadas" />
         <StatTile label="Valor total" valor={formatMoney(resumo.valor_total)} sub="Soma dos itens" />
         <StatTile
           label="Itens"
           valor={formatNumber(resumo.itens)}
           sub={`${formatNumber(resumo.quantidade_total, 2)} unidades informadas`}
         />
-        <StatTile label="Solicitantes" valor={formatNumber(resumo.solicitantes)} sub="Usuarios com compras diretas" />
+        <StatTile label="Solicitantes" valor={formatNumber(resumo.solicitantes)} sub="Usuários com compras diretas" />
         <StatTile label="Credores" valor={formatNumber(resumo.credores)} sub="Fornecedores/credores usados" />
       </StatGrid>
 
@@ -540,7 +540,7 @@ export default function ComprasRelatorioComprasDiretas() {
               },
               { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: (row) => row.item?.unidade || '-' },
               { id: 'quantidade', titulo: 'Qtd.', tipo: 'numero', render: (row) => formatNumber(row.quantidade, 2) },
-              { id: 'unitario', titulo: 'Unitario', tipo: 'valor', render: (row) => formatMoney(row.valor_unitario) },
+              { id: 'unitario', titulo: 'Unitário', tipo: 'valor', render: (row) => formatMoney(row.valor_unitario) },
               { id: 'total', titulo: 'Total', tipo: 'valor', render: (row) => formatMoney(row.valor_total) },
               {
                 id: 'status',

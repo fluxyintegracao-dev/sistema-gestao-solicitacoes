@@ -206,9 +206,9 @@ export default function FiscalDivergences() {
         acompanha a pessoa na rolagem).
       */}
       <PageHeader
-        titulo="Divergencias fiscais"
+        titulo="Divergências fiscais"
         contagem={loading ? null : `${pagination.total || 0} divergencia(s)`}
-        descricao="Visao centralizada das divergencias registradas nos documentos fiscais. Esta tela ainda nao altera pedidos, recebimentos ou financeiro."
+        descricao="Visão centralizada das divergências registradas nos documentos fiscais. Esta tela ainda não altera pedidos, recebimentos ou financeiro."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -219,7 +219,7 @@ export default function FiscalDivergences() {
         erro nenhum no console. O BlocoConteudo não recorta.
       */}
       <BlocoConteudo
-        titulo="Divergencias registradas"
+        titulo="Divergências registradas"
         variante="primario"
         cor="var(--module-fiscal)"
       >
@@ -227,7 +227,7 @@ export default function FiscalDivergences() {
           busca={visibilidadeFiltros.ehVisivel('q') ? {
             valor: filters.q,
             aoMudar: (valor) => updateFilter('q', valor),
-            placeholder: 'Buscar por nota, fornecedor ou descricao'
+            placeholder: 'Buscar por nota, fornecedor ou descrição'
           } : null}
           filtros={[
             {
@@ -326,7 +326,7 @@ export default function FiscalDivergences() {
             },
             {
               id: 'emissao',
-              titulo: 'Emissao',
+              titulo: 'Emissão',
               tipo: 'data',
               render: (item) => formatDate(item.document?.emission_date)
             },
@@ -361,7 +361,7 @@ export default function FiscalDivergences() {
             },
             {
               id: 'descricao',
-              titulo: 'Descricao',
+              titulo: 'Descrição',
               tipo: 'texto',
               // T6: texto longo trunca com o conteúdo completo no tooltip.
               render: (item) => (
@@ -384,7 +384,7 @@ export default function FiscalDivergences() {
           ]}
           itens={items}
           carregando={loading}
-          vazio="Nenhuma divergencia fiscal encontrada."
+          vazio="Nenhuma divergência fiscal encontrada."
           storageKey="tabela:divergencias-fiscais"
           rotuloRolagem="Divergencias fiscais"
           colunasConfiguraveis

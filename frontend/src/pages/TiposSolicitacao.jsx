@@ -35,23 +35,23 @@ import StatusBadge from '../components/StatusBadge';
 const BEHAVIOR_FIELDS = [
   { key: 'mostrar_valor', label: 'Mostrar valor' },
   { key: 'exige_valor', label: 'Exigir valor' },
-  { key: 'mostrar_descricao', label: 'Mostrar descricao' },
-  { key: 'exige_descricao', label: 'Exigir descricao' },
-  { key: 'mostrar_apropriacao_principal', label: 'Mostrar apropriacao principal' },
-  { key: 'exige_apropriacao_principal', label: 'Exigir apropriacao principal' },
+  { key: 'mostrar_descricao', label: 'Mostrar descrição' },
+  { key: 'exige_descricao', label: 'Exigir descrição' },
+  { key: 'mostrar_apropriacao_principal', label: 'Mostrar apropriação principal' },
+  { key: 'exige_apropriacao_principal', label: 'Exigir apropriação principal' },
   { key: 'mostrar_contrato', label: 'Mostrar contrato' },
   { key: 'exige_contrato', label: 'Exigir contrato' },
   { key: 'mostrar_subtipo', label: 'Mostrar subtipo' },
   { key: 'exige_subtipo', label: 'Exigir subtipo' },
-  { key: 'mostrar_periodo_medicao', label: 'Mostrar periodo de medicao' },
-  { key: 'exige_periodo_medicao', label: 'Exigir periodo de medicao' },
+  { key: 'mostrar_periodo_medicao', label: 'Mostrar período de medição' },
+  { key: 'exige_periodo_medicao', label: 'Exigir período de medição' },
   { key: 'mostrar_ref_contrato_abertura', label: 'Mostrar ref. contrato abertura' },
   { key: 'exige_ref_contrato_abertura', label: 'Exigir ref. contrato abertura' },
-  { key: 'mostrar_itens_apropriacao', label: 'Mostrar itens de apropriacao' },
-  { key: 'exige_itens_apropriacao', label: 'Exigir itens de apropriacao' },
+  { key: 'mostrar_itens_apropriacao', label: 'Mostrar itens de apropriação' },
+  { key: 'exige_itens_apropriacao', label: 'Exigir itens de apropriação' },
   { key: 'usa_fluxo_contrato_novo', label: 'Usar fluxo novo de contratos' },
   { key: 'usa_fluxo_despesa_eventual', label: 'Usar fluxo de Despesa Eventual' },
-  { key: 'exige_apropriacoes_contrato', label: 'Exigir apropriacoes do contrato' }
+  { key: 'exige_apropriacoes_contrato', label: 'Exigir apropriações do contrato' }
 ];
 
 function formatarRegrasTipo(tipo) {
@@ -241,7 +241,7 @@ export default function TiposSolicitacao() {
       carregar();
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao salvar edicao');
+      avisar.erro('Erro ao salvar edição');
     } finally {
       setSaving(false);
     }
@@ -282,7 +282,7 @@ export default function TiposSolicitacao() {
       // TRAVADAS (05/09): em edicao, codigo interno e regras sao os campos do
       // formulario da linha — sem elas o tipo nao tem como ser editado.
       sempreVisivel: true,
-      titulo: 'Codigo interno',
+      titulo: 'Código interno',
       // Codigo interno é longo (ex: SOLICITACAO_DE_COMPRA) — não cabe nos
       // 130px do tipo 'codigo'; 'texto' dá a medida de leitura.
       tipo: 'texto',
@@ -292,7 +292,7 @@ export default function TiposSolicitacao() {
             className="input input-sm w-full"
             value={editCodigoInterno}
             onChange={e => setEditCodigoInterno(e.target.value.toUpperCase())}
-            aria-label="Codigo interno do tipo"
+            aria-label="Código interno do tipo"
           />
         ) : (
           t.codigo_interno || '-'
@@ -341,7 +341,7 @@ export default function TiposSolicitacao() {
               <span key={label} className="fx-badge fx-badge--neutral">
                 {label}
               </span>
-            )) : <span className="text-xs text-[var(--c-muted)]">Padrao</span>}
+            )) : <span className="text-xs text-[var(--c-muted)]">Padrão</span>}
           </div>
         )
       )
@@ -361,7 +361,7 @@ export default function TiposSolicitacao() {
       <PageHeader
         titulo="Tipos (Macro)"
         contagem={`${tiposFiltrados.length} tipo(s)`}
-        descricao="Cadastro dos tipos macro utilizados nas solicitacoes."
+        descricao="Cadastro dos tipos macro utilizados nas solicitações."
         acaoPrincipal={{ rotulo: 'Novo tipo', onClick: abrirNovoTipo }}
       />
 
@@ -381,7 +381,7 @@ export default function TiposSolicitacao() {
           <div className="overflow-y-auto px-4 py-3">
             {faixaAvisos}
             <form className="space-y-4" onSubmit={handleSubmit}>
-              <FormSecao legenda="Identificacao" colunas={2}>
+              <FormSecao legenda="Identificação" colunas={2}>
                 <CampoForm label="Nome do tipo" obrigatorio>
                   <input
                     className="input w-full"
@@ -392,7 +392,7 @@ export default function TiposSolicitacao() {
                   />
                 </CampoForm>
                 <CampoForm
-                  label="Codigo interno"
+                  label="Código interno"
                   hint="Opcional; usado por integracoes e regras internas."
                 >
                   <input
@@ -470,7 +470,7 @@ export default function TiposSolicitacao() {
               className="input input-sm flex-1"
               value={setorSelecionado}
               onChange={e => setSetorSelecionado(e.target.value)}
-              aria-label="Setor dos tipos listados e do vinculo de novos tipos"
+              aria-label="Setor dos tipos listados e do vínculo de novos tipos"
             >
               <option value="">Selecione</option>
               {setores.map(s => (

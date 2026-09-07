@@ -240,7 +240,7 @@ export default function CrmLeads() {
       <PageHeader
         titulo="Leads"
         contagem={loading ? null : `${dados.total || 0} lead(s)`}
-        descricao="Gestao de leads e oportunidades comerciais do CRM."
+        descricao="Gestão de leads e oportunidades comerciais do CRM."
         acaoPrincipal={{ rotulo: 'Novo lead', to: '/crm/leads/novo' }}
         mais={podeExportar
           ? [{
@@ -260,8 +260,8 @@ export default function CrmLeads() {
       */}
       <StatGrid colunas={3}>
         <StatTile label="Total de leads" valor={dados.total || 0} />
-        <StatTile label="Convertidos" valor={totalConvertidos} sub="nesta pagina" />
-        <StatTile label="Quentes" valor={totalQuentes} sub="nesta pagina" />
+        <StatTile label="Convertidos" valor={totalConvertidos} sub="nesta página" />
+        <StatTile label="Quentes" valor={totalQuentes} sub="nesta página" />
       </StatGrid>
 
       <BlocoConteudo variante="primario" cor="var(--c-primary)">
@@ -381,7 +381,7 @@ export default function CrmLeads() {
             },
             {
               id: 'responsavel',
-              titulo: 'Responsavel',
+              titulo: 'Responsável',
               tipo: 'texto',
               render: (lead) => lead.responsavel?.nome || '—'
             },

@@ -73,7 +73,7 @@ export default function ComprovantesPendentes() {
     } catch (error) {
       console.error(error);
       // AVISO (evento): esta busca falhou.
-      avisar.erro('Erro ao buscar solicitacoes');
+      avisar.erro('Erro ao buscar solicitações');
     } finally {
       setBuscando(false);
     }
@@ -84,7 +84,7 @@ export default function ComprovantesPendentes() {
     if (!solicitacaoId) {
       // AVISO (alerta), não confirmação: não há ação para segurar — não
       // existe nada a autorizar. É a resposta ao clique de agora.
-      avisar.alerta('Escolha a solicitacao na coluna "Vincular a solicitacao" antes de vincular.');
+      avisar.alerta('Escolha a solicitação na coluna "Vincular a solicitação" antes de vincular.');
       return;
     }
 
@@ -97,7 +97,7 @@ export default function ComprovantesPendentes() {
         return next;
       });
       await carregarPendentes();
-      avisar.sucesso('Comprovante vinculado a solicitacao.');
+      avisar.sucesso('Comprovante vinculado a solicitação.');
     } catch (error) {
       console.error(error);
       // AVISO (evento): a vinculação falhou agora.
@@ -130,7 +130,7 @@ export default function ComprovantesPendentes() {
       await excluirComprovante(item.id);
       await carregarPendentes();
       // AVISO (evento): deu certo agora; some sozinho em 6s.
-      avisar.sucesso('Comprovante excluido com sucesso.');
+      avisar.sucesso('Comprovante excluído com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao excluir comprovante');
@@ -168,7 +168,7 @@ export default function ComprovantesPendentes() {
       <PageHeader
         titulo="Comprovantes pendentes"
         contagem={`${pendentes.length} comprovante(s)`}
-        descricao="Arquivos recebidos que ainda nao foram vinculados a uma solicitacao."
+        descricao="Arquivos recebidos que ainda não foram vinculados a uma solicitação."
         secundarias={[
           {
             rotulo: 'Atualizar',
@@ -188,14 +188,14 @@ export default function ComprovantesPendentes() {
         isso nenhuma etiqueta de filtro nasce dela.
       */}
       <BlocoConteudo
-        titulo="Localizar solicitacao para vincular"
+        titulo="Localizar solicitação para vincular"
         variante="secundario"
         contagem={solicitacoes.length ? `${solicitacoes.length} solicitacao(oes) encontradas` : null}
-        descricao="O resultado alimenta a escolha de cada linha; a lista de pendentes nao muda com esta busca."
+        descricao="O resultado alimenta a escolha de cada linha; a lista de pendentes não muda com esta busca."
       >
         <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
           <label className="sol-filter-field">
-            <span className="sol-filter-label">Codigo ou descricao da solicitacao</span>
+            <span className="sol-filter-label">Código ou descrição da solicitação</span>
             <input
               className="input w-full"
               placeholder="Ex: SOL-000123 ou Combustivel"
@@ -221,7 +221,7 @@ export default function ComprovantesPendentes() {
           colunas={[
             {
               id: 'arquivo',
-              titulo: 'Visualizacao',
+              titulo: 'Visualização',
               tipo: 'texto',
               noCard: 'titulo',
               render: (item) => item.nome_original
@@ -249,14 +249,14 @@ export default function ComprovantesPendentes() {
               // TRAVADAS (05/09): o select vincula o comprovante e os botoes abrem/baixam
               // o arquivo. Nenhuma das duas carrega dado — sao so o caminho de agir.
               sempreVisivel: true,
-              titulo: 'Vincular a solicitacao',
+              titulo: 'Vincular a solicitação',
               tipo: 'texto',
               // R12: select de FORMULÁRIO (entrada de dado da linha), não de
               // filtro — a regra o mantém legítimo.
               render: (item) => (
                 <select
                   className="input"
-                  aria-label={`Solicitacao para o comprovante ${item.nome_original || item.id}`}
+                  aria-label={`Solicitação para o comprovante ${item.nome_original || item.id}`}
                   value={selecionadas[item.id] || ''}
                   onChange={e =>
                     setSelecionadas(prev => ({ ...prev, [item.id]: e.target.value }))

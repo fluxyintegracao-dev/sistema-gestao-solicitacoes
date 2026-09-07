@@ -226,7 +226,7 @@ export default function FiscalAccountingBatches() {
       <PageHeader
         titulo="Exportação contábil"
         contagem={`${batches.length} lotes`}
-        descricao="Lotes com documentos fiscais validados, prontos para o envio contabil."
+        descricao="Lotes com documentos fiscais validados, prontos para o envio contábil."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -239,7 +239,7 @@ export default function FiscalAccountingBatches() {
       */}
       <BlocoConteudo
         titulo="Gerar rascunho do período"
-        descricao="Reune os documentos fiscais VALIDADOS da empresa no mes de referencia. Se ja existir lote do periodo, nenhum novo e criado."
+        descricao="Reune os documentos fiscais VALIDADOS da empresa no mês de referência. Se já existir lote do período, nenhum novo e criado."
         variante="secundario"
       >
         <form onSubmit={submit}>
@@ -303,7 +303,7 @@ export default function FiscalAccountingBatches() {
           colunas={[
             {
               id: 'periodo',
-              titulo: 'Periodo',
+              titulo: 'Período',
               tipo: 'data',
               render: (batch) => periodoDoLote(batch)
             },
@@ -350,7 +350,7 @@ export default function FiscalAccountingBatches() {
           ]}
           itens={batches}
           carregando={loading}
-          vazio="Nenhum lote contabil fiscal encontrado."
+          vazio="Nenhum lote contábil fiscal encontrado."
           storageKey="tabela:lotes-contabeis-fiscais"
           rotuloRolagem="Lotes contabeis"
           linhaSelecionada={(batch) => String(batch.id) === String(selectedBatch?.id)}
@@ -401,7 +401,7 @@ export default function FiscalAccountingBatches() {
         {selectedBatch ? (
           <>
             <StatGrid colunas={4}>
-              <StatTile label="Periodo" valor={periodoDoLote(selectedBatch)} />
+              <StatTile label="Período" valor={periodoDoLote(selectedBatch)} />
               <StatTile
                 label="Status"
                 valor={<StatusBadge status={rotuloStatusLote(selectedBatch.status)} kind={familiaStatusLote(selectedBatch.status)} />}
@@ -428,7 +428,7 @@ export default function FiscalAccountingBatches() {
                 },
                 {
                   id: 'emissao',
-                  titulo: 'Emissao',
+                  titulo: 'Emissão',
                   tipo: 'data',
                   render: (item) => formatDate(item.document?.emission_date)
                 },
@@ -456,7 +456,7 @@ export default function FiscalAccountingBatches() {
                 }
               ]}
               itens={selectedBatch.items || []}
-              vazio="Este lote nao tem documentos incluidos."
+              vazio="Este lote não tem documentos incluidos."
               storageKey="tabela:lotes-contabeis-fiscais:documentos-do-lote"
               rotuloRolagem="Documentos do lote"
             />

@@ -146,9 +146,9 @@ export default function FiscalLogs() {
       */
       if (result?.ready) {
         // Resultado do preflight fica fixo no painel (StatusBadge/tabela) abaixo: o aviso pode sumir sozinho.
-        avisar.sucesso('Preflight concluido. Ambiente pronto para a proxima etapa controlada.', undefined, { efemero: true });
+        avisar.sucesso('Preflight concluído. Ambiente pronto para a próxima etapa controlada.', undefined, { efemero: true });
       } else {
-        avisar.alerta('Preflight concluido com pendencias. Revise os checks antes de ativar SEFAZ.');
+        avisar.alerta('Preflight concluído com pendências. Revise os checks antes de ativar SEFAZ.');
       }
       await load();
     } catch (err) {
@@ -193,7 +193,7 @@ export default function FiscalLogs() {
       <PageHeader
         titulo="Logs de sincronização"
         contagem={`${logs.length} execuções registradas`}
-        descricao="Auditoria tecnica das sincronizacoes fiscais. Jobs reais serao ativados em fase posterior."
+        descricao="Auditoria técnica das sincronizacoes fiscais. Jobs reais serão ativados em fase posterior."
         acaoPrincipal={{
           rotulo: running ? 'Executando...' : manualActionLabel,
           onClick: runManual,
@@ -211,7 +211,7 @@ export default function FiscalLogs() {
 
       <BlocoConteudo
         titulo="Escopo da execução"
-        descricao="Empresa e tipo documental que as duas acoes acima vao usar."
+        descricao="Empresa e tipo documental que as duas ações acima vao usar."
         variante="secundario"
       >
         {/*
@@ -264,7 +264,7 @@ export default function FiscalLogs() {
       {preflight ? (
         <BlocoConteudo
           titulo="Preflight da sincronização"
-          descricao="Validacao administrativa sem consulta real a SEFAZ."
+          descricao="Validação administrativa sem consulta real a SEFAZ."
           variante="secundario"
           acoes={<StatusBadge status={preflight.ready ? 'Pronto' : 'Com pendencias'} kind={preflight.ready ? 'success' : 'warning'} />}
         >
@@ -403,13 +403,13 @@ export default function FiscalLogs() {
             },
             {
               id: 'ultima_tentativa',
-              titulo: 'Ultima tentativa',
+              titulo: 'Última tentativa',
               tipo: 'data',
               render: (state) => formatDateTime(state.last_attempt_at)
             },
             {
               id: 'proxima_tentativa',
-              titulo: 'Proxima tentativa',
+              titulo: 'Próxima tentativa',
               tipo: 'data',
               render: (state) => formatDateTime(state.next_allowed_sync_at)
             },
@@ -429,7 +429,7 @@ export default function FiscalLogs() {
           ]}
           itens={states}
           carregando={loading}
-          vazio="Nenhum estado de sincronizacao registrado."
+          vazio="Nenhum estado de sincronização registrado."
           storageKey="tabela:logs-fiscais:estados-sincronizacao"
           rotuloRolagem="Estados de sincronizacao"
         />
@@ -440,7 +440,7 @@ export default function FiscalLogs() {
       <BlocoConteudo
         titulo="Logs recentes"
         contagem={`${logs.length} execuções`}
-        descricao="Cada linha e uma EXECUCAO: quando comecou, sobre qual empresa, o que a SEFAZ respondeu."
+        descricao="Cada linha e uma EXECUÇÃO: quando comecou, sobre qual empresa, o que a SEFAZ respondeu."
         variante="primario"
         cor="var(--module-fiscal)"
       >
@@ -457,7 +457,7 @@ export default function FiscalLogs() {
           colunas={[
             {
               id: 'inicio',
-              titulo: 'Inicio',
+              titulo: 'Início',
               tipo: 'data',
               noCard: 'titulo',
               render: (log) => formatDateTime(log.started_at)

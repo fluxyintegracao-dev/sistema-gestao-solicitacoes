@@ -32,6 +32,7 @@ import {
   useConfirmacao
 } from '../components/padrao';
 import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../utils/formatters';
+import DateInputBR from '../components/DateInputBR';
 
 /*
  * AS QUATRO CLASSES FANTASMA DESTA TELA (achado de 04/09, fatia 3).
@@ -251,7 +252,7 @@ function CaixaPagamentosPanel({ avisar, limparAvisos, confirmar }) {
       await salvarCaixaPagamentoConvenio({ ...form, empresa_cpf_cnpj: onlyDigits(form.empresa_cpf_cnpj) });
       setForm(convenioInicial);
       setModalConvenio(false);
-      avisar.sucesso('Convenio Caixa de pagamentos salvo.');
+      avisar.sucesso('Convênio Caixa de pagamentos salvo.');
       await loadBase();
     } catch (err) {
       avisar.erro(err.message || 'Erro ao salvar convenio');
@@ -367,7 +368,7 @@ function CaixaPagamentosPanel({ avisar, limparAvisos, confirmar }) {
         <FormSecao legenda="Gerar remessa de pagamento" colunas={2}>
           <CampoForm label="Convênio Caixa" obrigatorio>
             <select className="input" value={selectedConvenioId} onChange={(e) => setSelectedConvenioId(e.target.value)}>
-              <option value="">Selecione um convenio</option>
+              <option value="">Selecione um convênio</option>
               {convenios.map((convenio) => (
                 <option key={convenio.id} value={convenio.id}>
                   {convenio.empresa?.razao_social || convenio.empresa_nome} - {convenio.compromisso_codigo || convenio.convenio_codigo}
@@ -376,7 +377,7 @@ function CaixaPagamentosPanel({ avisar, limparAvisos, confirmar }) {
             </select>
           </CampoForm>
           <CampoForm label="Data de pagamento" obrigatorio>
-            <input type="date" className="input" value={dataPagamento} onChange={(e) => setDataPagamento(e.target.value)} />
+            <DateInputBR className="input" value={dataPagamento} onChange={(e) => setDataPagamento(e.target.value)} />
           </CampoForm>
         </FormSecao>
 
@@ -405,7 +406,7 @@ function CaixaPagamentosPanel({ avisar, limparAvisos, confirmar }) {
             aoAlternarTodos: alternarTodosTitulos
           }}
           colunas={[
-            { id: 'codigo', titulo: 'Titulo', tipo: 'codigo', render: (titulo) => titulo.codigo },
+            { id: 'codigo', titulo: 'Título', tipo: 'codigo', render: (titulo) => titulo.codigo },
             {
               id: 'fornecedor',
               titulo: 'Fornecedor',
@@ -420,7 +421,7 @@ function CaixaPagamentosPanel({ avisar, limparAvisos, confirmar }) {
           itens={titulos}
           storageKey="tabela:financeiro-bancos:titulos-elegiveis"
           rotuloRolagem="Titulos elegiveis para remessa"
-          vazio="Nenhum titulo elegivel encontrado."
+          vazio="Nenhum título elegível encontrado."
         />
       </BlocoConteudo>
 
@@ -514,8 +515,8 @@ function CaixaPagamentosPanel({ avisar, limparAvisos, confirmar }) {
               </CampoForm>
               <CampoForm label="Ambiente">
                 <select className="input" value={form.ambiente} onChange={(e) => setForm({ ...form, ambiente: e.target.value })}>
-                  <option value="HOMOLOGACAO">Homologacao</option>
-                  <option value="PRODUCAO">Producao</option>
+                  <option value="HOMOLOGACAO">Homologação</option>
+                  <option value="PRODUCAO">Produção</option>
                 </select>
               </CampoForm>
             </FormSecao>
@@ -791,7 +792,7 @@ export default function FinanceiroBancos() {
             { id: 'origem', titulo: 'Origem', tipo: 'badge', render: (item) => item.origem },
             {
               id: 'codigo',
-              titulo: 'Codigo',
+              titulo: 'Código',
               // R17: o codigo/arquivo NOMEIA a remessa ou o retorno.
               tipo: 'identidade',
               noCard: 'titulo',

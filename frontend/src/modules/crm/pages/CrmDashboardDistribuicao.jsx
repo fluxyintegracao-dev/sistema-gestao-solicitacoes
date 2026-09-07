@@ -117,13 +117,13 @@ export default function CrmDashboardDistribuicao() {
     if (!kpis) return [];
     return [
       {
-        label: 'Carteira com responsavel',
+        label: 'Carteira com responsável',
         valor: `${texto(kpis.percentualAtribuido)}%`,
         sub: 'Dos leads ativos em carteira',
         tom: 'info'
       },
       {
-        label: 'Leads sem responsavel',
+        label: 'Leads sem responsável',
         valor: texto(kpis.leadsSemResponsavel),
         sub: 'Devem ser tratados antes de campanhas em escala',
         tom: kpis.leadsSemResponsavel > 0 ? 'danger' : 'success'
@@ -135,20 +135,20 @@ export default function CrmDashboardDistribuicao() {
         tom: kpis.leadsSemAtividade > 0 ? 'warning' : 'success'
       },
       {
-        label: 'Redistribuicoes no periodo',
+        label: 'Redistribuicoes no período',
         valor: texto(kpis.redistribuicoesPeriodo),
         sub: `${texto(kpis.leadsComMaisDeUmaRedistribuicao)} lead(s) redistribuido(s) mais de uma vez`,
         tom: kpis.leadsComMaisDeUmaRedistribuicao > 0 ? 'warning' : undefined
       },
       {
-        label: 'Responsaveis com carteira',
+        label: 'Responsáveis com carteira',
         valor: texto(kpis.responsaveisComCarteira),
-        sub: 'Usuarios com leads ativos atribuidos'
+        sub: 'Usuários com leads ativos atribuídos'
       },
       {
         label: 'Desequilibrio de carteira',
         valor: texto(kpis.desequilibrioCarteira),
-        sub: 'Diferenca entre maior e menor carteira ativa',
+        sub: 'Diferença entre maior e menor carteira ativa',
         tom: kpis.desequilibrioCarteira > 10 ? 'warning' : undefined
       }
     ];
@@ -169,9 +169,9 @@ export default function CrmDashboardDistribuicao() {
           rolava para fora. R11/C6: os botões "SLA" e "Leads" eram navegação
           na barra de ações — menu e Ctrl+K resolvem. */}
       <PageHeader
-        titulo="Distribuicao CRM"
+        titulo="Distribuição CRM"
         contagem={kpis ? `${texto(kpis.totalAtivos)} lead(s) ativo(s) em carteira` : null}
-        descricao="Visao de carteira, redistribuicoes e equilibrio operacional antes da criacao de pools avancados."
+        descricao="Visão de carteira, redistribuicoes e equilibrio operacional antes da criação de pools avançados."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar',
           onClick: () => load(filters),
@@ -185,14 +185,14 @@ export default function CrmDashboardDistribuicao() {
           entram como `campos` da BarraFiltros, o espaço declarado para o
           recorte que não é enumerável, e não como grade crua de inputs. */}
       <BlocoConteudo
-        titulo="Recorte de distribuicao"
+        titulo="Recorte de distribuição"
         descricao="Use este painel para entender sobrecarga e redistribuicoes antes de automatizar regras comerciais."
       >
         <BarraFiltros
           campos={[
             {
               id: 'dias',
-              rotulo: 'Periodo (dias)',
+              rotulo: 'Período (dias)',
               tipo: 'number',
               min: 1,
               max: 365,
@@ -213,7 +213,7 @@ export default function CrmDashboardDistribuicao() {
       </BlocoConteudo>
 
       {loading ? (
-        <BlocoConteudo>Carregando distribuicao CRM...</BlocoConteudo>
+        <BlocoConteudo>Carregando distribuição CRM...</BlocoConteudo>
       ) : !data ? null : (
         <>
           {/* M2/R10 + R25: `text-3xl` com amber/red/emerald/blue crus deu
@@ -246,7 +246,7 @@ export default function CrmDashboardDistribuicao() {
             {/* B2 — UM primário por tela: a carteira por responsável é o que
                 responde a pergunta central (quem está sobrecarregado). */}
             <BlocoConteudo
-              titulo="Carteira por responsavel"
+              titulo="Carteira por responsável"
               descricao="Base para identificar sobrecarga, carteira parada e desequilibrio operacional."
               variante="primario"
               cor="var(--c-primary)"
@@ -255,7 +255,7 @@ export default function CrmDashboardDistribuicao() {
                 colunas={[
                   {
                     id: 'responsavel',
-                    titulo: 'Responsavel',
+                    titulo: 'Responsável',
                     tipo: 'identidade',
                     noCard: 'titulo',
                     render: (row) => (
@@ -281,7 +281,7 @@ export default function CrmDashboardDistribuicao() {
                   },
                   {
                     id: 'novos',
-                    titulo: 'Novos periodo',
+                    titulo: 'Novos período',
                     tipo: 'numero',
                     render: (row) => row.novosPeriodo
                   },
@@ -305,20 +305,20 @@ export default function CrmDashboardDistribuicao() {
                   },
                   {
                     id: 'taxa',
-                    titulo: 'Taxa periodo',
+                    titulo: 'Taxa período',
                     tipo: 'numero',
                     render: (row) => `${row.taxaConversaoPeriodo}%`
                   },
                   {
                     id: 'pressao',
-                    titulo: 'Pressao',
+                    titulo: 'Pressão',
                     tipo: 'numero',
                     render: (row) => row.pressaoCarteira
                   }
                 ]}
                 itens={data.responsaveis || []}
                 getId={(row) => row.usuario?.id || row.usuario?.nome}
-                vazio="Nenhum responsavel com carteira ativa no periodo."
+                vazio="Nenhum responsável com carteira ativa no período."
                 storageKey="tabela:crm-dashboard-distribuicao:responsaveis"
                 rotuloRolagem="Carteira por responsavel"
               />
@@ -326,14 +326,14 @@ export default function CrmDashboardDistribuicao() {
 
             <BlocoVolume data-bloco-id="redistribuicoes-por-dia" data-bloco-rotulo="Redistribuicoes por dia"
               titulo="Redistribuicoes por dia"
-              descricao="Volume diario auditado no periodo selecionado."
+              descricao="Volume diário auditado no período selecionado."
               rows={data.redistribuicoesPorDia}
               labelKey="dia"
             />
 
             <BlocoVolume data-bloco-id="redistribuicoes-por-usuario" data-bloco-rotulo="Redistribuicoes por usuario"
-              titulo="Redistribuicoes por usuario"
-              descricao="Quem executou redistribuicoes no periodo."
+              titulo="Redistribuicoes por usuário"
+              descricao="Quem executou redistribuicoes no período."
               rows={data.redistribuicoesPorAtor}
               labelKey="usuario"
             />
@@ -350,7 +350,7 @@ export default function CrmDashboardDistribuicao() {
             */}
             <BlocoConteudo
               titulo="Redistribuicoes recentes"
-              descricao="Historico auditado das movimentacoes de responsavel."
+              descricao="Histórico auditado das movimentações de responsável."
               recolhivel
               chavePreferencia="bloco:crm-dashboard-distribuicao:redistribuicoes-recentes"
               recolhidoPadrao
@@ -370,7 +370,7 @@ export default function CrmDashboardDistribuicao() {
                   },
                   {
                     id: 'movimentacao',
-                    titulo: 'Movimentacao',
+                    titulo: 'Movimentação',
                     tipo: 'texto',
                     render: (row) => (
                       <CelulaDupla
@@ -403,7 +403,7 @@ export default function CrmDashboardDistribuicao() {
                 ]}
                 itens={data.redistribuicoesRecentes || []}
                 getId={(row) => row.id}
-                vazio="Nenhuma redistribuicao registrada no periodo."
+                vazio="Nenhuma redistribuicao registrada no período."
                 storageKey="tabela:crm-dashboard-distribuicao:redistribuicoes"
                 rotuloRolagem="Redistribuicoes recentes"
               />

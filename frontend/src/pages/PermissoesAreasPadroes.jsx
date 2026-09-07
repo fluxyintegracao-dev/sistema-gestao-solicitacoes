@@ -122,7 +122,7 @@ function CheckboxPermissao({ permissao, checked, disabled, onChange, inputType =
         <span className="font-mono text-xs text-[var(--c-muted)] opacity-60">{permissao.key}</span>
         {disabled && (
           <span className="text-xs font-semibold text-[var(--sem-success)]">
-            Padrao obrigatorio para setor OBRA
+            Padrão obrigatório para setor OBRA
           </span>
         )}
       </span>
@@ -246,7 +246,7 @@ export default function PermissoesAreasPadroes() {
         }
       } catch (error) {
         console.error(error);
-        avisar.erro('Nao foi possivel carregar as permissoes padrao.');
+        avisar.erro('Não foi possível carregar as permissões padrão.');
       } finally {
         setLoading(false);
       }
@@ -332,10 +332,10 @@ export default function PermissoesAreasPadroes() {
       setSaving(true);
       const resultado = await salvarPermissoesAreas({ padroes_setor_perfil: padroes });
       setPadroes(normalizePadroes(resultado?.padroes_setor_perfil));
-      avisar.sucesso('Permissoes padrao por setor e perfil salvas.');
+      avisar.sucesso('Permissões padrão por setor e perfil salvas.');
     } catch (error) {
       console.error(error);
-      avisar.erro('Nao foi possivel salvar as permissoes padrao.');
+      avisar.erro('Não foi possível salvar as permissões padrão.');
     } finally {
       setSaving(false);
     }
@@ -353,8 +353,8 @@ export default function PermissoesAreasPadroes() {
           usuario" saiu daqui; a tela de exceções por usuário tem porta
           própria no hub de Configurações, grupo "Status e Vinculos". */}
       <PageHeader
-        titulo="Permissoes por Setor e Perfil"
-        descricao="Configuracoes · Defina a matriz padrao para todos os usuarios de um setor e perfil. Permissoes adicionais continuam sendo configuradas por usuario na tela granular existente."
+        titulo="Permissões por Setor e Perfil"
+        descricao="Configurações · Defina a matriz padrão para todos os usuários de um setor e perfil. Permissões adicionais continuam sendo configuradas por usuário na tela granular existente."
         acaoPrincipal={{
           rotulo: saving ? 'Salvando...' : 'Salvar padroes',
           onClick: salvar,
@@ -370,11 +370,11 @@ export default function PermissoesAreasPadroes() {
           do topo (B3). Com ela fora da grade, restaram as duas colunas dos
           seletores e a medida arbitrária da grade deixou de existir. */}
       <BlocoConteudo
-        titulo="Contexto do padrao"
+        titulo="Contexto do padrão"
         variante="primario"
         cor="var(--c-primary)"
-        contagem={`${permissoesAtuais.length} permissao(oes)`}
-        descricao="no padrao atual do setor e perfil selecionados"
+        contagem={`${permissoesAtuais.length} permissão(oes)`}
+        descricao="no padrão atual do setor e perfil selecionados"
       >
         {/* R12: estes dois selects são seletores de CONTEXTO (escolhem QUAL
             padrão está sendo editado, e o que for marcado é gravado neles) —
@@ -408,14 +408,14 @@ export default function PermissoesAreasPadroes() {
             como faixa fixa ao lado do que descreve — só a cor virou token. */}
         {isSetorObra(setorAtual) && (
           <div className="mt-4 rounded-xl border border-[var(--sem-success-border)] bg-[var(--sem-success-bg)] px-4 py-3 text-sm text-[var(--sem-success)]">
-            Setor OBRA recebe automaticamente a permissao para ver suas proprias solicitacoes e solicitacoes das obras
+            Setor OBRA recebe automaticamente a permissão para ver suas próprias solicitações e solicitações das obras
             vinculadas ao usuario, sem liberar todas as solicitacoes do setor.
           </div>
         )}
       </BlocoConteudo>
 
       {loading ? (
-        <div className="app-empty-card">Carregando permissoes...</div>
+        <div className="app-empty-card">Carregando permissões...</div>
       ) : (
         registry.map((grupo) => (
           <ModuleCard
@@ -432,7 +432,7 @@ export default function PermissoesAreasPadroes() {
         ))
       )}
 
-      <BlocoConteudo titulo="Resumo dos modulos" variante="secundario">
+      <BlocoConteudo titulo="Resumo dos módulos" variante="secundario">
         <div className="grid gap-3 xl:grid-cols-2">
           {MODULE_GOVERNANCE.map((item) => {
             const active = moduleEnabledMap.has(item.key) ? moduleEnabledMap.get(item.key) : true;

@@ -17,6 +17,7 @@ import {
 import { parseDateSmart } from '../../utils/dateLocal';
 import { corrigirTextoCorrompido } from '../../utils/texto';
 import { hasAnyExplicitPermissao } from '../../utils/acessoProduto';
+import DateInputBR from '../../components/DateInputBR';
 
 /**
  * A LINHA DA TABELA DE SOLICITAÇÕES — agora declarada como COLUNAS.
@@ -140,7 +141,7 @@ function CelulaValor({ solicitacao, podeEditar, onAtualizar, avisar }) {
     try {
       const valorNumero = valorEditado === '' ? null : Number(valorEditado);
       if (valorEditado !== '' && Number.isNaN(valorNumero)) {
-        avisar.erro('Valor invalido');
+        avisar.erro('Valor inválido');
         return;
       }
       await updateValorSolicitacao(alvo.id, valorNumero);
@@ -228,8 +229,7 @@ function CelulaVencimento({ solicitacao, podeEditar, onAtualizar, avisar }) {
   if (editando) {
     return (
       <div className="flex flex-col gap-1">
-        <input
-          type="date"
+        <DateInputBR
           className="input"
           value={dataEditada || ''}
           onChange={(e) => setDataEditada(e.target.value)}
@@ -359,7 +359,7 @@ function AcoesSolicitacao({
       await onAtualizar?.({ type: 'remove_item', id: alvo.id });
     } catch (err) {
       console.error(err);
-      avisar.erro('Erro ao excluir solicitacao');
+      avisar.erro('Erro ao excluir solicitação');
     }
   }
 

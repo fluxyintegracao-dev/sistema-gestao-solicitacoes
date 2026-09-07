@@ -436,7 +436,7 @@ export default function CoresSistema() {
       desabilitada: salvando
     },
     secundarias: [{
-      rotulo: 'Restaurar padrao',
+      rotulo: 'Restaurar padrão',
       onClick: () => setDraft(clone(TEMA_PADRAO))
     }]
   };
@@ -449,7 +449,7 @@ export default function CoresSistema() {
       <Pagina className="max-w-7xl">
         <PageHeader
           titulo="Cores do Sistema"
-          descricao="Configure a identidade visual usada por botoes, cards, status, textos, numeros e acentos dos modulos."
+          descricao="Configure a identidade visual usada por botoes, cards, status, textos, números e acentos dos módulos."
         />
         <BlocoConteudo titulo="Carregando cores">
           <p className="app-note">Buscando o tema atual do sistema...</p>
@@ -465,7 +465,7 @@ export default function CoresSistema() {
           não grudava na rolagem nem tinha superfície própria. */}
       <PageHeader
         titulo="Cores do Sistema"
-        descricao="Configure a identidade visual usada por botoes, cards, status, textos, numeros e acentos dos modulos."
+        descricao="Configure a identidade visual usada por botoes, cards, status, textos, números e acentos dos módulos."
         {...acoesDoCabecalho}
       />
 
@@ -475,8 +475,8 @@ export default function CoresSistema() {
           tela ("como fica o sistema com estas cores?"). O `style` carrega as
           variáveis do rascunho, então a prévia mostra o valor em edição. */}
       <BlocoConteudo
-        titulo="Previa operacional"
-        descricao="Use esta area para validar contraste antes de salvar."
+        titulo="Prévia operacional"
+        descricao="Use esta área para validar contraste antes de salvar."
         variante="primario"
         // A barra de cor vai DENTRO do mesmo `style`: o BlocoConteudo monta
         // `--bloco-cor` a partir da prop `cor` e depois espalha `...props`,
@@ -490,23 +490,23 @@ export default function CoresSistema() {
               <button type="button" className="btn btn-secondary">Secundario</button>
               <button type="button" className="btn btn-outline">Contornado</button>
               <button type="button" className="btn btn-success">Sucesso</button>
-              <button type="button" className="btn btn-danger">Critico</button>
+              <button type="button" className="btn btn-danger">Crítico</button>
             </div>
             <div className="app-summary-grid app-summary-grid--compact mt-4">
               <div className="app-summary-card">
                 <div className="app-summary-label">Saldo</div>
                 <div className="app-summary-value">R$ 128.450,00</div>
-                <div className="app-summary-subvalue">Numero padrao</div>
+                <div className="app-summary-subvalue">Número padrão</div>
               </div>
               <div className="app-summary-card">
                 <div className="app-summary-label">Executado</div>
                 <div className="app-summary-value" style={{ color: draft.numbers?.positive }}>82%</div>
-                <div className="app-summary-subvalue">Numero positivo</div>
+                <div className="app-summary-subvalue">Número positivo</div>
               </div>
               <div className="app-summary-card">
                 <div className="app-summary-label">Risco</div>
                 <div className="app-summary-value" style={{ color: draft.numbers?.negative }}>12</div>
-                <div className="app-summary-subvalue">Numero critico</div>
+                <div className="app-summary-subvalue">Número crítico</div>
               </div>
             </div>
           </div>
@@ -525,14 +525,14 @@ export default function CoresSistema() {
       <ColorSection title="Botoes" description="Controla botoes principais, secundarios, contornados, discretos e estados operacionais." fields={BOTOES} draft={draft} onChange={atualizarCampo} />
       <ColorSection title="Cards e indicadores" description="Define superficies, cards de dashboards e cards de numeros dos relatorios." fields={CARDS} draft={draft} onChange={atualizarCampo} />
       <ColorSection title="Textos" description="Ajusta titulos, texto comum, links e textos auxiliares." fields={TEXTOS} draft={draft} onChange={atualizarCampo} />
-      <ColorSection title="Numeros e metricas" description="Cores usadas em valores, percentuais, KPIs e indicadores financeiros." fields={NUMEROS} draft={draft} onChange={atualizarCampo} />
-      <ColorSection title="Acentos por modulo" description="Cores institucionais para distinguir modulos sem alterar regras de negocio." fields={MODULOS} draft={draft} onChange={atualizarCampo} />
+      <ColorSection title="Números e métricas" description="Cores usadas em valores, percentuais, KPIs e indicadores financeiros." fields={NUMEROS} draft={draft} onChange={atualizarCampo} />
+      <ColorSection title="Acentos por módulo" description="Cores institucionais para distinguir modulos sem alterar regras de negocio." fields={MODULOS} draft={draft} onChange={atualizarCampo} />
       <ColorSection title="Badges e status visuais" description="Cores dos marcadores usados em financeiro, DRE, pagamentos, auditoria e demais listas." fields={STATUS_BADGES} draft={draft} onChange={atualizarCampo} columns="lg:grid-cols-3" />
-      <ColorSection title="Acoes de solicitacoes" description="Mantem compatibilidade com as cores especificas dos botoes de acao das solicitacoes." fields={ACOES_SOLICITACOES} draft={draft} onChange={atualizarCampo} />
+      <ColorSection title="Ações de solicitações" description="Mantem compatibilidade com as cores especificas dos botoes de acao das solicitacoes." fields={ACOES_SOLICITACOES} draft={draft} onChange={atualizarCampo} />
 
       <BlocoConteudo
-        titulo="Status geral das solicitacoes"
-        descricao="Cores usadas quando um status nao possui configuracao especifica por setor."
+        titulo="Status geral das solicitações"
+        descricao="Cores usadas quando um status não possui configuração especifica por setor."
       >
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {STATUS_PADRAO.map(status => (
@@ -552,7 +552,7 @@ export default function CoresSistema() {
 
       <BlocoConteudo
         titulo="Status por setor"
-        descricao="Ajuste fino para status especificos de cada area operacional."
+        descricao="Ajuste fino para status específicos de cada área operacional."
       >
         {/* R12: seletor de CONTEXTO (de qual setor são os status editados
             abaixo), não filtro de lista — continua sendo select. */}

@@ -33,7 +33,7 @@ export default function TimeoutInatividade() {
       }
     } catch (error) {
       console.error(error);
-      avisar.erro('Erro ao carregar configuracao de inatividade');
+      avisar.erro('Erro ao carregar configuração de inatividade');
     } finally {
       setLoading(false);
     }
@@ -80,7 +80,7 @@ export default function TimeoutInatividade() {
       <Pagina>
         {cabecalho}
         <Avisos avisos={avisos} aoFechar={fechar} />
-        <div className="app-empty-card">Carregando configuracao de inatividade...</div>
+        <div className="app-empty-card">Carregando configuração de inatividade...</div>
       </Pagina>
     );
   }

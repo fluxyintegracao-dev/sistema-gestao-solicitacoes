@@ -99,12 +99,12 @@ export default function Usuarios() {
     if (!file) return;
 
     if (!String(file.name || '').toLowerCase().endsWith('.csv')) {
-      avisar.alerta('Utilize o arquivo modelo em CSV para importar usuarios.');
+      avisar.alerta('Utilize o arquivo modelo em CSV para importar usuários.');
       return;
     }
 
     const { ok } = await confirmar({
-      titulo: 'Importar usuarios em massa',
+      titulo: 'Importar usuários em massa',
       mensagem: `Importar usuarios em massa usando o arquivo "${file.name}"?`,
       rotuloConfirmar: 'Importar'
     });
@@ -153,7 +153,7 @@ export default function Usuarios() {
       const resultado = await enviarConviteUsuario(usuario.id);
       await carregar();
       if (resultado?.email_configurado === false) {
-        avisar.alerta('Link gerado, mas o SMTP nao esta configurado. Configure o e-mail antes de usar em producao.');
+        avisar.alerta('Link gerado, mas o SMTP não esta configurado. Configure o e-mail antes de usar em produção.');
       } else {
         avisar.sucesso('Link enviado com sucesso.');
       }
@@ -166,7 +166,7 @@ export default function Usuarios() {
   async function forcarResetSenhas() {
     const { ok } = await confirmar({
       titulo: 'Resetar senhas de todos',
-      mensagem: 'Isso vai exigir que todos os usuarios ativos redefinam a senha no proximo acesso e enviara links por e-mail. Deseja continuar?',
+      mensagem: 'Isso vai exigir que todos os usuários ativos redefinam a senha no próximo acesso e enviara links por e-mail. Deseja continuar?',
       rotuloConfirmar: 'Resetar senhas',
       rotuloCancelar: 'Manter senhas',
       destrutiva: true
@@ -188,7 +188,7 @@ export default function Usuarios() {
   const colunas = [
     {
       id: 'usuario',
-      titulo: 'Usuario',
+      titulo: 'Usuário',
       // Nome de usuário é identificação: exibido em maiúsculas (só exibição).
       tipo: 'identidade',
       noCard: 'titulo',
@@ -225,10 +225,10 @@ export default function Usuarios() {
       {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
           linha no próprio PageHeader; nada de apoio duplicado no bloco. */}
       <PageHeader
-        titulo="Usuarios"
+        titulo="Usuários"
         contagem={loading ? null : `${usuarios.length} usuario(s)`}
-        descricao="Cadastro, importacao e gestao operacional de usuarios."
-        acaoPrincipal={{ rotulo: 'Novo usuario', onClick: () => navigate('/usuarios/novo') }}
+        descricao="Cadastro, importação e gestão operacional de usuários."
+        acaoPrincipal={{ rotulo: 'Novo usuário', onClick: () => navigate('/usuarios/novo') }}
         mais={[
           { rotulo: 'Baixar modelo CSV', onClick: baixarModeloImportacaoUsuarios },
           {
@@ -257,7 +257,7 @@ export default function Usuarios() {
       />
 
       <BlocoConteudo
-        titulo="Modelo de importacao CSV"
+        titulo="Modelo de importação CSV"
         variante="secundario"
         recolhivel
         recolhidoPadrao

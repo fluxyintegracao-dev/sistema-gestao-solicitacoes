@@ -278,7 +278,7 @@ export default function Obras() {
       };
 
       if (!payload.codigo || !payload.nome) {
-        avisar.alerta('Informe codigo e nome do cadastro.');
+        avisar.alerta('Informe código e nome do cadastro.');
         return;
       }
 
@@ -365,7 +365,7 @@ export default function Obras() {
           busca={{
             valor: busca,
             aoMudar: setBusca,
-            placeholder: 'Buscar por codigo, nome ou cidade'
+            placeholder: 'Buscar por código, nome ou cidade'
           }}
         />
         {!gestaoObrasHabilitada && (
@@ -534,7 +534,7 @@ export default function Obras() {
                   {form.id ? 'Editar cadastro' : 'Novo cadastro'}
                 </h2>
                 <p className="modal-subtitle">
-                  Mantenha obras reais e centros de custo administrativos alinhados para o modulo operacional e financeiro.
+                  Mantenha obras reais e centros de custo administrativos alinhados para o módulo operacional e financeiro.
                 </p>
               </div>
               <button type="button" className="modal-close-btn" onClick={fecharModal} aria-label="Fechar">

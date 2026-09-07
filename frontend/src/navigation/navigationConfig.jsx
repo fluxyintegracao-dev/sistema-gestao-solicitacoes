@@ -252,12 +252,12 @@ function sstChildrenFull() {
 */
 export const SECOES_CONFIGURACOES = [
   { id: 'cadastros', label: 'Cadastros', ordem: 10 },
-  { id: 'usuarios', label: 'Usuarios', ordem: 20 },
+  { id: 'usuarios', label: 'Usuários', ordem: 20 },
   { id: 'suporte', label: 'Suporte', ordem: 30 },
   { id: 'compras', label: 'Compras', ordem: 40 },
   { id: 'comercial', label: 'Comercial', ordem: 50 },
   { id: 'provisionamento', label: 'Provisionamento', ordem: 60 },
-  { id: 'status-vinculos', label: 'Status e Vinculos', ordem: 70 },
+  { id: 'status-vinculos', label: 'Status e Vínculos', ordem: 70 },
   { id: 'instalacao', label: 'Instalacao', ordem: 80 }
 ];
 
@@ -606,10 +606,10 @@ export const NAV_MODULES = [
       { id: 'cfg-status-setor', ordem: 240, secaoConfig: 'status-vinculos', ordemConfig: 10, label: 'Status por Setor', desc: 'Cadastro de status permitidos por setor.', icon: HiOutlineClipboardDocumentList, to: '/status-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-permissoes-setor', ordem: 250, secaoConfig: 'status-vinculos', ordemConfig: 20, label: 'Permissões por Setor', desc: 'Defina se usuários podem assumir e atribuir.', icon: HiOutlineShieldCheck, to: '/permissoes-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-cores-sistema', ordem: 260, secaoConfig: 'status-vinculos', ordemConfig: 30, label: 'Cores do Sistema', desc: 'Defina cores de botões e status.', icon: HiOutlineSparkles, to: '/cores-sistema', can: (user) => canManageConfiguracoesArea(user, 'aparencia') },
-      { id: 'cfg-areas-obra', ordem: 270, secaoConfig: 'status-vinculos', ordemConfig: 40, label: 'Areas Visiveis para OBRA', desc: 'Controle as áreas visíveis na nova solicitação.', icon: HiOutlineBuildingOffice2, to: '/areas-obra', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-areas-obra', ordem: 270, secaoConfig: 'status-vinculos', ordemConfig: 40, label: 'Áreas Visíveis para OBRA', desc: 'Controle as áreas visíveis na nova solicitação.', icon: HiOutlineBuildingOffice2, to: '/areas-obra', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-obra-tipo-apropriacao', ordem: 280, secaoConfig: 'status-vinculos', ordemConfig: 50, label: 'Apropriação Padrão por Obra', desc: 'Defina a apropriação preenchida automaticamente por obra e tipo de solicitação.', icon: HiOutlineAdjustmentsHorizontal, to: '/obra-tipo-apropriacao', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-contrato-obra-categorias', ordem: 290, secaoConfig: 'status-vinculos', ordemConfig: 60, label: 'Categorias do Contrato de Obra', desc: 'Selecione quais categorias financeiras aparecem ao criar um contrato de obra.', icon: HiOutlineArchiveBox, to: '/contrato-obra-categorias', can: (user) => canManageConfiguracoesArea(user, 'geral') },
-      { id: 'cfg-areas-setor-origem', ordem: 300, secaoConfig: 'status-vinculos', ordemConfig: 70, label: 'Areas por Setor de Origem', desc: 'Defina quais setores cada setor pode selecionar na nova solicitação.', icon: HiOutlineRectangleGroup, to: '/areas-por-setor-origem', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-areas-setor-origem', ordem: 300, secaoConfig: 'status-vinculos', ordemConfig: 70, label: 'Áreas por Setor de Origem', desc: 'Defina quais setores cada setor pode selecionar na nova solicitação.', icon: HiOutlineRectangleGroup, to: '/areas-por-setor-origem', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       /*
         A PERMISSÃO DIVERGIA, E QUEM ESTAVA ERRADO ERA O HUB (05/09).
 
@@ -622,7 +622,7 @@ export const NAV_MODULES = [
         tela.
       */
       { id: 'cfg-sla-setor', ordem: 310, secaoConfig: 'status-vinculos', ordemConfig: 80, label: 'SLA de Solicitações por Setor', desc: 'Defina o prazo real em dias usado no relatório operacional de solicitações.', icon: HiOutlineCalendarDays, to: '/solicitacoes-sla-setor', can: (user) => isBusinessAdmin(user) },
-      { id: 'cfg-setores-visiveis-usuario', ordem: 320, secaoConfig: 'status-vinculos', ordemConfig: 90, label: 'Setores Visiveis por Usuario', desc: 'Defina setores extras que cada usuário pode visualizar sem alterar regras de ação.', icon: HiOutlineUsers, to: '/setores-visiveis-usuario', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-setores-visiveis-usuario', ordem: 320, secaoConfig: 'status-vinculos', ordemConfig: 90, label: 'Setores Visíveis por Usuário', desc: 'Defina setores extras que cada usuário pode visualizar sem alterar regras de ação.', icon: HiOutlineUsers, to: '/setores-visiveis-usuario', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-recebimento-setor', ordem: 330, secaoConfig: 'status-vinculos', ordemConfig: 100, label: 'Recebimento por Setor', desc: 'Defina se as solicitações chegam primeiro ao admin ou ficam visíveis para todos.', icon: HiOutlineInboxStack, to: '/comportamento-recebimento-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-tipos-por-setor', ordem: 340, secaoConfig: 'status-vinculos', ordemConfig: 110, label: 'Tipos por Setor (Recebimento)', desc: 'Defina tipos por setor e o modo de recebimento para admin ou todos.', icon: HiOutlineClipboardDocumentList, to: '/tipos-solicitacao-por-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-nova-solicitacao-campos', ordem: 350, secaoConfig: 'status-vinculos', ordemConfig: 120, label: 'Campos da Nova Solicitação', desc: 'Defina campos visíveis e obrigatórios por tipo de solicitação.', icon: HiOutlineTableCells, to: '/nova-solicitacao-campos', can: (user) => canManageConfiguracoesArea(user, 'solicitacoes') },
@@ -642,7 +642,7 @@ export const NAV_MODULES = [
       { id: 'cfg-setores-acesso-todas-obras', ordem: 390, secaoConfig: 'status-vinculos', ordemConfig: 210, label: 'Acesso em Todas as Obras', desc: 'Defina quais setores podem acessar recursos protegidos por obra sem vínculo manual.', icon: HiOutlineKey, to: '/setores-acesso-todas-obras', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-usuarios-acesso-financeiro', ordem: 400, secaoConfig: 'status-vinculos', ordemConfig: 220, label: 'Acesso ao Financeiro', desc: 'Marque usuários que devem acessar o módulo financeiro e operar todas as obras nesse módulo.', icon: HiOutlineBanknotes, to: '/usuarios-acesso-financeiro', can: (user) => hasEnabledModule(user, 'FINANCEIRO') && canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-permissoes-areas-padroes', ordem: 410, secaoConfig: 'status-vinculos', ordemConfig: 230, label: 'Permissões por Setor e Perfil', desc: 'Configure permissões padrão por setor e perfil para aplicar a todos os usuários daquele grupo.', icon: HiOutlineShieldCheck, to: '/permissoes-areas-padroes', can: (user) => canManageConfiguracoesArea(user, 'permissoes') },
-      { id: 'cfg-permissoes-areas', ordem: 420, secaoConfig: 'status-vinculos', ordemConfig: 240, label: 'Permissões de Areas por Usuario', desc: 'Adicione exceções individuais quando um usuário precisar de permissões além do padrão do setor e perfil.', icon: HiOutlineIdentification, to: '/permissoes-areas', can: (user) => canManageConfiguracoesArea(user, 'permissoes') },
+      { id: 'cfg-permissoes-areas', ordem: 420, secaoConfig: 'status-vinculos', ordemConfig: 240, label: 'Permissões de Áreas por Usuário', desc: 'Adicione exceções individuais quando um usuário precisar de permissões além do padrão do setor e perfil.', icon: HiOutlineIdentification, to: '/permissoes-areas', can: (user) => canManageConfiguracoesArea(user, 'permissoes') },
       /*
         PORTA ABERTA EM 04/09 (decisão do responsável).
 
@@ -651,7 +651,7 @@ export const NAV_MODULES = [
         Ferramenta administrativa de permissão não pode depender de quem
         lembra o endereço.
       */
-      { id: 'cfg-usuarios-permissoes-rh-dp', ordem: 430, secaoConfig: 'status-vinculos', ordemConfig: 250, label: 'Permissões de RH e DP por Usuario', desc: 'Marque quais usuários podem ver e operar cada área de RH e Departamento Pessoal.', icon: HiOutlineUserGroup, to: '/usuarios-permissoes-rh-dp', can: (user) => hasEnabledModule(user, 'RH_DP') && canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-usuarios-permissoes-rh-dp', ordem: 430, secaoConfig: 'status-vinculos', ordemConfig: 250, label: 'Permissões de RH e DP por Usuário', desc: 'Marque quais usuários podem ver e operar cada área de RH e Departamento Pessoal.', icon: HiOutlineUserGroup, to: '/usuarios-permissoes-rh-dp', can: (user) => hasEnabledModule(user, 'RH_DP') && canManageConfiguracoesArea(user, 'status_vinculos') },
       { id: 'cfg-timeout-inatividade', ordem: 440, secaoConfig: 'status-vinculos', ordemConfig: 260, label: 'Tempo de Inatividade', desc: 'Define o tempo para logout automático por inatividade.', icon: HiOutlineKey, to: '/timeout-inatividade', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') }
     ]
   },
@@ -854,6 +854,88 @@ function isPathActive(currentPath, targetPath, currentSearch = '') {
   return true;
 }
 
+/*
+  A TRILHA DE RECUO — quando NENHUM item casa, o MÓDULO ainda casa (06/09).
+
+  A D2 levou o recorte de Contas a Pagar/Receber para a query, e com isso o
+  caminho `/financeiro/titulos` deixou de ter QUALQUER item de menu que o
+  descreva sem `?tipo=`: os dois que existem exigem o parâmetro. A tela nua
+  e a de DETALHE (`/financeiro/titulos/:id`) passaram a cair fora da árvore
+  e o breadcrumb virava só "Início" — a tela de detalhe ficou sem caminho de
+  volta nenhum, nas três larguras.
+
+  Medido em 06/09 sobre as 205 rotas do `App.jsx`, com um usuário que
+  enxerga tudo: 21 rotas sem trilha. Seis são legítimas (as quatro telas
+  fora do shell, a raiz e `/hub/:id`, que o breadcrumb resolve por conta
+  própria); as outras 15 são telas de dentro do sistema — as três de
+  títulos financeiros, `/financeiro/contas-a-*`, os três painéis do CRM,
+  as quatro do RH/DP, `/custos-recebiveis`, `/conversas/:id` e a revisão da
+  compra direta.
+
+  A REGRA DE ESPECIFICIDADE DA D2 NÃO É AFROUXADA. A primeira passada
+  continua exigindo os parâmetros do destino, e é ela que faz
+  `?tipo=pagar` mostrar "Contas a Pagar". Este recuo só roda quando ela não
+  achou nada, e é DELIBERADAMENTE mais tímido: quando dois itens do mesmo
+  módulo disputam o mesmo caminho (é o caso de `fin-pagar` e `fin-receber`),
+  ele NÃO escolhe um — escolher em silêncio seria dizer "Contas a Pagar"
+  numa tela que pode ser a de receber, que é o defeito que o comentário do
+  `findFixableByPath` já descreve como pior que o original. Ele para no
+  MÓDULO, que é verdadeiro nos dois casos e já devolve o caminho de volta.
+
+  E ele NÃO vale para a ESTRELA (`findFixableByPath`): fixar tela é escolher
+  UM destino, e no empate não há destino a fixar. A estrela continua ausente
+  na rota nua — de propósito, e não por falta de conserto.
+*/
+function primeiroSegmento(caminho) {
+  const segmento = String(caminho || '').split('/').filter(Boolean)[0];
+  return segmento ? `/${segmento}` : '';
+}
+
+function soUmModulo(lista) {
+  const modulos = new Set(lista.map((c) => c.mod.id));
+  return modulos.size === 1 ? lista[0].mod : null;
+}
+
+function trilhaPorCaminho(user, pathname) {
+  const raiz = primeiroSegmento(pathname);
+  if (!raiz) return null;
+  /* `prefixos`: itens cujo caminho PREFIXA a rota atual — a tela nua e o
+     detalhe de um item que existe no menu. `vizinhos`: itens que só
+     compartilham o primeiro segmento — a tela que o menu não lista, mas
+     que mora dentro de um módulo conhecido (`/rh-dp/apuracao` ao lado de
+     `/rh-dp/pessoal`). */
+  const prefixos = [];
+  const vizinhos = [];
+  for (const mod of getVisibleModules(user)) {
+    for (const item of mod.children) {
+      const caminho = stripHash(item.to);
+      if (pathname === caminho || pathname.startsWith(`${caminho}/`)) {
+        prefixos.push({ mod, item, caminho });
+      }
+      if (primeiroSegmento(caminho) === raiz) vizinhos.push({ mod, item, caminho });
+    }
+  }
+  if (prefixos.length) {
+    /* O caminho mais LONGO é o que descreve melhor a rota atual: entre
+       `/financeiro/titulos` e `/financeiro/titulos/novo`, quem está em
+       `/financeiro/titulos/novo` pertence ao segundo. */
+    const maisLongo = Math.max(...prefixos.map((c) => c.caminho.length));
+    const finalistas = prefixos.filter((c) => c.caminho.length === maisLongo);
+    if (finalistas.length === 1) {
+      return { module: finalistas[0].mod, item: finalistas[0].item };
+    }
+    /* Empate dentro do mesmo módulo: a trilha para no MÓDULO. `item` É o
+       módulo, e o breadcrumb já sabe não repetir o nível quando os dois
+       rótulos coincidem. Empate entre módulos: nada, porque não há
+       resposta verdadeira. */
+    const unico = soUmModulo(finalistas);
+    return unico ? { module: unico, item: unico } : null;
+  }
+  if (!vizinhos.length) return null;
+  const unico = soUmModulo(vizinhos);
+  return unico ? { module: unico, item: unico } : null;
+}
+
 // Melhor correspondência da rota atual na árvore (para o breadcrumb).
 // Retorna { module, item } ou null quando a rota não pertence à árvore.
 export function findActiveNode(user, pathname, search = '') {
@@ -867,5 +949,5 @@ export function findActiveNode(user, pathname, search = '') {
       }
     }
   }
-  return best;
+  return best || trilhaPorCaminho(user, pathname);
 }

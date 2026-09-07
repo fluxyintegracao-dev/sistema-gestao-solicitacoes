@@ -85,7 +85,7 @@ export default function AutomacaoStatusSetor() {
         setRegras(regrasConfiguradas.length ? regrasConfiguradas : [criarLinhaVazia()]);
       } catch (error) {
         console.error(error);
-        avisar.erro('Erro ao carregar automacao por status.');
+        avisar.erro('Erro ao carregar automação por status.');
       } finally {
         setLoading(false);
       }
@@ -164,7 +164,7 @@ export default function AutomacaoStatusSetor() {
     try {
       setSalvando(true);
       await salvarAutomacaoStatusSetor({ regras: payload });
-      avisar.sucesso('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuração salva com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao salvar automacao por status.');
@@ -183,10 +183,10 @@ export default function AutomacaoStatusSetor() {
   if (loading) {
     return (
       <Pagina>
-        <PageHeader titulo="Automacao de Envio por Status" descricao={DESCRICAO} />
+        <PageHeader titulo="Automação de Envio por Status" descricao={DESCRICAO} />
         <Avisos avisos={avisos} aoFechar={fechar} />
         <BlocoConteudo titulo="Regras de envio" variante="primario" cor="var(--c-primary)">
-          <p className="app-note">Carregando configuracoes...</p>
+          <p className="app-note">Carregando configurações...</p>
         </BlocoConteudo>
       </Pagina>
     );
@@ -202,7 +202,7 @@ export default function AutomacaoStatusSetor() {
           primario ("Salvar configuracao") esta sempre a um clique, e
           "Adicionar regra" fica como secundaria em contorno. */}
       <PageHeader
-        titulo="Automacao de Envio por Status"
+        titulo="Automação de Envio por Status"
         contagem={`${regrasCompletas} regra(s) configurada(s)`}
         descricao={DESCRICAO}
         secundarias={[{
@@ -227,7 +227,7 @@ export default function AutomacaoStatusSetor() {
                   esta cadastrando), nao recorte de lista — select de
                   formulario segue legitimo. */}
               <label className="form-field">
-                <span className="form-label">Tipo de solicitacao</span>
+                <span className="form-label">Tipo de solicitação</span>
                 <select className="input" value={regra.tipo_solicitacao_id} onChange={event => atualizarRegra(regra.chave_local, 'tipo_solicitacao_id', event.target.value)}>
                   <option value="">Selecione</option>
                   {tiposOrdenados.map(tipo => (

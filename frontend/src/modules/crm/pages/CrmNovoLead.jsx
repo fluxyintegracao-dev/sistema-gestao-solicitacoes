@@ -85,7 +85,7 @@ export default function CrmNovoLead() {
           return;
         }
         const { ok } = await confirmar({
-          titulo: 'Lead ja cadastrado',
+          titulo: 'Lead já cadastrado',
           mensagem: `${mensagemDuplicado} Deseja abrir o lead existente?`,
           rotuloConfirmar: 'Abrir lead existente',
           rotuloCancelar: 'Continuar editando'
@@ -125,7 +125,7 @@ export default function CrmNovoLead() {
       */}
       <form onSubmit={handleSubmit}>
         <BlocoConteudo titulo="Dados do lead" variante="primario" cor="var(--c-primary)">
-          <FormSecao legenda="Identificacao" colunas={2}>
+          <FormSecao legenda="Identificação" colunas={2}>
             <CampoForm label="Nome" obrigatorio span={2}>
               <input
                 className="input w-full"
@@ -237,14 +237,14 @@ export default function CrmNovoLead() {
             )}
           </FormSecao>
 
-          <FormSecao legenda="Observacoes" colunas={2}>
-            <CampoForm label="Informacoes adicionais" tipo="texto-longo" span={2}>
+          <FormSecao legenda="Observações" colunas={2}>
+            <CampoForm label="Informações adicionais" tipo="texto-longo" span={2}>
               <textarea
                 className="input w-full"
                 rows={4}
                 value={form.observacoes}
                 onChange={set('observacoes')}
-                placeholder="Informacoes adicionais sobre o lead..."
+                placeholder="Informações adicionais sobre o lead..."
               />
             </CampoForm>
           </FormSecao>

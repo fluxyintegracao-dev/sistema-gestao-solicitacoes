@@ -20,6 +20,7 @@ import {
   validateFiscalCertificate
 } from '../services/fiscalApi';
 import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
+import DateInputBR from '../../../components/DateInputBR';
 
 const EMPTY_FORM = {
   razao_social: '',
@@ -198,7 +199,7 @@ export default function FiscalCompanies() {
         checks: result?.checks || []
       });
       // Validação com pendência não é sucesso: o tom acompanha o resultado.
-      if (hasError) avisar.alerta('Validacao concluida com pendencias. Revise os checks.');
+      if (hasError) avisar.alerta('Validação concluída com pendências. Revise os checks.');
       else avisar.sucesso('Certificado validado administrativamente.');
       await load();
     } catch (err) {
@@ -218,7 +219,7 @@ export default function FiscalCompanies() {
       <PageHeader
         titulo="Empresas fiscais"
         contagem={loading ? null : `${companies.length} empresa(s)`}
-        descricao="Cadastro inicial dos CNPJs que serao monitorados pelo modulo fiscal."
+        descricao="Cadastro inicial dos CNPJs que serão monitorados pelo módulo fiscal."
         acaoPrincipal={{ rotulo: 'Nova empresa', onClick: novaEmpresa }}
       />
 
@@ -235,8 +236,8 @@ export default function FiscalCompanies() {
       */}
       <BlocoConteudo titulo={editingId ? 'Editar empresa fiscal' : 'Nova empresa fiscal'}>
         <form onSubmit={submit}>
-          <FormSecao legenda="Identificacao" colunas={2}>
-            <CampoForm label="Razao social" obrigatorio span={2}>
+          <FormSecao legenda="Identificação" colunas={2}>
+            <CampoForm label="Razão social" obrigatorio span={2}>
               <input
                 ref={campoRazaoSocialRef}
                 className="input w-full"
@@ -275,7 +276,7 @@ export default function FiscalCompanies() {
               />
             </CampoForm>
 
-            <CampoForm label="Inscricao estadual">
+            <CampoForm label="Inscrição estadual">
               <input
                 className="input w-full"
                 value={form.inscricao_estadual}
@@ -294,13 +295,13 @@ export default function FiscalCompanies() {
                 value={form.ambiente_sefaz}
                 onChange={(e) => updateField('ambiente_sefaz', e.target.value)}
               >
-                <option value="homologacao">Homologacao</option>
-                <option value="producao">Producao</option>
+                <option value="homologacao">Homologação</option>
+                <option value="producao">Produção</option>
               </select>
             </CampoForm>
 
             <div className="form-group">
-              <span className="form-label">Situacao</span>
+              <span className="form-label">Situação</span>
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -321,7 +322,7 @@ export default function FiscalCompanies() {
               </div>
             </div>
 
-            <CampoForm label="Observacoes" tipo="texto-longo" span={2}>
+            <CampoForm label="Observações" tipo="texto-longo" span={2}>
               {/* R10: a altura do textarea vem da folha do sistema
                   (textarea.input), não do `min-h-[80px]` que estava aqui. */}
               <textarea
@@ -338,7 +339,7 @@ export default function FiscalCompanies() {
             </button>
             {editingId ? (
               <button className="btn btn-outline" type="button" onClick={resetForm}>
-                Cancelar edicao
+                Cancelar edição
               </button>
             ) : null}
           </div>
@@ -354,7 +355,7 @@ export default function FiscalCompanies() {
         titulo="Empresas cadastradas"
         variante="primario"
         cor="var(--module-fiscal)"
-        descricao="Base para captura de DFe, certificados e sincronizacao com a SEFAZ."
+        descricao="Base para captura de DFe, certificados e sincronização com a SEFAZ."
       >
         <TabelaPadrao
           colunas={[
@@ -386,7 +387,7 @@ export default function FiscalCompanies() {
             },
             {
               id: 'inscricao_estadual',
-              titulo: 'Inscricao estadual',
+              titulo: 'Inscrição estadual',
               tipo: 'codigo',
               render: (company) => company.inscricao_estadual || '-'
             },
@@ -420,7 +421,7 @@ export default function FiscalCompanies() {
             },
             {
               id: 'observacoes',
-              titulo: 'Observacoes',
+              titulo: 'Observações',
               tipo: 'texto',
               // T6: texto longo trunca com o conteúdo completo no tooltip.
               render: (company) => (
@@ -455,10 +456,10 @@ export default function FiscalCompanies() {
       <BlocoConteudo
         id="certificados"
         titulo="Certificado A1"
-        descricao="Cadastro seguro de metadados. O arquivo e a senha nao sao exibidos depois de salvar."
+        descricao="Cadastro seguro de metadados. O arquivo e a senha não são exibidos depois de salvar."
       >
         <form onSubmit={submitCertificate}>
-          <FormSecao legenda="Vinculo e armazenamento" colunas={2}>
+          <FormSecao legenda="Vínculo e armazenamento" colunas={2}>
             <CampoForm label="Empresa fiscal" obrigatorio span={2}>
               {/* Seletor de CONTEXTO/entrada de dado: define a QUAL empresa o
                   certificado pertence. Legítimo pela R12. */}
@@ -531,24 +532,22 @@ export default function FiscalCompanies() {
 
           <FormSecao legenda="Dados do certificado" colunas={2}>
             <CampoForm label="Valido desde">
-              <input
+              <DateInputBR
                 className="input w-full"
-                type="date"
                 value={certificateForm.valid_from}
                 onChange={(e) => updateCertificateField('valid_from', e.target.value)}
               />
             </CampoForm>
 
-            <CampoForm label="Valido ate">
-              <input
+            <CampoForm label="Valido até">
+              <DateInputBR
                 className="input w-full"
-                type="date"
                 value={certificateForm.valid_until}
                 onChange={(e) => updateCertificateField('valid_until', e.target.value)}
               />
             </CampoForm>
 
-            <CampoForm label="Numero de serie">
+            <CampoForm label="Número de série">
               <input
                 className="input w-full"
                 value={certificateForm.serial_number}
@@ -595,8 +594,8 @@ export default function FiscalCompanies() {
       {certificateValidation ? (
         <BlocoConteudo
           variante="secundario"
-          titulo={`Validacao: ${certificateValidation.alias}`}
-          descricao="Resultado da ultima validacao administrativa deste certificado."
+          titulo={`Validação: ${certificateValidation.alias}`}
+          descricao="Resultado da última validação administrativa deste certificado."
           acoes={(
             <button className="btn btn-outline btn-sm" type="button" onClick={() => setCertificateValidation(null)}>
               Fechar
@@ -650,7 +649,7 @@ export default function FiscalCompanies() {
 
       <BlocoConteudo
         titulo="Certificados cadastrados"
-        descricao="Segredos criptografados nao retornam pela API."
+        descricao="Segredos criptografados não retornam pela API."
       >
         {/*
           R1/R17 — a lista era um <div> por certificado com seis campos
@@ -681,13 +680,13 @@ export default function FiscalCompanies() {
             },
             {
               id: 'validacao',
-              titulo: 'Validacao',
+              titulo: 'Validação',
               tipo: 'status',
               render: (certificate) => <StatusBadge status={certificate.validation_status || 'pending'} />
             },
             {
               id: 'ativo',
-              titulo: 'Situacao',
+              titulo: 'Situação',
               tipo: 'status',
               render: (certificate) => (
                 <StatusBadge

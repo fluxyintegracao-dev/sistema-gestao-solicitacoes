@@ -54,7 +54,7 @@ function RankingPorChave({ titulo, descricao, rotuloChave, rows, storageKey }) {
         itens={rows || []}
         semIdentidade
         getId={(item) => item.chave || item.usuario?.id || item.usuario?.nome}
-        vazio="Nenhum dado disponivel neste recorte."
+        vazio="Nenhum dado disponível neste recorte."
         storageKey={storageKey}
         rotuloRolagem={titulo}
       />
@@ -72,7 +72,7 @@ function RankingPorResponsavel({ titulo, descricao, rows, storageKey }) {
         colunas={[
           {
             id: 'responsavel',
-            titulo: 'Responsavel',
+            titulo: 'Responsável',
             tipo: 'identidade',
             noCard: 'titulo',
             render: (item) => item.usuario?.nome || item.chave || '—'
@@ -86,7 +86,7 @@ function RankingPorResponsavel({ titulo, descricao, rows, storageKey }) {
         ]}
         itens={rows || []}
         getId={(item) => item.usuario?.id || item.usuario?.nome || item.chave}
-        vazio="Nenhum dado disponivel neste recorte."
+        vazio="Nenhum dado disponível neste recorte."
         storageKey={storageKey}
         rotuloRolagem={titulo}
       />
@@ -124,11 +124,11 @@ export default function CrmDashboardGerencial() {
   const cards = useMemo(() => {
     if (!kpis) return [];
     return [
-      { label: `Entradas (${dias} dias)`, valor: texto(kpis.leadsPeriodo), sub: 'Capacidade de aquisicao', tom: 'info' },
-      { label: 'Convertidos no periodo', valor: texto(kpis.convertidosPeriodo), sub: `${texto(kpis.taxaConversaoPeriodo)}% de conversao`, tom: 'success' },
-      { label: 'Perdidos no periodo', valor: texto(kpis.perdidosPeriodo), sub: 'Monitorar qualidade do funil', tom: 'danger' },
+      { label: `Entradas (${dias} dias)`, valor: texto(kpis.leadsPeriodo), sub: 'Capacidade de aquisição', tom: 'info' },
+      { label: 'Convertidos no período', valor: texto(kpis.convertidosPeriodo), sub: `${texto(kpis.taxaConversaoPeriodo)}% de conversao`, tom: 'success' },
+      { label: 'Perdidos no período', valor: texto(kpis.perdidosPeriodo), sub: 'Monitorar qualidade do funil', tom: 'danger' },
       { label: 'Conversas abertas', valor: texto(kpis.conversasAbertas), sub: `${texto(kpis.mensagensNaoLidas)} mensagem(ns) nao lida(s)`, tom: 'warning' },
-      { label: 'Automacoes ativas', valor: texto(kpis.automacoesAtivas), sub: `${texto(kpis.tarefasVencidas)} tarefa(s) vencida(s)` }
+      { label: 'Automações ativas', valor: texto(kpis.automacoesAtivas), sub: `${texto(kpis.tarefasVencidas)} tarefa(s) vencida(s)` }
     ];
   }, [kpis, dias]);
 
@@ -153,7 +153,7 @@ export default function CrmDashboardGerencial() {
       <PageHeader
         titulo="Dashboard Gerencial CRM"
         contagem={kpis ? `${texto(kpis.leadsAtivos)} lead(s) ativo(s)` : null}
-        descricao="Leitura executiva de origem, conversao, atendimento e disciplina comercial."
+        descricao="Leitura executiva de origem, conversão, atendimento e disciplina comercial."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar',
           onClick: () => load(dias),
@@ -165,12 +165,12 @@ export default function CrmDashboardGerencial() {
 
       <BlocoConteudo
         titulo="Recorte gerencial"
-        descricao="Mantenha a comparacao por janelas curtas e medias para leitura de tendencia."
+        descricao="Mantenha a comparação por janelas curtas e médias para leitura de tendência."
       >
         <BarraFiltros
           filtros={[{
             id: 'dias',
-            rotulo: 'Periodo',
+            rotulo: 'Período',
             unico: true,
             // O relatorio SEMPRE tem um periodo: nao ha "sem recorte" para
             // onde voltar. A etiqueta e o estado atual, nao um filtro que se
@@ -215,8 +215,8 @@ export default function CrmDashboardGerencial() {
             dentroDeGrade
           >
             <RankingPorResponsavel data-bloco-id="carteira-por-responsavel" data-bloco-rotulo="Carteira por responsavel"
-              titulo="Carteira por responsavel"
-              descricao="Top usuarios com backlog ativo."
+              titulo="Carteira por responsável"
+              descricao="Top usuários com backlog ativo."
               rows={data.leadsPorResponsavel}
               storageKey="tabela:crm-dashboard-gerencial:responsaveis"
             />
@@ -231,7 +231,7 @@ export default function CrmDashboardGerencial() {
 
             <RankingPorChave data-bloco-id="conversas-por-canal" data-bloco-rotulo="Conversas por canal"
               titulo="Conversas por canal"
-              descricao="Distribuicao da operacao de atendimento."
+              descricao="Distribuição da operação de atendimento."
               rotuloChave="Canal"
               rows={data.conversasPorCanal}
               storageKey="tabela:crm-dashboard-gerencial:conversas-canal"
@@ -246,8 +246,8 @@ export default function CrmDashboardGerencial() {
             />
 
             <RankingPorChave data-bloco-id="automacoes-por-gatilho" data-bloco-rotulo="Automacoes por gatilho"
-              titulo="Automacoes por gatilho"
-              descricao="Base cadastral configurada para a proxima etapa de execucao automatica."
+              titulo="Automações por gatilho"
+              descricao="Base cadastral configurada para a próxima etapa de execução automática."
               rotuloChave="Gatilho"
               rows={data.automacoesPorGatilho}
               storageKey="tabela:crm-dashboard-gerencial:automacoes-gatilho"

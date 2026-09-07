@@ -719,7 +719,7 @@ export default function ComunicacaoInterna() {
     if (!conversaAtiva) return;
     const { ok } = await confirmar({
       titulo: 'Concluir conversa',
-      mensagem: 'Encerrar o assunto desta conversa? Ela fica marcada como concluida para todos os participantes. Isso e diferente de arquivar, que apenas tira a conversa da sua caixa.',
+      mensagem: 'Encerrar o assunto desta conversa? Ela fica marcada como concluída para todos os participantes. Isso e diferente de arquivar, que apenas tira a conversa da sua caixa.',
       rotuloConfirmar: 'Concluir'
     });
     if (!ok) return;
@@ -728,7 +728,7 @@ export default function ComunicacaoInterna() {
       const det = await getConversa(conversaAtiva);
       setDetalhe(det);
       await carregarLista(true);
-      avisar.sucesso('Conversa concluida.');
+      avisar.sucesso('Conversa concluída.');
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao concluir conversa');
     }
@@ -1437,7 +1437,7 @@ export default function ComunicacaoInterna() {
                 </div>
               ) : (
                 <p style={{ borderTop: '1px solid var(--ui-border)', paddingBlock: 'var(--esp-3)', paddingInline: 'var(--esp-4)', color: 'var(--c-muted)', fontSize: 'var(--fonte-detalhe)', marginBlock: 0 }}>
-                  Somente leitura. Solicite a permissao de enviar mensagens para responder ou iniciar conversas.
+                  Somente leitura. Solicite a permissão de enviar mensagens para responder ou iniciar conversas.
                 </p>
               )}
             </>

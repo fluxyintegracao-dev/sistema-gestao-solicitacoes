@@ -59,7 +59,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
         }, {}));
       } catch (error) {
         console.error(error);
-        avisar.erro('Erro ao carregar usuarios com acesso a prioridade diretoria.');
+        avisar.erro('Erro ao carregar usuários com acesso a prioridade diretoria.');
       } finally {
         setCarregando(false);
       }
@@ -167,7 +167,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
       }, {});
 
       await salvarUsuariosAcessoPrioridadeDiretoria({ usuarios: usuariosPayload });
-      avisar.sucesso('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuração salva com sucesso.');
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao salvar configuracao.');
@@ -179,7 +179,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
   const colunas = [
     {
       id: 'usuario',
-      titulo: 'Usuario',
+      titulo: 'Usuário',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
@@ -241,7 +241,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
           return (
             <span
               className="text-[var(--c-muted)]"
-              title="Disponivel apenas no escopo 'Diretorias especificas'"
+              title="Disponível apenas no escopo 'Diretorias especificas'"
             >
               -
             </span>
@@ -276,7 +276,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
       <PageHeader
         titulo="Acesso a Prioridade Diretoria"
         contagem={`${totalConfigurados} configurado(s)`}
-        descricao="Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas."
+        descricao="Defina quais usuários acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar configuracao',
           onClick: salvar,
@@ -292,12 +292,12 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
 
       {diretorias.length === 0 && !carregando && (
         <div className="app-alert">
-          Nenhuma diretoria esta configurada em Aprovacao por Diretoria. Configure as diretorias antes de limitar por diretoria especifica.
+          Nenhuma diretoria esta configurada em Aprovação por Diretoria. Configure as diretorias antes de limitar por diretoria especifica.
         </div>
       )}
 
       <BlocoConteudo
-        titulo="Usuarios"
+        titulo="Usuários"
         variante="primario"
         cor="var(--c-primary)"
       >

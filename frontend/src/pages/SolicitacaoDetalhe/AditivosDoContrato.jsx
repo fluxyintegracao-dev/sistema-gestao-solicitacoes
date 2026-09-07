@@ -100,7 +100,7 @@ export default function AditivosDoContrato({ contrato, onMudou }) {
       if (!ok) return;
       motivo = String(texto || '');
       if (acao === 'rejeitar' && !motivo.trim()) {
-        setErro('Informe o motivo da rejeicao.');
+        setErro('Informe o motivo da rejeição.');
         return;
       }
     }
@@ -147,7 +147,7 @@ export default function AditivosDoContrato({ contrato, onMudou }) {
             },
             {
               id: 'vigencia',
-              titulo: 'Nova vigencia',
+              titulo: 'Nova vigência',
               tipo: 'data',
               render: (a) => (a.nova_vigencia_fim ? brData(a.nova_vigencia_fim) : '—')
             },

@@ -26,7 +26,7 @@ import { getCpfCnpjError, maskCpfCnpj } from '../../utils/formatters';
 const CAMPOS = [
   { chave: 'cpf_cnpj', rotulo: 'CPF/CNPJ', obrigatorio: true, largura: 'md:col-span-2' },
   { chave: 'endereco', rotulo: 'Logradouro', obrigatorio: true, largura: 'md:col-span-4' },
-  { chave: 'numero', rotulo: 'Numero', obrigatorio: true, largura: 'md:col-span-1' },
+  { chave: 'numero', rotulo: 'Número', obrigatorio: true, largura: 'md:col-span-1' },
   { chave: 'complemento', rotulo: 'Complemento', obrigatorio: false, largura: 'md:col-span-2' },
   { chave: 'bairro', rotulo: 'Bairro', obrigatorio: true, largura: 'md:col-span-3' },
   { chave: 'cep', rotulo: 'CEP', obrigatorio: true, largura: 'md:col-span-2' },
@@ -151,7 +151,7 @@ export default function ModalConferenciaCredores({
         <div>
           <h3 className="text-lg font-semibold text-[var(--c-text)]">Conferir dados do contratado</h3>
           <p className="text-xs text-[var(--c-muted)]">
-            Acima do limite o contrato vai ao Juridico. Confira endereco e CPF/CNPJ antes de criar.
+            Acima do limite o contrato vai ao Jurídico. Confira endereço e CPF/CNPJ antes de criar.
           </p>
         </div>
         <button type="button" className="btn btn-outline btn-sm" onClick={onFechar} disabled={criando || salvando}>

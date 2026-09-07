@@ -94,7 +94,7 @@ function extractErrorMessage(error) {
 */
 const FILTROS_DA_TELA = [
   { id: 'data_inicio', rotulo: 'Pedido criado de' },
-  { id: 'data_fim', rotulo: 'Pedido criado ate' },
+  { id: 'data_fim', rotulo: 'Pedido criado até' },
   { id: 'obra_id', rotulo: 'Obra / Centro de custo' }
 ];
 
@@ -265,7 +265,7 @@ export default function ComprasRelatorioComprasFornecedor() {
     <Pagina>
       <PageHeader
         titulo="Compras por Fornecedor"
-        contagem="Compras / Relatorios"
+        contagem="Compras / Relatórios"
         descricao="Valor efetivamente pedido por fornecedor com base nos pedidos de compra emitidos."
         /* R11: o retorno ao hub de relatórios mora na seta do cabeçalho. */
         voltar={{ to: '/compras/relatorios', title: 'Voltar aos relatorios' }}
@@ -291,7 +291,7 @@ export default function ComprasRelatorioComprasFornecedor() {
             },
             {
               id: 'data_fim',
-              rotulo: 'Pedido criado ate',
+              rotulo: 'Pedido criado até',
               tipo: 'date',
               valor: filtros.data_fim,
               aoMudar: (valor) => mudarCampo('data_fim', valor)
@@ -307,14 +307,14 @@ export default function ComprasRelatorioComprasFornecedor() {
 
       <StatGrid colunas={3}>
         <StatTile label="Pedidos" valor={formatNumber(resumo.pedidos)} sub="Pedidos emitidos" />
-        <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com pedido no periodo" />
+        <StatTile label="Fornecedores" valor={formatNumber(resumo.fornecedores)} sub="Com pedido no período" />
         <StatTile label="Valor pedido" valor={formatMoney(resumo.valor_total)} sub="Baseado em pedidos reais" />
-        <StatTile label="Ticket medio" valor={formatMoney(resumo.ticket_medio_pedido)} sub="Valor por pedido" />
-        <StatTile label="Concentracao top 5" valor={formatPercent(resumo.concentracao_top5)} sub="Valor nos maiores fornecedores" />
+        <StatTile label="Ticket médio" valor={formatMoney(resumo.ticket_medio_pedido)} sub="Valor por pedido" />
+        <StatTile label="Concentração top 5" valor={formatPercent(resumo.concentracao_top5)} sub="Valor nos maiores fornecedores" />
         <StatTile
-          label="Minimo nao atingido"
+          label="Mínimo não atingido"
           valor={formatNumber(resumo.pedidos_minimo_nao_atingido)}
-          sub="Pedidos abaixo do minimo cadastrado"
+          sub="Pedidos abaixo do mínimo cadastrado"
           tom={Number(resumo.pedidos_minimo_nao_atingido || 0) > 0 ? 'warning' : undefined}
         />
       </StatGrid>
@@ -331,7 +331,7 @@ export default function ComprasRelatorioComprasFornecedor() {
         <BlocoConteudo
           titulo="Ranking visual de fornecedores"
           contagem="Top 10"
-          descricao="Por valor efetivamente pedido no periodo filtrado."
+          descricao="Por valor efetivamente pedido no período filtrado."
           variante="secundario"
         >
           {loading ? (
@@ -425,9 +425,9 @@ export default function ComprasRelatorioComprasFornecedor() {
                 )
               },
               { id: 'valor', titulo: 'Valor pedido', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
-              { id: 'ticket', titulo: 'Ticket medio', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
-              { id: 'minimo', titulo: 'Minimo nao atingido', tipo: 'numero', render: (item) => formatNumber(item.pedidos_minimo_nao_atingido) },
-              { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
+              { id: 'ticket', titulo: 'Ticket médio', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
+              { id: 'minimo', titulo: 'Mínimo não atingido', tipo: 'numero', render: (item) => formatNumber(item.pedidos_minimo_nao_atingido) },
+              { id: 'ultimo', titulo: 'Último pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
             ]}
             itens={fornecedores}
             getId={(item) => item.key}
@@ -470,8 +470,8 @@ export default function ComprasRelatorioComprasFornecedor() {
 
           <BlocoConteudo
             titulo="Pedidos recentes"
-            contagem="Ultimos 100"
-            descricao="Pedidos usados no relatorio."
+            contagem="Últimos 100"
+            descricao="Pedidos usados no relatório."
           >
             <TabelaPadrao
               colunas={[
@@ -497,7 +497,7 @@ export default function ComprasRelatorioComprasFornecedor() {
                 { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
                 {
                   id: 'solicitacao',
-                  titulo: 'Solicitacao',
+                  titulo: 'Solicitação',
                   tipo: 'codigo',
                   render: (item) => (item.solicitacao?.id ? (
                     <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/solicitacoes-compra/${item.solicitacao.id}`}>

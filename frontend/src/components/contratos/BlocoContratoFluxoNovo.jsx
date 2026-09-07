@@ -3,6 +3,7 @@ import { formatCurrencyBRL as formatarMoedaBR } from '../../utils/formatters';
 import { HiPaperClip, HiTrash } from 'react-icons/hi2';
 import { TabelaPadrao } from '../padrao';
 import { getOpcoesFormularioContrato } from '../../services/contratos';
+import DateInputBR from '../DateInputBR';
 
 /**
  * Bloco do fluxo novo de contratos (wireframe 1), montado DENTRO da Nova Solicitacao
@@ -449,18 +450,18 @@ export default function BlocoContratoFluxoNovo({
             </select>
             {obraId && usuarios.length === 0 && !erroUsuarios && (
               <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                Nenhum usuario ativo esta vinculado a esta obra/centro de custo.
+                Nenhum usuário ativo esta vinculado a esta obra/centro de custo.
               </span>
             )}
           </label>}
           {exibirVigenciaInicio && <label className="grid gap-1 text-sm">
             Vigência inicial{campoObrigatorio('contrato_vigencia_inicio') ? ' *' : ''}
-            <input className="input input-sm" type="date" value={campos.vigencia_inicio} onChange={campo('vigencia_inicio')}
+            <DateInputBR className="input input-sm" value={campos.vigencia_inicio} onChange={campo('vigencia_inicio')}
               required={campoObrigatorio('contrato_vigencia_inicio')} />
           </label>}
           {exibirVigenciaFim && <label className="grid gap-1 text-sm">
             Vigência final{campoObrigatorio('contrato_vigencia_fim') ? ' *' : ''}
-            <input className="input input-sm" type="date" value={campos.vigencia_fim} onChange={campo('vigencia_fim')}
+            <DateInputBR className="input input-sm" value={campos.vigencia_fim} onChange={campo('vigencia_fim')}
               required={campoObrigatorio('contrato_vigencia_fim')} />
           </label>}
         </div>
@@ -468,7 +469,7 @@ export default function BlocoContratoFluxoNovo({
 
       <div className="space-y-2" style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }}>
         <div className="text-xs" style={{ fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--c-muted)' }}>
-          Previsao de pagamento
+          Previsão de pagamento
         </div>
         <p className="text-xs" style={{ color: 'var(--c-muted)' }}>
           Defina abaixo os valores e vencimentos previstos. A forma de pagamento, o favorecido e
@@ -763,7 +764,7 @@ export default function BlocoContratoFluxoNovo({
               /* Editavel linha a linha: sem o campo de "1o vencimento" gerando tudo, a data de
                  cada parcela e escolha de quem monta o contrato. */
               render: (p) => (
-                <input className="input" type="date"
+                <DateInputBR className="input"
                   value={p.vencimento || ''}
                   onChange={(e) => editarVencimento(p.numero, e.target.value)} />
               )

@@ -47,7 +47,7 @@ export default function ObraTipoApropriacao() {
         setObras(Array.isArray(data?.obras) ? data.obras : []);
         setPadroesNovaObra(Array.isArray(data?.padroes_nova_obra) ? data.padroes_nova_obra : []);
       } catch (e) {
-        setErro('Nao foi possivel carregar o mapeamento.');
+        setErro('Não foi possível carregar o mapeamento.');
       } finally {
         setCarregando(false);
       }
@@ -117,7 +117,7 @@ export default function ObraTipoApropriacao() {
       const tipo = tipos.find((item) => Number(item.id) === Number(tipoId));
       const obra = obras.find((item) => Number(item.id) === Number(obraId));
       const { ok } = await confirmar({
-        titulo: 'Remover vinculo de apropriacao',
+        titulo: 'Remover vínculo de apropriação',
         mensagem: `Remover o vinculo de ${tipo?.nome || 'tipo'} da obra ${obra?.codigo || obra?.nome || obraId}? Novas solicitacoes deste tipo ficarao bloqueadas ate um novo vinculo ser definido.`,
         rotuloConfirmar: 'Remover vinculo',
         rotuloCancelar: 'Manter vinculo',
@@ -158,7 +158,7 @@ export default function ObraTipoApropriacao() {
   if (carregando) {
     return (
       <Pagina>
-        <h1 className="page-title">Apropriacao padrao por obra</h1>
+        <h1 className="page-title">Apropriação padrão por obra</h1>
         <div className="card">Carregando...</div>
       </Pagina>
     );
@@ -169,11 +169,11 @@ export default function ObraTipoApropriacao() {
       {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
           linha no próprio PageHeader. */}
       <PageHeader
-        titulo="Apropriacao padrao por obra"
+        titulo="Apropriação padrão por obra"
         contagem={totalVinculos - totalPendentes
           ? `${totalVinculos - totalPendentes} de ${totalVinculos} vinculos definidos`
           : null}
-        descricao="Defina qual apropriacao sera preenchida automaticamente na Nova Solicitacao para cada obra e tipo. Como os codigos variam entre as obras, o vinculo e informado obra a obra."
+        descricao="Defina qual apropriação será preenchida automaticamente na Nova Solicitação para cada obra e tipo. Como os códigos variam entre as obras, o vínculo e informado obra a obra."
       />
 
       {padroesNovaObra.length > 0 && (
@@ -196,7 +196,7 @@ export default function ObraTipoApropriacao() {
           busca={{
             valor: filtro,
             aoMudar: setFiltro,
-            placeholder: 'Filtrar obra por nome ou codigo'
+            placeholder: 'Filtrar obra por nome ou código'
           }}
         />
         <label className="flex items-center gap-2 text-sm">
@@ -205,7 +205,7 @@ export default function ObraTipoApropriacao() {
             checked={somentePendentes}
             onChange={(e) => setSomentePendentes(e.target.checked)}
           />
-          <span>Somente obras com pendencia</span>
+          <span>Somente obras com pendência</span>
         </label>
 
         {erro && <div className="app-alert app-alert--error">{erro}</div>}
@@ -220,7 +220,7 @@ export default function ObraTipoApropriacao() {
                     <div>{tipo.nome}</div>
                     {tipo.apropriacao_automatica_obra && (
                       <div className="text-xs" style={{ color: 'var(--c-muted)', fontWeight: 400 }}>
-                        Etapa com apropriacao automatica
+                        Etapa com apropriação automática
                       </div>
                     )}
                     <div className="text-xs" style={{ color: 'var(--c-muted)', fontWeight: 400 }}>
@@ -255,13 +255,13 @@ export default function ObraTipoApropriacao() {
                             </div>
                             {vinculo.inativa && (
                               <div className="app-alert app-alert--error mt-1" style={{ padding: '4px 8px' }}>
-                                Apropriacao inativa — redefina o vinculo
+                                Apropriação inativa — redefina o vínculo
                               </div>
                             )}
                           </div>
                         ) : (
                           <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                            Nao definida
+                            Não definida
                           </span>
                         )}
 
@@ -291,7 +291,7 @@ export default function ObraTipoApropriacao() {
                             <input
                               type="text"
                               className="input w-full"
-                              placeholder="Buscar por codigo ou descricao"
+                              placeholder="Buscar por código ou descrição"
                               value={buscaOpcao}
                               onChange={(e) => buscarOpcoes(obra.id, e.target.value)}
                             />
@@ -303,7 +303,7 @@ export default function ObraTipoApropriacao() {
                               )}
                               {!carregandoOpcoes && opcoes.length === 0 && (
                                 <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                                  Nenhuma apropriacao encontrada.
+                                  Nenhuma apropriação encontrada.
                                 </div>
                               )}
                               {!carregandoOpcoes && opcoes.map((ap) => (

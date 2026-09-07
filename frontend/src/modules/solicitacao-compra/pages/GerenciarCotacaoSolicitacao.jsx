@@ -1,3 +1,4 @@
+import DateInputBR from '../../../components/DateInputBR';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useFecharAoSair } from '../../../hooks/useFecharAoSair';
@@ -470,7 +471,7 @@ function ModalRespostaInternaCotacao({
               className="mb-3 rounded-lg border px-3 py-2 text-xs"
               style={estiloTom('warning')}
             >
-              Esta cotacao esta encerrada. Ao salvar, ela sera reaberta somente se a edicao criar nova disponibilidade para este fornecedor. A quantidade originalmente solicitada permanece inalterada.
+              Esta cotação esta encerrada. Ao salvar, ela será reaberta somente se a edição criar nova disponibilidade para este fornecedor. A quantidade originalmente solicitada permanece inalterada.
             </div>
           ) : null}
           {form.nova_oferta_saldo ? (
@@ -478,7 +479,7 @@ function ModalRespostaInternaCotacao({
               className="mb-3 rounded-lg border px-3 py-2 text-xs"
               style={estiloTom('info')}
             >
-              O pedido anterior e seu preco permanecem inalterados. Informe abaixo a quantidade, o preco e o prazo oferecidos agora para o saldo restante.
+              O pedido anterior e seu preço permanecem inalterados. Informe abaixo a quantidade, o preço e o prazo oferecidos agora para o saldo restante.
             </div>
           ) : null}
 
@@ -489,7 +490,7 @@ function ModalRespostaInternaCotacao({
             como filtro. `FormSecao`/`CampoForm` dizem o que eles são.
           */}
           <FormSecao colunas={3}>
-            <CampoForm label="Valor minimo do pedido">
+            <CampoForm label="Valor mínimo do pedido">
               <input className="input input-moeda" inputMode="decimal" value={form.valor_minimo_pedido} onChange={(e) => onChange('valor_minimo_pedido', sanitizeNumeroCompraInput(e.target.value))} />
             </CampoForm>
             <CampoForm label="Desconto concedido">
@@ -504,7 +505,7 @@ function ModalRespostaInternaCotacao({
             <CampoForm label="Tipo do prazo" obrigatorio>
               <select className="input" value={form.prazo_entrega_tipo} onChange={(e) => onChange('prazo_entrega_tipo', e.target.value)}>
                 <option value="DIAS_CORRIDOS">Dias corridos</option>
-                <option value="DIAS_UTEIS">Dias uteis</option>
+                <option value="DIAS_UTEIS">Dias úteis</option>
               </select>
             </CampoForm>
             <CampoForm label="Condicao de pagamento" obrigatorio span={2}>
@@ -535,7 +536,7 @@ function ModalRespostaInternaCotacao({
                     ))}
                   </div>
                   <button type="button" className="btn btn-outline btn-sm mt-2 w-full justify-center" onClick={() => setCondicoesAbertas(false)}>
-                    Fechar opcoes
+                    Fechar opções
                   </button>
                 </div>
               )}
@@ -546,7 +547,7 @@ function ModalRespostaInternaCotacao({
             <CampoForm label="Frete">
               <select className="input" value={form.frete_tipo} onChange={(e) => onChange('frete_tipo', e.target.value)}>
                 <option value="SEM_FRETE">Sem frete</option>
-                <option value="EMBUTIDO">Embutido no preco</option>
+                <option value="EMBUTIDO">Embutido no preço</option>
                 <option value="TERCEIRO">Pago a terceiro</option>
               </select>
             </CampoForm>
@@ -566,7 +567,7 @@ function ModalRespostaInternaCotacao({
             {form.frete_tipo === 'TERCEIRO' ? (
               <>
                 <CampoForm label="Data para pagamento" obrigatorio>
-                  <input className="input" type="date" value={form.frete_data_vencimento} onChange={(e) => onChange('frete_data_vencimento', e.target.value)} />
+                  <DateInputBR className="input" value={form.frete_data_vencimento} onChange={(e) => onChange('frete_data_vencimento', e.target.value)} />
                 </CampoForm>
                 <CampoForm label="Transportador" hint="Opcional">
                   <input className="input" value={form.frete_transportador_nome} onChange={(e) => onChange('frete_transportador_nome', e.target.value)} />
@@ -579,7 +580,7 @@ function ModalRespostaInternaCotacao({
           </FormSecao>
 
           <FormSecao colunas={2}>
-            <CampoForm label="Observacao geral" tipo="observacao">
+            <CampoForm label="Observação geral" tipo="observacao">
               <textarea className="input" rows={3} value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
             </CampoForm>
           </FormSecao>
@@ -591,7 +592,7 @@ function ModalRespostaInternaCotacao({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Arquivos da resposta</div>
-                <div className="text-xs" style={{ color: 'var(--c-muted)' }}>PDF, PNG, JPG ou JPEG. Ate 10 arquivos por envio.</div>
+                <div className="text-xs" style={{ color: 'var(--c-muted)' }}>PDF, PNG, JPG ou JPEG. Até 10 arquivos por envio.</div>
               </div>
               <label className={`btn btn-outline btn-sm cursor-pointer ${enviandoArquivos ? 'pointer-events-none opacity-60' : ''}`}>
                 <input
@@ -678,14 +679,14 @@ function ModalRespostaInternaCotacao({
                 },
                 {
                   id: 'preco',
-                  titulo: 'Preco unit.',
+                  titulo: 'Preço unit.',
                   tipo: 'valor',
                   render: (item) => (
                     <input
                       className="input w-full text-right"
                       inputMode="decimal"
                       value={item.preco}
-                      aria-label={`Preco unitario de ${item.nome}`}
+                      aria-label={`Preço unitário de ${item.nome}`}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => onChangeItem(item.__indice, 'preco', formatarMoedaCotacaoInput(e.target.value))}
                     />
@@ -700,7 +701,7 @@ function ModalRespostaInternaCotacao({
                       className="input w-full"
                       inputMode="decimal"
                       value={item.quantidade_disponivel}
-                      aria-label={`Quantidade disponivel de ${item.nome}`}
+                      aria-label={`Quantidade disponível de ${item.nome}`}
                       onChange={(e) => onChangeItem(item.__indice, 'quantidade_disponivel', sanitizeNumeroCompraInput(e.target.value))}
                     />
                   )
@@ -784,20 +785,20 @@ function ModalRespostaInternaCotacao({
                       className="input w-full"
                       inputMode="decimal"
                       value={item.quantidade_minima_item}
-                      aria-label={`Quantidade minima de ${item.nome}`}
+                      aria-label={`Quantidade mínima de ${item.nome}`}
                       onChange={(e) => onChangeItem(item.__indice, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))}
                     />
                   )
                 },
                 {
                   id: 'observacao',
-                  titulo: 'Observacao',
+                  titulo: 'Observação',
                   tipo: 'texto',
                   render: (item) => (
                     <input
                       className="input w-full"
                       value={item.observacao}
-                      aria-label={`Observacao de ${item.nome}`}
+                      aria-label={`Observação de ${item.nome}`}
                       onChange={(e) => onChangeItem(item.__indice, 'observacao', e.target.value)}
                     />
                   )
@@ -809,7 +810,7 @@ function ModalRespostaInternaCotacao({
               getId={(item) => buildItemKey(item)}
               storageKey="tabela:gerenciar-cotacao:resposta-interna"
               rotuloRolagem="Itens da resposta do fornecedor"
-              vazio="Nenhum item nesta cotacao."
+              vazio="Nenhum item nesta cotação."
             />
           </div>
           {/*
@@ -872,9 +873,9 @@ function ModalEncerrarSemPedido({
           data-modal="cabecalho"
         >
           <div className="min-w-0">
-            <h2 id="encerrar-sem-pedido-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Encerrar cotacao sem gerar pedido?</h2>
+            <h2 id="encerrar-sem-pedido-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Encerrar cotação sem gerar pedido?</h2>
             <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--c-muted)' }}>
-              O saldo abaixo sera encerrado definitivamente. Pedidos ja gerados permanecem inalterados e esta acao nao pode ser desfeita.
+              O saldo abaixo será encerrado definitivamente. Pedidos já gerados permanecem inalterados e esta ação não pode ser desfeita.
             </p>
           </div>
           <button type="button" className="compras-icon-action shrink-0" onClick={onFechar} disabled={processando} title="Fechar" aria-label="Fechar">
@@ -906,7 +907,7 @@ function ModalEncerrarSemPedido({
               className="border-b px-3 py-2 text-sm font-semibold"
               style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)', color: 'var(--c-text)' }}
             >
-              Itens que nao serao comprados
+              Itens que não serão comprados
             </div>
             <div className="max-h-48 overflow-y-auto">
               {itens.map((item) => (
@@ -939,7 +940,7 @@ function ModalEncerrarSemPedido({
                 value={justificativa}
                 disabled={processando}
                 onChange={(event) => onJustificativaChange(event.target.value)}
-                placeholder="Explique por que o saldo restante nao sera comprado."
+                placeholder="Explique por que o saldo restante não será comprado."
               />
             </CampoForm>
           </FormSecao>
@@ -954,7 +955,7 @@ function ModalEncerrarSemPedido({
               disabled={processando}
               onChange={(event) => onConfirmadoChange(event.target.checked)}
             />
-            <span>Confirmo que o saldo restante nao sera comprado e que nenhum novo pedido deve ser gerado.</span>
+            <span>Confirmo que o saldo restante não será comprado e que nenhum novo pedido deve ser gerado.</span>
           </label>
         </div>
 
@@ -1432,7 +1433,7 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                   },
                   {
                     id: 'preco',
-                    titulo: 'Preco unit.',
+                    titulo: 'Preço unit.',
                     tipo: 'valor',
                     render: (it) => fmtMoeda(it.preco)
                   },
@@ -1559,7 +1560,7 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                     const copiou = await copiarTexto(mensagemWhatsApp);
                     // Retorno trivial de clipboard: nada foi gravado, o botao ja diz o que aconteceu.
                     if (copiou) avisar.sucesso('Mensagem copiada.', undefined, { efemero: true });
-                    else avisar.erro('Nao foi possivel copiar a mensagem automaticamente.');
+                    else avisar.erro('Não foi possível copiar a mensagem automaticamente.');
                   }}
                 >
                   Copiar mensagem
@@ -1764,7 +1765,7 @@ function SecaoEnvioFornecedores({
         <div className="cotacao-whatsapp-panel rounded-xl border px-3 py-3" style={estiloTom('success')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold">Enviar cotacoes via WhatsApp</h3>
+              <h3 className="text-sm font-semibold">Enviar cotações via WhatsApp</h3>
               <p className="mt-1 text-xs">
                 {linksVinculados.length} fornecedor(es) com mensagem pronta.
               </p>
@@ -2026,8 +2027,8 @@ function SecaoEnvioFornecedores({
               style={{ borderColor: 'var(--c-border)', background: 'var(--c-surface)' }}
             >
               <div>
-                <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Cadastro rapido</div>
-                <div className="text-xs" style={{ color: 'var(--c-muted)' }}>Inclua um fornecedor novo sem sair da cotacao.</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Cadastro rápido</div>
+                <div className="text-xs" style={{ color: 'var(--c-muted)' }}>Inclua um fornecedor novo sem sair da cotação.</div>
               </div>
               <FormSecao colunas={2}>
                 <CampoForm label="Nome do fornecedor" span={2}>
@@ -2064,7 +2065,7 @@ function SecaoEnvioFornecedores({
                 <div>
                   <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Itens por fornecedor</div>
                   <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                    Marque quais itens cada fornecedor recebera no link. Cada coluna vira uma cotacao daquele fornecedor.
+                    Marque quais itens cada fornecedor receberá no link. Cada coluna vira uma cotação daquele fornecedor.
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -2114,8 +2115,8 @@ function SecaoEnvioFornecedores({
                     <tr>
                       <th className="sticky left-0 z-celula-cabecalho min-w-[260px] px-3 py-2" style={{ background: 'var(--ui-surface-2)' }}>Item</th>
                       <th className="min-w-[95px] px-3 py-2">Qtd.</th>
-                      <th className="min-w-[180px] px-3 py-2">Especificacao</th>
-                      <th className="min-w-[115px] px-3 py-2">Necessario</th>
+                      <th className="min-w-[180px] px-3 py-2">Especificação</th>
+                      <th className="min-w-[115px] px-3 py-2">Necessário</th>
                       {fornecedoresSelecionadosDetalhes.map((fornecedor) => {
                         const selectionKey = fornecedorSelectionKey(fornecedor);
                         const itensFornecedor = itemKeys.filter((itemKey) => Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])).length;
@@ -2427,11 +2428,11 @@ function SecaoComparativo({
   if (!comparativo?.itens?.length) {
     return (
       <BlocoConteudo
-        titulo="Comparativo de Cotacoes"
+        titulo="Comparativo de Cotações"
         className="cotacao-comparativo-panel"
       >
         <div className="app-empty-card">
-          O comparativo aparece assim que os fornecedores responderem a cotacao.
+          O comparativo aparece assim que os fornecedores responderem a cotação.
         </div>
       </BlocoConteudo>
     );
@@ -2448,7 +2449,7 @@ function SecaoComparativo({
         variante="primario"
         cor="var(--sem-info)"
         contagem={`${comparativo.itens.length} item(ns)`}
-        descricao="Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta."
+        descricao="Compare respostas, selecione vencedores e encerre a cotação quando estiver pronta."
         acoes={(
           <span
             className="inline-flex rounded-lg border p-1 text-xs"
@@ -2478,7 +2479,7 @@ function SecaoComparativo({
           <div className="mb-3 rounded-lg border" style={{ borderColor: 'var(--c-border)', background: 'var(--ui-surface-2)' }}>
             <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2" style={{ borderColor: 'var(--c-border)' }}>
               <div>
-                <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Mapa de comparacao</div>
+                <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Mapa de comparação</div>
                 <div className="text-xs" style={{ color: 'var(--c-muted)' }}>Itens nas linhas e fornecedores respondidos nas colunas.</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -2652,7 +2653,7 @@ function SecaoComparativo({
                     },
                     {
                       id: 'quantidade_disponivel',
-                      titulo: 'Qtd. disponivel',
+                      titulo: 'Qtd. disponível',
                       tipo: 'numero',
                       render: (resp) => (
                         <span className="block">
@@ -2663,7 +2664,7 @@ function SecaoComparativo({
                     },
                     {
                       id: 'preco',
-                      titulo: 'Preco unit.',
+                      titulo: 'Preço unit.',
                       tipo: 'valor',
                       ordenavel: true,
                       valorOrdenacao: (resp) => (resp.preco ? parseNumeroCompra(resp.preco) : null),
@@ -2711,7 +2712,7 @@ function SecaoComparativo({
                     },
                     {
                       id: 'observacao',
-                      titulo: 'Observacao',
+                      titulo: 'Observação',
                       tipo: 'texto',
                       render: (resp) => resp.observacao || '-'
                     }
@@ -2763,7 +2764,7 @@ function SecaoComparativo({
                           <span
                             className="text-xs font-semibold"
                             style={{ color: 'var(--sem-warning)' }}
-                            title="Exige justificativa obrigatoria no fechamento"
+                            title="Exige justificativa obrigatória no fechamento"
                           >
                             Acima do solicitado
                           </span>
@@ -3104,7 +3105,7 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleAbrirArquivo(item) {
     try {
       const url = await obterUrlAssinadaCompra(item?.arquivo_url);
-      if (!url) { avisar.alerta('Arquivo nao encontrado.'); return; }
+      if (!url) { avisar.alerta('Arquivo não encontrado.'); return; }
       setPreviewArquivo(await criarPreviewCompra({
         title: 'Arquivo do item',
         name: item.arquivo_nome_original || 'Arquivo anexado',
@@ -3173,7 +3174,7 @@ export default function GerenciarCotacaoSolicitacao() {
       setItensSelecionadosEnvio({});
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       await carregarTudo();
-      avisar.sucesso('Links de cotacao gerados. Use os botoes de WhatsApp para enviar a mensagem a cada fornecedor.');
+      avisar.sucesso('Links de cotação gerados. Use os botoes de WhatsApp para enviar a mensagem a cada fornecedor.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao enviar para fornecedores');
@@ -3195,7 +3196,7 @@ export default function GerenciarCotacaoSolicitacao() {
     // R21: DESESTRUTURADO. `confirmar()` devolve `{ ok, texto }`, e objeto é
     // sempre truthy — ler `const ok = ...` faria "Cancelar" reabrir a cotação.
     const { ok, texto } = await confirmar({
-      titulo: 'Reabrir cotacao',
+      titulo: 'Reabrir cotação',
       mensagem: `A cotacao de ${fornecedorNome} volta a aceitar resposta pelo mesmo link.`,
       rotuloConfirmar: 'Reabrir',
       campo: { rotulo: 'Motivo da reabertura', multilinha: true }
@@ -3206,7 +3207,7 @@ export default function GerenciarCotacaoSolicitacao() {
       setReabrindoCotacaoId(alvo.id);
       await reabrirCotacaoCompra(alvo.id, { motivo: texto });
       await carregarTudo();
-      avisar.sucesso('Cotacao reaberta. O fornecedor pode responder novamente pelo mesmo link.');
+      avisar.sucesso('Cotação reaberta. O fornecedor pode responder novamente pelo mesmo link.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao reabrir cotacao');
@@ -3218,7 +3219,7 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleCancelarCotacao() {
     const motivo = motivoCancelamentoCotacao.trim();
     if (!motivo) {
-      avisar.alerta('Informe o motivo do cancelamento da cotacao.');
+      avisar.alerta('Informe o motivo do cancelamento da cotação.');
       return;
     }
 
@@ -3228,7 +3229,7 @@ export default function GerenciarCotacaoSolicitacao() {
       setModalCancelamentoCotacao(false);
       setMotivoCancelamentoCotacao('');
       await carregarTudo();
-      avisar.sucesso('Cotacao cancelada. Os links foram bloqueados e a solicitacao voltou para liberada para compra.');
+      avisar.sucesso('Cotação cancelada. Os links foram bloqueados e a solicitação voltou para liberada para compra.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao cancelar cotacao');
@@ -3259,7 +3260,7 @@ export default function GerenciarCotacaoSolicitacao() {
       (item) => Number(item.id) === Number(cotacaoFornecedorId)
     );
     if (!cotacaoFornecedor) {
-      avisar.erro('Cotacao do fornecedor nao encontrada para edicao.');
+      avisar.erro('Cotação do fornecedor não encontrada para edição.');
       return;
     }
     abrirRespostaInterna(cotacaoFornecedor);
@@ -3280,7 +3281,7 @@ export default function GerenciarCotacaoSolicitacao() {
     const selecionados = Array.from(files || []);
     if (!selecionados.length || !cotacaoRespostaInterna) return;
     if (selecionados.length > 10) {
-      avisar.alerta('Selecione no maximo 10 arquivos por vez.');
+      avisar.alerta('Selecione no máximo 10 arquivos por vez.');
       return;
     }
 
@@ -3305,7 +3306,7 @@ export default function GerenciarCotacaoSolicitacao() {
         ? caminho
         : await obterUrlAssinadaCompra(caminho);
       if (!url) {
-        avisar.alerta('Arquivo nao encontrado.');
+        avisar.alerta('Arquivo não encontrado.');
         return;
       }
       setPreviewArquivo(await criarPreviewCompra({
@@ -3326,7 +3327,7 @@ export default function GerenciarCotacaoSolicitacao() {
       || !Number.isInteger(Number(formRespostaInterna.prazo_entrega_dias))
       || Number(formRespostaInterna.prazo_entrega_dias) <= 0
     )) {
-      avisar.alerta('Informe a condicao de pagamento e o prazo de entrega para finalizar a resposta.');
+      avisar.alerta('Informe a condição de pagamento e o prazo de entrega para finalizar a resposta.');
       return;
     }
     const valorFreteInformado = formRespostaInterna.frete_modo === 'POR_ITEM'
@@ -3524,7 +3525,7 @@ export default function GerenciarCotacaoSolicitacao() {
 
   function abrirEncerramentoSemPedido() {
     if (resumoEncerramentoSemPedido.saldoTotal <= 0.0001) {
-      avisar.alerta('Nao existe saldo restante para encerrar sem pedido.');
+      avisar.alerta('Não existe saldo restante para encerrar sem pedido.');
       return;
     }
     setJustificativaEncerrarSemPedido('');
@@ -3548,7 +3549,7 @@ export default function GerenciarCotacaoSolicitacao() {
       return;
     }
     if (!confirmadoEncerrarSemPedido) {
-      avisar.alerta('Confirme que o saldo restante nao sera comprado.');
+      avisar.alerta('Confirme que o saldo restante não será comprado.');
       return;
     }
 
@@ -3689,15 +3690,15 @@ export default function GerenciarCotacaoSolicitacao() {
 
       if (fechamentoParcial) {
         if (!podeFecharParcialCotacao) {
-          avisar.alerta('Seu usuario nao possui permissao para fechar parcialmente a cotacao.');
+          avisar.alerta('Seu usuário não possui permissão para fechar parcialmente a cotação.');
           return;
         }
         /*
           Justificativa de AUDITORIA nº 2 — fechamento parcial. Mesmo piso.
         */
         const { ok, texto } = await pedirJustificativa({
-          titulo: 'Fechar parcialmente a cotacao',
-          mensagem: 'Nem todo o saldo foi selecionado. Os pedidos marcados sao gerados agora e o restante fica aberto para uma proxima rodada.',
+          titulo: 'Fechar parcialmente a cotação',
+          mensagem: 'Nem todo o saldo foi selecionado. Os pedidos marcados são gerados agora e o restante fica aberto para uma próxima rodada.',
           detalhes: [
             `Saldo atual: ${formatNumeroCompra(saldoTotalAntes)}`,
             `Saldo que permanecera aberto: ${formatNumeroCompra(saldoTotalDepois)}`
@@ -3711,13 +3712,13 @@ export default function GerenciarCotacaoSolicitacao() {
         if (!ok) return;
         justificativa = texto;
       } else if (!podeEncerrarCotacao) {
-        avisar.alerta('A selecao consome todo o saldo e exige permissao para encerrar definitivamente a cotacao.');
+        avisar.alerta('A seleção consome todo o saldo e exige permissão para encerrar definitivamente a cotação.');
         return;
       } else {
         // R21: DESESTRUTURADO. Com `const ok = await confirmar(...)` o objeto
         // seria sempre truthy e "Cancelar" geraria os pedidos finais.
         const { ok } = await confirmar({
-          titulo: 'Encerrar a cotacao definitivamente',
+          titulo: 'Encerrar a cotação definitivamente',
           mensagem: `Todo o saldo foi selecionado. Os pedidos finais serao gerados para ${alocacoes.length} selecao(oes) e a cotacao sera encerrada. Esta acao nao pode ser desfeita.`,
           rotuloConfirmar: 'Encerrar e gerar pedidos',
           destrutiva: true
@@ -3744,7 +3745,7 @@ export default function GerenciarCotacaoSolicitacao() {
       await carregarTudo();
       const fechamentoResultado = resultado?.fechamento_resultado || {};
       if (fechamentoResultado.final) {
-        avisar.sucesso('Cotacao encerrada e pedidos finais gerados. Abrindo a tela de pedidos.');
+        avisar.sucesso('Cotação encerrada e pedidos finais gerados. Abrindo a tela de pedidos.');
         navigate('/pedidos-compra');
       } else {
         avisar.sucesso(`Rodada parcial concluida. Os pedidos selecionados foram fechados e o saldo ${formatNumeroCompra(fechamentoResultado.saldo_restante)} permanece aberto.`);
@@ -3765,7 +3766,7 @@ export default function GerenciarCotacaoSolicitacao() {
       R21: DESESTRUTURADO — objeto é sempre truthy.
     */
     const { ok, texto } = await confirmar({
-      titulo: 'Recusar solicitacao de compra',
+      titulo: 'Recusar solicitação de compra',
       mensagem: `A solicitacao SC-${String(solicitacao?.id || id).padStart(5, '0')} sai do fluxo de compra. Esta acao nao pode ser desfeita.`,
       rotuloConfirmar: 'Recusar',
       destrutiva: true,
@@ -3776,7 +3777,7 @@ export default function GerenciarCotacaoSolicitacao() {
     try {
       await recusarSolicitacaoCompra(id, { motivo: texto });
       await carregarTudo();
-      avisar.sucesso('Solicitacao de compra recusada.');
+      avisar.sucesso('Solicitação de compra recusada.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao recusar solicitacao de compra');
@@ -3786,7 +3787,7 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleRegistrarComentarioCotacao() {
     const comentario = comentarioCotacao.trim();
     if (!comentario) {
-      avisar.alerta('Digite o comentario da cotacao.');
+      avisar.alerta('Digite o comentário da cotação.');
       return;
     }
 
@@ -3795,7 +3796,7 @@ export default function GerenciarCotacaoSolicitacao() {
       await comentarSolicitacaoCompra(id, { comentario });
       setComentarioCotacao('');
       await carregarTudo();
-      avisar.sucesso('Comentario registrado no historico da solicitacao.');
+      avisar.sucesso('Comentário registrado no histórico da solicitação.');
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao registrar comentario da cotacao');
@@ -3874,7 +3875,7 @@ export default function GerenciarCotacaoSolicitacao() {
         }}
         destrutiva={podeOperarFluxo ? { rotulo: 'Recusar', onClick: handleRecusarSolicitacao } : undefined}
         mais={podeExibirCancelamentoCotacao ? [{
-          rotulo: 'Cancelar cotacao',
+          rotulo: 'Cancelar cotação',
           perigosa: true,
           onClick: () => setModalCancelamentoCotacao(true)
         }] : []}
@@ -3898,15 +3899,15 @@ export default function GerenciarCotacaoSolicitacao() {
 
       {podeOperarFluxo && (
         <BlocoConteudo
-          titulo="Comentario da cotacao"
+          titulo="Comentário da cotação"
           variante="secundario"
-          descricao="Registre alinhamentos com compras; o texto tambem alimenta o historico da solicitacao da obra."
+          descricao="Registre alinhamentos com compras; o texto também alimenta o histórico da solicitação da obra."
         >
           <div className="grid gap-3 md:grid-cols-2 md:items-end">
             <textarea
               className="input"
               rows={3}
-              aria-label="Comentario da cotacao"
+              aria-label="Comentário da cotação"
               value={comentarioCotacao}
               onChange={(event) => setComentarioCotacao(event.target.value)}
               placeholder="Ex.: fornecedor pediu prazo adicional, compra dividida por quantidade, ajuste combinado..."
@@ -3937,11 +3938,11 @@ export default function GerenciarCotacaoSolicitacao() {
         esta: quem foi convidado a cotar e por qual link.
       */}
       <BlocoConteudo
-        titulo="Fornecedores e links de cotacao"
+        titulo="Fornecedores e links de cotação"
         variante="primario"
         cor="var(--module-compras)"
         contagem={`${solicitacao.fornecedores?.length || 0} vinculado(s)`}
-        descricao="Pesquise fornecedores cadastrados, faca cadastro rapido e gere os links do portal."
+        descricao="Pesquise fornecedores cadastrados, faca cadastro rápido e gere os links do portal."
       >
             {/* Componente de envio para fornecedores */}
             <SecaoEnvioFornecedores
@@ -4110,7 +4111,7 @@ export default function GerenciarCotacaoSolicitacao() {
                   getId={(cf) => cf.id}
                   storageKey="tabela:gerenciar-cotacao:fornecedores"
                   rotuloRolagem="Cotações enviadas"
-                  vazio="Nenhuma cotacao enviada."
+                  vazio="Nenhuma cotação enviada."
                   larguraAcoes={320}
                   acoesLinha={(cotacaoFornecedor) => {
                     const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
@@ -4144,8 +4145,8 @@ export default function GerenciarCotacaoSolicitacao() {
                           onClick={async () => {
                             const copiou = await copiarTexto(publicUrl);
                             // Retorno trivial de clipboard: nada foi gravado, o botao ja diz o que aconteceu.
-                            if (copiou) avisar.sucesso('Link da cotacao copiado.', undefined, { efemero: true });
-                            else avisar.erro('Nao foi possivel copiar o link automaticamente.');
+                            if (copiou) avisar.sucesso('Link da cotação copiado.', undefined, { efemero: true });
+                            else avisar.erro('Não foi possível copiar o link automaticamente.');
                           }}
                           title="Copiar link"
                           aria-label="Copiar link"
@@ -4183,7 +4184,7 @@ export default function GerenciarCotacaoSolicitacao() {
                             <HiOutlineChatBubbleLeftRight />
                           </CotacaoActionButton>
                         ) : (
-                          <CotacaoActionButton type="button" disabled title="WhatsApp indisponivel" aria-label="WhatsApp indisponivel">
+                          <CotacaoActionButton type="button" disabled title="WhatsApp indisponível" aria-label="WhatsApp indisponível">
                             <HiOutlineChatBubbleLeftRight />
                           </CotacaoActionButton>
                         )}
@@ -4213,7 +4214,7 @@ export default function GerenciarCotacaoSolicitacao() {
                           onClick={() => handleReabrirCotacao(cotacaoFornecedor)}
                           disabled={!podeReabrirCotacao || reabrindoCotacaoId === cotacaoFornecedor.id}
                           title={podeReabrirCotacao ? 'Reabrir cotacao' : 'Reabertura indisponivel'}
-                          aria-label="Reabrir cotacao"
+                          aria-label="Reabrir cotação"
                         >
                           <HiOutlineArrowPath className={reabrindoCotacaoId === cotacaoFornecedor.id ? 'animate-spin' : undefined} />
                         </CotacaoActionButton>
@@ -4309,9 +4310,9 @@ export default function GerenciarCotacaoSolicitacao() {
         <ModalPortal onClose={() => setModalCancelamentoCotacao(false)} closeOnEscape={!cancelandoCotacao}>
           <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cancelar-cotacao-titulo">
             <div className="app-modal-surface app-modal-surface--compact p-4">
-            <h2 id="cancelar-cotacao-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Cancelar cotacao</h2>
+            <h2 id="cancelar-cotacao-titulo" className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Cancelar cotação</h2>
             <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
-              Os links serao bloqueados, as respostas deixarao de participar do comparativo e a solicitacao voltara para liberada para compra. O historico sera preservado.
+              Os links serão bloqueados, as respostas deixarao de participar do comparativo e a solicitação voltará para liberada para compra. O histórico será preservado.
             </p>
             <FormSecao colunas={2}>
               <CampoForm label="Motivo do cancelamento" obrigatorio tipo="observacao">
@@ -4320,7 +4321,7 @@ export default function GerenciarCotacaoSolicitacao() {
                   rows={4}
                   value={motivoCancelamentoCotacao}
                   onChange={(event) => setMotivoCancelamentoCotacao(event.target.value)}
-                  placeholder="Explique por que a cotacao esta sendo cancelada."
+                  placeholder="Explique por que a cotação esta sendo cancelada."
                 />
               </CampoForm>
             </FormSecao>

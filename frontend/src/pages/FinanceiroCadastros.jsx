@@ -258,22 +258,22 @@ const CATEGORIA_TIPO_META = {
   TODAS: {
     label: 'Todas',
     titulo: 'Todas as categorias',
-    descricao: 'Visao consolidada de contas a pagar, receber e categorias compartilhadas.'
+    descricao: 'Visão consolidada de contas a pagar, receber e categorias compartilhadas.'
   },
   PAGAR: {
     label: 'Contas a pagar',
     titulo: 'Categorias de contas a pagar',
-    descricao: 'Aparecem apenas em titulos do tipo PAGAR.'
+    descricao: 'Aparecem apenas em títulos do tipo PAGAR.'
   },
   RECEBER: {
     label: 'Contas a receber',
     titulo: 'Categorias de contas a receber',
-    descricao: 'Aparecem apenas em titulos do tipo RECEBER.'
+    descricao: 'Aparecem apenas em títulos do tipo RECEBER.'
   },
   AMBOS: {
     label: 'Compartilhadas',
     titulo: 'Categorias compartilhadas',
-    descricao: 'Ficam disponiveis para titulos a pagar e a receber.'
+    descricao: 'Ficam disponíveis para títulos a pagar e a receber.'
   }
 };
 
@@ -557,11 +557,11 @@ export default function FinanceiroCadastros() {
       const contaSelecionada = contas.find((item) => String(item.id) === String(payload.conta_bancaria_id));
       const empresaContaId = getContaEmpresaId(contaSelecionada);
       if (!empresaContaId) {
-        avisar.erro('A conta bancaria interna precisa estar vinculada a uma empresa do grupo antes de virar conta pagadora.');
+        avisar.erro('A conta bancária interna precisa estar vinculada a uma empresa do grupo antes de virar conta pagadora.');
         return;
       }
       if (String(payload.empresa_id) !== empresaContaId) {
-        avisar.erro('A empresa pagadora deve ser a mesma vinculada a conta bancaria interna.');
+        avisar.erro('A empresa pagadora deve ser a mesma vinculada a conta bancária interna.');
         return;
       }
       const cleanPayload = {
@@ -681,7 +681,7 @@ export default function FinanceiroCadastros() {
         itens: prepararTarifasBancariasParaSalvar(tarifasBancariasAtalhos)
       });
       setTarifasBancariasAtalhos(prepararTarifasBancariasParaEdicao(itensSalvos));
-      avisar.sucesso('Atalhos salvos. Os itens ativos ja estao disponiveis na conciliacao OFX.');
+      avisar.sucesso('Atalhos salvos. Os itens ativos já estão disponíveis na conciliação OFX.');
     } catch (err) {
       avisar.erro(err?.message || 'Erro ao salvar atalhos de tarifas bancarias');
     } finally {
@@ -785,7 +785,7 @@ export default function FinanceiroCadastros() {
       <PageHeader
         titulo="Cadastros financeiros"
         contagem={`${contas.length} conta(s) · ${categorias.length} categoria(s)`}
-        descricao="Base de contas, categorias, formas de pagamento, cartoes e favorecidos usada nas baixas e nos titulos."
+        descricao="Base de contas, categorias, formas de pagamento, cartões e favorecidos usada nas baixas e nos títulos."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -798,7 +798,7 @@ export default function FinanceiroCadastros() {
               cartão de débito e conciliação OFX todos apontam para ela, e
               sem ela os outros cadastros não fecham. */}
           <BlocoConteudo
-            titulo="Contas bancarias"
+            titulo="Contas bancárias"
             descricao={contaForm.id
               ? 'Edite a conta selecionada.'
               : 'Cadastre contas bancarias e caixas internos usados no financeiro.'}
@@ -806,7 +806,7 @@ export default function FinanceiroCadastros() {
             cor="var(--sem-info)"
           >
             <form onSubmit={handleSalvarConta}>
-              <FormSecao legenda="Identificacao" colunas={2}>
+              <FormSecao legenda="Identificação" colunas={2}>
                 <CampoForm label="Nome" obrigatorio linha>
                   <input
                     className="input w-full"
@@ -823,7 +823,7 @@ export default function FinanceiroCadastros() {
                     value={contaForm.empresa_id}
                     onChange={(e) => setContaForm((c) => ({ ...c, empresa_id: e.target.value }))}
                   >
-                    <option value="">Nao vinculada</option>
+                    <option value="">Não vinculada</option>
                     {empresasGrupo.map((empresa) => (
                       <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
                     ))}
@@ -843,7 +843,7 @@ export default function FinanceiroCadastros() {
                       }));
                     }}
                   >
-                    <option value="BANCARIA">Conta bancaria</option>
+                    <option value="BANCARIA">Conta bancária</option>
                     <option value="CAIXA_INTERNO">Caixa interno</option>
                   </select>
                 </CampoForm>
@@ -864,7 +864,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Agencia">
+                <CampoForm label="Agência">
                   <input
                     className="input w-full"
                     value={contaForm.agencia}
@@ -893,7 +893,7 @@ export default function FinanceiroCadastros() {
                 </CampoForm>
               </FormSecao>
 
-              <FormSecao legenda="Identificacao OFX para conciliacao" colunas={3}>
+              <FormSecao legenda="Identificação OFX para conciliação" colunas={3}>
                 <CampoForm label="Banco OFX" hint="Codigo do banco no arquivo, quando existir.">
                   <input
                     className="input w-full"
@@ -903,7 +903,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Agencia OFX" hint="Se houver BRANCHID no arquivo.">
+                <CampoForm label="Agência OFX" hint="Se houver BRANCHID no arquivo.">
                   <input
                     className="input w-full"
                     value={contaForm.ofx_branch_id}
@@ -958,7 +958,7 @@ export default function FinanceiroCadastros() {
             variante="secundario"
           >
             {contas.length === 0 ? (
-              <div className="app-note">Nenhuma conta bancaria cadastrada.</div>
+              <div className="app-note">Nenhuma conta bancária cadastrada.</div>
             ) : (
               <div className="app-list-stack">
                 {contas.map((conta) => (
@@ -996,15 +996,15 @@ export default function FinanceiroCadastros() {
             variante="secundario"
           >
             <form onSubmit={handleSalvarPaymentAccount}>
-              <FormSecao legenda="Vinculo" colunas={2}>
-                <CampoForm label="Conta bancaria interna" obrigatorio linha>
+              <FormSecao legenda="Vínculo" colunas={2}>
+                <CampoForm label="Conta bancária interna" obrigatorio linha>
                   <select
                     className="input w-full"
                     value={paymentAccountForm.conta_bancaria_id}
                     onChange={(e) => preencherContaPagadoraPelaContaBancaria(e.target.value)}
                     required
                   >
-                    <option value="">Selecione a conta bancaria</option>
+                    <option value="">Selecione a conta bancária</option>
                     {contas.map((conta) => (
                       <option key={conta.id} value={conta.id}>
                         {conta.nome} - {conta.banco || 'Banco'} {conta.agencia || '-'} / {conta.conta || '-'}
@@ -1039,8 +1039,8 @@ export default function FinanceiroCadastros() {
                 </CampoForm>
               </FormSecao>
 
-              <FormSecao legenda="Dados bancarios do pagador" colunas={3}>
-                <CampoForm label="Codigo banco" obrigatorio>
+              <FormSecao legenda="Dados bancários do pagador" colunas={3}>
+                <CampoForm label="Código banco" obrigatorio>
                   <input
                     className="input w-full"
                     value={paymentAccountForm.banco_codigo}
@@ -1049,7 +1049,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Agencia" obrigatorio>
+                <CampoForm label="Agência" obrigatorio>
                   <input
                     className="input w-full"
                     value={paymentAccountForm.agencia}
@@ -1058,7 +1058,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Digito agencia">
+                <CampoForm label="Dígito agência">
                   <input
                     className="input w-full"
                     value={paymentAccountForm.agencia_digito}
@@ -1075,7 +1075,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Digito conta">
+                <CampoForm label="Dígito conta">
                   <input
                     className="input w-full"
                     value={paymentAccountForm.conta_digito}
@@ -1092,7 +1092,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Convenio bancario" obrigatorio>
+                <CampoForm label="Convênio bancário" obrigatorio>
                   <input
                     className="input w-full"
                     value={paymentAccountForm.convenio}
@@ -1113,7 +1113,7 @@ export default function FinanceiroCadastros() {
                 </CampoForm>
               </FormSecao>
 
-              <FormSecao legenda="Credenciais e situacao" colunas={3}>
+              <FormSecao legenda="Credenciais e situação" colunas={3}>
                 <CampoForm label="client_id_ref">
                   <input
                     className="input w-full"
@@ -1205,7 +1205,7 @@ export default function FinanceiroCadastros() {
               variante="secundario"
             >
               <form onSubmit={handleSalvarCategoria}>
-                <FormSecao legenda="Identificacao" colunas={2}>
+                <FormSecao legenda="Identificação" colunas={2}>
                   <CampoForm label="Nome" obrigatorio>
                     <input
                       ref={categoriaNomeInputRef}
@@ -1228,7 +1228,7 @@ export default function FinanceiroCadastros() {
                     </select>
                   </CampoForm>
 
-                  <CampoForm label="Classificacao gerencial" linha>
+                  <CampoForm label="Classificação gerencial" linha>
                     <select
                       className="input w-full"
                       value={categoriaForm.classificacao_gerencial}
@@ -1240,7 +1240,7 @@ export default function FinanceiroCadastros() {
                     </select>
                   </CampoForm>
 
-                  <CampoForm label="Descricao" tipo="observacao">
+                  <CampoForm label="Descrição" tipo="observacao">
                     <textarea
                       className="input w-full"
                       value={categoriaForm.descricao}
@@ -1255,7 +1255,7 @@ export default function FinanceiroCadastros() {
                     campo que a resolve — não vira aviso dispensável. */}
                 {categoriaForm.considera_dre && !String(categoriaForm.dre_grupo || '').trim() && (
                   <div className="app-alert">
-                    Para entrar na DRE, esta categoria precisa de grupo DRE definido de forma explicita. O sistema nao classifica automaticamente pelo nome.
+                    Para entrar na DRE, esta categoria precisa de grupo DRE definido de forma explícita. O sistema não classifica automaticamente pelo nome.
                   </div>
                 )}
 
@@ -1320,7 +1320,7 @@ export default function FinanceiroCadastros() {
           <BlocoConteudo
             titulo="Categorias cadastradas"
             contagem={`${categoriasFiltradas.length} de ${categorias.length}`}
-            descricao="Digite parte do nome, descricao ou classificacao, ou marque o fluxo para recortar a lista."
+            descricao="Digite parte do nome, descrição ou classificação, ou marque o fluxo para recortar a lista."
             variante="secundario"
             acoes={(
               <button
@@ -1346,7 +1346,7 @@ export default function FinanceiroCadastros() {
               busca={{
                 valor: categoriaFiltro,
                 aoMudar: setCategoriaFiltro,
-                placeholder: 'Buscar por ID, nome, descricao, DRE ou classificacao'
+                placeholder: 'Buscar por ID, nome, descrição, DRE ou classificação'
               }}
               filtros={[{
                 id: 'tipo',
@@ -1439,7 +1439,7 @@ export default function FinanceiroCadastros() {
             variante="secundario"
           >
             <form onSubmit={handleSalvarFormaPagamento}>
-              <FormSecao legenda="Identificacao" colunas={2}>
+              <FormSecao legenda="Identificação" colunas={2}>
                 <CampoForm label="Nome" obrigatorio>
                   <input
                     className="input w-full"
@@ -1449,7 +1449,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Codigo" obrigatorio>
+                <CampoForm label="Código" obrigatorio>
                   <input
                     className="input w-full"
                     value={formaPagamentoForm.codigo}
@@ -1466,16 +1466,16 @@ export default function FinanceiroCadastros() {
                   >
                     <option value="BOLETO">Boleto</option>
                     <option value="PIX">Pix</option>
-                    <option value="TRANSFERENCIA">Transferencia</option>
-                    <option value="CARTAO_CREDITO">Cartao de credito</option>
-                    <option value="CARTAO_DEBITO">Cartao de debito</option>
+                    <option value="TRANSFERENCIA">Transferência</option>
+                    <option value="CARTAO_CREDITO">Cartão de crédito</option>
+                    <option value="CARTAO_DEBITO">Cartão de débito</option>
                     <option value="CHEQUE">Cheque</option>
                     <option value="DINHEIRO">Dinheiro</option>
                     <option value="OUTROS">Outros</option>
                   </select>
                 </CampoForm>
 
-                <CampoForm label="Ordem de exibicao">
+                <CampoForm label="Ordem de exibição">
                   <input
                     className="input valor-tabular w-full"
                     type="number"
@@ -1545,9 +1545,9 @@ export default function FinanceiroCadastros() {
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Atalhos de tarifas bancarias"
+            titulo="Atalhos de tarifas bancárias"
             contagem={`${tarifasBancariasAtalhos.length} atalho(s)`}
-            descricao="Atalhos da conciliacao bancaria para tarifas como TAR PIX, TAR TED e manutencao de conta. Cada atalho precisa de categoria financeira de saida e classificada para DRE."
+            descricao="Atalhos da conciliação bancária para tarifas como TAR PIX, TAR TED e manutenção de conta. Cada atalho precisa de categoria financeira de saída e classificada para DRE."
             variante="secundario"
             acoes={(
               <button type="button" className="btn btn-outline" onClick={handleAdicionarTarifaBancaria}>
@@ -1569,7 +1569,7 @@ export default function FinanceiroCadastros() {
                       />
                     </CampoForm>
 
-                    <CampoForm label="Codigo">
+                    <CampoForm label="Código">
                       <input
                         className="input w-full"
                         value={tarifa.codigo || ''}
@@ -1577,7 +1577,7 @@ export default function FinanceiroCadastros() {
                       />
                     </CampoForm>
 
-                    <CampoForm label="Descricao" tipo="observacao">
+                    <CampoForm label="Descrição" tipo="observacao">
                       <textarea
                         className="input w-full"
                         value={tarifa.descricao || ''}
@@ -1632,15 +1632,15 @@ export default function FinanceiroCadastros() {
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Cartoes"
+            titulo="Cartões"
             descricao={cartaoForm.id
               ? 'Edite o cartao selecionado.'
               : 'Cadastre cartoes para agrupar titulos por fatura conforme fechamento e vencimento.'}
             variante="secundario"
           >
             <form onSubmit={handleSalvarCartao}>
-              <FormSecao legenda="Identificacao" colunas={3}>
-                <CampoForm label="Nome do cartao" obrigatorio>
+              <FormSecao legenda="Identificação" colunas={3}>
+                <CampoForm label="Nome do cartão" obrigatorio>
                   <input
                     className="input w-full"
                     value={cartaoForm.nome}
@@ -1664,8 +1664,8 @@ export default function FinanceiroCadastros() {
                     value={cartaoForm.tipo}
                     onChange={(e) => setCartaoForm((c) => ({ ...c, tipo: e.target.value }))}
                   >
-                    <option value="CREDITO">Credito</option>
-                    <option value="DEBITO">Debito</option>
+                    <option value="CREDITO">Crédito</option>
+                    <option value="DEBITO">Débito</option>
                   </select>
                 </CampoForm>
 
@@ -1677,7 +1677,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="4 ultimos digitos" obrigatorio>
+                <CampoForm label="4 últimos dígitos" obrigatorio>
                   <input
                     className="input valor-tabular w-full"
                     maxLength={4}
@@ -1734,7 +1734,7 @@ export default function FinanceiroCadastros() {
                   />
                 </CampoForm>
 
-                <CampoForm label="Observacoes" tipo="observacao">
+                <CampoForm label="Observações" tipo="observacao">
                   <textarea
                     className="input w-full"
                     value={cartaoForm.observacoes}
@@ -1748,7 +1748,7 @@ export default function FinanceiroCadastros() {
                     checked={cartaoForm.ativo}
                     onChange={(e) => setCartaoForm((c) => ({ ...c, ativo: e.target.checked }))}
                   />
-                  Cartao ativo
+                  Cartão ativo
                 </label>
               </FormSecao>
 
@@ -1766,7 +1766,7 @@ export default function FinanceiroCadastros() {
 
             <div className="mt-4 app-list-stack">
               {cartoes.length === 0 ? (
-                <div className="app-note">Nenhum cartao cadastrado.</div>
+                <div className="app-note">Nenhum cartão cadastrado.</div>
               ) : cartoes.map((cartao) => (
                 <div key={cartao.id} className="app-list-card">
                   <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -1789,7 +1789,7 @@ export default function FinanceiroCadastros() {
           </BlocoConteudo>
 
           <BlocoConteudo
-            titulo="Favorecidos bancarios PIX"
+            titulo="Favorecidos bancários PIX"
             contagem={`${favorecidos.length} favorecido(s)`}
             descricao="Cadastro rastreado usado pelos lotes de pagamento em massa."
             variante="secundario"
@@ -1969,7 +1969,7 @@ export default function FinanceiroCadastros() {
                 <div className="finance-category-search-line">
                   <input
                     className="input app-busca w-full"
-                    placeholder="Filtrar por ID, nome, descricao, DRE ou classificacao"
+                    placeholder="Filtrar por ID, nome, descrição, DRE ou classificação"
                     value={categoriasModalBusca}
                     onChange={(event) => setCategoriasModalBusca(event.target.value)}
                   />
@@ -1992,7 +1992,7 @@ export default function FinanceiroCadastros() {
               ) : (
                 <div className="finance-category-modal-table" role="table" aria-label="Categorias financeiras cadastradas">
                   <div className="finance-category-modal-row finance-category-modal-row--head" role="row">
-                    <span>Acoes</span>
+                    <span>Ações</span>
                     <span>Categoria</span>
                     <span>Tipo</span>
                     <span>DRE</span>

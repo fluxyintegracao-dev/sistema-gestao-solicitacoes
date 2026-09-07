@@ -66,9 +66,9 @@ export default function SstDashboard() {
           solto; agora é a faixa fixa do sistema, que compacta na rolagem e
           mantém a ação principal a um clique em página longa. */}
       <PageHeader
-        titulo="Saude e Seguranca do Trabalho"
+        titulo="Saúde e Seguranca do Trabalho"
         descricao="Controle operacional de riscos, ASO, exames, EPIs, treinamentos, acidentes e documentos por empresa e obra."
-        acaoPrincipal={{ rotulo: 'Relatorios SST', to: '/sst/relatorios' }}
+        acaoPrincipal={{ rotulo: 'Relatórios SST', to: '/sst/relatorios' }}
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -84,7 +84,7 @@ export default function SstDashboard() {
       <BlocosPersonalizaveis chave="blocos:sst-dashboard" larguraPadrao="total">
         {isVisible('sst.dashboard.metricas_principais') ? (
           <BlocoConteudo
-            titulo="Indicadores criticos"
+            titulo="Indicadores críticos"
             variante="primario"
             cor="var(--module-sst)"
             descricao={data?.periodo_alerta_dias
@@ -98,7 +98,7 @@ export default function SstDashboard() {
                 tom="success"
               />
               <StatTile
-                label={<><HiOutlineExclamationTriangle aria-hidden="true" /> Riscos criticos</>}
+                label={<><HiOutlineExclamationTriangle aria-hidden="true" /> Riscos críticos</>}
                 valor={cards.riscos_criticos ?? 0}
                 tom={tom(cards.riscos_criticos, 'danger', 'info')}
               />
@@ -108,7 +108,7 @@ export default function SstDashboard() {
                 tom={tom(cards.colaboradores_inaptos, 'danger', 'success')}
               />
               <StatTile
-                label={<><HiOutlineClipboardDocumentCheck aria-hidden="true" /> Pendencias criticas</>}
+                label={<><HiOutlineClipboardDocumentCheck aria-hidden="true" /> Pendências críticas</>}
                 valor={cards.pendencias_criticas ?? 0}
                 tom={tom(cards.pendencias_criticas, 'danger', undefined)}
               />
@@ -119,7 +119,7 @@ export default function SstDashboard() {
         {isVisible('sst.dashboard.vencimentos') ? (
           <BlocoConteudo
             titulo="Vencimentos"
-            descricao="Documentos e entregas que ja venceram ou estao no prazo de alerta."
+            descricao="Documentos e entregas que já venceram ou estão no prazo de alerta."
           >
             <StatGrid>
               <StatTile label="Exames vencidos" valor={cards.exames_vencidos ?? 0} tom={tom(cards.exames_vencidos, 'danger', undefined)} />
@@ -132,9 +132,9 @@ export default function SstDashboard() {
 
         {isVisible('sst.dashboard.operacao') ? (
           <BlocoConteudo
-            titulo="Operacao SST"
+            titulo="Operação SST"
             contagem={loading ? 'Carregando' : `${visibleNav.length} area(s)`}
-            descricao="Areas do modulo liberadas para o seu acesso."
+            descricao="Áreas do módulo liberadas para o seu acesso."
           >
             {/* R25: os atalhos usavam `hover:border-sky-200 hover:bg-sky-50
               hover:text-sky-900` — paleta crua. Passam a ser botões do

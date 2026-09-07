@@ -143,7 +143,7 @@ function BlocoAlerta({ titulo, descricao, itens, storageKey, aoAbrir, vazio }) {
         colunas={[
           {
             id: 'codigo',
-            titulo: 'Codigo',
+            titulo: 'Código',
             // R17: o código NOMEIA o provisionamento da linha.
             tipo: 'identidade',
             noCard: 'titulo',
@@ -371,7 +371,7 @@ export default function DashboardProvisionamentoFinanceiro() {
   if (loadingBase) {
     return (
       <Pagina>
-        <PageHeader titulo="Dashboard de Previsao" />
+        <PageHeader titulo="Dashboard de Previsão" />
         <BlocoConteudo>Carregando dashboard...</BlocoConteudo>
       </Pagina>
     );
@@ -380,7 +380,7 @@ export default function DashboardProvisionamentoFinanceiro() {
   if (!podeVerDashboard) {
     return (
       <Pagina>
-        <PageHeader titulo="Dashboard de Previsao" />
+        <PageHeader titulo="Dashboard de Previsão" />
         <BlocoConteudo>Redirecionando...</BlocoConteudo>
       </Pagina>
     );
@@ -402,7 +402,7 @@ export default function DashboardProvisionamentoFinanceiro() {
         05/09) e os blocos, com os recortes.
       */}
       <PageHeader
-        titulo="Dashboard de Previsao"
+        titulo="Dashboard de Previsão"
         contagem={loadingDashboard ? null : `${formatarMoedaBRL(dashboard?.cards?.total_periodo || 0)} previstos`}
         descricao="Leitura gerencial do desembolso previsto por obra, categoria e janela de tempo."
         acaoPrincipal={{
@@ -457,33 +457,33 @@ export default function DashboardProvisionamentoFinanceiro() {
       */}
       <StatGrid colunas={4}>
         <StatTile
-          label="Provisoes em aberto"
+          label="Provisões em aberto"
           valor={String(dashboard?.cards?.quantidade_abertas || 0)}
           sub="Previstas, em analise ou aprovadas"
           icone={<HiOutlineBanknotes aria-hidden="true" />}
         />
         <StatTile
-          label="Proximos 7 dias"
+          label="Próximos 7 dias"
           valor={formatarMoedaBRL(dashboard?.cards?.total_proximos_7_dias || 0)}
-          sub="Pressao financeira imediata"
+          sub="Pressão financeira imediata"
           tom="warning"
           icone={<HiOutlineCalendarDays aria-hidden="true" />}
         />
         <StatTile
-          label="Proximos 30 dias"
+          label="Próximos 30 dias"
           valor={formatarMoedaBRL(dashboard?.cards?.total_proximos_30_dias || 0)}
-          sub="Visao de caixa do curto prazo"
+          sub="Visão de caixa do curto prazo"
           icone={<HiOutlineChartBarSquare aria-hidden="true" />}
         />
         <StatTile
-          label="Vencidas nao tratadas"
+          label="Vencidas não tratadas"
           valor={String(dashboard?.alertas?.vencidas_nao_tratadas?.quantidade || 0)}
-          sub="Itens que pedem acao imediata"
+          sub="Itens que pedem ação imediata"
           tom={Number(dashboard?.alertas?.vencidas_nao_tratadas?.quantidade || 0) > 0 ? 'danger' : 'success'}
           icone={<HiOutlineExclamationTriangle aria-hidden="true" />}
         />
         <StatTile
-          label="Obra com maior concentracao"
+          label="Obra com maior concentração"
           valor={destaqueObra ? formatarMoedaBRL(destaqueObra.total_valor) : null}
           vazio={!destaqueObra}
           sub={destaqueObra ? formatarObra(destaqueObra.obra) : 'Sem destaque no recorte atual'}
@@ -497,9 +497,9 @@ export default function DashboardProvisionamentoFinanceiro() {
           icone={<HiOutlineTag aria-hidden="true" />}
         />
         <StatTile
-          label="Obras em concentracao alta"
+          label="Obras em concentração alta"
           valor={String(obrasConcentracaoAlta.length || 0)}
-          sub="Acima do limiar de concentracao do recorte"
+          sub="Acima do limiar de concentração do recorte"
           tom={obrasConcentracaoAlta.length ? 'warning' : undefined}
           icone={<HiOutlineExclamationTriangle aria-hidden="true" />}
         />
@@ -523,8 +523,8 @@ export default function DashboardProvisionamentoFinanceiro() {
             dentroDeGrade
           >
             <BlocoBarras data-bloco-id="provisionamento-por-mes" data-bloco-rotulo="Provisionamento por mes"
-              titulo="Provisionamento por mes"
-              descricao="Curva de previsao para antecipar picos de desembolso."
+              titulo="Provisionamento por mês"
+              descricao="Curva de previsão para antecipar picos de desembolso."
               variante="primario"
               itens={(dashboard?.graficos?.por_mes || []).map((item) => ({
                 label: formatarMes(item.mes),
@@ -535,7 +535,7 @@ export default function DashboardProvisionamentoFinanceiro() {
 
             <BlocoBarras data-bloco-id="top-obras-por-valor" data-bloco-rotulo="Top obras por valor"
               titulo="Top obras por valor"
-              descricao="Onde a concentracao financeira esta mais forte."
+              descricao="Onde a concentração financeira esta mais forte."
               itens={obrasOrdenadas.map((item) => ({
                 label: formatarObra(item.obra),
                 valor: Number(item.total_valor || 0),
@@ -545,7 +545,7 @@ export default function DashboardProvisionamentoFinanceiro() {
 
             <BlocoBarras data-bloco-id="provisionamento-por-item-macro" data-bloco-rotulo="Provisionamento por item macro"
               titulo="Provisionamento por item macro"
-              descricao="Composicao da previsao por natureza de gasto."
+              descricao="Composição da previsão por natureza de gasto."
               itens={categoriasOrdenadas.map((item) => ({
                 label: item.categoria?.nome || '-',
                 valor: Number(item.total_valor || 0),
@@ -555,7 +555,7 @@ export default function DashboardProvisionamentoFinanceiro() {
 
             <BlocoBarras data-bloco-id="curva-semanal" data-bloco-rotulo="Curva semanal"
               titulo="Curva semanal"
-              descricao="Distribuicao da previsao nas proximas semanas do recorte."
+              descricao="Distribuição da previsão nas próximas semanas do recorte."
               itens={curvaSemanal.map((item) => ({
                 label: item.semana_label || '-',
                 valor: Number(item.total_valor || 0),
@@ -564,7 +564,7 @@ export default function DashboardProvisionamentoFinanceiro() {
             />
 
             <BlocoAlerta data-bloco-id="vencidas-nao-tratadas" data-bloco-rotulo="Vencidas nao tratadas"
-              titulo="Vencidas nao tratadas"
+              titulo="Vencidas não tratadas"
               descricao="Itens que precisam de regularizacao."
               itens={vencidasNaoTratadas}
               storageKey="tabela:provisionamento-dashboard:vencidas"
@@ -573,7 +573,7 @@ export default function DashboardProvisionamentoFinanceiro() {
             />
 
             <BlocoAlerta data-bloco-id="criticas-proximas" data-bloco-rotulo="Criticas proximas"
-              titulo="Criticas proximas"
+              titulo="Críticas próximas"
               descricao="Itens de prioridade critica no horizonte imediato."
               itens={criticasProximas}
               storageKey="tabela:provisionamento-dashboard:criticas"
@@ -582,7 +582,7 @@ export default function DashboardProvisionamentoFinanceiro() {
             />
 
             <BlocoConteudo
-              titulo="Concentracao por obra"
+              titulo="Concentração por obra"
               contagem={`${obrasConcentracaoAlta.length} obra(s)`}
               descricao="Obras com peso mais alto dentro do valor previsto do recorte."
               variante="secundario"
@@ -605,7 +605,7 @@ export default function DashboardProvisionamentoFinanceiro() {
                   },
                   {
                     id: 'percentual',
-                    titulo: 'Participacao',
+                    titulo: 'Participação',
                     tipo: 'numero',
                     render: (item) => `${item.percentual}%`
                   }
@@ -614,7 +614,7 @@ export default function DashboardProvisionamentoFinanceiro() {
                 getId={(item) => item.obra_id}
                 storageKey="tabela:provisionamento-dashboard:concentracao"
                 rotuloRolagem="Concentracao por obra"
-                vazio="Nenhuma obra acima do limiar de concentracao."
+                vazio="Nenhuma obra acima do limiar de concentração."
               />
             </BlocoConteudo>
           </BlocosPersonalizaveis>

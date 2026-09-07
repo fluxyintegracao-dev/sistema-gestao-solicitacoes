@@ -156,7 +156,7 @@ export default function GestaoApropriacoes() {
     }
 
     if (!codigo.trim()) {
-      avisar.alerta('Informe o codigo da apropriacao.');
+      avisar.alerta('Informe o código da apropriação.');
       return;
     }
 
@@ -239,12 +239,12 @@ export default function GestaoApropriacoes() {
     const alvos = [...ids];
 
     if (!alvos.length) {
-      avisar.alerta('Selecione ao menos uma apropriacao.');
+      avisar.alerta('Selecione ao menos uma apropriação.');
       return;
     }
 
     const { ok } = await confirmar({
-      titulo: 'Excluir apropriacoes',
+      titulo: 'Excluir apropriações',
       mensagem: `Excluir ${alvos.length} apropriacao(oes)? Esta acao nao pode ser desfeita. Se o lote parar no meio, o que ja foi excluido continua excluido.`,
       rotuloConfirmar: `Excluir ${alvos.length}`,
       destrutiva: true
@@ -306,7 +306,7 @@ export default function GestaoApropriacoes() {
     const ignoradas = brutas.filter((linha) => !parseLinhaApropriacao(linha));
 
     if (!linhas.length) {
-      avisar.alerta('Use o formato Codigo|Descricao, uma por linha.');
+      avisar.alerta('Use o formato Código|Descrição, uma por linha.');
       return;
     }
 
@@ -414,13 +414,13 @@ export default function GestaoApropriacoes() {
   const colunas = [
     {
       id: 'codigo',
-      titulo: 'Codigo',
+      titulo: 'Código',
       tipo: 'codigo',
       render: (item) => item.codigo
     },
     {
       id: 'descricao',
-      titulo: 'Descricao',
+      titulo: 'Descrição',
       tipo: 'identidade',
       noCard: 'titulo',
       render: (item) => item.descricao || '-'
@@ -472,7 +472,7 @@ export default function GestaoApropriacoes() {
   return (
     <Pagina>
       <PageHeader
-        titulo="Gestao de apropriacoes"
+        titulo="Gestão de apropriações"
         /*
           A FAIXA SEMPRE TEM NUMERO (C2, 05/09).
 
@@ -486,8 +486,8 @@ export default function GestaoApropriacoes() {
         contagem={obraSelecionada && !loading
           ? `${apropriacoes.length} apropriacao(oes)`
           : `${obras.length} obra(s)`}
-        descricao="Cadastro compartilhado das apropriacoes vinculadas as obras para solicitacoes, financeiro e compras."
-        acaoPrincipal={{ rotulo: 'Nova apropriacao', onClick: () => { limparFormulario(); focarFormulario(); } }}
+        descricao="Cadastro compartilhado das apropriações vinculadas as obras para solicitações, financeiro e compras."
+        acaoPrincipal={{ rotulo: 'Nova apropriação', onClick: () => { limparFormulario(); focarFormulario(); } }}
       />
 
       {/* R16: UM dono para a faixa de avisos, logo abaixo do cabeçalho. */}
@@ -501,7 +501,7 @@ export default function GestaoApropriacoes() {
       */}
       <BlocoConteudo
         titulo="Obra"
-        descricao="As apropriacoes listadas e as que voce cadastrar pertencem a obra escolhida aqui."
+        descricao="As apropriações listadas e as que você cadastrar pertencem a obra escolhida aqui."
       >
         <FormSecao colunas={2}>
           <CampoForm label="Obra" obrigatorio>
@@ -529,7 +529,7 @@ export default function GestaoApropriacoes() {
       <BlocoConteudo titulo={editandoId ? 'Editar apropriacao' : 'Nova apropriacao'}>
         <form onSubmit={handleSalvar}>
           <FormSecao colunas={2}>
-            <CampoForm label="Codigo" obrigatorio>
+            <CampoForm label="Código" obrigatorio>
               <input
                 ref={campoCodigoRef}
                 className="input w-full"
@@ -539,17 +539,17 @@ export default function GestaoApropriacoes() {
               />
             </CampoForm>
 
-            <CampoForm label="Descricao">
+            <CampoForm label="Descrição">
               <input
                 className="input w-full"
-                placeholder="Descricao da apropriacao"
+                placeholder="Descrição da apropriação"
                 value={descricao}
                 onChange={(event) => setDescricao(event.target.value)}
               />
             </CampoForm>
 
             <CampoForm
-              label="Apropriacao pai"
+              label="Apropriação pai"
               hint="Deixe em 'Identificar pelo codigo' para o sistema deduzir o pai a partir da numeracao."
             >
               {/* R12: select de FORMULÁRIO (entrada de dado do registro) —
@@ -559,7 +559,7 @@ export default function GestaoApropriacoes() {
                 value={apropriacaoPaiId}
                 onChange={(event) => setApropriacaoPaiId(event.target.value)}
               >
-                <option value="">Identificar pelo codigo</option>
+                <option value="">Identificar pelo código</option>
                 {apropriacoesPaisDisponiveis.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.codigo} - {item.descricao || 'Sem descricao'}
@@ -594,8 +594,8 @@ export default function GestaoApropriacoes() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo="Importacao em massa"
-        descricao="Planilha Excel ou colagem de texto. O que nao entrar continua na caixa para nova tentativa."
+        titulo="Importação em massa"
+        descricao="Planilha Excel ou colagem de texto. O que não entrar continua na caixa para nova tentativa."
         variante="secundario"
         recolhivel
         recolhidoPadrao
@@ -634,7 +634,7 @@ export default function GestaoApropriacoes() {
                 (textarea.input); o `min-h-[140px]` era medida à mão. */}
             <textarea
               className="input w-full"
-              placeholder={'Formato: Codigo|Descricao|Somadora|CodigoPai\nExemplo:\n00.001|Servicos preliminares|sim|\n00.001.001|Tapume|nao|00.001'}
+              placeholder={'Formato: Código|Descrição|Somadora|CodigoPai\nExemplo:\n00.001|Serviços preliminares|sim|\n00.001.001|Tapume|não|00.001'}
               value={textoMassa}
               onChange={(event) => setTextoMassa(event.target.value)}
             />
@@ -650,13 +650,13 @@ export default function GestaoApropriacoes() {
 
       {resultadoXlsx ? (
         <BlocoConteudo
-          titulo="Resultado da importacao Excel"
+          titulo="Resultado da importação Excel"
           contagem={resultadoXlsx.arquivo || null}
-          descricao="Fica na tela ate a proxima importacao — o relatorio antes so existia dentro da caixa do navegador."
+          descricao="Fica na tela até a próxima importação — o relatório antes so existia dentro da caixa do navegador."
           variante="secundario"
           acoes={(
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setResultadoXlsx(null)}>
-              Fechar relatorio
+              Fechar relatório
             </button>
           )}
         >
@@ -690,7 +690,7 @@ export default function GestaoApropriacoes() {
       ) : null}
 
       <BlocoConteudo
-        titulo="Apropriacoes cadastradas"
+        titulo="Apropriações cadastradas"
         contagem={obraSelecionada ? `${apropriacoes.length} apropriacao(oes)` : null}
         descricao={idsSelecionados.length ? `${idsSelecionados.length} marcada(s) para exclusao.` : 'Marque na tabela para excluir em lote.'}
         variante="primario"
@@ -707,7 +707,7 @@ export default function GestaoApropriacoes() {
         )}
       >
         {!obraSelecionada ? (
-          <p className="text-muted text-sm">Selecione uma obra para visualizar as apropriacoes.</p>
+          <p className="text-muted text-sm">Selecione uma obra para visualizar as apropriações.</p>
         ) : (
           /*
             R16: o botão "Selecionar todas" saiu porque a responsabilidade

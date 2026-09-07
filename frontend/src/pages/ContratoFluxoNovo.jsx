@@ -17,6 +17,7 @@ import { getContratoObraCategorias, getApropriacoesDaObra } from '../services/co
 import { criarContratoFluxoNovo, aprovarContratoFluxoNovo, rejeitarContratoFluxoNovo } from '../services/contratos';
 import { buscarParceiros } from '../services/parceiros';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
+import DateInputBR from '../components/DateInputBR';
 
 /**
  * Criacao de contrato do fluxo novo (wireframe 1).
@@ -246,7 +247,7 @@ export default function ContratoFluxoNovo() {
       titulo: 'Rejeitar contrato',
       mensagem: `Rejeitar o contrato ${contrato.codigo}? As parcelas em previsao passam a rejeitadas e a `
         + 'solicitacao volta para ajuste — o contrato nao e excluido, e o motivo fica no historico dele.',
-      campo: { rotulo: 'Motivo da rejeicao', obrigatorio: true, multilinha: true },
+      campo: { rotulo: 'Motivo da rejeição', obrigatorio: true, multilinha: true },
       rotuloConfirmar: 'Rejeitar contrato',
       rotuloCancelar: 'Manter aguardando aprovacao',
       destrutiva: true
@@ -294,7 +295,7 @@ export default function ContratoFluxoNovo() {
     <Pagina>
       <PageHeader
         titulo="Novo contrato"
-        descricao="O contrato e criado aguardando aprovacao; as parcelas so entram no financeiro quando aprovado."
+        descricao="O contrato e criado aguardando aprovação; as parcelas so entram no financeiro quando aprovado."
         voltar={{ to: CAMINHO_GESTAO_CONTRATOS, title: 'Voltar para a gestao de contratos' }}
         acaoPrincipal={{
           rotulo: salvando ? 'Criando...' : 'Criar contrato',
@@ -310,7 +311,7 @@ export default function ContratoFluxoNovo() {
            titulo do bloco — numero sem contexto era o que o `app-alert` dava. */
         <BlocoConteudo
           titulo={`Contrato ${contratoCriado.codigo}`}
-          descricao="Criado por este formulario."
+          descricao="Criado por este formulário."
           acoes={(
             <StatusBadge
               status={ROTULO_STATUS_CONTRATO[contratoCriado.status_contrato] || contratoCriado.status_contrato}
@@ -320,7 +321,7 @@ export default function ContratoFluxoNovo() {
           {aguardandoAprovacao ? (
             <>
               <p className="app-note">
-                As parcelas ficam em previsao ate a aprovacao. Rejeitar devolve o contrato para
+                As parcelas ficam em previsão até a aprovação. Rejeitar devolve o contrato para
                 ajuste — nao o exclui.
               </p>
               {/* C5: primario solido para a acao que segue o fluxo; a destrutiva
@@ -351,9 +352,9 @@ export default function ContratoFluxoNovo() {
       <BlocoConteudo
         variante="primario"
         cor="var(--module-contratos)"
-        descricao="Acima do limite do Juridico a negociacao detalhada e obrigatoria e vira documento anexado depois da criacao."
+        descricao="Acima do limite do Jurídico a negociação detalhada e obrigatória e vira documento anexado depois da criação."
       >
-        <FormSecao legenda="Identificacao do contrato" colunas={3}>
+        <FormSecao legenda="Identificação do contrato" colunas={3}>
           <CampoForm label="Obra" obrigatorio>
             <select className="input w-full" value={form.obra_id} onChange={campo('obra_id')}>
               <option value="">Selecione</option>
@@ -412,7 +413,7 @@ export default function ContratoFluxoNovo() {
             </span>
           </div>
 
-          <CampoForm label="Referencia">
+          <CampoForm label="Referência">
             <input className="input w-full" value={form.ref_contrato} onChange={campo('ref_contrato')} />
           </CampoForm>
 
@@ -433,7 +434,7 @@ export default function ContratoFluxoNovo() {
             </select>
           </CampoForm>
 
-          <CampoForm label="Apropriacao" obrigatorio hint="A lista depende da obra escolhida.">
+          <CampoForm label="Apropriação" obrigatorio hint="A lista depende da obra escolhida.">
             <select className="input w-full" value={form.apropriacao_id} onChange={campo('apropriacao_id')}>
               <option value="">Selecione</option>
               {apropriacoesObra.map((a) => <option key={a.id} value={a.id}>{a.codigo} — {a.descricao}</option>)}
@@ -457,7 +458,7 @@ export default function ContratoFluxoNovo() {
           </CampoForm>
 
           <CampoForm label="1º vencimento" obrigatorio>
-            <input className="input w-full" type="date" value={form.primeiro_vencimento} onChange={campo('primeiro_vencimento')} />
+            <DateInputBR className="input w-full" value={form.primeiro_vencimento} onChange={campo('primeiro_vencimento')} />
           </CampoForm>
 
           {/*
@@ -488,7 +489,7 @@ export default function ContratoFluxoNovo() {
               </span>
             </div>
             <span className="form-hint">
-              Diferenca entre o valor total do contrato e a soma das parcelas previstas abaixo.
+              Diferença entre o valor total do contrato e a soma das parcelas previstas abaixo.
             </span>
           </div>
         </FormSecao>
@@ -499,7 +500,7 @@ export default function ContratoFluxoNovo() {
             contrato travaria na aprovacao do mesmo jeito, porque o backend cobra o arquivo. */}
         {exigeDetalhes && (
           <div className="app-alert app-alert--warning" data-testid="aviso-negociacao">
-            Acima do limite do Juridico a negociacao detalhada e obrigatoria e precisa ser um
+            Acima do limite do Jurídico a negociação detalhada e obrigatória e precisa ser um
             documento (.docx ou .pdf). Depois de criar, anexe o documento pela Gestao de Contratos —
             sem ele o contrato nao pode ser aprovado.
           </div>

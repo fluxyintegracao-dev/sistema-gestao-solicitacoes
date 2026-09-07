@@ -101,7 +101,7 @@ function BlocoFaixas({ titulo, descricao, rows, storageKey }) {
 const FILTROS_DA_TELA = [
   { id: 'first_contact_minutes', rotulo: 'Primeiro contato (min)' },
   { id: 'no_activity_hours', rotulo: 'Sem atividade (h)' },
-  { id: 'recent_days', rotulo: 'Janela automacoes (dias)' }
+  { id: 'recent_days', rotulo: 'Janela automações (dias)' }
 ];
 
 export default function CrmDashboardSla() {
@@ -184,10 +184,10 @@ export default function CrmDashboardSla() {
       {
         label: 'Regras SLA ativas',
         valor: texto(kpis.regrasSlaAtivas),
-        sub: 'Automacoes NO_FIRST_CONTACT e NO_ACTIVITY'
+        sub: 'Automações NO_FIRST_CONTACT e NO_ACTIVITY'
       },
       {
-        label: 'Execucoes recentes com erro',
+        label: 'Execuções recentes com erro',
         valor: texto(kpis.execucoesRecentesErro),
         sub: `${texto(kpis.execucoesRecentes)} execucao(oes) nos ultimos ${data?.thresholds?.recentDays || filters.recent_days} dias`,
         tom: kpis.execucoesRecentesErro > 0 ? 'danger' : 'success'
@@ -208,7 +208,7 @@ export default function CrmDashboardSla() {
       <PageHeader
         titulo="Dashboard SLA CRM"
         contagem={kpis ? `${texto(kpis.leadsSemPrimeiroContato)} lead(s) sem primeiro contato` : null}
-        descricao="Leitura de atrasos operacionais, backlog por responsavel e saude do runtime do CRM."
+        descricao="Leitura de atrasos operacionais, backlog por responsável e saúde do runtime do CRM."
         acaoPrincipal={{
           rotulo: loading ? 'Atualizando...' : 'Atualizar',
           onClick: () => load(filters),
@@ -251,7 +251,7 @@ export default function CrmDashboardSla() {
             },
             {
               id: 'recent_days',
-              rotulo: 'Janela automacoes (dias)',
+              rotulo: 'Janela automações (dias)',
               tipo: 'number',
               min: 1,
               max: 90,
@@ -299,7 +299,7 @@ export default function CrmDashboardSla() {
                 gera ação (cobrar, redistribuir), então é ele que leva a barra
                 de cor; faixas e listas de apoio ficam neutras. */}
             <BlocoConteudo
-              titulo="Backlog por responsavel"
+              titulo="Backlog por responsável"
               descricao="Fila combinada de leads sem contato, tarefas vencidas e conversas pendentes."
               variante="primario"
               cor="var(--sem-danger)"
@@ -308,7 +308,7 @@ export default function CrmDashboardSla() {
                 colunas={[
                   {
                     id: 'responsavel',
-                    titulo: 'Responsavel',
+                    titulo: 'Responsável',
                     tipo: 'identidade',
                     noCard: 'titulo',
                     render: (row) => row.usuario?.nome || '-'
@@ -333,7 +333,7 @@ export default function CrmDashboardSla() {
                   },
                   {
                     id: 'nao_lidas',
-                    titulo: 'Nao lidas',
+                    titulo: 'Não lidas',
                     tipo: 'numero',
                     render: (row) => row.mensagensNaoLidas
                   },
@@ -346,7 +346,7 @@ export default function CrmDashboardSla() {
                 ]}
                 itens={data.backlogResponsaveis || []}
                 getId={(row) => row.usuario?.id || row.usuario?.nome}
-                vazio="Nenhum backlog por responsavel neste recorte."
+                vazio="Nenhum backlog por responsável neste recorte."
                 storageKey="tabela:crm-dashboard-sla:backlog"
                 rotuloRolagem="Backlog por responsavel"
               />
@@ -358,7 +358,7 @@ export default function CrmDashboardSla() {
                 função (por que estes leads estão aqui). */}
             <BlocoConteudo
               titulo="Leads sem primeiro contato"
-              descricao={`Mais antigos e com maior urgencia de abordagem. Regra atual: ${data.thresholds?.firstContactMinutes || filters.first_contact_minutes} min.`}
+              descricao={`Mais antigos e com maior urgência de abordagem. Regra atual: ${data.thresholds?.firstContactMinutes || filters.first_contact_minutes} min.`}
             >
               <TabelaPadrao
                 colunas={[
@@ -381,7 +381,7 @@ export default function CrmDashboardSla() {
                   },
                   {
                     id: 'responsavel',
-                    titulo: 'Responsavel',
+                    titulo: 'Responsável',
                     tipo: 'texto',
                     render: (row) => row.responsavel?.nome || '-'
                   },
@@ -436,7 +436,7 @@ export default function CrmDashboardSla() {
                   },
                   {
                     id: 'responsavel',
-                    titulo: 'Responsavel',
+                    titulo: 'Responsável',
                     tipo: 'texto',
                     render: (row) => row.responsavel?.nome || '-'
                   },
@@ -454,7 +454,7 @@ export default function CrmDashboardSla() {
                   },
                   {
                     id: 'ultima',
-                    titulo: 'Ultima interacao',
+                    titulo: 'Última interação',
                     tipo: 'data',
                     render: (row) => fmtDate(row.ultimaInteracaoAt)
                   }
@@ -468,7 +468,7 @@ export default function CrmDashboardSla() {
 
             <BlocoConteudo
               titulo="Tarefas vencidas"
-              descricao="Fila operacional que ja passou do prazo."
+              descricao="Fila operacional que já passou do prazo."
             >
               <TabelaPadrao
                 colunas={[
@@ -487,7 +487,7 @@ export default function CrmDashboardSla() {
                   },
                   {
                     id: 'responsavel',
-                    titulo: 'Responsavel',
+                    titulo: 'Responsável',
                     tipo: 'texto',
                     render: (row) => row.responsavel?.nome || '-'
                   },
@@ -542,7 +542,7 @@ export default function CrmDashboardSla() {
                   },
                   {
                     id: 'responsavel',
-                    titulo: 'Responsavel',
+                    titulo: 'Responsável',
                     tipo: 'texto',
                     render: (row) => row.responsavel?.nome || '-'
                   },
@@ -554,13 +554,13 @@ export default function CrmDashboardSla() {
                   },
                   {
                     id: 'unreadCount',
-                    titulo: 'Nao lidas',
+                    titulo: 'Não lidas',
                     tipo: 'numero',
                     render: (row) => row.unreadCount
                   },
                   {
                     id: 'lastMessageAt',
-                    titulo: 'Ultima mensagem',
+                    titulo: 'Última mensagem',
                     tipo: 'data',
                     render: (row) => fmtDate(row.lastMessageAt)
                   }
@@ -580,21 +580,21 @@ export default function CrmDashboardSla() {
             */}
             <BlocoFaixas data-bloco-id="faixas-sem-primeiro-contato" data-bloco-rotulo="Faixas sem primeiro contato"
               titulo="Faixas sem primeiro contato"
-              descricao="Leads novos ou em contato que ja estouraram o SLA inicial."
+              descricao="Leads novos ou em contato que já estouraram o SLA inicial."
               rows={data.buckets?.primeiroContato}
               storageKey="tabela:crm-dashboard-sla:faixas-primeiro-contato"
             />
 
             <BlocoFaixas data-bloco-id="faixas-sem-atividade" data-bloco-rotulo="Faixas sem atividade"
               titulo="Faixas sem atividade"
-              descricao="Leads sem interacao recente conforme a regra configurada."
+              descricao="Leads sem interação recente conforme a regra configurada."
               rows={data.buckets?.semAtividade}
               storageKey="tabela:crm-dashboard-sla:faixas-sem-atividade"
             />
 
             <BlocoFaixas data-bloco-id="runtime-de-automacoes" data-bloco-rotulo="Runtime de automacoes"
-              titulo="Runtime de automacoes"
-              descricao={`Execucoes nos ultimos ${data.thresholds?.recentDays || filters.recent_days} dias.`}
+              titulo="Runtime de automações"
+              descricao={`Execuções nos últimos ${data.thresholds?.recentDays || filters.recent_days} dias.`}
               rows={data.automacoes?.execucoesPorStatus?.map((item) => ({ faixa: item.chave, total: item.total }))}
               storageKey="tabela:crm-dashboard-sla:runtime-automacoes"
             />

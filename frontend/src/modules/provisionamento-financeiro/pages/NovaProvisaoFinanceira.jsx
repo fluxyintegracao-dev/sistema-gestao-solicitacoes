@@ -1,3 +1,4 @@
+import DateInputBR from '../../../components/DateInputBR';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -110,7 +111,7 @@ export default function NovaProvisaoFinanceira() {
     if (saving) return;
 
     if (!form.obra_id || !form.data_prevista_desembolso || !form.item_macro.trim() || !form.descricao.trim() || !form.valor_previsto) {
-      avisar.erro('Preencha obra, data prevista, item macro, descricao e valor previsto.');
+      avisar.erro('Preencha obra, data prevista, item macro, descrição e valor previsto.');
       return;
     }
 
@@ -148,8 +149,8 @@ export default function NovaProvisaoFinanceira() {
   if (loading) {
     return (
       <Pagina>
-        <PageHeader titulo="Nova Provisao" />
-        <BlocoConteudo>Carregando formulario...</BlocoConteudo>
+        <PageHeader titulo="Nova Provisão" />
+        <BlocoConteudo>Carregando formulário...</BlocoConteudo>
       </Pagina>
     );
   }
@@ -167,13 +168,13 @@ export default function NovaProvisaoFinanceira() {
         como no molde aprovado (ComercialUnidades).
       */}
       <PageHeader
-        titulo="Nova Provisao"
+        titulo="Nova Provisão"
         /* C3 (apontado pela matriz): tela de CADASTRO com rota propria tem
            registro-pai a que voltar — a listagem de onde se veio. E o inverso
            da listagem, onde a seta e redundante. */
         voltar={{ to: '/provisoes-financeiras', title: 'Voltar para provisoes' }}
-        contagem={`${obrasCriacao.length} obra(s) disponivel(is)`}
-        descricao="Registre uma previsao gerencial de desembolso com os dados essenciais do compromisso."
+        contagem={`${obrasCriacao.length} obra(s) disponível(is)`}
+        descricao="Registre uma previsão gerencial de desembolso com os dados essenciais do compromisso."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
@@ -190,7 +191,7 @@ export default function NovaProvisaoFinanceira() {
           tela. Não mover para OverlayModal.
         */}
         <BlocoConteudo
-          titulo="Dados da provisao"
+          titulo="Dados da provisão"
           variante="primario"
           cor="var(--c-primary)"
         >
@@ -212,8 +213,7 @@ export default function NovaProvisaoFinanceira() {
             </CampoForm>
 
             <CampoForm label="Data prevista de desembolso" obrigatorio>
-              <input
-                type="date"
+              <DateInputBR
                 className="input w-full"
                 value={form.data_prevista_desembolso}
                 onChange={(event) => atualizarCampo('data_prevista_desembolso', event.target.value)}
@@ -243,7 +243,7 @@ export default function NovaProvisaoFinanceira() {
                 value={form.prioridade}
                 onChange={(event) => atualizarCampo('prioridade', event.target.value)}
               >
-                <option value="">Nao definida</option>
+                <option value="">Não definida</option>
                 <option value="baixa">Baixa</option>
                 <option value="media">Media</option>
                 <option value="alta">Alta</option>
@@ -276,23 +276,23 @@ export default function NovaProvisaoFinanceira() {
               />
             </CampoForm>
 
-            <CampoForm label="Descricao" obrigatorio tipo="texto-longo" span={2}>
+            <CampoForm label="Descrição" obrigatorio tipo="texto-longo" span={2}>
               {/* R10: a altura do textarea vem da folha do sistema
                   (textarea.input), não do `min-h-[110px]` que estava aqui. */}
               <textarea
                 className="input w-full"
                 value={form.descricao}
                 onChange={(event) => atualizarCampo('descricao', event.target.value)}
-                placeholder="Descreva o desembolso previsto com contexto suficiente para a equipe entender a provisao."
+                placeholder="Descreva o desembolso previsto com contexto suficiente para a equipe entender a provisão."
               />
             </CampoForm>
           </FormSecao>
         </BlocoConteudo>
 
         <BlocoConteudo
-          titulo="Anexos da provisao"
+          titulo="Anexos da provisão"
           contagem={`${arquivosPendentes.length} arquivo(s) selecionado(s)`}
-          descricao={`Enviados logo apos o registro ser salvo. Limite atual: ate ${UPLOAD_MAX_FILE_SIZE_MB_PADRAO} MB por arquivo.`}
+          descricao={`Enviados logo após o registro ser salvo. Limite atual: até ${UPLOAD_MAX_FILE_SIZE_MB_PADRAO} MB por arquivo.`}
           variante="secundario"
           acoes={(
             <label className={`btn btn-outline${saving ? ' pointer-events-none opacity-60' : ''}`}>

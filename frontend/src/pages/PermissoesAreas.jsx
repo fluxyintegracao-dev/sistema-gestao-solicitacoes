@@ -245,12 +245,12 @@ function ModuleGovernancePanel({ moduleEnabledMap }) {
     // O h2 de 16px (text-base) virou o título do BlocoConteudo, que já é o
     // degrau 18 da escala; o apoio virou a prop `descricao` do bloco.
     <BlocoConteudo
-      titulo="Matriz modular relevante para permissao de area"
+      titulo="Matriz modular relevante para permissão de área"
       variante="secundario"
-      descricao="Esta leitura mostra o impacto estrutural dos modulos que mais afetam o fluxo principal da instalacao."
+      descricao="Esta leitura mostra o impacto estrutural dos módulos que mais afetam o fluxo principal da instalacao."
     >
       <p className="app-note mb-4">
-        A tela de permissao nao habilita modulo. Ela apenas restringe o que cada usuario pode operar nos modulos ativos.
+        A tela de permissão não habilita módulo. Ela apenas restringe o que cada usuário pode operar nos módulos ativos.
       </p>
 
       <div className="grid gap-3 xl:grid-cols-2">
@@ -275,7 +275,7 @@ function ModuleGovernancePanel({ moduleEnabledMap }) {
               </div>
 
               <div className="mt-3 space-y-2 text-xs text-[var(--c-muted)]">
-                <p><strong className="text-[var(--c-text)]">Relacao:</strong> {item.dependency}</p>
+                <p><strong className="text-[var(--c-text)]">Relação:</strong> {item.dependency}</p>
                 <p><strong className="text-[var(--c-text)]">Usado em:</strong> {item.usedIn.join(' | ')}</p>
                 <p><strong className="text-[var(--c-text)]">Ao desabilitar:</strong> {item.disabledEffect}</p>
               </div>
@@ -634,7 +634,7 @@ export default function PermissoesAreas() {
             hasPadraoConfiguradoUsuario(usuarioSelecionado, normalizePadroes(resultado?.padroes_setor_perfil))
         });
       }
-      avisar.sucesso('Permissoes salvas com sucesso.');
+      avisar.sucesso('Permissões salvas com sucesso.');
     } catch (err) {
       console.error(err);
       avisar.erro(err?.message || 'Erro ao salvar permissoes');
@@ -669,13 +669,13 @@ export default function PermissoesAreas() {
           porta ausente. Ele ainda era um `<a href>` cru, que numa SPA faz
           recarga completa da página e joga fora o estado do React. */}
       <PageHeader
-        titulo="Permissoes adicionais por Usuario"
+        titulo="Permissões adicionais por Usuário"
         // B3: a contagem da faixa e a do painel lateral são fatos DIFERENTES
         // — aqui, quantos usuários já têm exceção individual gravada (o
         // assunto da tela); lá, quantos a busca deixou na lista. Repetir o
         // mesmo número nos dois lugares é que seria defeito.
         contagem={carregando ? null : `${Object.keys(mapa).length} com excecao individual`}
-        descricao="Adicione excecoes individuais acima do padrao por setor e perfil. Nas operacoes criticas de pagamento, aprovacao e preparacao/envio sao papeis incompativeis, inclusive para perfis administrativos."
+        descricao="Adicione exceções individuais acima do padrão por setor e perfil. Nas operações críticas de pagamento, aprovação e preparacao/envio são papeis incompativeis, inclusive para perfis administrativos."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar permissoes',
           onClick: salvar,
@@ -691,7 +691,7 @@ export default function PermissoesAreas() {
           Recolhível para quem já sabe, visível por padrão para quem não. */}
       <BlocoConteudo titulo="Como funciona" variante="secundario" recolhivel>
         <p className="app-note">
-          Esta tela mostra o acesso efetivo do usuario: padrao do setor/perfil, permissoes individuais extras
+          Esta tela mostra o acesso efetivo do usuário: padrão do setor/perfil, permissões individuais extras
           e bloqueios individuais. Se uma permissao herdada for desmarcada aqui, ela fica bloqueada apenas
           para este usuario.
         </p>
@@ -702,7 +702,7 @@ export default function PermissoesAreas() {
       ) : (
         <BlocoConteudo titulo="Leitura operacional" variante="secundario">
           <p className="app-note">
-            Esta tela controla apenas o que cada usuario pode operar nos recursos disponiveis nesta instalacao.
+            Esta tela controla apenas o que cada usuário pode operar nos recursos disponíveis nesta instalacao.
             Se algum recurso ainda nao estiver disponivel, as permissoes podem ser deixadas prontas aqui, mas
             permanecem inativas ate a liberacao.
           </p>
@@ -740,8 +740,8 @@ export default function PermissoesAreas() {
             trabalho está agora.
           */}
           <BlocoConteudo
-            titulo="Usuarios"
-            contagem={`${usuariosFiltrados.length} usuario(s)`}
+            titulo="Usuários"
+            contagem={`${usuariosFiltrados.length} usuário(s)`}
             variante={usuarioSelecionado ? 'neutro' : 'primario'}
             cor="var(--c-primary)"
             className="self-start lg:col-span-1 lg:sticky lg:top-4"
@@ -750,7 +750,7 @@ export default function PermissoesAreas() {
               busca={{
                 valor: filtroUsuario,
                 aoMudar: setFiltroUsuario,
-                placeholder: 'Buscar usuario...'
+                placeholder: 'Buscar usuário...'
               }}
             />
 
@@ -817,7 +817,7 @@ export default function PermissoesAreas() {
           <div className="space-y-4 lg:col-span-3">
             {!usuarioSelecionado ? (
               <div className="app-empty-card">
-                <p className="text-sm text-[var(--c-muted)]">Selecione um usuario para configurar as permissoes.</p>
+                <p className="text-sm text-[var(--c-muted)]">Selecione um usuário para configurar as permissões.</p>
               </div>
             ) : (
               <>
@@ -843,14 +843,14 @@ export default function PermissoesAreas() {
 
                     {selectedUserIsBypassAdmin ? (
                       <div className="rounded-lg border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] px-3 py-2 text-xs text-[var(--sem-info)]">
-                        Bypass total: este perfil nao e afetado por permissoes de area.
+                        Bypass total: este perfil não e afetado por permissões de área.
                       </div>
                     ) : (
                       <StatGrid colunas={1}>
                         <StatTile
-                          label="Permissoes configuradas"
+                          label="Permissões configuradas"
                           valor={permissoesUsuarioAtual.length}
-                          sub={`${permissoesPadraoUsuarioAtual.length} padrao | ${permissoesIndividuaisUsuarioAtual.length} individual | ${permissoesBloqueadasUsuarioAtual.length} bloqueada(s)`}
+                          sub={`${permissoesPadraoUsuarioAtual.length} padrão | ${permissoesIndividuaisUsuarioAtual.length} individual | ${permissoesBloqueadasUsuarioAtual.length} bloqueada(s)`}
                         />
                       </StatGrid>
                     )}

@@ -159,7 +159,7 @@ function ListaDistribuicao({ titulo, descricao, linhas, chaveRotulo, formatarRot
             </div>
           );
         }) : (
-          <p className="text-sm text-[var(--c-muted)]">Sem dados no periodo.</p>
+          <p className="text-sm text-[var(--c-muted)]">Sem dados no período.</p>
         )}
       </div>
     </BlocoConteudo>
@@ -352,14 +352,14 @@ export default function FiscalOperationalReport() {
     { titulo: 'Documentos por status', linhas: agrupamentos.por_status || [], chave: 'status', formatar: statusLabel },
     { titulo: 'Documentos por empresa fiscal', linhas: agrupamentos.por_empresa || [], chave: 'empresa' },
     { titulo: 'Documentos por fornecedor', linhas: agrupamentos.por_fornecedor || [], chave: 'fornecedor' },
-    { titulo: 'Divergencias por tipo', linhas: agrupamentos.divergencias_por_tipo || [], chave: 'tipo' },
-    { titulo: 'Divergencias por severidade', linhas: agrupamentos.divergencias_por_severidade || [], chave: 'severidade' },
+    { titulo: 'Divergências por tipo', linhas: agrupamentos.divergencias_por_tipo || [], chave: 'tipo' },
+    { titulo: 'Divergências por severidade', linhas: agrupamentos.divergencias_por_severidade || [], chave: 'severidade' },
     { titulo: 'Documentos por origem', linhas: agrupamentos.por_origem || [], chave: 'origem', formatar: sourceLabel },
     {
-      titulo: 'Evolucao mensal de documentos',
+      titulo: 'Evolução mensal de documentos',
       linhas: agrupamentos.por_mes || [],
       chave: 'mes',
-      descricao: 'Quantidade por mes de emissao ou cadastro quando a emissao nao existe.'
+      descricao: 'Quantidade por mês de emissão ou cadastro quando a emissão não existe.'
     }
   ];
 
@@ -424,12 +424,12 @@ export default function FiscalOperationalReport() {
       </BlocoConteudo>
 
       <StatGrid colunas={4}>
-        <StatTile label="Período" valor={periodoTexto} sub="Emissao, ou cadastro quando nao ha emissao" />
+        <StatTile label="Período" valor={periodoTexto} sub="Emissão, ou cadastro quando não ha emissão" />
         <StatTile label="Valor fiscal" valor={formatMoney(resumo.valor_total)} sub="Soma dos XMLs filtrados" />
         <StatTile
           label="Sem vínculo"
           valor={formatNumber(resumo.documentos_sem_vinculo_confirmado)}
-          sub="Sem vinculo confirmado/manual"
+          sub="Sem vínculo confirmado/manual"
           tom={resumo.documentos_sem_vinculo_confirmado > 0 ? 'warning' : 'success'}
         />
         <StatTile
@@ -442,7 +442,7 @@ export default function FiscalOperationalReport() {
         <StatTile
           label="Pendentes"
           valor={formatNumber(resumo.documentos_pendentes)}
-          sub="Nao validados/ignorados/cancelados"
+          sub="Não validados/ignorados/cancelados"
           tom={resumo.documentos_pendentes > 0 ? 'warning' : 'success'}
         />
         <StatTile
@@ -477,7 +477,7 @@ export default function FiscalOperationalReport() {
       <BlocoConteudo
         titulo="Documentos que exigem ação"
         contagem={`${formatNumber(documents.length)} itens`}
-        descricao="Itens com divergencia aberta, sem vinculo confirmado ou sem arquivo fiscal essencial."
+        descricao="Itens com divergência aberta, sem vínculo confirmado ou sem arquivo fiscal essencial."
         variante="primario"
         cor="var(--module-fiscal)"
       >
@@ -518,7 +518,7 @@ export default function FiscalOperationalReport() {
             },
             {
               id: 'emissao',
-              titulo: 'Emissao',
+              titulo: 'Emissão',
               tipo: 'data',
               render: (item) => formatDate(item.emission_date)
             },
@@ -541,14 +541,14 @@ export default function FiscalOperationalReport() {
             },
             {
               id: 'pendencias',
-              titulo: 'Pendencias',
+              titulo: 'Pendências',
               tipo: 'texto',
               render: (item) => <EtiquetasRisco item={item} />
             }
           ]}
           itens={documents}
           carregando={loading}
-          vazio="Sem documentos pendentes no periodo."
+          vazio="Sem documentos pendentes no período."
           storageKey="tabela:relatorio-operacional-fiscal:documentos-criticos"
           rotuloRolagem="Documentos que exigem acao"
         />
