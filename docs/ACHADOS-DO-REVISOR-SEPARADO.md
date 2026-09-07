@@ -101,7 +101,42 @@ FORNECEDOR sobra espaço e PEDIDO MINIMO mostra só "-".
 `sst-dashboard`: "> **Dashl**"; `fiscal-dashboard`: "> **Pain**". Em `obras` e
 `usuarios` a trilha termina em "Início > Cadastros >" — separador solto, sem
 nada depois. E `inicio`, `financeiro-titulos` e `solicitacao-detalhe` recolhem
-certo com o botão `»`. **Três comportamentos diferentes para o mesmo estouro.**
+certo com o botão `»`. ~~**Três comportamentos diferentes para o mesmo
+estouro.**~~
+
+**CORREÇÃO AO ENQUADRAMENTO (07/09), por medição.** Não são três
+comportamentos: é **um mecanismo só** — `.fx-breadcrumb` era `overflow-x:
+auto` com `scrollbar-width: none`, numa caixa que ficava com a SOBRA da
+fileira da navegação. Onde o corte cai depende apenas do comprimento dos
+rótulos. E os três casos que "recolhiam certo" não recolhiam: `inicio` tem
+só "Início" por definição, `financeiro-titulos` mostrava só "Início" por
+causa do A7 (trilha ausente), e o botão `»` é o painel de ATALHOS, não um
+recolhimento da trilha.
+
+**E era muito maior do que as seis telas do relato.** Medido nas 174 telas
+do manifesto que têm rota fixa, com o `Layout` real (`medirTrilha`, hoje
+`provaTextoInteiroAparece.mjs`):
+
+| largura | telas com degrau cortado | com degrau INTEIRAMENTE invisível | caixa da trilha |
+|---|---|---|---|
+| 390 | **167 de 174** | **161** | 79px |
+| 768 | 166 | 132 | 140px |
+| 1366 | 87 | 0 | ~294px |
+| 1920 | 0 | 0 | cabe |
+
+O "separador solto" de `obras`/`usuarios` é literalmente isso: o terceiro
+degrau existe, ocupa 76px, e **0px** dele estão na tela.
+
+**A rolagem não era saída em ponta nenhuma** — no ponteiro não há rolagem
+horizontal (roda de mouse não rola em X, e a barra estava escondida); no
+toque o arrasto existe, mas sem pista de que há mais caminho. E a trilha
+nem `title` tinha.
+
+**CORRIGIDO (07/09).** A trilha quebra em linhas, como `.app-bloco-lead` e
+`.la-visoes` já faziam; abaixo de 1024px ela usa a fileira inteira da barra.
+Nas 174 telas × 4 larguras: **0 degrau cortado**. Preço medido, e ele é o
+custo declarado: barra de 119 → 162/165/202px a 390, de 117 → 160/163px a
+768, de 67 → 94px em 88 das 174 telas a 1366, e **nada muda a 1920**.
 
 ### A7. Trilha ausente justamente na consulta de títulos
 
@@ -124,6 +159,27 @@ então é clamp de uma linha, não falta de espaço.
 
 **Encosta na leva:** o texto de apoio **do bloco** foi corrigido no item 8 e
 quebra certo; o do **cabeçalho da página** não foi tocado.
+
+**CONFIRMADO E CORRIGIDO (07/09).** Causa: `.app-page-lead` era
+`white-space: nowrap` + `text-overflow: ellipsis`, com o texto inteiro só no
+`title`. Medido no `PageHeader` real dentro do shell real, a 390px (caixa de
+335px):
+
+| tela | texto pede | ficava fora |
+|---|---|---|
+| `solicitacoes` | 775px | 440px (57%) |
+| `financeiro-titulos` | 626px | 291px (46%) |
+| `solicitacoes-rel-operacional` | 882px | 547px (62%) |
+| `compras-rel-economia` | 1138px | 774px (68%) |
+
+**Alcance: 198 usos de `PageHeader` com `contagem` ou `descricao`, em 179
+arquivos** — e todos passam pela mesma classe, porque `.app-page-lead` só
+nasce dentro do componente (nenhum escrito à mão no sistema; conferido). O
+número de 204 que circulou no pedido está 6 acima do medido.
+
+A correção é o bloco que o irmão `.app-bloco-lead` já tinha: dentro de
+`@media (max-width: 767px)`, `white-space: normal; overflow: visible;
+text-overflow: clip`. Acima de 768px nada muda — lá o `title` abre.
 
 ### A10. Botão `»` sobrepondo o vizinho em 1366px
 

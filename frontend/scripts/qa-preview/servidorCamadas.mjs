@@ -191,6 +191,21 @@ export function criarServidorDeCamadas() {
   propósito: a barra é `sticky` no topo do `.layout-content-shell` e
   qualquer regra inventada aqui mudaria a geometria que a prova mede.
 */
+/*
+  A FIXTURE DO APOIO DA FAIXA — quarta entrada do MESMO servidor. Pede o
+  Tailwind pelo mesmo motivo da barra do topo: `src/index.css` começa com as
+  três diretivas do Tailwind e o shell usa utilitárias; servido cru, o CSS
+  medido não é o do sistema.
+*/
+export function criarServidorDeApoioDaFaixa() {
+  return criarServidorDeFixture({
+    entrada: 'fixtureApoioDaFaixa.jsx',
+    cssExtra: 'body { margin: 0; }',
+    caminho: 'apoio-da-faixa',
+    tailwind: true
+  });
+}
+
 export function criarServidorDeBarraDoTopo() {
   return criarServidorDeFixture({
     entrada: 'fixtureBarraDoTopo.jsx',

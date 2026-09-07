@@ -591,7 +591,6 @@
   gap: 8px;
   flex: 1 1 52rem;
   min-width: 0;
-  flex-wrap: wrap;
 }
 
 .fx-home-btn,
@@ -649,8 +648,48 @@
   janela — medido a 1024px, "Mais 3 atalhos" sobrando 0×32 de 32×32.
   Com a base `auto` da navegação a trilha já está protegida por
   construção: a barra quebra ANTES de espremê-la, e depois da quebra ela
-  fica com o que sobra da fileira (87px a 390px, 182px a 768px), sempre
-  com rolagem própria para o resto do caminho.
+  fica com o que sobra da fileira (87px a 390px, 182px a 768px).
+
+  ATUALIZADO EM 07/09 — a última frase deste bloco dizia "sempre com
+  rolagem própria para o resto do caminho", e essa rolagem era o defeito:
+  ver a nota da própria `.fx-breadcrumb`, logo abaixo. Abaixo de 1024px a
+  trilha não mora mais nesta sobra; ela tem fileira própria.
+*/
+/*
+  A TRILHA QUEBRA EM LINHAS — ela NÃO esconde caminho atrás de rolagem
+  (07/09).
+  ---------------------------------------------------------------------
+  O QUE ESTAVA AQUI: `overflow-x: auto` com `scrollbar-width: none`, numa
+  caixa que fica com a SOBRA da fileira. O caminho era cortado no meio da
+  palavra, sem reticências, sem barra de rolagem, sem tooltip — sem pista
+  nenhuma de que havia cortado. Medido nas 174 telas do manifesto que têm
+  rota fixa, com o `Layout` real e o CSS real:
+
+    @390   167 telas com degrau cortado — 161 delas com um degrau
+           INTEIRAMENTE invisível (0px de 56 a 213px). A caixa tem 79px.
+    @768   166 cortadas, 132 com degrau invisível. A caixa tem 140px.
+    @1366   87 cortadas, nenhuma invisível. A caixa tem ~294px.
+    @1920    0 — lá a trilha cabe.
+
+  É o "Início > Cadastros >" com separador solto que o revisor separado
+  fotografou em `obras` e `usuarios`: o terceiro degrau existe, ocupa
+  76px, e ZERO deles estão na tela. Não são três comportamentos; é um só,
+  e onde ele corta depende só do comprimento dos rótulos.
+
+  E A ROLAGEM NÃO ERA SAÍDA, em nenhuma das duas pontas: no ponteiro não
+  há rolagem horizontal (roda de mouse não rola em X, e a barra estava
+  escondida por `scrollbar-width: none`); no toque o arrasto existe, mas
+  sem pista nenhuma de que há mais caminho — foi exatamente por isso que a
+  faixa de visões perdeu a tira horizontal dela (`lista-avancada.css`,
+  06/09). E, ao contrário do apoio de bloco, a trilha nem `title` tinha.
+
+  A SOLUÇÃO É A QUE O SISTEMA JÁ USOU DUAS VEZES nesta leva, com a mesma
+  conta paga pela decisão do cliente de 02/09 ("mais rolagem é aceitável,
+  apertar os olhos não"):
+    - `.app-bloco-lead` — quebra em linhas no celular em vez de truncar;
+    - `.la-visoes` — quebra em linhas no celular em vez de rolar.
+  Aqui é a mesma. E ela é conservadora por construção: `flex-wrap` só age
+  quando não cabe — a 1920px nenhuma das 174 telas muda de altura.
 */
 .fx-breadcrumb {
   display: flex;
@@ -662,6 +701,69 @@
   color: var(--app-muted-color);
 }
 
+/*
+  DE ONDE VEM A LARGURA PARA QUEBRAR — e por que a trilha nasce em DOIS
+  lugares no `Layout.jsx`.
+
+  Quebrar em linhas só resolve se a linha couber o degrau mais largo do
+  sistema — 265px, "Visibilidade de Dashboards e Tabelas". Dentro da
+  navegação a trilha fica com a sobra: 79px a 390, 140px a 768. Ali a
+  quebra não esconde mais nada, mas pinta os degraus POR CIMA da estrela e
+  do "»" — medido, e a `provaBarraDoTopo` reprova (par sobreposto em
+  `/solicitacoes` a 390).
+
+  Então abaixo de 1024px a trilha usa a FILEIRA INTEIRA da barra — 341px a
+  390 e 695px a 768, medidos. 1024 não é número novo: é a fronteira em que
+  o shell já troca de forma (`responsive-system.css` — abaixo dela o menu
+  vira gaveta). De 1024 para cima a trilha volta para dentro da navegação,
+  onde a caixa nunca desce de 294px (varrido de 1024 a 1920 de 40 em 40px;
+  o piso cai a 1366, quando a barra volta a caber em uma fileira só) e a
+  quebra por dentro basta.
+
+  O QUE FOI DESCARTADO, por medição e não por gosto:
+    - `flex-wrap: wrap` na `.fx-topbar-nav`. Resolve, e APAGA A MORDIDA da
+      `provaBarraDoTopo`: com a navegação quebrando por dentro, a folha de
+      antes de 06/09 (`flex: 1 1 0%`) deixa de sobrepor botão nenhum e a
+      prova para de reprovar em 3 das 4 larguras em que o defeito foi
+      medido. Ainda por cima custa uma fileira a mais — barra de 213 a
+      250px a 390, contra 162 a 202px por aqui —, porque a área de atalhos
+      é empurrada para baixo da trilha.
+    - `order` para trazer os atalhos de volta para a primeira fileira.
+      Economiza 44px e inverte a ordem de foco em relação à ordem visual.
+      Não se paga acessibilidade com altura de barra.
+*/
+@media (max-width: 1023px) {
+  .fx-breadcrumb.fx-breadcrumb--dentro { display: none; }
+}
+
+@media (min-width: 1024px) {
+  .fx-breadcrumb.fx-breadcrumb--fileira { display: none; }
+}
+
+/* Base 100% para abrir fileira nova dentro da barra, que já sabe quebrar
+   (`.fx-topbar`, `flex-wrap: wrap`). */
+.fx-breadcrumb--fileira {
+  flex: 1 1 100%;
+}
+
+/*
+  O DEGRAU QUEBRA SOZINHO QUANDO NEM ELE CABE — e isto é o que torna a
+  regra acima verdadeira POR CONSTRUÇÃO, e não por coincidência de 29px.
+
+  A quebra em linhas só resolve enquanto a linha couber o degrau mais
+  largo. Hoje o mais largo tem 265px ("Visibilidade de Dashboards e
+  Tabelas") e o piso da caixa de 1024 para cima é 294px — 29px de folga,
+  que um rótulo novo come sem avisar. Com `white-space: normal`, um degrau
+  que sozinho não cabe na linha quebra o PRÓPRIO texto em vez de vazar por
+  cima do vizinho.
+
+  E ele só age nesse caso: com `flex-wrap: wrap`, a quebra de linha é
+  decidida pelo tamanho MÁXIMO de cada degrau, então um degrau que caberia
+  numa linha vai para a linha seguinte inteiro. Encolher só acontece quando
+  o degrau, sozinho, é maior que a linha — que é exatamente a hora em que
+  se quer que ele quebre. Medido: nenhuma das 174 telas muda de altura por
+  causa desta declaração.
+*/
 .fx-breadcrumb a {
   display: inline-flex;
   align-items: center;
@@ -671,7 +773,7 @@
   color: var(--app-muted-color);
   text-decoration: none;
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .fx-breadcrumb a:hover {
@@ -683,7 +785,8 @@
   padding: 6px 8px;
   font-weight: 700;
   color: var(--app-heading-color);
-  white-space: nowrap;
+  /* Mesma razão do degrau clicável, logo acima. */
+  white-space: normal;
 }
 
 .fx-breadcrumb-sep {

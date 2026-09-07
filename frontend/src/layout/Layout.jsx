@@ -62,13 +62,13 @@ function isComprasResponsiveRoute(pathname = '') {
   mudar de rota, e nada em teste ou fixture, onde esse global não reflete
   a rota do router.
 */
-function Breadcrumb({ user, pathname, busca = '' }) {
+function Breadcrumb({ user, pathname, busca = '', classe = '' }) {
   const hubMatch = pathname.match(/^\/hub\/([^/]+)/);
   const hubModule = hubMatch ? getVisibleModule(user, hubMatch[1]) : null;
   const active = !hubMatch && pathname !== '/' ? findActiveNode(user, pathname, busca) : null;
 
   return (
-    <nav className="fx-breadcrumb" aria-label="Trilha de navegação">
+    <nav className={`fx-breadcrumb${classe ? ` ${classe}` : ''}`} aria-label="Trilha de navegação">
       {pathname === '/' ? (
         <span className="fx-breadcrumb-current" aria-current="page">Início</span>
       ) : (
@@ -280,12 +280,44 @@ export default function Layout() {
                   <kbd className="fx-search-kbd hidden md:inline">Ctrl K</kbd>
                 </button>
 
-                <Breadcrumb user={user} pathname={location.pathname} busca={location.search} />
+                <Breadcrumb
+                  user={user}
+                  pathname={location.pathname}
+                  busca={location.search}
+                  classe="fx-breadcrumb--dentro"
+                />
 
                 {/* Estrela de fixar a tela atual + fileira de atalhos
                     (ícones na cor do módulo, excedente no painel »). */}
                 <AtalhosTopbar />
               </div>
+
+              {/*
+                A MESMA TRILHA, NA FILEIRA DE BAIXO — e só uma das duas
+                existe de cada vez (`display: none` na outra, por largura;
+                o que está oculto não entra na árvore de acessibilidade).
+
+                POR QUE DUAS E NÃO UMA QUE SE MOVE: elas moram em CAIXAS
+                DIFERENTES. Abaixo de 1024px a trilha precisa da fileira
+                inteira, e a única caixa que sabe abrir fileira nova é a
+                própria barra (`.fx-topbar`, `flex-wrap: wrap`) — não a
+                navegação, que é uma fileira só. CSS não muda um nó de
+                caixa; ou ele nasce nas duas, ou a navegação passaria a
+                quebrar por dentro, e isso apaga a mordida da prova da
+                barra (medido: com `flex-wrap` na navegação, a folha de
+                antes de 06/09 deixa de reprovar em 3 das 4 larguras).
+
+                A ORDEM DO DOM É A ORDEM DA TELA nas duas larguras — nada
+                de `order`, que inverteria o foco do teclado em relação ao
+                que se vê. Aqui a trilha fica entre a navegação e a
+                bandeja, que é onde ela é desenhada.
+              */}
+              <Breadcrumb
+                user={user}
+                pathname={location.pathname}
+                busca={location.search}
+                classe="fx-breadcrumb--fileira"
+              />
 
               <div className="fx-topbar-tray">
                 <button

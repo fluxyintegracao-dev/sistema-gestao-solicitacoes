@@ -204,6 +204,53 @@
   font-weight: 700;
 }
 
+/*
+  NO CELULAR O APOIO DA FAIXA QUEBRA — o mesmo bloco que o irmão de bloco
+  já ganhou em 06/09, pelo mesmo motivo, na mesma largura (07/09).
+
+  A regra de cima é honesta em UMA condição, escrita no `PageHeader`: "o
+  texto completo vai no tooltip". No toque não há hover e `title` não abre:
+  a metade que tornava a reticência honesta some, e fica só a metade que
+  esconde. É a MESMA frase que está no `.app-bloco-lead`, logo abaixo, e o
+  irmão foi corrigido por ela — o do cabeçalho da página não tinha sido
+  tocado, e o revisor separado voltou a apontá-lo (A9).
+
+  MEDIDO no `PageHeader` REAL, dentro do shell real, a 390px, com os
+  literais das próprias telas (`provaTextoInteiroAparece.mjs`). A caixa do
+  apoio tem 335px; o que o texto pede, e o que ficava fora:
+
+    solicitacoes                 775px  → 440px fora (57%)
+    financeiro-titulos           626px  → 291px fora (46%)
+    solicitacoes-rel-operacional 882px  → 547px fora (62%)
+    compras-rel-economia        1138px  → 774px fora (68%)
+
+  O terceiro é o que fecha o argumento do revisor: em
+  `solicitacoes-rel-operacional` a linha está SOZINHA na faixa e mesmo
+  assim cortava. Não é falta de espaço — é clamp de uma linha.
+
+  ALCANCE: 198 usos de `PageHeader` com `contagem` ou `descricao`, em 179
+  arquivos — e todos passam por aqui, porque `.app-page-lead` só nasce
+  dentro do componente (nenhum `<p className="app-page-lead">` escrito à
+  mão no sistema; conferido).
+
+  E TEM UM SEGUNDO PREÇO, o mesmo que o irmão pagou: texto que não quebra
+  tem mínimo-de-conteúdo do tamanho da FRASE INTEIRA. A `paginaCabeNoCelular`
+  já nomeia "um apoio com `white-space: nowrap`" entre os culpados de a
+  página estourar os 390px, e o `compras-relatorio-apoio.css` teve de
+  escrever `flex-basis: 0` no bloco do título só para conter esse mesmo
+  hipotético.
+
+  Acima de 768px nada muda: lá existe hover, o tooltip funciona, e a linha
+  única com reticências continua sendo o desenho.
+*/
+@media (max-width: 767px) {
+  .app-page-lead {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
 /* first-of-TYPE, não first-child: com a seta de voltar (C3) o primeiro
    filho da linha passa a ser o botão/Link — o contêiner do título segue
    sendo o primeiro <div>. */

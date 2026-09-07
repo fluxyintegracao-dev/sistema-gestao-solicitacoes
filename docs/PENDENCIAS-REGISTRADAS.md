@@ -3241,3 +3241,42 @@ As outras três de `componentes-padrao.css` (`z-index: 2` no botão de
 limpar, `3` e `4` na célula fixa da tabela) são empilhamento **local** e
 seguem corretas onde estão: `--z-conteudo-acima`, `--z-celula-fixa` e
 `--z-celula-fixa-cabecalho` existem para elas.
+
+---
+
+## O título da tela quebra no meio da palavra na faixa COMPACTA, a 390px (07/09)
+
+**Achado novo, não é da minha leva, e é ANTERIOR à correção do apoio (A9) —
+medido nos dois estados.**
+
+**Onde**: `frontend/src/styles/componentes-padrao.css`, na regra
+`.layout-main .app-page-header--compacto .app-page-header-row > div:first-of-type`,
+que é `display: flex; align-items: baseline` — título e apoio lado a lado,
+numa linha só.
+
+**O que acontece**: a 390px essa linha não tem largura para os dois. O `h1`
+não tem `flex-shrink: 0` (só ganha isso dentro do escopo
+`.apoio-linha-unica`, em `compras-relatorio-apoio.css`), então quem é
+espremido é o TÍTULO. Medido na fixture `fixtureApoioDaFaixa.jsx`, tela
+`solicitacoes`, depois de rolar 400px:
+
+    "Solicitações"  →  "Solici / tações / s"   (três linhas, quebra dentro
+                                                da palavra)
+
+E acontece **assim que a pessoa rola**, que é o estado normal de uso de uma
+listagem no celular.
+
+**Por que não corrigi aqui**: está fora dos dois achados que me foram
+passados (A6 e A9), e mexer na faixa compacta encosta na banda morta medida
+do `PageHeader` (`saltoRef`, a correção do laço de 60fps de 06/09) — a
+altura dos dois estados é insumo daquele cálculo. Correção às cegas ali
+troca um defeito visível por um laço que volta calado.
+
+**O que já se sabe do conserto**: `flex-wrap: wrap` (ou
+`flex-direction: column`) nessa caixa dentro de `@media (max-width: 767px)`
+resolve sem tocar no `h1`; a conta a refazer é a da banda morta.
+
+**Medido antes e depois da correção do A9**, para não confundir causa: a
+altura da faixa compacta a 390px é **133px nos dois casos** — o título já
+quebrava assim com o apoio em `nowrap`. A quebra do apoio não criou isto e
+não piorou a altura.

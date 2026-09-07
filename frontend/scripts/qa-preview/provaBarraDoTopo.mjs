@@ -15,7 +15,8 @@
  * Cada alvo acionável da barra (`a[href]` e `button`) vira um retângulo, e o
  * retângulo é intersectado com o de TODO ancestral que corta (`overflow`
  * diferente de `visible`) e com a janela. Isso importa mais do que parece: a
- * trilha é `overflow-x: auto` e a fileira de atalhos é `overflow: clip`, então
+ * fileira de atalhos é `overflow: clip` (e até 07/09 a trilha era
+ * `overflow-x: auto`), então
  * o `getBoundingClientRect()` cru acusa sobreposições que NÃO existem na tela
  * — o link está fora da caixa que o recorta e ninguém o vê. Medir sem recorte
  * é inventar defeito; e inventar defeito gasta a leitura de quem confere.
@@ -42,6 +43,13 @@
  * `.fx-topbar-nav` e do `.fx-atalhos-area` — a folha exata de antes de
  * 06/09 — e a prova EXIGE que ela reprove. Medição que não reprova o estado
  * conhecido não está medindo nada.
+ *
+ * Desde 07/09 as duas folhas plantadas devolvem TAMBÉM a trilha para dentro
+ * da navegação: com a trilha abrindo fileira própria abaixo de 1024px, a
+ * navegação ganha uma fileira inteira e a base zero deixa de espremer
+ * qualquer coisa — a mordida parava de reprovar a 768 e a 390. Plantar o
+ * defeito de 06/09 exige plantar o arranjo de 06/09; a nota inteira está
+ * em `fixtureBarraDoTopo.jsx`.
  *
  * Rode com `npm run provas` ou `node scripts/qa-preview/provaBarraDoTopo.mjs`.
  */
@@ -108,10 +116,14 @@ const medirBarra = () => {
     se sobrepõe a nada, porque ninguém o está vendo.
 
     ALCANÇÁVEL: a caixa depois só do que corta SEM ROLAGEM (`hidden`,
-    `clip`) e da janela. Rolagem é caminho: a trilha é `overflow-x: auto`
-    e o degrau que ficou para trás se alcança arrastando. Já o
-    `overflow-x: clip` do shell não tem volta — o que passa da borda
-    some, e é assim que os três botões de tela sumiam pela direita.
+    `clip`) e da janela. Rolagem é caminho, e o `overflow-x: clip` do
+    shell não tem volta — o que passa da borda some, e é assim que os
+    três botões de tela sumiam pela direita.
+
+    A distinção nasceu da trilha, que era `overflow-x: auto`. Ela deixou
+    de ser em 07/09 (a trilha quebra em linhas; ver `design-tokens.css`),
+    mas a regra fica: quem é rolável de verdade continua alcançável, e
+    medir sem essa diferença inventa defeito.
   */
   const cortar = (el, soSemRolagem) => {
     const r = el.getBoundingClientRect();
@@ -183,7 +195,17 @@ const medirBarra = () => {
   const fileira = barra.querySelector('.fx-atalhos-fileira');
   const excedente = Boolean(barra.querySelector('.fx-atalhos-mais'));
 
-  const trilha = barra.querySelector('.fx-breadcrumb');
+  /*
+    A TRILHA VISÍVEL, não a primeira do DOM (07/09). Desde a correção da
+    trilha cortada existem DOIS `.fx-breadcrumb` na barra — o de dentro da
+    navegação (≥1024px) e o de fileira própria (<1024px) —, e a cada
+    largura um deles é `display: none`. `querySelector` devolveria sempre
+    o primeiro do DOM, que abaixo de 1024 é justamente o oculto: a prova
+    passaria a medir 0px e a reprovar as 16 telas por "a TRILHA não
+    aparece", com a trilha inteira desenhada logo abaixo.
+  */
+  const trilha = [...barra.querySelectorAll('.fx-breadcrumb')]
+    .find((el) => getComputedStyle(el).display !== 'none') || null;
   const degrau = trilha ? trilha.querySelector('a, .fx-breadcrumb-current') : null;
   const ct = trilha ? pintado(trilha) : null;
   const cd = degrau ? pintado(degrau) : null;

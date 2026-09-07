@@ -19,9 +19,10 @@
  *
  * `?rota=` escolhe a rota (é ela que liga ou não o escopo de Compras).
  * `?d=` planta um defeito conhecido — `antesDaCorrecao` devolve as quatro
- * declarações de antes de 06/09, e `soAreaDeAtalhos` devolve só as duas da
- * área de atalhos. Prova que não reprova o defeito conhecido não está
- * medindo nada.
+ * declarações de antes de 06/09, `soAreaDeAtalhos` devolve só as duas da
+ * área de atalhos, e `trilhaQueRola` devolve a trilha rolante de antes de
+ * 07/09 (usado pela `provaTextoInteiroAparece`). Prova que não reprova o
+ * defeito conhecido não está medindo nada.
  */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -74,13 +75,58 @@ const AUTH = {
 
   `soAreaDeAtalhos`: a outra metade, sozinha.
 */
+/*
+  A TRILHA DE ANTES DE 07/09 — e por que ela entra nos DOIS defeitos.
+
+  Até 07/09 a trilha morava DENTRO da `.fx-topbar-nav` e escondia o resto
+  do caminho atrás de `overflow-x: auto` sem barra de rolagem. A correção
+  daquele defeito tirou-a de lá abaixo de 1024px: ela passou a ter fileira
+  própria, com `flex: 1 1 100%`, e essa base é o que faz a BARRA quebrar.
+
+  Isso muda a geometria que estes dois defeitos precisam para aparecer. Com
+  a trilha abrindo fileira, a navegação ganha uma fileira inteira abaixo de
+  1024px — e aí `flex: 1 1 0%` nela deixa de espremer coisa nenhuma:
+  medido, a mordida parou de reprovar a 768 e a 390 (e a segunda mordida,
+  nas duas). A folha de antes de 06/09, sozinha, virou uma folha que não
+  reproduz mais o estado de antes de 06/09.
+
+  Então ela vem junto: para plantar o defeito de 06/09 é preciso plantar
+  também o arranjo de 06/09. NÃO é afrouxar a mordida — é o contrário: sem
+  isto ela passaria a verde sem medir nada, que é exatamente o que este
+  arquivo diz, lá em cima, para não deixar acontecer.
+
+  De 1024px para cima nada disto muda a tela (a trilha já mora dentro da
+  navegação), e é por isso que a mordida continuava reprovando ali.
+*/
+const TRILHA_DE_ANTES = `
+  .fx-breadcrumb--fileira { display: none !important; }
+  .fx-breadcrumb--dentro {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  /*
+    O degrau tambem recusava quebra — e sem esta linha o defeito plantado
+    NAO e o defeito que existia: com o white-space normal de hoje o degrau
+    encolhe e quebra o proprio texto dentro da tira rolante, nada fica
+    escondido, e a mordida da trilha para de reprovar a 1024 e a 1366
+    (medido). A folha de antes tem de vir inteira. (Sem crases aqui: este
+    comentario mora dentro de um template literal.)
+  */
+  .fx-breadcrumb--dentro a,
+  .fx-breadcrumb--dentro .fx-breadcrumb-current { white-space: nowrap !important; }
+`;
+
 const CSS_DEFEITOS = {
-  /* A folha EXATA de antes de 06/09, nas quatro declarações que mudaram. */
+  /* A folha EXATA de antes de 06/09, nas quatro declarações que mudaram,
+     mais o arranjo de trilha que existia naquele dia (ver acima). */
   antesDaCorrecao: `
     .fx-topbar-nav { flex: 1 1 0% !important; min-width: 0 !important; }
     .fx-atalhos-area { flex: 1 1 0% !important; }
     .fx-atalhos-fileira { flex: 0 1 auto !important; }
     .fx-topbar-tray { flex-wrap: nowrap !important; }
+    ${TRILHA_DE_ANTES}
   `,
   /* Só a metade da correção que mora na ÁREA DE ATALHOS. A barra continua
      quebrando certo (a navegação tem base `auto`), mas a área volta a ter
@@ -91,7 +137,14 @@ const CSS_DEFEITOS = {
   soAreaDeAtalhos: `
     .fx-atalhos-area { flex: 1 1 0% !important; }
     .fx-atalhos-fileira { flex: 0 1 auto !important; }
-  `
+    ${TRILHA_DE_ANTES}
+  `,
+  /*
+    A TRILHA QUE ROLA — o defeito de 07/09, sozinho, para a
+    `provaTrilhaInteiraAparece` plantar de volta. Sem as bases zero: aqui
+    o que se quer medir é o CAMINHO SUMINDO, não a barra se atravessando.
+  */
+  trilhaQueRola: TRILHA_DE_ANTES
 };
 
 function Corpo() {
