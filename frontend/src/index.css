@@ -5178,6 +5178,35 @@ input[type="file"]:disabled {
 }
 
 /*
+  A CONFIRMACAO ESTAVA PINTADA DE ALERTA (06/09).
+
+  `.app-alert--success` era usada em 3 pontos e NAO EXISTIA. O base
+  `.app-alert` e ambar e desenha TRIANGULO DE ATENCAO no `::before`; so
+  `--error` e `--warning` sobrescreviam. Resultado medido: "Cartao
+  cadastrado." saia com a cor E o icone de AVISO.
+
+  Elemento presente, texto certo, SIGNIFICADO TROCADO — a classe de defeito
+  que este projeto chama de SIGNIFICADO, e que nenhum check de forma pega.
+
+  O comentario de 04/09 em `CartoesRecarga.jsx:110` ja tinha diagnosticado
+  isto por extenso. Nao faltou descobrir: faltou declarar a variante.
+
+  Troca a cor E O ICONE. So a cor deixaria um triangulo de atencao verde,
+  que continua dizendo "cuidado" para quem le a forma antes da cor — e e
+  assim que a maioria le.
+*/
+.app-alert--success {
+  border-color: var(--sem-success-border);
+  background: var(--sem-success-bg);
+  color: var(--sem-success);
+}
+
+.app-alert--success::before {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.8' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.8' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/*
   `--warning` era classe FANTASMA e funcionava por acidente (05/09).
 
   Cinco pontos escrevem `app-alert app-alert--warning`, entre eles telas ja

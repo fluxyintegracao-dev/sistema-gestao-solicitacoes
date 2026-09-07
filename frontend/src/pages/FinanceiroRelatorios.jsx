@@ -1126,7 +1126,7 @@ function ContaReportShell({ title, subtitle, type }) {
                   id: 'status',
                   titulo: type === 'conciliacao' ? 'Status' : 'Classe',
                   tipo: 'status',
-                  render: (item) => <span className="badge badge-soft">{type === 'conciliacao' ? item.status : item.classe}</span>
+                  render: (item) => <span className="fx-badge">{type === 'conciliacao' ? item.status : item.classe}</span>
                 },
                 ...(type === 'conciliacao' ? [{
                   id: 'natureza',

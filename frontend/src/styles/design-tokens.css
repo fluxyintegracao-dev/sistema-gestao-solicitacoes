@@ -591,6 +591,7 @@
   gap: 8px;
   flex: 1 1 52rem;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .fx-home-btn,
@@ -656,14 +657,9 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex-wrap: wrap;
   font-size: var(--fonte-corpo);
   color: var(--app-muted-color);
-}
-
-.fx-breadcrumb::-webkit-scrollbar {
-  display: none;
 }
 
 .fx-breadcrumb a {

@@ -594,7 +594,7 @@ export default function RhDpJornada() {
           </BlocoConteudo>
 
           {comProblema.length ? (
-            <div className="alert alert-danger">
+            <div className="app-alert app-alert--error">
               Dias mais faltas passam de {diasBase} em: {comProblema.map((l) => l.nome).join(', ')}.
             </div>
           ) : null}
