@@ -61,6 +61,22 @@ const STATUS_PEDIDOS_FALLBACK = [
   { codigo: 'CANCELADO', nome: 'Cancelado', ativo: true }
 ];
 
+const STATUS_FINANCEIRO_OPTIONS = [
+  ['AGUARDANDO_GEO', 'Aguardando GEO'],
+  ['LEGADO_PENDENTE_REVISAO', 'Legado pendente de revisão'],
+  ['PREVISAO_CRIADA', 'Previsão criada'],
+  ['PARCIALMENTE_LIBERADO', 'Parcialmente liberado'],
+  ['LIBERADO_FINANCEIRO', 'Liberado ao Financeiro'],
+  ['PAGO_PARCIALMENTE', 'Pago parcialmente'],
+  ['CONCLUIDO', 'Concluído'],
+  ['CORRECAO_SOLICITADA', 'Reabertura solicitada']
+].map(([valor, rotulo]) => ({ valor, rotulo }));
+
+function formatStatusFinanceiro(value) {
+  return STATUS_FINANCEIRO_OPTIONS.find((item) => item.valor === value)?.rotulo
+    || String(value || 'Não iniciado').replace(/_/g, ' ');
+}
+
 async function carregarStatusPedidosComFallback() {
   try {
     const dataStatus = await getStatusPedidosCompra();
@@ -90,6 +106,7 @@ async function carregarStatusPedidosComFallback() {
 const FILTROS_DA_TELA = [
   { id: 'busca', rotulo: 'Busca', obrigatorio: true },
   { id: 'status', rotulo: 'Status' },
+  { id: 'status_financeiro', rotulo: 'Financeiro GEO' },
   { id: 'obra_id', rotulo: 'Obra' }
 ];
 
@@ -109,7 +126,7 @@ export default function PedidosCompra() {
     valor cada. Marcação múltipla mostraria duas etiquetas e mandaria um
     valor só: a lista não estreitaria e a etiqueta mentiria (R15).
   */
-  const [ativos, setAtivos] = useState({ status: new Set(), obra_id: new Set() });
+  const [ativos, setAtivos] = useState({ status: new Set(), status_financeiro: new Set(), obra_id: new Set() });
   /*
     N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
     ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
@@ -139,12 +156,13 @@ export default function PedidosCompra() {
   });
 
   const status = useMemo(() => [...(ativos.status || [])][0] || '', [ativos.status]);
+  const statusFinanceiro = useMemo(() => [...(ativos.status_financeiro || [])][0] || '', [ativos.status_financeiro]);
   const obraId = useMemo(() => [...(ativos.obra_id || [])][0] || '', [ativos.obra_id]);
 
   // O recorte corrente numa ref: o refresh em tempo real e o botão
   // "Atualizar" reconsultam o MESMO recorte que está na tela.
-  const recorteRef = useRef({ q: '', status: '', obra_id: '' });
-  recorteRef.current = { q: busca, status, obra_id: obraId };
+  const recorteRef = useRef({ q: '', status: '', status_financeiro: '', obra_id: '' });
+  recorteRef.current = { q: busca, status, status_financeiro: statusFinanceiro, obra_id: obraId };
 
   async function carregar() {
     const recorte = recorteRef.current;
@@ -154,6 +172,7 @@ export default function PedidosCompra() {
         listarPedidosCompra({
           q: recorte.q || undefined,
           status: recorte.status || undefined,
+          status_financeiro: recorte.status_financeiro || undefined,
           obra_id: recorte.obra_id || undefined,
           visao: 'resumo'
         }),
@@ -183,7 +202,7 @@ export default function PedidosCompra() {
       carregar();
     }, busca ? 350 : 0);
     return () => window.clearTimeout(timer);
-  }, [busca, status, obraId]);
+  }, [busca, status, statusFinanceiro, obraId]);
 
   useComprasRealtimeRefresh(carregar);
 
@@ -206,6 +225,12 @@ export default function PedidosCompra() {
       rotulo: 'Obra',
       unico: true,
       opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
+    },
+    {
+      id: 'status_financeiro',
+      rotulo: 'Financeiro GEO',
+      unico: true,
+      opcoes: STATUS_FINANCEIRO_OPTIONS
     }
   ], [statusOptions, obras]);
 
@@ -214,7 +239,7 @@ export default function PedidosCompra() {
   }
 
   function limparFiltros() {
-    setAtivos({ status: new Set(), obra_id: new Set() });
+    setAtivos({ status: new Set(), status_financeiro: new Set(), obra_id: new Set() });
     setBusca('');
   }
 
@@ -290,6 +315,17 @@ export default function PedidosCompra() {
           kind={statusKind(pedido.status, statusMap)}
         />
       )
+    },
+    {
+      id: 'financeiro_geo',
+      titulo: 'Financeiro GEO',
+      tipo: 'status',
+      render: (pedido) => (
+        <StatusBadge
+          status={formatStatusFinanceiro(pedido.financeiro?.status)}
+          kind={['CONCLUIDO', 'LIBERADO_FINANCEIRO'].includes(pedido.financeiro?.status) ? 'success' : 'neutral'}
+        />
+      )
     }
   ];
 
@@ -298,7 +334,7 @@ export default function PedidosCompra() {
       <PageHeader
         titulo="Pedidos de Compra"
         contagem={loading ? null : `${totalPedidos} pedido(s)`}
-        descricao="Consulta dos pedidos gerados a partir das cotações encerradas, com gestão restrita ao setor de compras."
+        descricao="Compras acompanha o pedido; o GEO prepara e libera os títulos financeiros após o fechamento com o fornecedor."
         secundarias={[
           {
             rotulo: loading ? 'Buscando...' : 'Atualizar',

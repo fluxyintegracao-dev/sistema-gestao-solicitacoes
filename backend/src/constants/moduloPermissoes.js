@@ -214,6 +214,17 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'compras.pedidos.financeiro',
+        label: 'Financeiro dos Pedidos pelo GEO',
+        permissoes: [
+          { key: 'compras.pedidos.financeiro.visualizar', label: 'Visualizar financeiro do pedido', descricao: 'Ver previsoes, titulos, documentos e pedidos de reabertura vinculados ao pedido.' },
+          { key: 'compras.pedidos.financeiro.anexar_documentos', label: 'Anexar documentos', descricao: 'Registrar nota fiscal, comprovante de compra ou outra confirmacao do fornecedor.' },
+          { key: 'compras.pedidos.financeiro.gerar_previsao', label: 'Gerar previsoes', descricao: 'Criar os titulos de previsao a partir de um pedido fechado pelo setor de Compras.' },
+          { key: 'compras.pedidos.financeiro.liberar_pagamento', label: 'Liberar para pagamento', descricao: 'Converter previsoes confirmadas em titulos abertos para o Financeiro.' },
+          { key: 'compras.pedidos.financeiro.aprovar_reabertura', label: 'Decidir reabertura', descricao: 'Aprovar ou rejeitar a reabertura solicitada por Compras quando houver titulo vinculado.' }
+        ]
+      },
+      {
         key: 'compras.delegacao',
         label: 'Delegacao de Compras',
         permissoes: [

@@ -9,6 +9,8 @@ const {
   PedidoCompraFreteRateio,
   PedidoCompraItem,
   PedidoCompraItemLog,
+  PedidoCompraReabertura,
+  PedidoCompraTitulo,
   Solicitacao,
   SolicitacaoCompra,
   SolicitacaoCompraAlocacao,
@@ -2184,6 +2186,9 @@ async function fecharPedidosDaSolicitacaoCompraAutomaticamente({
       },
       transaction
     });
+
+    const { sincronizarPedidoFinanceiroAoFechar } = require('./pedidoCompraFinanceiroService');
+    await sincronizarPedidoFinanceiroAoFechar({ pedido, usuarioId, transaction });
   }
 }
 
@@ -2205,7 +2210,7 @@ async function isSolicitacaoCompraComPedidosFechadosComFornecedor(solicitacao) {
   ));
 }
 
-async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transaction }) {
+async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, aprovacaoGeoId = null, transaction }) {
   const motivoNormalizado = String(motivo || '').trim();
   if (!motivoNormalizado) {
     throw new Error('Informe o motivo da reabertura.');
@@ -2224,7 +2229,24 @@ async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transacti
     throw new Error('Pedido cancelado nao pode ser reaberto.');
   }
 
-  await assertPedidoSemVinculoFinanceiroParaCancelamento(pedido.id, transaction);
+  if (aprovacaoGeoId) {
+    const aprovacao = await PedidoCompraReabertura.findOne({
+      where: {
+        id: Number(aprovacaoGeoId),
+        pedido_compra_id: pedido.id,
+        status: 'APROVADA'
+      },
+      transaction
+    });
+    if (!aprovacao) {
+      const error = new Error('A aprovacao do GEO para esta reabertura nao foi encontrada.');
+      error.statusCode = 409;
+      error.code = 'APROVACAO_GEO_INVALIDA';
+      throw error;
+    }
+  } else {
+    await assertPedidoPodeReabrirDiretamente(pedido.id, transaction);
+  }
 
   const solicitacao = await SolicitacaoCompra.findByPk(pedido.solicitacao_compra_id, {
     transaction,
@@ -2245,7 +2267,10 @@ async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transacti
     await pedido.update(
       {
         status: statusAberto.codigo,
-        encerrado_em: null
+        encerrado_em: null,
+        ...(pedido.financeiro_fluxo_versao
+          ? { status_financeiro: 'NAO_INICIADO', financeiro_atualizado_em: new Date() }
+          : {})
       },
       { transaction }
     );
@@ -2362,7 +2387,8 @@ async function listarPedidos({
   obraIds = null,
   compradorResponsavelId = null,
   solicitanteId = null,
-  visao = null
+  visao = null,
+  statusFinanceiro = null
 } = {}) {
   const where = {};
 
@@ -2440,11 +2466,18 @@ async function listarPedidos({
     return haystack.includes(filtro);
   });
 
-  if (!visaoResumo || pedidosFiltrados.length === 0) {
-    return pedidosFiltrados;
+  const { aplicarResumoFinanceiroPedidos } = require('./pedidoCompraFinanceiroService');
+  const pedidosComFinanceiro = await aplicarResumoFinanceiroPedidos(pedidosFiltrados);
+  const statusFinanceiroNormalizado = normalizeText(statusFinanceiro);
+  const pedidosFinais = statusFinanceiroNormalizado
+    ? pedidosComFinanceiro.filter((pedido) => normalizeText(pedido.financeiro?.status) === statusFinanceiroNormalizado)
+    : pedidosComFinanceiro;
+
+  if (!visaoResumo || pedidosFinais.length === 0) {
+    return pedidosFinais;
   }
 
-  const ids = pedidosFiltrados.map((pedido) => Number(pedido.id));
+  const ids = pedidosFinais.map((pedido) => Number(pedido.id));
   const contagens = await PedidoCompraItem.findAll({
     where: {
       pedido_compra_id: { [Op.in]: ids },
@@ -2461,8 +2494,8 @@ async function listarPedidos({
     contagens.map((row) => [Number(row.pedido_compra_id), Number(row.total || 0)])
   );
 
-  return pedidosFiltrados.map((pedido) => ({
-    ...pedido.toJSON(),
+  return pedidosFinais.map((pedido) => ({
+    ...pedido,
     itens_ativos_count: Number(mapaContagens.get(Number(pedido.id)) || 0)
   }));
 }
@@ -2571,7 +2604,7 @@ async function listarAuditoriaItensPedido({ obraId, pedidoId, itemId, acao, q, o
 async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
   const pedido = await PedidoCompra.findByPk(id, {
     include: [
-      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'email', 'whatsapp', 'contato'] },
+      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'email', 'whatsapp', 'contato', 'parceiro_id'] },
       {
         model: Obra,
         as: 'obra',
@@ -2804,6 +2837,9 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
     };
   });
 
+  const { obterResumoFinanceiroPedido } = require('./pedidoCompraFinanceiroService');
+  const financeiro = await obterResumoFinanceiroPedido(pedido, { incluirDetalhes: true });
+
   return {
     ...pedido.toJSON(),
     itens,
@@ -2814,7 +2850,8 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
       ? 'COTACAO_ENCERRADA'
       : null,
     candidatos_adicao: candidatos,
-    candidatos_remanejamento: candidatosRemanejamento
+    candidatos_remanejamento: candidatosRemanejamento,
+    financeiro
   };
 }
 
@@ -3040,12 +3077,39 @@ async function atualizarStatusPedido({ pedidoId, status, usuarioId, transaction 
     transaction
   });
 
+  if (statusConfig.codigo === 'FECHADO_FORNECEDOR') {
+    const { sincronizarPedidoFinanceiroAoFechar } = require('./pedidoCompraFinanceiroService');
+    await sincronizarPedidoFinanceiroAoFechar({ pedido, usuarioId, transaction });
+  }
+
   return pedido;
+}
+
+async function assertPedidoPodeReabrirDiretamente(pedidoId, transaction) {
+  const pedidoCompraId = Number(pedidoId);
+  const [vinculosNovos, alocacoesHistoricas, fretesHistoricos] = await Promise.all([
+    PedidoCompraTitulo.count({ where: { pedido_compra_id: pedidoCompraId }, transaction }),
+    SolicitacaoCompraAlocacao.count({
+      where: { pedido_compra_id: pedidoCompraId, titulo_financeiro_id: { [Op.ne]: null } },
+      transaction
+    }),
+    PedidoCompraFrete.count({
+      where: { pedido_compra_id: pedidoCompraId, titulo_financeiro_id: { [Op.ne]: null } },
+      transaction
+    })
+  ]);
+
+  if (vinculosNovos > 0 || alocacoesHistoricas > 0 || fretesHistoricos > 0) {
+    const error = new Error('Este pedido possui historico financeiro. Solicite a aprovacao do GEO para reabri-lo.');
+    error.statusCode = 409;
+    error.code = 'REABERTURA_EXIGE_APROVACAO_GEO';
+    throw error;
+  }
 }
 
 async function assertPedidoSemVinculoFinanceiroParaCancelamento(pedidoId, transaction) {
   const pedidoCompraId = Number(pedidoId);
-  const [alocacoesComTitulo, fretesComTitulo] = await Promise.all([
+  const [alocacoesComTitulo, fretesComTitulo, titulosNovoFluxoAtivos] = await Promise.all([
     SolicitacaoCompraAlocacao.count({
       where: {
         pedido_compra_id: pedidoCompraId,
@@ -3076,10 +3140,20 @@ async function assertPedidoSemVinculoFinanceiroParaCancelamento(pedidoId, transa
         ]
       },
       transaction
+    }),
+    PedidoCompraTitulo.count({
+      where: { pedido_compra_id: pedidoCompraId },
+      include: [{
+        model: TituloFinanceiro,
+        as: 'titulo',
+        required: true,
+        where: { status: { [Op.notIn]: ['CANCELADO', 'ESTORNADO'] } }
+      }],
+      transaction
     })
   ]);
 
-  if (alocacoesComTitulo > 0 || fretesComTitulo > 0) {
+  if (alocacoesComTitulo > 0 || fretesComTitulo > 0 || titulosNovoFluxoAtivos > 0) {
     throw new Error('Este pedido possui titulo financeiro vinculado. Estorne ou cancele o financeiro antes de alterar o pedido.');
   }
 }

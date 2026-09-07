@@ -660,6 +660,73 @@ export async function reabrirPedidoCompraParaCotacao(id, data) {
   return handleJsonResponse(response, 'Erro ao reabrir pedido para cotacao');
 }
 
+function pedidoFinanceiroIdempotencyKey(prefix, pedidoId) {
+  const random = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}:${pedidoId}:${random}`;
+}
+
+export async function adotarFinanceiroPedidoCompra(id) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/financeiro/adotar-legado`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao iniciar a gestao financeira do pedido');
+}
+
+export async function criarPrevisoesPedidoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/financeiro/previsoes`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': pedidoFinanceiroIdempotencyKey('previsao', id)
+    }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao criar as previsoes do pedido');
+}
+
+export async function registrarDocumentoFinanceiroPedidoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/financeiro/documentos`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': pedidoFinanceiroIdempotencyKey('documento', id)
+    }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao registrar o documento financeiro do pedido');
+}
+
+export async function liberarTitulosPedidoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/financeiro/liberar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao liberar os titulos do pedido');
+}
+
+export async function solicitarReaberturaPedidoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/reaberturas`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': pedidoFinanceiroIdempotencyKey('reabertura', id)
+    }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao solicitar a reabertura do pedido');
+}
+
+export async function decidirReaberturaPedidoCompra(id, reaberturaId, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/reaberturas/${reaberturaId}/decisao`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao decidir a reabertura do pedido');
+}
+
 export async function atualizarStatusPedidosCompraEmLote(data) {
   const response = await fetch(`${API_URL}/compras/pedidos/status-lote`, {
     method: 'PATCH',

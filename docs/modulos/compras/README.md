@@ -82,6 +82,23 @@ Campos e rotas de diretoria ainda presentes no backend atendem somente compras a
 - edicao e remanejamento recalculam os rateios e totais dentro da transacao existente, sem mudar rotas, permissoes ou estados do pedido;
 - detalhe, comparativo e PDF exibem o frete e o total da aquisicao para evitar que um frete informado fique apenas como texto.
 
+## Gestao financeira do pedido pelo GEO
+
+- a solicitacao de compra continua no setor de Compras durante as rodadas de cotacao e a geracao de varios pedidos;
+- cada pedido fechado com um fornecedor entra individualmente na fila financeira do GEO, sem aguardar o encerramento dos demais pedidos da solicitacao;
+- o GEO acessa a area de Pedidos por permissoes granulares proprias, sem receber permissao para editar itens, cotacoes ou outras operacoes exclusivas de Compras;
+- o GEO distribui o total devido ao fornecedor em um ou mais titulos `PREVISAO`, com vencimentos informados por parcela e vinculo explicito entre pedido e titulo;
+- nota fiscal, comprovante de compra ou outra confirmacao fica vinculada ao pedido; ao menos uma confirmacao e obrigatoria antes da liberacao;
+- a liberacao e manual e seletiva: apenas os titulos escolhidos mudam de `PREVISAO` para `ABERTO` e recebem a forma de pagamento definida pelo GEO;
+- novos pedidos do mesmo fornecedor permanecem registros independentes e geram seus proprios vinculos financeiros;
+- pedidos anteriores a implantacao nao sofrem backfill ou alteracao automatica: aparecem como legados pendentes de revisao e somente entram no fluxo quando o GEO os adota expressamente;
+- se o pedido ja teve qualquer titulo vinculado, inclusive previsao ou titulo historico cancelado, Compras nao pode reabri-lo diretamente e precisa solicitar decisao do GEO;
+- o GEO pode aprovar a reabertura quando todos os titulos estiverem em `PREVISAO`, `CANCELADO` ou `ESTORNADO`; previsoes ainda ativas sao canceladas na mesma transacao antes da reabertura;
+- titulo `ABERTO`, `PARCIAL` ou `QUITADO` bloqueia a aprovacao ate o Financeiro regularizar o efeito financeiro;
+- criacao de previsoes e solicitacao de reabertura exigem chave de idempotencia, e criacao, liberacao, cancelamento de previsao e reabertura sao transacionais.
+
+A estrutura e criada pela migration `202609070050_pedido_compra_gestao_financeira_geo.js`, que nao altera pedidos ou titulos existentes.
+
 As rotas antigas `PATCH /compras/solicitacoes/:id/integrar` e `PATCH /compras/solicitacoes/:id/liberar` respondem `410`. O codigo depois desse retorno e legado inacessivel e nao define a regra vigente.
 
 ## Dependencias
@@ -116,7 +133,7 @@ No fechamento de cotacao, a mesma chave de idempotencia nao pode repetir pedidos
 
 A disponibilidade e acumulada por fornecedor e item, sem depender do ID versionado da resposta. Uma edicao interna que aumente a capacidade total do fornecedor pode reabrir uma solicitacao `ENCERRADO` para `FECHAMENTO_PARCIAL`; o sistema abate tudo que ja foi comprado daquele fornecedor para o item e libera somente a diferenca real. A resposta publica continua bloqueada depois do encerramento.
 
-Reabrir um pedido libera ajustes operacionais, mas preserva as alocacoes ja compradas. Edicao e remanejamento ficam bloqueados quando houver titulo financeiro ou frete titulado. No remanejamento, origem e destino sao atualizados na mesma transacao, com validacao do saldo do fornecedor, custos gerenciais, descontos e fretes pendentes. Depois do ajuste, o usuario fecha novamente os pedidos; a solicitacao e as cotacoes sao sincronizadas automaticamente conforme todos os pedidos ativos estejam fechados ou algum pedido seja cancelado.
+Reabrir um pedido libera ajustes operacionais, mas preserva as alocacoes ja compradas. Sem historico financeiro, Compras pode executar a reabertura diretamente. Se existir ou tiver existido titulo do pedido, a reabertura exige aprovacao do GEO e o tratamento financeiro descrito acima. Edicao e remanejamento permanecem bloqueados enquanto houver efeito financeiro impeditivo ou frete titulado. No remanejamento, origem e destino sao atualizados na mesma transacao, com validacao do saldo do fornecedor, custos gerenciais, descontos e fretes pendentes. Depois do ajuste, o usuario fecha novamente os pedidos; a solicitacao e as cotacoes sao sincronizadas automaticamente conforme todos os pedidos ativos estejam fechados ou algum pedido seja cancelado.
 
 ## Mudanca segura
 

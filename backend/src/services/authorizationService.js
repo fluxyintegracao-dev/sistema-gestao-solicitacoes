@@ -211,6 +211,11 @@ const COMPRAS_PEDIDOS_VIEW_KEYS = [
   'compras.pedidos.registrar_frete',
   'compras.pedidos.cancelar_frete',
   'compras.pedidos.auditoria',
+  'compras.pedidos.financeiro.visualizar',
+  'compras.pedidos.financeiro.anexar_documentos',
+  'compras.pedidos.financeiro.gerar_previsao',
+  'compras.pedidos.financeiro.liberar_pagamento',
+  'compras.pedidos.financeiro.aprovar_reabertura',
   'compras.relatorios.visualizar',
   'compras.relatorios.pedidos'
 ];
@@ -262,6 +267,19 @@ const COMPRAS_PEDIDOS_AUDIT_KEYS = [
 const COMPRAS_PEDIDOS_ANEXAR_ESPELHO_KEYS = [
   'compras.pedidos.anexar_espelho'
 ];
+
+const COMPRAS_PEDIDOS_FINANCEIRO_VIEW_KEYS = [
+  'compras.pedidos.financeiro.visualizar',
+  'compras.pedidos.financeiro.anexar_documentos',
+  'compras.pedidos.financeiro.gerar_previsao',
+  'compras.pedidos.financeiro.liberar_pagamento',
+  'compras.pedidos.financeiro.aprovar_reabertura'
+];
+
+const COMPRAS_PEDIDOS_FINANCEIRO_DOCUMENTO_KEYS = ['compras.pedidos.financeiro.anexar_documentos'];
+const COMPRAS_PEDIDOS_FINANCEIRO_PREVISAO_KEYS = ['compras.pedidos.financeiro.gerar_previsao'];
+const COMPRAS_PEDIDOS_FINANCEIRO_LIBERAR_KEYS = ['compras.pedidos.financeiro.liberar_pagamento'];
+const COMPRAS_PEDIDOS_FINANCEIRO_REABERTURA_KEYS = ['compras.pedidos.financeiro.aprovar_reabertura'];
 
 const COMPRAS_COTACOES_VIEW_KEYS = [
   'compras.cotacoes.visualizar',
@@ -1914,6 +1932,46 @@ async function canViewComprasPedidos(user) {
   return canAccessCompras(user);
 }
 
+async function canViewPedidoCompraFinanceiro(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_FINANCEIRO_VIEW_KEYS);
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+async function canAnexarDocumentoPedidoCompraFinanceiro(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_FINANCEIRO_DOCUMENTO_KEYS);
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+async function canGerarPrevisaoPedidoCompraFinanceiro(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_FINANCEIRO_PREVISAO_KEYS);
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+async function canLiberarPedidoCompraFinanceiro(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_FINANCEIRO_LIBERAR_KEYS);
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+async function canAprovarReaberturaPedidoCompraFinanceiro(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_FINANCEIRO_REABERTURA_KEYS);
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
 async function canManageComprasPedidos(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -3246,11 +3304,13 @@ module.exports = {
   canManageComercialEmpreendimentos,
   canAlterarQuantidadeSolicitacaoCompra,
   canAlterarStatusComprasPedidos,
+  canAnexarDocumentoPedidoCompraFinanceiro,
   canAnexarEspelhoComprasPedidos,
   canCancelarComprasPedidos,
   canCancelarFreteComprasPedidos,
   canCatalogarItensManuaisCompras,
   canEditarItensComprasPedidos,
+  canGerarPrevisaoPedidoCompraFinanceiro,
   canEditarItensSolicitacaoCompra,
   canEncerrarComprasCotacoes,
   canEncerrarSemPedidoComprasCotacoes,
@@ -3259,10 +3319,12 @@ module.exports = {
   canManageComprasCotacoes,
   canManageComprasFornecedores,
   canManageComprasPedidos,
+  canLiberarPedidoCompraFinanceiro,
   canOperateComprasCotacoes,
   canReabrirComprasCotacoes,
   canCancelarComprasCotacoes,
   canReabrirComprasPedidos,
+  canAprovarReaberturaPedidoCompraFinanceiro,
   canRegistrarFreteComprasPedidos,
   canRemanejarComprasPedidos,
   canManageConfiguracoesArea,
@@ -3324,6 +3386,7 @@ module.exports = {
   canManageComprasDelegacao,
   canViewComprasFornecedores,
   canViewComprasPedidos,
+  canViewPedidoCompraFinanceiro,
   canViewComprasRelatorios,
   canViewCrmAtendimento,
   canViewCrmAutomacoes,

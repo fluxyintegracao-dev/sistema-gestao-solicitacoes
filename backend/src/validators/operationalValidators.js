@@ -858,7 +858,7 @@ function validateCompraEncerrarSemPedidoBody(body = {}) {
 }
 
 function validateCompraPedidoQuery(query = {}) {
-  ensureAllowedKeys(query, ['obra_id', 'solicitacao_id', 'status', 'q', 'visao'], 'Consulta de pedidos de compra');
+  ensureAllowedKeys(query, ['obra_id', 'solicitacao_id', 'status', 'status_financeiro', 'q', 'visao'], 'Consulta de pedidos de compra');
 
   const visao = parseOptionalText(query.visao, 'Visao', 40);
   const visaoNormalizada = visao ? String(visao).trim().toLowerCase() : undefined;
@@ -870,6 +870,7 @@ function validateCompraPedidoQuery(query = {}) {
     obra_id: parseInteger(query.obra_id, 'Obra'),
     solicitacao_id: parseInteger(query.solicitacao_id, 'Solicitacao de compra'),
     status: parseOptionalText(query.status, 'Status', 40),
+    status_financeiro: parseOptionalText(query.status_financeiro, 'Status financeiro', 40),
     q: parseOptionalText(query.q, 'Busca', 120),
     visao: visaoNormalizada
   };
@@ -1145,6 +1146,86 @@ function validateCompraPedidoReabrirBody(body = {}) {
 
   return {
     motivo: parseOptionalText(body.motivo, 'Motivo da reabertura', 1000, { required: true })
+  };
+}
+
+function validateCompraPedidoPrevisoesBody(body = {}) {
+  ensureAllowedKeys(body, ['categoria_financeira_id', 'descricao', 'parcelas'], 'Previsoes financeiras do pedido');
+  if (!Array.isArray(body.parcelas) || body.parcelas.length === 0) {
+    throw new ValidationError('Informe ao menos uma parcela da previsao.');
+  }
+  if (body.parcelas.length > 120) {
+    throw new ValidationError('A previsao nao pode possuir mais de 120 parcelas.');
+  }
+  return {
+    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira', { required: true }),
+    descricao: parseOptionalText(body.descricao, 'Descricao', 255),
+    parcelas: body.parcelas.map((parcela, index) => {
+      ensureAllowedKeys(parcela || {}, ['valor', 'data_vencimento'], `Parcela ${index + 1}`);
+      return {
+        valor: parseDecimal(parcela?.valor, `Valor da parcela ${index + 1}`, {
+          required: true,
+          min: 0.01,
+          scale: 2,
+          brazilianFormat: true
+        }),
+        data_vencimento: parseDateOnly(parcela?.data_vencimento, `Vencimento da parcela ${index + 1}`, { required: true })
+      };
+    })
+  };
+}
+
+function validateCompraPedidoDocumentoFinanceiroBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['tipo', 'numero_documento', 'arquivo_url', 'arquivo_nome', 'observacoes'],
+    'Documento financeiro do pedido'
+  );
+  const tipo = parseOptionalText(body.tipo, 'Tipo do documento', 30, { required: true }).toUpperCase();
+  if (!['NOTA_FISCAL', 'COMPROVANTE_COMPRA', 'OUTRA_CONFIRMACAO'].includes(tipo)) {
+    throw new ValidationError('Tipo de documento financeiro invalido.');
+  }
+  const arquivoUrl = parseOptionalText(body.arquivo_url, 'URL do arquivo', 2000);
+  const observacoes = parseOptionalText(body.observacoes, 'Observacoes', 2000);
+  if (!arquivoUrl && !observacoes) {
+    throw new ValidationError('Anexe um documento ou descreva a confirmacao do fornecedor.');
+  }
+  return {
+    tipo,
+    numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
+    arquivo_url: arquivoUrl,
+    arquivo_nome: parseOptionalText(body.arquivo_nome, 'Nome do arquivo', 255),
+    observacoes
+  };
+}
+
+function validateCompraPedidoLiberarTitulosBody(body = {}) {
+  ensureAllowedKeys(body, ['titulo_ids', 'forma_pagamento_id'], 'Liberacao financeira do pedido');
+  if (!Array.isArray(body.titulo_ids) || body.titulo_ids.length === 0) {
+    throw new ValidationError('Selecione ao menos uma previsao para liberar.');
+  }
+  return {
+    titulo_ids: [...new Set(body.titulo_ids.map((id) => parseInteger(id, 'Titulo financeiro', { required: true })))],
+    forma_pagamento_id: parseInteger(body.forma_pagamento_id, 'Forma de pagamento', { required: true })
+  };
+}
+
+function validateCompraPedidoReaberturaParams(params = {}) {
+  return {
+    id: parseInteger(params.id, 'Pedido de compra', { required: true }),
+    reaberturaId: parseInteger(params.reaberturaId, 'Pedido de reabertura', { required: true })
+  };
+}
+
+function validateCompraPedidoDecisaoReaberturaBody(body = {}) {
+  ensureAllowedKeys(body, ['decisao', 'motivo'], 'Decisao de reabertura do pedido');
+  const decisao = parseOptionalText(body.decisao, 'Decisao', 20, { required: true }).toUpperCase();
+  if (!['APROVAR', 'REJEITAR'].includes(decisao)) {
+    throw new ValidationError('Decisao de reabertura invalida.');
+  }
+  return {
+    decisao,
+    motivo: parseOptionalText(body.motivo, 'Motivo da decisao', 1000, { required: true })
   };
 }
 
@@ -1804,6 +1885,11 @@ module.exports = {
   validateCompraPedidoFreteBody,
   validateCompraPedidoRemanejarBody,
   validateCompraPedidoReabrirBody,
+  validateCompraPedidoPrevisoesBody,
+  validateCompraPedidoDocumentoFinanceiroBody,
+  validateCompraPedidoLiberarTitulosBody,
+  validateCompraPedidoReaberturaParams,
+  validateCompraPedidoDecisaoReaberturaBody,
   validateCompraPedidoStatusBody,
   validateCompraPedidoStatusBatchBody,
   validateCompraSolicitacaoItemQuantidadeBody,

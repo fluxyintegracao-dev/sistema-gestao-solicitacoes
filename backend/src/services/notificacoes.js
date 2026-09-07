@@ -195,7 +195,8 @@ async function criarNotificacao({
   metadata,
   created_by,
   destinatarios,
-  usarDestinatariosInformados = false
+  usarDestinatariosInformados = false,
+  transaction = null
 }) {
   const tipoNormalizado = String(tipo || '').trim().toUpperCase();
   if (!(await notificacaoEventoAtivo(tipoNormalizado))) {
@@ -233,7 +234,7 @@ async function criarNotificacao({
     mensagem,
     metadata: metadata ? JSON.stringify(metadata) : null,
     created_by: created_by || null
-  });
+  }, { transaction });
 
   const linhas = Array.from(destinatariosSet).map(usuario_id => ({
     notificacao_id: notificacao.id,
@@ -241,7 +242,7 @@ async function criarNotificacao({
   }));
 
   if (linhas.length > 0) {
-    await NotificacaoDestinatario.bulkCreate(linhas);
+    await NotificacaoDestinatario.bulkCreate(linhas, { transaction });
   }
 
   return notificacao;

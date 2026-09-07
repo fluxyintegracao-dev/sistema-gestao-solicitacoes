@@ -17,6 +17,7 @@ import {
   obterPedidoCompra,
   registrarFretePedidoCompra,
   reabrirPedidoCompraParaCotacao,
+  solicitarReaberturaPedidoCompra,
   removerItemPedidoCompra,
   remanejarItemPedidoCompra,
   uploadAnexoTemporarioCompra
@@ -31,6 +32,7 @@ import {
   canCancelarFreteComprasPedidos,
   canEditarItensComprasPedidos,
   canManageComprasPedidos,
+  canViewPedidoCompraFinanceiro,
   canReabrirComprasPedidos,
   canRegistrarFreteComprasPedidos,
   canRemanejarComprasPedidos,
@@ -39,6 +41,7 @@ import {
 import { useSafeNavigateBack } from '../../../utils/navigation';
 import { isValidCpfCnpj, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
 import CompraPreviewModal from '../components/CompraPreviewModal';
+import PedidoCompraFinanceiro from '../components/PedidoCompraFinanceiro';
 import OverlayModal from '../../../components/ui/OverlayModal';
 import '../../../styles/compras-relatorio-apoio.css';
 import {
@@ -480,6 +483,7 @@ export default function PedidoCompraDetalhe() {
   const podeRegistrarFretePedido = canRegistrarFreteComprasPedidos(user);
   const podeCancelarFretePedido = canCancelarFreteComprasPedidos(user);
   const podeRemanejarPedido = canRemanejarComprasPedidos(user);
+  const podeGerenciarFinanceiroPedido = canViewPedidoCompraFinanceiro(user);
   const podeGerenciarPedido = Boolean(
     podeEditarItensPedido ||
     podeAlterarStatusPedido ||
@@ -638,6 +642,7 @@ export default function PedidoCompraDetalhe() {
   const pedidoBloqueado = Boolean(edicaoBloqueadaPorStatus || !podeEditarItensPedido);
   const pedidoCancelado = String(pedido?.status || '').toUpperCase() === 'CANCELADO';
   const podeReabrirCotacao = Boolean(podeReabrirPedido && edicaoBloqueadaPorStatus && !pedidoCancelado);
+  const reaberturaPendenteGeo = String(pedido?.financeiro?.reabertura?.status || '').toUpperCase() === 'PENDENTE';
   const permiteFreteEmbutido = !edicaoBloqueadaPorStatus;
   const statusSelectOptions = useMemo(() => {
     const ativos = (statusOptions || []).filter((item) => item?.ativo !== false);
@@ -1202,10 +1207,13 @@ export default function PedidoCompraDetalhe() {
     justificativa juntos, com validação visível (`campo.obrigatorio`).
   */
   async function handleReabrirCotacao() {
+    const exigeAprovacaoGeo = Boolean(pedido?.financeiro?.reabertura_exige_geo);
     const { ok, texto } = await confirmar({
-      titulo: 'Reabrir pedido para edição ou cancelamento',
-      mensagem: 'Reabrir este pedido para edição ou cancelamento? A cotação vinculada voltará para edição e a ação ficará registrada no histórico.',
-      rotuloConfirmar: 'Reabrir pedido',
+      titulo: exigeAprovacaoGeo ? 'Solicitar reabertura ao GEO' : 'Reabrir pedido para edição ou cancelamento',
+      mensagem: exigeAprovacaoGeo
+        ? 'Este pedido possui histórico financeiro. Informe o motivo para o GEO analisar a reabertura; nenhum título será alterado antes da aprovação.'
+        : 'Reabrir este pedido para edição ou cancelamento? A cotação vinculada voltará para edição e a ação ficará registrada no histórico.',
+      rotuloConfirmar: exigeAprovacaoGeo ? 'Enviar ao GEO' : 'Reabrir pedido',
       campo: { rotulo: 'Motivo da reabertura', obrigatorio: true, multilinha: true }
     });
     if (!ok) return;
@@ -1218,9 +1226,15 @@ export default function PedidoCompraDetalhe() {
 
     try {
       setReabrindoCotacao(true);
-      const data = await reabrirPedidoCompraParaCotacao(id, { motivo: motivoNormalizado });
-      setPedido(data || null);
-      avisar.sucesso('Pedido reaberto para edição ou cancelamento.');
+      if (exigeAprovacaoGeo) {
+        await solicitarReaberturaPedidoCompra(id, { motivo: motivoNormalizado });
+        await carregar();
+        avisar.sucesso('Pedido de reabertura enviado ao GEO.');
+      } else {
+        const data = await reabrirPedidoCompraParaCotacao(id, { motivo: motivoNormalizado });
+        setPedido(data || null);
+        avisar.sucesso('Pedido reaberto para edição ou cancelamento.');
+      }
     } catch (error) {
       console.error(error);
       avisar.erro(error.message || 'Erro ao reabrir pedido');
@@ -1567,9 +1581,13 @@ export default function PedidoCompraDetalhe() {
       desabilitada: baixandoPdf
     },
     podeReabrirCotacao ? {
-      rotulo: reabrindoCotacao ? 'Reabrindo...' : 'Reabrir pedido',
+      rotulo: reaberturaPendenteGeo
+        ? 'Reabertura aguardando GEO'
+        : reabrindoCotacao
+        ? 'Processando...'
+        : (pedido?.financeiro?.reabertura_exige_geo ? 'Solicitar reabertura ao GEO' : 'Reabrir pedido'),
       onClick: handleReabrirCotacao,
-      desabilitada: reabrindoCotacao
+      desabilitada: reabrindoCotacao || reaberturaPendenteGeo
     } : null
   ].filter(Boolean);
 
@@ -1676,9 +1694,13 @@ export default function PedidoCompraDetalhe() {
       {/* R16: UM dono para a faixa de avisos, logo abaixo do cabeçalho. */}
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {!podeGerenciarPedido ? (
+      {!podeGerenciarPedido && !podeGerenciarFinanceiroPedido ? (
         <div className="app-alert">
           Você esta visualizando este pedido. Alterações de status e itens ficam restritas ao setor de compras.
+        </div>
+      ) : !podeGerenciarPedido && podeGerenciarFinanceiroPedido ? (
+        <div className="app-alert">
+          A gestão operacional permanece com Compras. Você pode consultar o pedido e executar apenas as ações financeiras autorizadas ao GEO.
         </div>
       ) : null}
 
@@ -1747,6 +1769,13 @@ export default function PedidoCompraDetalhe() {
           </div>
         ) : null}
       </BlocoConteudo>
+
+      <PedidoCompraFinanceiro
+        pedido={pedido}
+        user={user}
+        avisar={avisar}
+        onAtualizar={carregar}
+      />
 
       <BlocoConteudo
         titulo="Itens do pedido"

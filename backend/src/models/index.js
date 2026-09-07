@@ -191,6 +191,9 @@ db.PedidoCompraItem = require('./PedidoCompraItem')(sequelize, Sequelize);
 db.PedidoCompraItemLog = require('./PedidoCompraItemLog')(sequelize, Sequelize);
 db.PedidoCompraFrete = require('./PedidoCompraFrete')(sequelize, Sequelize);
 db.PedidoCompraFreteRateio = require('./PedidoCompraFreteRateio')(sequelize, Sequelize);
+db.PedidoCompraTitulo = require('./PedidoCompraTitulo')(sequelize, Sequelize);
+db.PedidoCompraReabertura = require('./PedidoCompraReabertura')(sequelize, Sequelize);
+db.PedidoCompraDocumentoFinanceiro = require('./PedidoCompraDocumentoFinanceiro')(sequelize, Sequelize);
 
 /* =====================
    CRM
@@ -2833,6 +2836,61 @@ db.TituloFinanceiro.hasMany(db.SolicitacaoCompraAlocacao, {
 db.SolicitacaoCompraAlocacao.belongsTo(db.TituloFinanceiro, {
   foreignKey: 'titulo_financeiro_id',
   as: 'tituloFinanceiro'
+});
+
+db.PedidoCompra.hasMany(db.PedidoCompraTitulo, {
+  foreignKey: 'pedido_compra_id',
+  as: 'titulosPedido'
+});
+
+db.PedidoCompraTitulo.belongsTo(db.PedidoCompra, {
+  foreignKey: 'pedido_compra_id',
+  as: 'pedido'
+});
+
+db.TituloFinanceiro.hasMany(db.PedidoCompraTitulo, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'vinculosPedidosCompra'
+});
+
+db.PedidoCompraTitulo.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'titulo'
+});
+
+db.PedidoCompra.hasMany(db.PedidoCompraReabertura, {
+  foreignKey: 'pedido_compra_id',
+  as: 'reaberturas'
+});
+
+db.PedidoCompraReabertura.belongsTo(db.PedidoCompra, {
+  foreignKey: 'pedido_compra_id',
+  as: 'pedido'
+});
+
+db.PedidoCompraReabertura.belongsTo(db.User, {
+  foreignKey: 'solicitado_por',
+  as: 'solicitante'
+});
+
+db.PedidoCompraReabertura.belongsTo(db.User, {
+  foreignKey: 'decidido_por',
+  as: 'decididoPor'
+});
+
+db.PedidoCompra.hasMany(db.PedidoCompraDocumentoFinanceiro, {
+  foreignKey: 'pedido_compra_id',
+  as: 'documentosFinanceiros'
+});
+
+db.PedidoCompraDocumentoFinanceiro.belongsTo(db.PedidoCompra, {
+  foreignKey: 'pedido_compra_id',
+  as: 'pedido'
+});
+
+db.PedidoCompraDocumentoFinanceiro.belongsTo(db.User, {
+  foreignKey: 'criado_por',
+  as: 'criadoPor'
 });
 
 db.PedidoCompra.hasMany(db.PedidoCompraItemLog, {

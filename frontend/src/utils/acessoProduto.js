@@ -444,11 +444,67 @@ export function canViewComprasPedidos(user) {
       'compras.pedidos.registrar_frete',
       'compras.pedidos.cancelar_frete',
       'compras.pedidos.auditoria',
+      'compras.pedidos.financeiro.visualizar',
+      'compras.pedidos.financeiro.anexar_documentos',
+      'compras.pedidos.financeiro.gerar_previsao',
+      'compras.pedidos.financeiro.liberar_pagamento',
+      'compras.pedidos.financeiro.aprovar_reabertura',
       'compras.relatorios.visualizar',
       'compras.relatorios.pedidos'
     ]);
   }
   return canAccessCompras(user);
+}
+
+export function canViewPedidoCompraFinanceiro(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.financeiro.visualizar',
+      'compras.pedidos.financeiro.anexar_documentos',
+      'compras.pedidos.financeiro.gerar_previsao',
+      'compras.pedidos.financeiro.liberar_pagamento',
+      'compras.pedidos.financeiro.aprovar_reabertura'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+export function canAnexarDocumentoPedidoCompraFinanceiro(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.pedidos.financeiro.anexar_documentos');
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+export function canGerarPrevisaoPedidoCompraFinanceiro(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.pedidos.financeiro.gerar_previsao');
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+export function canLiberarPedidoCompraFinanceiro(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.pedidos.financeiro.liberar_pagamento');
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
+}
+
+export function canAprovarReaberturaPedidoCompraFinanceiro(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.pedidos.financeiro.aprovar_reabertura');
+  }
+  return userHasSetorCapability(user, 'eh_setor_geo');
 }
 
 export function canCreateComprasPedidos(user) {

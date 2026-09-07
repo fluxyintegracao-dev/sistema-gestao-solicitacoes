@@ -67,6 +67,11 @@ const {
   validateCompraPedidoFreteBody,
   validateCompraPedidoRemanejarBody,
   validateCompraPedidoReabrirBody,
+  validateCompraPedidoPrevisoesBody,
+  validateCompraPedidoDocumentoFinanceiroBody,
+  validateCompraPedidoLiberarTitulosBody,
+  validateCompraPedidoReaberturaParams,
+  validateCompraPedidoDecisaoReaberturaBody,
   validateCompraPedidoStatusBody,
   validateCompraPedidoStatusBatchBody,
   validateCompraCatalogarItemManualBody,
@@ -246,6 +251,8 @@ const {
     canAccessProvisoes,
     canAlterarQuantidadeSolicitacaoCompra,
     canAlterarStatusComprasPedidos,
+    canAnexarDocumentoPedidoCompraFinanceiro,
+    canAprovarReaberturaPedidoCompraFinanceiro,
     canApprovePagamentos,
     canRejectPagamentos,
     canAuditPaymentBeneficiaries,
@@ -271,6 +278,7 @@ const {
   canCreateComercialContratos,
   canCreateCrmLeads,
   canEditarItensComprasPedidos,
+  canGerarPrevisaoPedidoCompraFinanceiro,
   canEncerrarSemPedidoComprasCotacoes,
   canFecharComprasCotacoes,
   canExportCrmLeads,
@@ -310,6 +318,7 @@ const {
   canManageComprasCotacoes,
   canOperateComprasCotacoes,
   canManageComprasPedidos,
+  canLiberarPedidoCompraFinanceiro,
   canReabrirComprasCotacoes,
   canReabrirComprasPedidos,
   canRegistrarFreteComprasPedidos,
@@ -401,6 +410,7 @@ const SolicitacaoCompraController = require('./controllers/SolicitacaoCompraCont
 const FornecedorCompraController = require('./controllers/FornecedorCompraController');
 const CotacaoFornecedorController = require('./controllers/CotacaoFornecedorController');
 const PedidoCompraController = require('./controllers/PedidoCompraController');
+const PedidoCompraFinanceiroController = require('./controllers/PedidoCompraFinanceiroController');
 const RelatorioComprasController = require('./controllers/RelatorioComprasController');
 const ParceiroController = require('./controllers/ParceiroController');
 const ParceiroCategoriaController = require('./controllers/ParceiroCategoriaController');
@@ -942,6 +952,7 @@ const allowCompraSolicitacoesUpload = allowPaymentAction(
     await canCreateCompraSolicitacao(user)
     || await canManageCompraSolicitacoes(user)
     || await canManageComprasPedidos(user)
+    || await canAnexarDocumentoPedidoCompraFinanceiro(user)
   ),
   'Acesso negado para enviar anexos de compras'
 );
@@ -954,6 +965,26 @@ const allowComprasPedidosManage = allowPaymentAction(
   'COMPRAS_PEDIDOS_MANAGE',
   canManageComprasPedidos,
   'Acesso negado para gerenciar pedidos de compra'
+);
+const allowComprasPedidosFinanceiroPrevisao = allowPaymentAction(
+  'COMPRAS_PEDIDOS_FINANCEIRO_PREVISAO',
+  canGerarPrevisaoPedidoCompraFinanceiro,
+  'Acesso negado para gerar previsoes financeiras do pedido'
+);
+const allowComprasPedidosFinanceiroDocumento = allowPaymentAction(
+  'COMPRAS_PEDIDOS_FINANCEIRO_DOCUMENTO',
+  canAnexarDocumentoPedidoCompraFinanceiro,
+  'Acesso negado para anexar documentos financeiros do pedido'
+);
+const allowComprasPedidosFinanceiroLiberar = allowPaymentAction(
+  'COMPRAS_PEDIDOS_FINANCEIRO_LIBERAR',
+  canLiberarPedidoCompraFinanceiro,
+  'Acesso negado para liberar titulos do pedido'
+);
+const allowComprasPedidosFinanceiroReabertura = allowPaymentAction(
+  'COMPRAS_PEDIDOS_FINANCEIRO_REABERTURA',
+  canAprovarReaberturaPedidoCompraFinanceiro,
+  'Acesso negado para decidir a reabertura financeira do pedido'
 );
 const allowComprasPedidosAnexarEspelho = allowPaymentAction(
   'COMPRAS_PEDIDOS_ANEXAR_ESPELHO',
@@ -2192,6 +2223,12 @@ router.get('/compras/pedidos/:id', allowComprasPedidosRead, validateRequest({ pa
 router.post('/compras/pedidos/:id/itens', allowComprasPedidosEditarItens, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoItemAddBody }), requirePedidoCompraAccess, PedidoCompraController.addItem);
 router.patch('/compras/pedidos/:id/status', allowComprasPedidosAlterarStatus, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoStatusBody }), requirePedidoCompraAccess, PedidoCompraController.updateStatus);
 router.patch('/compras/pedidos/:id/reabrir-cotacao', allowComprasPedidosReabrir, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoReabrirBody }), requirePedidoCompraAccess, PedidoCompraController.reabrirCotacao);
+router.post('/compras/pedidos/:id/financeiro/adotar-legado', allowComprasPedidosFinanceiroPrevisao, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra') }), requirePedidoCompraAccess, PedidoCompraFinanceiroController.adotarLegado);
+router.post('/compras/pedidos/:id/financeiro/previsoes', allowComprasPedidosFinanceiroPrevisao, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoPrevisoesBody }), requirePedidoCompraAccess, PedidoCompraFinanceiroController.criarPrevisoes);
+router.post('/compras/pedidos/:id/financeiro/documentos', allowComprasPedidosFinanceiroDocumento, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoDocumentoFinanceiroBody }), requirePedidoCompraAccess, PedidoCompraFinanceiroController.registrarDocumento);
+router.patch('/compras/pedidos/:id/financeiro/liberar', allowComprasPedidosFinanceiroLiberar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoLiberarTitulosBody }), requirePedidoCompraAccess, PedidoCompraFinanceiroController.liberarTitulos);
+router.post('/compras/pedidos/:id/reaberturas', allowComprasPedidosReabrir, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoReabrirBody }), requirePedidoCompraAccess, PedidoCompraFinanceiroController.solicitarReabertura);
+router.patch('/compras/pedidos/:id/reaberturas/:reaberturaId/decisao', allowComprasPedidosFinanceiroReabertura, criticalRateLimit, validateRequest({ params: validateCompraPedidoReaberturaParams, body: validateCompraPedidoDecisaoReaberturaBody }), requirePedidoCompraAccess, PedidoCompraFinanceiroController.decidirReabertura);
 router.patch('/compras/pedidos/:id/cancelar', allowComprasPedidosCancelar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoCancelBody }), requirePedidoCompraAccess, PedidoCompraController.cancel);
 router.patch('/compras/pedidos/:id/itens-cancelar', allowComprasPedidosCancelar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoCancelBody }), requirePedidoCompraAccess, PedidoCompraController.cancelItems);
 router.post('/compras/pedidos/:id/comentarios', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoComentarioBody }), requirePedidoCompraAccess, PedidoCompraController.comentar);

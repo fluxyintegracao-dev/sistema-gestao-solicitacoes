@@ -23,6 +23,7 @@ const {
   PaymentBatchItem,
   PaymentBeneficiary,
   PaymentIntent,
+  PedidoCompraTitulo,
   PedidoCompraFrete,
   SecurityEventLog,
   Solicitacao,
@@ -2874,7 +2875,7 @@ async function criarTituloManual(req, payload = {}, options = {}) {
   const permitirFormaPagamentoPendenteNaPrevisao = Boolean(
     permitirFormaPagamentoPendente
     && statusTitulo === 'PREVISAO'
-    && origemTitulo === 'CONTRATO'
+    && ['CONTRATO', 'PEDIDO_COMPRA'].includes(origemTitulo)
   );
 
   const obraId = Number(payload.obra_id);
@@ -3558,13 +3559,27 @@ async function sincronizarRealizacaoCompraPorTitulo({
         realizado_em: null
       };
 
+  const vinculosPedido = await PedidoCompraTitulo.findAll({
+    where: { titulo_financeiro_id: titulo.id },
+    attributes: ['pedido_compra_id'],
+    transaction,
+    raw: true
+  });
+  const pedidoIds = [...new Set(vinculosPedido.map((item) => Number(item.pedido_compra_id)).filter(Boolean))];
+
   await SolicitacaoCompraAlocacao.update(update, {
     where: {
       solicitacao_compra_id: solicitacaoCompra.id,
-      status: 'ATIVA'
+      status: 'ATIVA',
+      ...(pedidoIds.length ? { pedido_compra_id: { [Op.in]: pedidoIds } } : {})
     },
     transaction
   });
+
+  if (pedidoIds.length) {
+    const { sincronizarStatusFinanceiroPedidos } = require('./pedidoCompraFinanceiroService');
+    await sincronizarStatusFinanceiroPedidos(pedidoIds, transaction);
+  }
 }
 
 

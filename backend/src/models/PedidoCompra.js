@@ -182,6 +182,22 @@ module.exports = (sequelize, DataTypes) => {
       encerrado_em: {
         type: DataTypes.DATE,
         allowNull: true
+      },
+      financeiro_fluxo_versao: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      status_financeiro: {
+        type: DataTypes.STRING(40),
+        allowNull: true
+      },
+      financeiro_encaminhado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
+      financeiro_atualizado_em: {
+        type: DataTypes.DATE,
+        allowNull: true
       }
     },
     {

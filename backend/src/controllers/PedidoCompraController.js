@@ -41,6 +41,7 @@ const {
   canViewAllComprasScope,
   canViewComprasDelegacao,
   canViewComprasPedidos,
+  canViewPedidoCompraFinanceiro,
   normalizeToken
 } = require('../services/authorizationService');
 const { renderPedidoCompraPdf } = require('../services/pedidoCompraPdf');
@@ -132,7 +133,10 @@ async function buildHistoricoPrecoScope(req) {
 }
 
 async function validarEscopoPedidoCompra(usuario, pedido, res) {
-  if (await canAccessSolicitacaoCompraByScope(usuario, pedido?.solicitacao)) {
+  if (
+    await canViewPedidoCompraFinanceiro(usuario)
+    || await canAccessSolicitacaoCompraByScope(usuario, pedido?.solicitacao)
+  ) {
     return true;
   }
 
@@ -215,13 +219,17 @@ module.exports = {
         return;
       }
 
-      const podeVerEscopoCompleto = await canViewAllComprasScope(usuario);
+      const podeVerEscopoCompleto = (
+        await canViewAllComprasScope(usuario)
+        || await canViewPedidoCompraFinanceiro(usuario)
+      );
       const pedidos = await listarPedidos({
         solicitacaoId: req.query?.solicitacao_id,
         obraId: req.query?.obra_id,
         status: req.query?.status,
         q: req.query?.q,
         visao: req.query?.visao,
+        statusFinanceiro: req.query?.status_financeiro,
         obraIds: req.compraScopeObraIds,
         compradorResponsavelId: podeVerEscopoCompleto ? null : usuario.id,
         solicitanteId: podeVerEscopoCompleto ? null : usuario.id
