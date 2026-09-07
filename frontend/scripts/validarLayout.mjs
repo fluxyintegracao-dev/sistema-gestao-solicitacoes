@@ -699,6 +699,12 @@ export function validarLayout() {
   falhas.push(...r35.falhas);
   avisos.push(...r35.avisos);
 
+  // R36 — menu "⋯": botão que só revela outro botão (decisão do cliente,
+  // 07/09). Ação sobre a tela é visível na própria barra.
+  const r36 = validarMenuMais();
+  falhas.push(...r36.falhas);
+  avisos.push(...r36.avisos);
+
   // R25 — cor fora do sistema de tokens (decisão do cliente, 03/09).
   const r25 = validarCoresForaDoToken();
   falhas.push(...r25.falhas);
@@ -1742,6 +1748,94 @@ function validarDatasNativas() {
   for (const rel of Object.keys(herdado)) {
     if (contagens[rel] === undefined) {
       avisos.push(`${rel} [R35] zerou os campos de data nativos — remova a linha de scripts/trinco-datas.json.`);
+    }
+  }
+  return { falhas, avisos };
+}
+
+/*
+  R36 — O MENU "⋯" (decisao do cliente, 07/09).
+
+  "Clicar num botao para aparecer outro botao nao tem logica, e ha espaco de
+  sobra na faixa." A folga e MEDIDA, nao suposta: as nove telas que usavam o
+  menu na faixa foram remontadas com todos os itens visiveis e medidas a
+  1920, 1366 e 390 com o CSS real. A 1920 e a 1366 todas cabem em UMA linha
+  (a mais carregada, a Governanca, com cinco botoes); a 390 a barra quebra em
+  2 ou 3 linhas pelo `flex-wrap: wrap` que ela ja tinha, sem NENHUM rotulo
+  cortado e sem rolagem lateral da pagina.
+
+  Para onde foi cada item: acao comum virou `secundarias`; item `perigosa`
+  virou `destrutiva` (que passou a aceitar LISTA, porque a Gestao da Cotacao
+  tem duas). A prop `mais` do PageHeader deixou de existir.
+
+  O QUE ESTA REGRA MEDE, E O QUE ELA NAO MEDE. Ela conta montagens de
+  `<MenuMais`, nao a decisao de esconder acao. Um `useState` com uma lista de
+  botoes escrita a mao faz a mesma coisa e passa por aqui — o portao nao
+  substitui a leitura, ele impede o retorno do componente por descuido.
+
+  Trinco, no mesmo molde da R19 e da R35:
+    - arquivo NOVO com <MenuMais            -> FALHA;
+    - arquivo do trinco que AUMENTA         -> FALHA;
+    - arquivo do trinco que diminui         -> passa, e o trinco aperta.
+
+  O UNICO arquivo no trinco e a `LinhaSolicitacao.jsx`, e ele esta la porque
+  NAO cabe: os seis botoes visiveis pedem 478px de largura natural e a coluna
+  de acoes tem 296px uteis, com `flex-wrap: nowrap` — cinco dos seis rotulos
+  sairiam cortados. O caso foi levado ao cliente em vez de decidido aqui.
+*/
+function validarMenuMais() {
+  const falhas = [];
+  const avisos = [];
+  const caminhoTrinco = path.join(frontendRoot, 'scripts', 'trinco-menu-mais.json');
+  const trinco = fs.existsSync(caminhoTrinco)
+    ? JSON.parse(fs.readFileSync(caminhoTrinco, 'utf8'))
+    : { arquivos: {} };
+  const herdado = trinco.arquivos || {};
+  const contagens = {};
+
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      if (item.isFile() && ehFixtureDeOutraProva(item.name, rel)) continue;
+      if (item.isDirectory()) {
+        if (item.name === 'node_modules' || item.name === 'dist') continue;
+        varrer(caminho);
+        continue;
+      }
+      if (!/\.(jsx?|tsx?)$/.test(item.name)) continue;
+      /* O proprio componente e o barril que o reexporta nao sao telas: contar
+         a definicao como uso faria a regra acusar o alvo dela. */
+      if (rel === 'src/components/padrao/MenuMais.jsx') continue;
+      if (rel === 'src/components/padrao/index.js') continue;
+      /* Comentario nao e codigo — varias telas CITAM o menu para explicar
+         de onde o botao veio (mesma correcao da R19 e da R35). */
+      const codigo = fs.readFileSync(caminho, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (trecho) => trecho.replace(/[^\n]/g, ' '));
+      const total = [...codigo.matchAll(/<MenuMais[\s/>]/g)].length;
+      if (total > 0) contagens[rel] = total;
+    }
+  };
+  varrer(path.join(frontendRoot, 'src'));
+
+  for (const [rel, quantidade] of Object.entries(contagens)) {
+    const limite = herdado[rel];
+    if (limite === undefined) {
+      falhas.push(`${rel} [R36] ${quantidade} montagem(ns) de \`<MenuMais>\` em arquivo NOVO para a regra — o menu "⋯" saiu do sistema em 07/09 (decisao do cliente): acao SOBRE ESTA TELA e botao VISIVEL na propria barra. Comum vai em \`secundarias\`, perigosa vai em \`destrutiva\` (que aceita lista). Se de fato nao couber, MEÇA e leve o caso ao cliente antes de esconder.`);
+      continue;
+    }
+    if (quantidade > limite) {
+      falhas.push(`${rel} [R36] montagem(ns) de \`<MenuMais>\` AUMENTOU de ${limite} para ${quantidade} — o trinco so aperta.`);
+      continue;
+    }
+    if (quantidade < limite) {
+      avisos.push(`${rel} [R36] passivo herdado caiu de ${limite} para ${quantidade} montagem(ns) — atualize scripts/trinco-menu-mais.json para apertar o trinco.`);
+    }
+  }
+  for (const rel of Object.keys(herdado)) {
+    if (contagens[rel] === undefined) {
+      avisos.push(`${rel} [R36] zerou as montagens de <MenuMais> — remova a linha de scripts/trinco-menu-mais.json.`);
     }
   }
   return { falhas, avisos };

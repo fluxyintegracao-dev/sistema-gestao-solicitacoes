@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import MenuMais from './MenuMais';
 
 /*
   A AÇÃO PODE TER ESTADO, E O ESTADO TEM DE CHEGAR AO DOM (05/09).
@@ -56,9 +55,28 @@ function BotaoAcao({ acao, classe }) {
  * linha só com escala de título — trunca com reticências e o texto completo
  * vai no tooltip. Não é texto miúdo nem flutua sobre o fundo.
  *
- * Três pesos de botão, todos visíveis: UMA ação primária sólida;
- * secundárias em contorno; destrutiva em vermelho suave e APARTADA; ações
- * raras no MenuMais — que NUNCA contém navegação (R11).
+ * Três pesos de botão, TODOS VISÍVEIS: UMA ação primária sólida;
+ * secundárias em contorno; destrutiva em vermelho suave e APARTADA.
+ *
+ * O MENU "⋯" SAIU DA FAIXA (decisão do cliente, 07/09).
+ *
+ * A faixa tinha um quarto peso, o `mais`: ações raras atrás de um botão que
+ * só revelava outros botões. "Clicar num botão para aparecer outro botão não
+ * tem lógica, e há espaço de sobra na faixa" — e a folga é medida, não
+ * suposta: as nove telas que usavam o menu foram remontadas com todos os
+ * itens visíveis e medidas a 1920, 1366 e 390. A 1920 e a 1366 todas cabem
+ * em UMA linha; a 390 a barra quebra em 2 ou 3 linhas (`flex-wrap: wrap`,
+ * que ela já tinha), sem NENHUM rótulo cortado e sem rolagem lateral da
+ * página. A tela mais carregada é a Governança, com cinco botões.
+ *
+ * Para onde foi cada item: ação comum virou `secundarias`; item `perigosa`
+ * virou `destrutiva`, que por isso passou a aceitar LISTA — a Gestão da
+ * Cotação tem duas destrutivas ("Recusar" e "Cancelar cotação") e um slot
+ * só as faria disputar o mesmo lugar. Elas continuam apartadas, juntas, no
+ * fim da barra.
+ *
+ * A regra R11 não mudou de conteúdo, só de endereço: o que entra na barra
+ * continua sendo AÇÃO SOBRE ESTA TELA, nunca navegação.
  *
  * `voltar` (R11 revisto, 02/09): em tela de DETALHE/REGISTRO a seta de
  * voltar à esquerda do cabeçalho é a affordance primária de retorno e FICA
@@ -84,10 +102,15 @@ export default function PageHeader({
   voltar,
   acaoPrincipal,
   secundarias = [],
+  // Objeto (um destrutivo — 8 das 9 telas que usam a prop) ou lista.
+  // As duas formas desenham igual: apartadas, no fim da barra.
   destrutiva,
-  mais = [],
   children
 }) {
+  /* Uma forma só daqui para baixo: `destrutiva` chega objeto ou lista e o
+     resto do componente lê sempre uma lista. `filter(Boolean)` porque a
+     tela costuma montar o item por condição (`podeX ? {...} : null`). */
+  const destrutivas = (Array.isArray(destrutiva) ? destrutiva : [destrutiva]).filter(Boolean);
   const headerRef = useRef(null);
   const sentinelaRef = useRef(null);
   const [compacto, setCompacto] = useState(false);
@@ -256,13 +279,14 @@ export default function PageHeader({
             {secundarias.filter(Boolean).map((acao) => (
               <BotaoAcao key={acao.rotulo} acao={acao} classe="btn btn-outline" />
             ))}
-            <MenuMais itens={mais} />
             {acaoPrincipal ? (
               <BotaoAcao acao={acaoPrincipal} classe="btn btn-primary" />
             ) : null}
-            {destrutiva ? (
+            {destrutivas.length > 0 ? (
               <span className="app-actionbar-apartada">
-                <BotaoAcao acao={destrutiva} classe="btn btn-outline btn-perigo-suave" />
+                {destrutivas.map((acao) => (
+                  <BotaoAcao key={acao.rotulo} acao={acao} classe="btn btn-outline btn-perigo-suave" />
+                ))}
               </span>
             ) : null}
           </div>

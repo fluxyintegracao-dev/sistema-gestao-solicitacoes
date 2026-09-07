@@ -234,15 +234,16 @@ export default function CrmLeads() {
         Ctrl+K, nunca na barra de ações. Conferido antes de tirar, como a
         regra manda: `crm-kanban` (`/crm/kanban`) está no navigationConfig,
         então nenhuma porta de entrada foi perdida.
-        "Exportar CSV" é ação SOBRE esta tela e continua — no "⋯", por ser
-        a rara ao lado do cadastro de lead.
+        "Exportar CSV" é ação SOBRE esta tela e continua. Ela morava no "⋯";
+        o menu saiu do sistema (07/09) e ela é botão visível na faixa, ao
+        lado do cadastro de lead — dois botões numa faixa de 1920.
       */}
       <PageHeader
         titulo="Leads"
         contagem={loading ? null : `${dados.total || 0} lead(s)`}
         descricao="Gestão de leads e oportunidades comerciais do CRM."
         acaoPrincipal={{ rotulo: 'Novo lead', to: '/crm/leads/novo' }}
-        mais={podeExportar
+        secundarias={podeExportar
           ? [{
             rotulo: exportando ? 'Exportando...' : 'Exportar CSV',
             desabilitada: exportando,

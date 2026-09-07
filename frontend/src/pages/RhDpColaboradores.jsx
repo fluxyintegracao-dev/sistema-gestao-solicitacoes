@@ -757,7 +757,9 @@ export default function RhDpColaboradores() {
         contagem={carregando ? null : `${colaboradores.length} colaborador(es)`}
         descricao="Base cadastral com empresa do grupo, obra, vínculo, dados pessoais e dados de pagamento."
         acaoPrincipal={podeEditar ? { rotulo: 'Novo colaborador', onClick: abrirNovoColaborador } : undefined}
-        mais={podeEditar ? [
+        /* Saíram do "⋯" (removido do sistema em 07/09) e viraram botões
+           visíveis: três na faixa, uma linha só a 1920 e a 1366. */
+        secundarias={podeEditar ? [
           { rotulo: 'Baixar modelo', onClick: downloadModeloColaboradores },
           {
             rotulo: importando ? 'Importando massa...' : 'Importar massa',

@@ -334,7 +334,7 @@ apontava.
   (peso e escala de título). Número sem nome é defeito.
 - **C5** Ações principais à direita: UM primário sólido, secundários em
   contorno, destrutiva apartada.
-- **C6** Nenhum link de navegação disfarçado de ação (menu "⋯" e barra de
+- **C6** Nenhum link de navegação disfarçado de ação (barra de
   ações sem navigate/Link de "ir para" — R11).
   **Escopo declarado**: a C6 pressupõe o shell (menu, breadcrumb, Ctrl+K).
   Em tela que renderiza FORA do `Layout` ela **se inverte** — o link de

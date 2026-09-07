@@ -468,6 +468,10 @@ export default function CrmLeadDetalhe() {
             desabilitada: saving
           }
           : { rotulo: 'Editar', onClick: iniciarEdicao }}
+        /* "Redistribuir lead" vinha do "⋯", que saiu do sistema (07/09):
+           é ação sobre este lead e agora é botão visível, na mesma fila das
+           outras secundárias. Cinco botões na faixa a 1920, medidos numa
+           linha só. */
         secundarias={editando
           ? [{ rotulo: 'Cancelar', onClick: () => setEditando(false) }]
           : [
@@ -476,11 +480,11 @@ export default function CrmLeadDetalhe() {
               : null,
             !['PERDIDO', 'ARQUIVADO'].includes(lead.lifecycle_status)
               ? { rotulo: 'Registrar perda', onClick: () => setShowLoss(true) }
+              : null,
+            podeRedistribuir
+              ? { rotulo: 'Redistribuir lead', onClick: abrirRedistribuicao }
               : null
           ].filter(Boolean)}
-        mais={!editando && podeRedistribuir
-          ? [{ rotulo: 'Redistribuir lead', onClick: abrirRedistribuicao }]
-          : []}
         destrutiva={!editando && lead.lifecycle_status !== 'ARQUIVADO'
           ? { rotulo: 'Arquivar', onClick: handleArquivar }
           : undefined}

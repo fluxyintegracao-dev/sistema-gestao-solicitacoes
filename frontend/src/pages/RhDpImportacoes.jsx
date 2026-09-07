@@ -506,8 +506,9 @@ export default function RhDpImportacoes() {
     <Pagina className="rhdp-page">
       {/* D6/D7: sem prefixo "RH/DP" no título e sem os links cruzados de
           navegação — o breadcrumb e o menu já situam o módulo (R11). Os três
-          modelos de planilha são AÇÃO (baixar arquivo), não navegação: cabem
-          no "⋯" e deixam a ação do dia a dia sozinha na barra. */}
+          modelos de planilha são AÇÃO (baixar arquivo), não navegação. Eles
+          ficavam no "⋯", que saiu do sistema (07/09): são botões visíveis,
+          quatro na faixa, medidos em uma linha a 1920 e a 1366. */}
       <PageHeader
         titulo="Importações"
         contagem={`${importacoes.length} lote(s)`}
@@ -517,7 +518,7 @@ export default function RhDpImportacoes() {
           onClick: () => inputArquivoRef.current?.click(),
           desabilitada: gerandoPreview
         } : undefined}
-        mais={TIPOS_IMPORTACAO.map((item) => ({
+        secundarias={TIPOS_IMPORTACAO.map((item) => ({
           rotulo: `Modelo ${item.label}`,
           title: `Baixar o modelo CSV de ${item.label.toLowerCase()}`,
           onClick: () => downloadTemplate(item.value)

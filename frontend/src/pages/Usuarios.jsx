@@ -229,20 +229,24 @@ export default function Usuarios() {
         contagem={loading ? null : `${usuarios.length} usuario(s)`}
         descricao="Cadastro, importação e gestão operacional de usuários."
         acaoPrincipal={{ rotulo: 'Novo usuário', onClick: () => navigate('/usuarios/novo') }}
-        mais={[
+        /* Modelo e importação vinham do "⋯" (removido do sistema em 07/09)
+           e são secundárias visíveis. "Resetar senhas de todos" era o item
+           `perigosa` do menu, que o apartava com separador e cor de perigo:
+           na faixa, o equivalente é o grupo APARTADO — por isso ela vai
+           para `destrutiva`, e não para a fila das secundárias. */
+        secundarias={[
           { rotulo: 'Baixar modelo CSV', onClick: baixarModeloImportacaoUsuarios },
           {
             rotulo: importando ? 'Importando…' : 'Importar usuarios (.csv)',
             desabilitada: importando,
             onClick: () => inputImportacaoRef.current?.click()
-          },
-          isSuperadminLogado && {
-            rotulo: 'Resetar senhas de todos',
-            perigosa: true,
-            title: 'Forcar redefinicao de senha para todos os usuarios ativos',
-            onClick: forcarResetSenhas
           }
         ]}
+        destrutiva={isSuperadminLogado ? {
+          rotulo: 'Resetar senhas de todos',
+          title: 'Forcar redefinicao de senha para todos os usuarios ativos',
+          onClick: forcarResetSenhas
+        } : undefined}
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />

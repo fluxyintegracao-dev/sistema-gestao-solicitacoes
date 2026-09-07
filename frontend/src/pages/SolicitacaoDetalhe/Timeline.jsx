@@ -8,9 +8,19 @@ import { Avisos, BlocoConteudo, useAvisos, useConfirmacao } from '../../componen
  *
  * O que a rodada de 05/09 mudou (reorganizacao pura: nenhum evento, campo ou botao saiu):
  *
- * - **Regra de organizacao do cliente**: historico e registro vem POR ULTIMO e RECOLHIDOS por
- *   padrao — `BlocoConteudo recolhivel recolhidoPadrao`. O titulo e a contagem ficam sempre a
- *   vista, entao a pessoa sabe que o historico existe e quantos eventos tem; um clique abre.
+ * - **Regra de organizacao do cliente**: historico e registro vem POR ULTIMO. Vinham tambem
+ *   RECOLHIDOS por padrao; nao vem mais (decisao do cliente, 07/09): o bloco NASCE ABERTO. O
+ *   `recolhivel` continua — quem quiser fechar fecha, e a escolha e gravada como sempre foi
+ *   (`recolhidos` da preferencia `detalhe-solicitacao`, no banco, valendo em qualquer aparelho).
+ *   O motivo de nascer aberto: o historico e o que a pessoa vem ler, e um bloco recolhido cobrava
+ *   DOIS cliques por causa do recolhimento em duas camadas (o do arranjo e o proprio deste bloco).
+ *
+ * - **A ORDEM E ESCOLHA, NAO TEXTO** (07/09). O apoio do bloco dizia "Mais recentes primeiro." /
+ *   "Ordem cronologica...": um INDICADOR no lugar da COISA. O seletor existia, mas morava na barra
+ *   de personalizacao — atras do "..." da faixa e do "Personalizar layout", dois cliques longe de
+ *   quem so queria inverter a leitura. Ele vem para os `controles` do proprio bloco, ao lado do
+ *   titulo, onde o texto estava. Grava onde ja gravava (`historico_ordem`), continua valendo por
+ *   usuario e em qualquer aparelho, e vale SO para o historico da solicitacao.
  * - **R19**: os cinco `alert()` e os dois `window.confirm()` sairam. Aviso vira `useAvisos`
  *   (faixa dentro do bloco, com tom semantico) e confirmacao vira `useConfirmacao`.
  * - **R21**: o retorno de `confirmar()` e DESESTRUTURADO (`const { ok }`) — o objeto e sempre
@@ -40,7 +50,11 @@ export default function Timeline({
   onAnexoRemovido,
   // Preferência do usuário: 'asc' (mais antigos primeiro, rolagem no fim
   // — padrão) ou 'desc' (mais recentes primeiro).
-  ordem = 'asc'
+  ordem = 'asc',
+  // Sem ouvinte não há escolha a oferecer: o seletor não é desenhado e o
+  // bloco fica exatamente como era. Botão que não tem para onde mandar o
+  // clique é enfeite — a mesma regra do par `recolhido`/`aoAlternarRecolhido`.
+  aoMudarOrdem
 }) {
   const [preview, setPreview] = useState(null);
   const listaRef = useRef(null);
@@ -274,9 +288,24 @@ export default function Timeline({
     <BlocoConteudo
       titulo="Histórico"
       contagem={`${totalVisiveis} evento(s)`}
-      descricao={ordem === 'desc' ? 'Mais recentes primeiro.' : 'Ordem cronologica — a rolagem comeca no evento mais recente.'}
       recolhivel
-      recolhidoPadrao
+      controles={typeof aoMudarOrdem === 'function' ? (
+        <label className="sol-detail-historico-ordem">
+          Ordem:
+          {/* Seletor de CONTEXTO da apresentação, não filtro de lista — R12.
+              Fica nos `controles` (e não em `acoes`) porque ali ele está FORA
+              do botão de recolher: clicar no seletor escolhe a ordem, não
+              fecha o bloco. */}
+          <select
+            value={ordem === 'desc' ? 'desc' : 'asc'}
+            onChange={(evento) => aoMudarOrdem(evento.target.value)}
+            aria-label="Ordem do histórico"
+          >
+            <option value="asc">mais antigos primeiro</option>
+            <option value="desc">mais recentes primeiro</option>
+          </select>
+        </label>
+      ) : undefined}
     >
       <Avisos avisos={avisos} aoFechar={fechar} />
 

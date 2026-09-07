@@ -28,9 +28,10 @@ import { Avisos, BlocoConteudo, useAvisos } from '../../components/padrao';
  *
  * ## O que a rodada de 05/09 mudou (reorganizacao pura — nenhum campo, botao ou endpoint saiu)
  *
- * - **Regra de organizacao do cliente**: conversa e historico ficam POR ULTIMO e RECOLHIDOS por
- *   padrao (`BlocoConteudo recolhivel recolhidoPadrao`). Recolher e livre; remover nao seria — o
- *   titulo do bloco continua sempre a vista e um clique devolve tudo.
+ * - **Regra de organizacao do cliente**: conversa e historico ficam POR ULTIMO. Ficavam tambem
+ *   RECOLHIDOS por padrao; nao ficam mais (decisao do cliente, 07/09) — o bloco NASCE ABERTO.
+ *   `recolhivel` continua: quem quiser fechar fecha, e a escolha e gravada como sempre foi
+ *   (`recolhidos` da preferencia `detalhe-solicitacao`, no banco, valendo em qualquer aparelho).
  * - **R19**: os tres `alert()` (limite de tamanho, sucesso do envio, erro do envio) viraram
  *   `Avisos`/`useAvisos`, dentro da propria pagina e com tom semantico.
  * - **R25**: `bg-blue-50`, `bg-blue-100`, `bg-blue-900`, `bg-blue-950`, `bg-gray-900`,
@@ -39,8 +40,10 @@ import { Avisos, BlocoConteudo, useAvisos } from '../../components/padrao';
  * - **R18**: a lista de usuarios para mencionar rola com `overflow-y: auto` (nunca `hidden`, que
  *   criaria scrollport e mataria qualquer sticky da pagina em silencio).
  *
- * O `id` e o `data-testid` ficam no BLOCO, nao no corpo: o bloco nasce recolhido, e ancora/seletor
- * que so existe depois de a pessoa abrir seria uma porta que funciona metade do tempo.
+ * O `id` e o `data-testid` ficam no BLOCO, nao no corpo. O motivo era o bloco nascer recolhido —
+ * ancora/seletor que so existe depois de a pessoa abrir seria uma porta que funciona metade do
+ * tempo. Ele nasce aberto agora, mas continua PODENDO ser recolhido, entao o motivo continua de pe
+ * e os dois ficam onde estao.
  */
 export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = true, motivoBloqueio = '' }) {
   const [texto, setTexto] = useState('');
@@ -197,7 +200,6 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
       <BlocoConteudo
         titulo="Conversa"
         recolhivel
-        recolhidoPadrao
         data-testid="comentarios-somente-leitura"
       >
         <div>
@@ -214,7 +216,6 @@ export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = tru
       titulo="Conversa"
       descricao="Comentar e anexar são um ato so: um dos dois basta."
       recolhivel
-      recolhidoPadrao
       id="sol-detail-conversa"
       data-testid="card-comentario"
     >

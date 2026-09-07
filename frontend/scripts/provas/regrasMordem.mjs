@@ -250,6 +250,29 @@ const CASOS_ARQUIVO_INTEIRO = [
     naoPodeReprovar: true,
     arquivo: `import { Pagina } from '../components/padrao';\nimport DateInputBR from '../components/DateInputBR';\n\nexport default function ProvaDeRegra() {\n  // trocado: antes era type="date", que muda de formato conforme a maquina\n  return (\n    <Pagina>\n      <DateInputBR name="data" value="" onChange={() => {}} />\n    </Pagina>\n  );\n}\n`
   },
+  /*
+    R36 — O MENU "..." (07/09).
+
+    O positivo e o componente montado numa tela nova para a regra: acao
+    escondida atras de um botao que so revela outros botoes.
+
+    O NEGATIVO e o que essa leva inteira produziu: a tela que TIROU o menu e
+    pos os itens visiveis, e que ainda CITA o menu no comentario para
+    explicar de onde o botao veio. Nove telas ficaram assim. Uma regra que
+    contasse comentario acusaria exatamente o conserto — o mesmo erro que a
+    R19 ja teve de desfazer, e que a R35 nasceu cobrindo.
+  */
+  {
+    regra: 'R36',
+    porque: 'menu "..." — botao que so revela outro botao, com a faixa vazia ao lado',
+    arquivo: `import { Pagina } from '../components/padrao';\nimport MenuMais from '../components/padrao/MenuMais';\n\nexport default function ProvaDeRegra() {\n  return (\n    <Pagina>\n      <MenuMais itens={[{ rotulo: 'Exportar CSV', onClick: () => {} }]} />\n    </Pagina>\n  );\n}\n`
+  },
+  {
+    regra: 'R36',
+    porque: 'NEGATIVO: itens visiveis na faixa, com o menu CITADO em comentario — o conserto nao pode reprovar',
+    naoPodeReprovar: true,
+    arquivo: `import { Pagina, PageHeader } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  // "Exportar CSV" vinha do <MenuMais />, que saiu do sistema em 07/09.\n  return (\n    <Pagina>\n      <PageHeader\n        titulo="Prova"\n        acaoPrincipal={{ rotulo: 'Novo', onClick: () => {} }}\n        secundarias={[{ rotulo: 'Exportar CSV', onClick: () => {} }]}\n      />\n    </Pagina>\n  );\n}\n`
+  },
   {
     regra: 'R22',
     porque: 'hook usado sem import',

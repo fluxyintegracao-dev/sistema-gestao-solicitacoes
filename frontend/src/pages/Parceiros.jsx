@@ -429,7 +429,11 @@ export default function Parceiros() {
         contagem={loading ? null : `${parceiros.length} pessoa(s)`}
         descricao="Cadastro mestre de clientes, credores, fornecedores e corretores usado nas solicitações, financeiro, comercial e cotações."
         acaoPrincipal={{ rotulo: 'Nova pessoa', onClick: abrirNovaPessoa }}
-        mais={[
+        /* As três vinham do "⋯", que saiu do sistema (07/09): modelo,
+           exportação e importação são ações SOBRE esta tela e agora são
+           botões visíveis. Quatro na faixa, medidos em uma linha a 1920 e
+           a 1366; a 390 quebram em três linhas, sem corte. */
+        secundarias={[
           { rotulo: 'Baixar modelo de importação', onClick: handleBaixarModelo },
           { rotulo: 'Exportar pessoas', onClick: handleExportar },
           {

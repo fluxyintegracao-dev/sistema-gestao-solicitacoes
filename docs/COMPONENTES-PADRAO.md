@@ -22,7 +22,8 @@ Pilotos de referência: `pages/Usuarios.jsx` (listagem de cadastro),
    um primário por tela com barra de cor à esquerda; secundários em
    `--ui-surface-2` (branco rebaixado, criado nesta leva). Botões TODOS
    visíveis, em três pesos; destrutivo em vermelho suave, sempre apartado;
-   ações raras no menu "⋯". Só tokens — nenhuma cor à mão.
+   ações raras também visíveis, na mesma barra (R36). Só tokens — nenhuma
+   cor à mão.
 7. **Adoção antes de criação**: ListaAvancada, StatusBadge, ResizableTable,
    ModalPortal/OverlayModal, `useFecharAoSair`, classes `app-*` já existentes.
 
@@ -30,8 +31,8 @@ Pilotos de referência: `pages/Usuarios.jsx` (listagem de cadastro),
 
 | Componente | Para quê | Observações |
 |---|---|---|
-| `PageHeader` | Cabeçalho de página: título+subtítulo, UMA `acaoPrincipal` sólida, `secundarias` em contorno, `destrutiva` apartada, `mais` (MenuMais) | O `h1` é ocultado pelo CSS do shell (a topbar mostra o título da seção) — fica no DOM por acessibilidade. **Links para telas irmãs não entram** (menu e Ctrl+K resolvem; decisão de 02/09) |
-| `MenuMais` | Menu "⋯" para ações raras | `itens=[{rotulo, onClick, perigosa, desabilitada, icone, title}]`; perigosas vão para o fim, com separador |
+| `PageHeader` | Cabeçalho de página: título+subtítulo, UMA `acaoPrincipal` sólida, `secundarias` em contorno, `destrutiva` apartada (objeto **ou lista**) | O `h1` é ocultado pelo CSS do shell (a topbar mostra o título da seção) — fica no DOM por acessibilidade. **Links para telas irmãs não entram** (menu e Ctrl+K resolvem; decisão de 02/09). A prop `mais` **não existe mais** (R36, 07/09) |
+| `MenuMais` | Menu "⋯" para ações raras | **Em retirada (R36).** Sobrou UM ponto: a célula de ações da lista de Solicitações, onde os seis botões visíveis pedem 478px e a coluna tem 296px úteis — caso levado ao cliente. Nenhuma tela nova deve usá-lo |
 | `BlocoConteudo` | O card padrão | `variante="primario"` (barra de cor via `cor`, ex. `var(--module-financeiro)` ou `var(--sem-info)`) / `"secundario"` (`--ui-surface-2`); `recolhivel` + `recolhidoPadrao` para raros/históricos |
 | `StatGrid` + `StatTile` | Ladrilho de dado único (unifica InfoItem, app-summary-card, StatsCard, hub-pendencia-cartao) | `tom` semântico, `span`, `full`, `vazio` |
 | `CamposComVazios` | O grid de campos do detalhe com o alternador de vazios | `campos=[{label, valor, sub, tom, span, contexto}]` — a contagem sai da própria lista (nada de espelhar condição à mão); `contexto:false` = campo que não pertence a este registro (fora da tela E da contagem) |

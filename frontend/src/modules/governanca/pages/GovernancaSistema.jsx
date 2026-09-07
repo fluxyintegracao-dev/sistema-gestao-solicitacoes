@@ -213,8 +213,11 @@ export default function GovernancaSistema() {
         gruda abaixo da topbar e compacta na rolagem. O olho-de-boi
         "ADMINISTRACAO" virou apoio de UMA linha, na escala de título.
         R11/C6: os três botões de exportação são ações SOBRE ESTA TELA
-        (baixar o recorte aberto), não navegação — por isso vão para o menu
-        "⋯" de ações raras, e não para uma barra própria.
+        (baixar o recorte aberto), não navegação. Eles ficavam no menu "⋯",
+        que saiu do sistema (07/09): são botões visíveis da faixa. Esta é a
+        tela mais carregada das nove que tinham menu — cinco botões — e a
+        medição a 1920, 1366 e 390 mostrou uma linha nas duas primeiras e
+        duas linhas a 390, sem rótulo cortado.
       */}
       <PageHeader
         titulo="Governança do Sistema"
@@ -226,17 +229,19 @@ export default function GovernancaSistema() {
           desabilitada: saving,
           icone: <HiOutlineClock />
         } : undefined}
-        secundarias={[{
-          rotulo: 'Atualizar',
-          onClick: load,
-          icone: <HiOutlineArrowPath />
-        }]}
-        mais={['csv', 'xlsx', 'pdf'].map((format) => ({
-          rotulo: `Exportar ${format.toUpperCase()}`,
-          title: `Baixa o recorte da aba aberta (${abaAtual?.label || activeTab}) em ${format.toUpperCase()}`,
-          onClick: () => handleExport(format),
-          icone: <HiOutlineArrowDownTray />
-        }))}
+        secundarias={[
+          {
+            rotulo: 'Atualizar',
+            onClick: load,
+            icone: <HiOutlineArrowPath />
+          },
+          ...['csv', 'xlsx', 'pdf'].map((format) => ({
+            rotulo: `Exportar ${format.toUpperCase()}`,
+            title: `Baixa o recorte da aba aberta (${abaAtual?.label || activeTab}) em ${format.toUpperCase()}`,
+            onClick: () => handleExport(format),
+            icone: <HiOutlineArrowDownTray />
+          }))
+        ]}
       />
 
       {/* R16/R19: UM dono para a faixa de avisos — o `div` vermelho de erro

@@ -27,7 +27,9 @@ import { formaPagamentoEhPix } from '../../utils/formaPagamento';
 
   - O menu "⋯" escrito à mão (estado, `useEffect` de clique fora e de
     Escape, `role="menu"`) virou o `MenuMais` do `PageHeader`. Eram ~60
-    linhas replicando um componente padrão.
+    linhas replicando um componente padrão. Em 07/09 o menu saiu da faixa
+    inteira, por decisão do cliente: o item que ele guardava aqui
+    ("Personalizar layout") é botão visível do `PageHeader`.
 
   - A grade de ladrilhos virou `CamposComVazios`. A contagem de campos
     vazios era uma LISTA MANUAL de 14 pares `[contexto, temValor]`

@@ -236,10 +236,11 @@ ser o que se declara.
 
 ## R11 — Navegação não é ação (02/09; ESCOPO corrigido em 02/09 e ampliado em 03/09)
 
-- **Onde vale**: menus de ações (MenuMais "⋯", barra de ações do PageHeader)
-  e botões "Voltar" REDUNDANTES em telas de LISTAGEM (onde menu, breadcrumb
-  e Ctrl+K já resolvem). Exemplo: "Ir para categorias" dentro do "⋯" de
-  Parceiros — sai.
+- **Onde vale**: a barra de ações do `PageHeader` e as ações de linha da
+  tabela, e botões "Voltar" REDUNDANTES em telas de LISTAGEM (onde menu,
+  breadcrumb e Ctrl+K já resolvem). Exemplo: "Ir para categorias" na barra
+  de Parceiros — sai. (Até 07/09 esta linha dizia também "MenuMais ⋯"; o
+  menu saiu da faixa — ver R36.)
 - **Onde NÃO vale**: em tela de DETALHE/REGISTRO, a **seta de voltar à
   esquerda do cabeçalho é a affordance primária de retorno e FICA — sempre,
   em todas**. Exemplo: a seta da gestão da obra (ObraGestao), do título
@@ -846,7 +847,8 @@ Decisão do cliente, tomada sobre um caso concreto: a `FinanceiroRelatorios`
 tinha três atalhos de navegação na faixa fixa, e duas regras nossas
 brigavam por causa deles.
 
-- **R11** proíbe navegação dentro do menu de ações "⋯".
+- **R11** proíbe navegação dentro do menu de ações "⋯" (o menu saiu em
+  07/09 — R36; a proibição segue valendo para onde os itens dele foram).
 - **C6** proíbe navegação vestida de ação na barra de ações.
 
 A tela tinha ido para a barra de ações **por eliminação** (decisão D3): se
@@ -861,7 +863,7 @@ do escopo dos dois.
 
 | Isto é… | Mora em |
 |---|---|
-| **Ação sobre esta tela** (salvar, baixar, importar, arquivar) | barra de ações; as raras, no menu "⋯" |
+| **Ação sobre esta tela** (salvar, baixar, importar, arquivar) | barra de ações, TODAS visíveis (R36) |
 | **Caminho para outra tela** | **hub do módulo**, **breadcrumb** e **Ctrl+K** |
 | **Link para o REGISTRO RELACIONADO** | **no corpo, junto do dado que o origina** — nunca na barra de ações nem no menu |
 

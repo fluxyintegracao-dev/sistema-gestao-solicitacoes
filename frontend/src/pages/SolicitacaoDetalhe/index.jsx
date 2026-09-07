@@ -83,7 +83,8 @@ import {
     3. ladrilhos de situação — status, setor, prazo, última atualização;
     4. dados do registro — o bloco principal, em largura total;
     5. blocos de trabalho — contrato, financeiro, apropriações;
-    6. histórico, conversa e auditoria — registros, POR ÚLTIMO e RECOLHIDOS.
+    6. histórico, conversa e auditoria — registros, POR ÚLTIMO. Histórico e conversa
+       nascem ABERTOS (decisão do cliente, 07/09); só a auditoria nasce recolhida.
 
   Reorganização é PURA: mesma rota, mesmos handlers, mesmas chamadas de
   serviço. Nenhum campo, botão ou bloco saiu — o que mudou foi ordem, peso
@@ -192,14 +193,33 @@ function mapearItemManualCompraDireta(item) {
 }
 
 /*
-  Regra de organização do cliente: "histórico e registros por último,
-  recolhidos por padrão". O catálogo `ORDEM_PADRAO` (blocosDetalhe.js) é
-  espelhado no backend e validado pelo validarNavegacao.mjs — a ORDEM de
-  apresentação, não. Então o rebaixamento acontece aqui, e SÓ quando
-  nenhuma camada declarou arranjo: usuário e setor que já escolheram uma
-  ordem continuam com a deles, byte a byte.
+  Regra de organização do cliente: "histórico e registros por último". O
+  catálogo `ORDEM_PADRAO` (blocosDetalhe.js) é espelhado no backend e
+  validado pelo validarNavegacao.mjs — a ORDEM de apresentação, não. Então o
+  rebaixamento acontece aqui, e SÓ quando nenhuma camada declarou arranjo:
+  usuário e setor que já escolheram uma ordem continuam com a deles, byte a
+  byte.
 */
 const BLOCOS_DE_REGISTRO = ['historico', 'conversa', 'auditoria'];
+
+/*
+  IR POR ÚLTIMO E NASCER RECOLHIDO ERAM A MESMA LISTA — E NÃO SÃO A MESMA
+  COISA (decisão do cliente, 07/09).
+
+  Os três desciam para o fim E nasciam recolhidos, pela mesma constante.
+  Descer para o fim continua certo: são registro, não decisão. Nascer
+  recolhido, não — histórico e conversa são JUSTAMENTE o que a pessoa vem
+  ler nesta tela, e o custo era maior do que um clique: o recolhimento
+  acontecia em DUAS camadas (esta, do arranjo, e o `recolhidoPadrao` do
+  próprio bloco), então abrir o histórico pedia dois cliques.
+
+  A auditoria fica: ela é registro de pendência, ato raro e de administração.
+
+  Quem já declarou `recolhidos` (usuário ou setor) não é tocado — o `Set`
+  abaixo só entra quando ninguém declarou nada, e a escolha de quem fechou o
+  bloco continua gravada onde sempre esteve.
+*/
+const BLOCOS_QUE_NASCEM_RECOLHIDOS = ['auditoria'];
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
@@ -1022,7 +1042,8 @@ export default function SolicitacaoDetalhe() {
 
   /*
     Regra de organização do cliente aplicada SÓ ao padrão: histórico,
-    conversa e auditoria vão para o fim e nascem recolhidos. Quem já
+    conversa e auditoria vão para o fim; só a auditoria nasce recolhida
+    (07/09 — ver a nota da `BLOCOS_QUE_NASCEM_RECOLHIDOS`). Quem já
     declarou ordem (usuário ou admin do setor) mantém a dele — mudar o
     arranjo de quem escolheu seria trocar a decisão da pessoa por uma
     regra genérica. Recolher é reversível e persiste no clique.
@@ -1039,7 +1060,7 @@ export default function SolicitacaoDetalhe() {
   const usuarioDeclarouRecolhidos = Array.isArray(prefsLayoutUsuario?.recolhidos);
   const blocosRecolhidos = usuarioDeclarouRecolhidos
     ? recolhidosResolvidos
-    : new Set([...recolhidosResolvidos, ...BLOCOS_DE_REGISTRO]);
+    : new Set([...recolhidosResolvidos, ...BLOCOS_QUE_NASCEM_RECOLHIDOS]);
 
   const temCamadaUsuario = (novo) => Boolean(
     novo && (
@@ -1169,6 +1190,7 @@ export default function SolicitacaoDetalhe() {
     historico: (
       <Timeline
         ordem={historicoOrdem}
+        aoMudarOrdem={definirOrdemHistorico}
         historicos={solicitacao.historicos || []}
         canRemoveAnexo={podeInteragirSolicitacao && canDeleteSolicitacaoAnexo(user)}
         canRemoveComentario={podeInteragirSolicitacao && String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN'}
@@ -1352,11 +1374,25 @@ export default function SolicitacaoDetalhe() {
         acaoPrincipal={acaoPrincipalResolvida
           ? { rotulo: acaoPrincipalResolvida.rotulo, onClick: acaoPrincipalResolvida.executar }
           : undefined}
-        secundarias={acoesSecundarias}
-        mais={[
-          // Ações SOBRE ESTA TELA — nenhuma navegação (R11/C6).
+        /*
+          "PERSONALIZAR LAYOUT" SAIU DO "⋯" (decisão do cliente, 07/09).
+
+          Ela era o único item do menu desta tela: um botão que só revelava
+          outro botão. O menu saiu do sistema e ela é secundária VISÍVEL da
+          faixa, ao lado das outras. Medido a 1920, 1366 e 390 no pior caso
+          desta tela (principal + duas secundárias + esta): uma linha nas
+          duas primeiras larguras, duas a 390, sem rótulo cortado.
+
+          `pressionada` vai junto porque a ação tem ESTADO (liga/desliga o
+          modo) — sem ela, quem usa leitor de tela deixa de saber se o modo
+          está ligado. Continua fora do celular: lá o modo não arranja nada
+          (largura e arrasto são do desktop).
+        */
+        secundarias={[
+          ...acoesSecundarias,
           !isMobileDetalhe ? {
             rotulo: personalizando ? 'Concluir personalização' : 'Personalizar layout',
+            pressionada: personalizando,
             onClick: () => setPersonalizando((atual) => !atual)
           } : null
         ].filter(Boolean)}
@@ -1465,28 +1501,25 @@ export default function SolicitacaoDetalhe() {
           aoMudarArranjo={persistirArranjoBlocos}
           aoRestaurar={restaurarPadraoSetor}
           rotuloRestaurar="Restaurar padrão do setor"
-          /* O modo é ligado pelo "⋯" da faixa (ação SOBRE ESTA TELA —
-             R11/C6), então ele é controlado daqui e a entrada própria do
-             componente não aparece: dois botões para a mesma coisa
-             seriam dois donos. */
+          /* O modo é ligado pelo botão "Personalizar layout" da faixa (ação
+             SOBRE ESTA TELA — R11/C6), então ele é controlado daqui e a
+             entrada própria do componente não aparece: dois botões para a
+             mesma coisa seriam dois donos. */
           personalizando={personalizando}
           aoAlternarPersonalizando={(ligado) => setPersonalizando(ligado)}
-          /* A ordem do histórico é preferência DESTA tela e não é bloco —
-             continua na mesma barra, ao lado do que é do arranjo. */
-          toolbarExtra={(
-            <label className="sol-detail-historico-ordem">
-              Histórico:
-              {/* Seletor de CONTEXTO da apresentação, não filtro de lista — R12. */}
-              <select
-                value={historicoOrdem}
-                onChange={(event) => definirOrdemHistorico(event.target.value)}
-                aria-label="Ordem do histórico"
-              >
-                <option value="asc">mais antigos primeiro</option>
-                <option value="desc">mais recentes primeiro</option>
-              </select>
-            </label>
-          )}
+          /*
+            A ORDEM DO HISTÓRICO SAIU DAQUI (07/09).
+
+            Ela morava nesta barra porque é preferência DESTA tela e não é
+            bloco. Só que esta barra só existe em modo de personalização —
+            que por sua vez nascia atrás do "⋯" da faixa. Eram dois cliques
+            e um modo inteiro para inverter a leitura de uma lista.
+
+            Agora ela é `controles` do próprio bloco Histórico
+            (`Timeline.jsx`), ao lado do título, no lugar onde antes havia
+            só o TEXTO dizendo a ordem. Um dono, no bloco que ela governa —
+            manter uma cópia aqui seria o segundo dono.
+          */
           classes={{
             arranjo: 'sol-detail-arranjo',
             colunas: 'sol-detail-blocos',

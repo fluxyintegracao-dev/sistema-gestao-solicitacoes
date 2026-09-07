@@ -104,7 +104,7 @@ Com qualquer perfil (repetir com um segundo usuário para provar o isolamento):
 
 1. Configurações → Ação Principal por Setor: mapear setor+estado → botão em
    destaque aparece no cabeçalho do detalhe daquele setor/estado; secundárias
-   vão para o menu "⋯"; sem mapeamento, botões de sempre.
+   ficam visíveis na mesma barra (R36); sem mapeamento, botões de sempre.
 2. Atalhos por Setor: definir sugeridos + 2 obrigatórios (o 3º obrigatório é
    recusado); usuário novo do setor recebe os padrões; obrigatório não pode
    ser removido pelo usuário; a personalização própria continua por cima.

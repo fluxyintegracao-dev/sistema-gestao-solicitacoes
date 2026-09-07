@@ -3873,12 +3873,21 @@ export default function GerenciarCotacaoSolicitacao() {
           onClick: handleAbrirPdf,
           desabilitada: baixando
         }}
-        destrutiva={podeOperarFluxo ? { rotulo: 'Recusar', onClick: handleRecusarSolicitacao } : undefined}
-        mais={podeExibirCancelamentoCotacao ? [{
-          rotulo: 'Cancelar cotação',
-          perigosa: true,
-          onClick: () => setModalCancelamentoCotacao(true)
-        }] : []}
+        /*
+          DUAS DESTRUTIVAS, LADO A LADO (07/09). "Cancelar cotação" estava no
+          menu "⋯" marcada como `perigosa` — o menu a apartava com separador
+          e cor de perigo. O menu saiu do sistema, e o lugar de um item
+          perigoso na faixa é o grupo APARTADO, não a fila das secundárias:
+          por isso o `destrutiva` passou a aceitar lista. As duas continuam
+          em vermelho suave, juntas e separadas do resto por `margin-left:
+          auto`.
+        */
+        destrutiva={[
+          podeOperarFluxo ? { rotulo: 'Recusar', onClick: handleRecusarSolicitacao } : null,
+          podeExibirCancelamentoCotacao
+            ? { rotulo: 'Cancelar cotação', onClick: () => setModalCancelamentoCotacao(true) }
+            : null
+        ].filter(Boolean)}
       />
 
       {/*
