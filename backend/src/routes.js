@@ -374,6 +374,7 @@ const CargoController = require('./controllers/CargoController');
 const SetorController = require('./controllers/SetorController');
 const ObraController = require('./controllers/ObraController');
 const TipoSolicitacaoController = require('./controllers/TipoSolicitacaoController');
+const TipoSolicitacaoDisponibilidadeController = require('./controllers/TipoSolicitacaoDisponibilidadeController');
 const ListaPreferenciasController = require('./controllers/ListaPreferenciasController');
 const BuscaController = require('./controllers/BuscaController');
 const TelaInicialController = require('./controllers/TelaInicialController');
@@ -2246,6 +2247,9 @@ router.get('/compras/pedidos/:id/pdf', allowComprasPedidosRead, validateRequest(
 // -------------------------------------------------------------------
 
 router.get('/tipos-solicitacao', TipoSolicitacaoController.index);
+router.get('/tipos-solicitacao/disponiveis', TipoSolicitacaoDisponibilidadeController.disponiveis);
+router.get('/configuracoes/tipos-solicitacao-por-destino', allowConfiguracoesStatusVinculos, TipoSolicitacaoDisponibilidadeController.configuracao);
+router.patch('/configuracoes/tipos-solicitacao-por-destino', allowConfiguracoesStatusVinculos, TipoSolicitacaoDisponibilidadeController.atualizarConfiguracao);
 router.post('/tipos-solicitacao', allowConfiguracoesCadastros, TipoSolicitacaoController.create);
 router.patch('/tipos-solicitacao/:id', allowConfiguracoesCadastros, TipoSolicitacaoController.update);
 router.patch('/tipos-solicitacao/:id/ativar', allowConfiguracoesCadastros, TipoSolicitacaoController.ativar);

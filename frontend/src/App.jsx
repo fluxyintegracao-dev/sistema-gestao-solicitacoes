@@ -155,6 +155,7 @@ const SetoresVisiveisUsuario = lazy(() => import('./pages/SetoresVisiveisUsuario
 const ComportamentoRecebimentoSetor = lazy(() => import('./pages/ComportamentoRecebimentoSetor'));
 const TimeoutInatividade = lazy(() => import('./pages/TimeoutInatividade'));
 const TiposSolicitacaoPorSetor = lazy(() => import('./pages/TiposSolicitacaoPorSetor'));
+const TiposSolicitacaoPorDestino = lazy(() => import('./pages/TiposSolicitacaoPorDestino'));
 const NovaSolicitacaoCamposConfig = lazy(() => import('./pages/NovaSolicitacaoCamposConfig'));
 const NovaSolicitacaoAutomacaoDestinoConfig = lazy(() => import('./pages/NovaSolicitacaoAutomacaoDestinoConfig'));
 const TiposCompartilhadosSetor = lazy(() => import('./pages/TiposCompartilhadosSetor'));
@@ -915,6 +916,7 @@ export default function App() {
         <Route path="comportamento-recebimento-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><ComportamentoRecebimentoSetor /></ConfiguracoesAreaRoute>} />
         <Route path="timeout-inatividade" element={<ConfiguracoesAreaRoute area="status_vinculos"><TimeoutInatividade /></ConfiguracoesAreaRoute>} />
         <Route path="tipos-solicitacao-por-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><TiposSolicitacaoPorSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="tipos-solicitacao-por-destino" element={<ConfiguracoesAreaRoute area="status_vinculos"><TiposSolicitacaoPorDestino /></ConfiguracoesAreaRoute>} />
         <Route path="nova-solicitacao-campos" element={<ConfiguracoesAreaRoute area="solicitacoes"><NovaSolicitacaoCamposConfig /></ConfiguracoesAreaRoute>} />
         <Route path="nova-solicitacao-automacao-destino" element={<ConfiguracoesAreaRoute area="solicitacoes"><NovaSolicitacaoAutomacaoDestinoConfig /></ConfiguracoesAreaRoute>} />
         <Route path="tipos-compartilhados-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><TiposCompartilhadosSetor /></ConfiguracoesAreaRoute>} />

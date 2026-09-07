@@ -38,6 +38,7 @@ module.exports = {
     const tipo = await TipoSolicitacao.create({
       nome,
       codigo_interno: codigoInterno || null,
+      disponivel_para_obras: req.body?.disponivel_para_obras !== false,
       comportamento: serializeTipoSolicitacaoBehavior(req.body?.comportamento || null)
     });
     return res.status(201).json(enrichTipoSolicitacao(tipo));
@@ -75,6 +76,9 @@ module.exports = {
       await tipo.update({
         nome,
         codigo_interno: codigoInterno || null,
+        disponivel_para_obras: req.body?.disponivel_para_obras !== undefined
+          ? req.body.disponivel_para_obras === true
+          : tipo.disponivel_para_obras,
         comportamento: req.body?.comportamento !== undefined
           ? serializeTipoSolicitacaoBehavior(req.body?.comportamento)
           : tipo.comportamento

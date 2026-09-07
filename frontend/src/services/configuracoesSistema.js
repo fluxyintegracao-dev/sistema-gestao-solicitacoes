@@ -195,6 +195,26 @@ export async function getTiposSolicitacaoPorSetor() {
   return res.json();
 }
 
+export async function getTiposSolicitacaoPorDestino() {
+  const res = await fetch(`${API_URL}/configuracoes/tipos-solicitacao-por-destino`, {
+    headers: authHeaders()
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'Erro ao carregar tipos por Obra/Centro de Custo');
+  return data;
+}
+
+export async function salvarTiposSolicitacaoPorDestino(payload) {
+  const res = await fetch(`${API_URL}/configuracoes/tipos-solicitacao-por-destino`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'Erro ao salvar tipos por Obra/Centro de Custo');
+  return data;
+}
+
 export async function salvarTiposSolicitacaoPorSetor(data) {
   const res = await fetch(`${API_URL}/configuracoes/tipos-solicitacao-por-setor`, {
     method: 'PATCH',

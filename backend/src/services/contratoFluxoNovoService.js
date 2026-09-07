@@ -1,7 +1,7 @@
 'use strict';
 
 const { Op } = require('sequelize');
-const { sequelize, Anexo, CategoriaFinanceira, Contrato, ContratoAnexo, ContratoParcela, ContratoApropriacao, ContratoCredor, Apropriacao, ConfiguracaoSistema, FormaPagamentoFinanceira, Historico, Parceiro, Setor, TipoSubContrato, TipoSolicitacao, TituloFinanceiro, User, Solicitacao } = require('../models');
+const { sequelize, Anexo, CategoriaFinanceira, Contrato, ContratoAnexo, ContratoParcela, ContratoApropriacao, ContratoCredor, Apropriacao, ConfiguracaoSistema, FormaPagamentoFinanceira, Historico, Obra, Parceiro, Setor, TipoSubContrato, TipoSolicitacao, TituloFinanceiro, User, Solicitacao } = require('../models');
 const { codigoDoSetor } = require('../utils/codigoDoSetor');
 const {
   normalizeTipoSolicitacaoBehavior,
@@ -19,6 +19,8 @@ const { obterLimiteJuridico } = require('./contratoLimiteConfigService');
 const { formaPagamentoEhBoleto } = require('./formasPagamentoMedicaoService');
 const { isValidCpfCnpj, normalizarCpfCnpj } = require('./parceiroService');
 const { validarResponsavelVinculadoObra } = require('./contratoResponsavelService');
+const { resolverDestinoInicialNovaSolicitacao } = require('./novaSolicitacaoDestinoService');
+const { assertTipoDisponivelNoDestino } = require('./tipoSolicitacaoDisponibilidadeService');
 const gerarCodigoSolicitacao = require('./solicitacao/gerarCodigo');
 
 /**
@@ -658,8 +660,6 @@ async function criarContrato(dados, { usuarioId } = {}) {
     tipo_sub_id: tipoSubId,
     justificativa,
     categoria_financeira_id: categoriaFinanceiraId,
-    // PI-16: o contrato nasce com uma solicitacao, e toda solicitacao pertence a um setor.
-    area_responsavel: areaResponsavel,
     apropriacoes: apropriacoesInformadas
   } = dados;
 
@@ -679,17 +679,17 @@ async function criarContrato(dados, { usuarioId } = {}) {
     throw Object.assign(new Error('Obra e obrigatoria.'), { statusCode: 400 });
   }
 
-  // PI-16: o contrato nasce como solicitacao, e toda solicitacao pertence a um setor — e por ele
-  // que ela e encontrada, roteada e devolvida. Sem area nao ha fila para a solicitacao cair.
-  //
-  // Exigido em vez de adivinhado de proposito: chutar o setor mandaria o contrato para a fila
-  // errada, e ninguem descobriria ate ele sumir. A tela sempre envia (e o codigo do setor, nao o
-  // nome — `GEO`, nao `GERENCIA DE PROCESSOS`).
-  if (!String(areaResponsavel || '').trim()) {
-    throw Object.assign(
-      new Error('Area responsavel e obrigatoria: e o setor que recebe a solicitacao do contrato.'),
-      { statusCode: 400 }
-    );
+  // Nova Solicitacao nao aceita mais o setor informado pelo navegador. O destino inicial e uma
+  // regra do servidor: toda abertura operacional nasce na fila GEO com status PENDENTE.
+  const destinoInicial = await resolverDestinoInicialNovaSolicitacao();
+  const areaResponsavel = destinoInicial.areaResponsavel;
+
+  const obraSelecionada = await Obra.findOne({
+    where: { id: obraId, ativo: true },
+    attributes: ['id', 'nome', 'tipo_centro_custo']
+  });
+  if (!obraSelecionada) {
+    throw Object.assign(new Error('Obra ou centro de custo inexistente ou inativo.'), { statusCode: 400 });
   }
 
   const contratados = [...new Set(
@@ -839,6 +839,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
     if (!tipoMacro) {
       throw Object.assign(new Error('Tipo de solicitacao inexistente.'), { statusCode: 400 });
     }
+    await assertTipoDisponivelNoDestino(obraSelecionada, tipoMacro);
 
     const comportamentoMacro = normalizeTipoSolicitacaoBehavior(tipoMacro);
     rotuloDataSolicitacao = obterRotuloDataSolicitacao(comportamentoMacro);

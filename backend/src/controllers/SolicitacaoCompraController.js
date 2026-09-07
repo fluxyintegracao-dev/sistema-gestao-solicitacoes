@@ -37,6 +37,7 @@ const gerarCodigoSolicitacao = require('../services/solicitacao/gerarCodigo');
 const { normalizeOriginalName } = require('../utils/fileName');
 const { findSetorByCapability, resolveSetorPersistenciaValue, userHasSetorCapability } = require('../services/setorCapabilityService');
 const { normalizeTipoSolicitacaoBehavior, normalizeTipoSolicitacaoCodigo } = require('../services/tipoSolicitacaoBehaviorService');
+const { assertTipoDisponivelNoDestino } = require('../services/tipoSolicitacaoDisponibilidadeService');
 const {
   buildCotacaoItemKey,
   carregarSolicitacaoCompraCompleta,
@@ -389,7 +390,7 @@ async function validarAcessoCompras(usuario) {
 
 async function buscarTipoSolicitacaoCompra(transaction) {
   const tipos = await TipoSolicitacao.findAll({
-    attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento'],
+    attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento', 'disponivel_para_obras'],
     transaction
   });
 
@@ -410,6 +411,7 @@ async function buscarTipoSolicitacaoCompra(transaction) {
       nome: 'Solicitação de Compra',
       codigo_interno: 'SOLICITACAO_DE_COMPRA',
       comportamento: JSON.stringify(normalizeTipoSolicitacaoBehavior({ codigo_interno: 'SOLICITACAO_DE_COMPRA' })),
+      disponivel_para_obras: true,
       ativo: true
     },
     { transaction }
@@ -461,7 +463,7 @@ async function montarFluxoAprovacaoCompraDireta({ transaction }) {
 async function buscarTipoSolicitacaoCompraDireta(tipoSolicitacaoId, transaction) {
   if (tipoSolicitacaoId) {
     const tipoInformado = await TipoSolicitacao.findByPk(tipoSolicitacaoId, {
-      attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento'],
+      attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento', 'disponivel_para_obras'],
       transaction
     });
 
@@ -471,7 +473,7 @@ async function buscarTipoSolicitacaoCompraDireta(tipoSolicitacaoId, transaction)
   }
 
   const tipos = await TipoSolicitacao.findAll({
-    attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento'],
+    attributes: ['id', 'nome', 'ativo', 'codigo_interno', 'comportamento', 'disponivel_para_obras'],
     transaction
   });
 
@@ -492,6 +494,7 @@ async function buscarTipoSolicitacaoCompraDireta(tipoSolicitacaoId, transaction)
       nome: 'Compra Direta',
       codigo_interno: 'COMPRA_DIRETA',
       comportamento: JSON.stringify(normalizeTipoSolicitacaoBehavior({ codigo_interno: 'COMPRA_DIRETA' })),
+      disponivel_para_obras: true,
       ativo: true
     },
     { transaction }
@@ -3842,6 +3845,7 @@ module.exports = {
       const tipoSolicitacao = compraDireta
         ? await buscarTipoSolicitacaoCompraDireta(tipo_solicitacao_id, transaction)
         : await buscarTipoSolicitacaoCompra(transaction);
+      await assertTipoDisponivelNoDestino(obra, tipoSolicitacao, { transaction });
       const fluxoCompra = compraDireta
         ? await montarFluxoAprovacaoCompraDireta({
             transaction
@@ -4110,7 +4114,10 @@ module.exports = {
     } catch (error) {
       await transaction.rollback();
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao criar solicitacao de compra' });
+      const status = Number(error?.statusCode) || 500;
+      return res.status(status).json({
+        error: status >= 500 ? 'Erro ao criar solicitacao de compra' : error.message
+      });
     }
   },
 

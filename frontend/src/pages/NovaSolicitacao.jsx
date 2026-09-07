@@ -12,8 +12,7 @@ import {
   useConfirmacao
 } from '../components/padrao';
 import { getMinhasObras } from '../services/obras';
-import { getTiposSolicitacao } from '../services/tiposSolicitacao';
-import { getSetores } from '../services/setores';
+import { getTiposSolicitacaoDisponiveis } from '../services/tiposSolicitacao';
 import { createSolicitacao, getApropriacaoPadraoSolicitacao, getSaldoDespesaEventual, solicitarRetornoSolicitacao } from '../services/solicitacoes';
 import { uploadArquivos } from '../services/uploads';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
@@ -24,7 +23,7 @@ import BlocoMedicaoContrato from '../components/contratos/BlocoMedicaoContrato';
 import ModalAditivoContrato from '../components/contratos/ModalAditivoContrato';
 import { buscarParceiros, criarCredorNovaSolicitacao } from '../services/parceiros';
 import { listarApropriacoes } from '../services/apropriacoes';
-import { getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
+import { getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { useFecharAoSair } from '../hooks/useFecharAoSair';
 import { HiOutlineArrowUturnLeft, HiOutlineClock, HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
@@ -35,7 +34,6 @@ import CadastroRapidoFavorecidoButton from '../components/solicitacoes/CadastroR
 import RateioApropriacoesContrato, { numeroDoCampo } from '../components/contratos/RateioApropriacoesContrato';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import RecargaCartaoFields from '../components/recarga-cartao/RecargaCartaoFields';
-import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import {
   applyTipoSolicitacaoModuleAvailability,
@@ -81,13 +79,6 @@ function isTipoRecargaCartao(tipo, comportamento = {}) {
   if (comportamento?.usa_fluxo_recarga_cartao === true) return true;
   const token = normalizarBusca(tipo?.codigo_interno || tipo?.nome).replace(/[^A-Z0-9]+/g, '_');
   return token === 'RECARGA_DE_CARTAO';
-}
-
-function isSetorGerenciaProcessos(setor) {
-  const tokens = [setor?.codigo, setor?.nome]
-    .map((valor) => normalizarBusca(valor).replace(/[^A-Z0-9]+/g, '_'))
-    .filter(Boolean);
-  return tokens.some((token) => token === 'GEO' || (token.includes('GERENCIA') && token.includes('PROCESSO')));
 }
 
 function formatarLocalidadeObra(obra) {
@@ -169,10 +160,7 @@ export default function NovaSolicitacao() {
   const [obraBusca, setObraBusca] = useState('');
   const [obraBuscaAtiva, setObraBuscaAtiva] = useState(false);
   const [tipos, setTipos] = useState([]);
-  const [setores, setSetores] = useState([]);
-  const [areasObra, setAreasObra] = useState([]);
-  const [areasPorSetorOrigem, setAreasPorSetorOrigem] = useState({});
-  const [tiposPorSetorConfig, setTiposPorSetorConfig] = useState({});
+  const [catalogoDestino, setCatalogoDestino] = useState({ status: 'idle', contexto: null, destino: null, erro: '' });
   const [camposNovaSolicitacaoConfig, setCamposNovaSolicitacaoConfig] = useState({ regras: {} });
   const [automacaoDestinoConfig, setAutomacaoDestinoConfig] = useState({ destinos_disponiveis: [], regras: {} });
   const [tiposSub, setTiposSub] = useState([]);
@@ -321,27 +309,11 @@ export default function NovaSolicitacao() {
   useEffect(() => {
     async function load() {
       setObras(await getMinhasObras({ modo: 'CRIACAO', escopo: 'TODOS' }));
-      setTipos(await getTiposSolicitacao());
-      setSetores(await getSetores());
       try {
-        const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgCamposNovaSolicitacao, cfgAutomacaoDestino] = await Promise.all([
-          getAreasObra(),
-          getAreasPorSetorOrigem(),
-          getTiposSolicitacaoPorSetor(),
+        const [cfgCamposNovaSolicitacao, cfgAutomacaoDestino] = await Promise.all([
           getCamposNovaSolicitacao(),
           getAutomacaoDestinoNovaSolicitacao()
         ]);
-        setAreasObra(Array.isArray(cfg?.areas) ? cfg.areas : []);
-        setAreasPorSetorOrigem(
-          cfgSetorOrigem?.regras && typeof cfgSetorOrigem.regras === 'object'
-            ? cfgSetorOrigem.regras
-            : {}
-        );
-        setTiposPorSetorConfig(
-          cfgTiposPorSetor?.regras && typeof cfgTiposPorSetor.regras === 'object'
-            ? cfgTiposPorSetor.regras
-            : {}
-        );
         setCamposNovaSolicitacaoConfig({
           regras: cfgCamposNovaSolicitacao?.regras && typeof cfgCamposNovaSolicitacao.regras === 'object'
             ? cfgCamposNovaSolicitacao.regras
@@ -350,15 +322,70 @@ export default function NovaSolicitacao() {
         setAutomacaoDestinoConfig(normalizarConfigAutomacaoDestinoNovaSolicitacao(cfgAutomacaoDestino));
       } catch (error) {
         console.error(error);
-        setAreasObra([]);
-        setAreasPorSetorOrigem({});
-        setTiposPorSetorConfig({});
         setCamposNovaSolicitacaoConfig({ regras: {} });
         setAutomacaoDestinoConfig({ destinos_disponiveis: [], regras: {} });
       }
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (!form.obra_id) {
+      setTipos([]);
+      setCatalogoDestino({ status: 'idle', contexto: null, destino: null, erro: '' });
+      setForm((atual) => ({
+        ...atual,
+        area_responsavel: '',
+        tipo_solicitacao_id: '',
+        tipo_sub_id: ''
+      }));
+      return undefined;
+    }
+
+    let cancelado = false;
+    setCatalogoDestino({ status: 'loading', contexto: null, destino: null, erro: '' });
+    getTiposSolicitacaoDisponiveis(form.obra_id)
+      .then((data) => {
+        if (cancelado) return;
+        const tiposDisponiveis = Array.isArray(data?.tipos) ? data.tipos : [];
+        const idsDisponiveis = new Set(tiposDisponiveis.map((tipo) => String(tipo.id)));
+        setTipos(tiposDisponiveis);
+        setCatalogoDestino({
+          status: 'success',
+          contexto: data?.contexto || null,
+          destino: data?.destino_inicial || null,
+          erro: ''
+        });
+        setForm((atual) => ({
+          ...atual,
+          area_responsavel: data?.destino_inicial?.codigo || '',
+          tipo_solicitacao_id: idsDisponiveis.has(String(atual.tipo_solicitacao_id))
+            ? atual.tipo_solicitacao_id
+            : '',
+          tipo_sub_id: idsDisponiveis.has(String(atual.tipo_solicitacao_id))
+            ? atual.tipo_sub_id
+            : ''
+        }));
+      })
+      .catch((error) => {
+        if (cancelado) return;
+        setTipos([]);
+        setCatalogoDestino({
+          status: 'error',
+          contexto: null,
+          destino: null,
+          erro: error?.message || 'Não foi possível carregar os tipos disponíveis.'
+        });
+        setForm((atual) => ({
+          ...atual,
+          area_responsavel: '',
+          tipo_solicitacao_id: '',
+          tipo_sub_id: ''
+        }));
+      });
+
+    return () => { cancelado = true; };
+  }, [form.obra_id]);
 
   useEffect(() => {
     if (!form.tipo_solicitacao_id) {
@@ -595,6 +622,8 @@ export default function NovaSolicitacao() {
   }
 
   function limparSelecaoObraERegras() {
+    setTipos([]);
+    setCatalogoDestino({ status: 'idle', contexto: null, destino: null, erro: '' });
     setForm(prev => ({
       ...prev,
       obra_id: '',
@@ -818,13 +847,6 @@ export default function NovaSolicitacao() {
     setValorTexto('');
     setForm((atual) => ({ ...atual, valor: '', data_vencimento: '' }));
   }
-
-  useEffect(() => {
-    if (!usaFluxoRecargaCartao) return;
-    const gerencia = setores.find(isSetorGerenciaProcessos);
-    if (!gerencia?.codigo || String(form.area_responsavel) === String(gerencia.codigo)) return;
-    setForm((atual) => ({ ...atual, area_responsavel: gerencia.codigo }));
-  }, [usaFluxoRecargaCartao, setores, form.area_responsavel]);
 
   // O limite vem da configuracao (`CONTRATO_LIMITE_JURIDICO`). A constante da tela ficou apenas
   // como fallback: com o numero fixo aqui, mudar o limite pela tela de configuracao fazia a tela
@@ -1792,8 +1814,6 @@ export default function NovaSolicitacao() {
           // PI-16: a categoria financeira NAO vai mais daqui. Quem abre o contrato e o usuario da
           // obra, que nao conhece o plano financeiro da empresa — ela passou a ser informada por
           // quem APROVA, no detalhe da solicitacao, e a aprovacao e barrada sem ela.
-          // O setor que recebe a solicitacao do contrato. Codigo do setor, nao nome.
-          area_responsavel: form.area_responsavel,
           detalhes_contratacao: d.detalhes_contratacao,
           representante_legal_qualificacao: acimaDoLimite ? d.representante_legal_qualificacao : null,
           // Campos do escopo 3.1/3.2 — as colunas ja existiam; faltava o caminho da tela.
@@ -1890,6 +1910,8 @@ export default function NovaSolicitacao() {
 
     const payload = {
       ...form,
+      // O destino inicial e uma regra do backend (GEO/PENDENTE), nunca um dado controlado pela tela.
+      area_responsavel: undefined,
       parceiro_id: permitirVinculoCredor ? (form.parceiro_id || null) : null,
       favorecido_id: exibirFavorecidoPagamento ? (form.favorecido_id || null) : null,
       forma_pagamento_id: exibirFormaPagamento ? (form.forma_pagamento_id || null) : null,
@@ -1990,39 +2012,6 @@ export default function NovaSolicitacao() {
     }
   }
 
-  const isSetorObra = userHasSetorCapability(user, 'eh_setor_obra');
-  const tokensSetorUsuario = useMemo(() => {
-    return Array.from(new Set([
-      String(user?.setor?.codigo || '').toUpperCase(),
-      String(user?.setor?.nome || '').toUpperCase(),
-      String(user?.area || '').toUpperCase(),
-      String(user?.setor_id || '').toUpperCase()
-    ].filter(Boolean)));
-  }, [user]);
-  const destinosPermitidosPorSetorOrigem = useMemo(() => {
-    const destinos = new Set();
-    tokensSetorUsuario.forEach(token => {
-      const lista = areasPorSetorOrigem?.[token];
-      if (Array.isArray(lista)) {
-        lista.forEach(item => destinos.add(String(item || '').toUpperCase()));
-      }
-    });
-    return destinos;
-  }, [tokensSetorUsuario, areasPorSetorOrigem]);
-  const setoresFiltrados = useMemo(() => {
-    let lista = [...setores];
-
-    if (destinosPermitidosPorSetorOrigem.size > 0) {
-      lista = lista.filter(s => destinosPermitidosPorSetorOrigem.has(String(s.codigo || '').toUpperCase()));
-    }
-
-    if (isSetorObra && areasObra && areasObra.length > 0) {
-      const permitidasObra = new Set(areasObra.map(a => String(a).toUpperCase()));
-      lista = lista.filter(s => permitidasObra.has(String(s.codigo || '').toUpperCase()));
-    }
-
-    return lista;
-  }, [setores, isSetorObra, areasObra, destinosPermitidosPorSetorOrigem]);
   const contratosDisponiveis = contratosRef.length > 0 ? contratosRef : contratos;
   const contratoSelecionado = useMemo(() => {
     if (!form.contrato_id) return null;
@@ -2344,47 +2333,11 @@ export default function NovaSolicitacao() {
       valorDespesaAtual > Number(saldoDespesaDados.saldo_obra || 0)
     )
   );
-  const tiposFiltradosPorSetor = useMemo(() => {
-    const setorKey = String(form.area_responsavel || '').trim().toUpperCase();
-    if (!setorKey) return [];
-
-    // PI-16: tipo de USO DO SISTEMA nunca aparece aqui. O filtro e por TIPO, antes da lista por
-    // setor, de proposito: a lista por setor e permissiva (setor sem lista mostra tudo, e 9 dos 19
-    // setores ativos nao tem lista), entao esconder por la vazaria — e voltaria a vazar a cada
-    // setor novo. Aqui nao tem como vazar.
-    const setorSelecionado = setores.find(
-      (setor) => String(setor.codigo || '').toUpperCase() === setorKey
-    ) || null;
-    const tiposAtivos = Array.isArray(tipos)
-      ? tipos.filter((tipo) => {
-          if (tipo?.ativo === false || tipo?.comportamento?.somente_sistema === true) return false;
-          const behavior = getTipoSolicitacaoBehavior(tipo);
-          return behavior.somente_gerencia_processos !== true || isSetorGerenciaProcessos(setorSelecionado);
-        })
-      : [];
-
-    const regra = tiposPorSetorConfig?.[setorKey];
-    const tiposPermitidos = Array.isArray(regra?.tipos)
-      ? regra.tipos.map(Number).filter(Number.isFinite)
-      : [];
-
-    if (tiposPermitidos.length === 0) {
-      return tiposAtivos;
-    }
-
-    const idsPermitidos = new Set(tiposPermitidos);
-    return tiposAtivos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
-  }, [tipos, tiposPorSetorConfig, form.area_responsavel, setores]);
-
-  useEffect(() => {
-    if (!form.area_responsavel) return;
-    const existe = setoresFiltrados.some(
-      setor => String(setor.codigo || '').toUpperCase() === String(form.area_responsavel || '').toUpperCase()
-    );
-    if (!existe) {
-      setForm(prev => ({ ...prev, area_responsavel: '' }));
-    }
-  }, [setoresFiltrados, form.area_responsavel]);
+  const tiposDisponiveis = useMemo(() => (
+    Array.isArray(tipos)
+      ? tipos.filter((tipo) => tipo?.ativo !== false && tipo?.comportamento?.somente_sistema !== true)
+      : []
+  ), [tipos]);
 
   useEffect(() => {
     if (!form.area_responsavel) {
@@ -2394,13 +2347,13 @@ export default function NovaSolicitacao() {
       return;
     }
     if (!form.tipo_solicitacao_id) return;
-    const existe = tiposFiltradosPorSetor.some(
+    const existe = tiposDisponiveis.some(
       tipo => String(tipo.id) === String(form.tipo_solicitacao_id)
     );
     if (!existe) {
       setForm(prev => ({ ...prev, tipo_solicitacao_id: '', tipo_sub_id: '' }));
     }
-  }, [form.area_responsavel, form.tipo_solicitacao_id, tiposFiltradosPorSetor]);
+  }, [form.area_responsavel, form.tipo_solicitacao_id, tiposDisponiveis]);
 
   useEffect(() => {
     if (!form.obra_id || !form.area_responsavel || !form.tipo_solicitacao_id) return;
@@ -2471,8 +2424,9 @@ export default function NovaSolicitacao() {
   const apoioDoCabecalho = (() => {
     const nomeDoTipo = String(tipoSelecionado?.nome || '').trim();
     if (nomeDoTipo) return nomeDoTipo;
-    if (!form.obra_id) return 'Comece pela obra ou centro de custo — é ela que libera o setor e os tipos disponíveis.';
-    if (!form.area_responsavel) return 'Escolha o setor responsável para ver os tipos de solicitação disponíveis.';
+    if (!form.obra_id) return 'Comece pela obra ou centro de custo — ela define os tipos disponíveis.';
+    if (catalogoDestino.status === 'loading') return 'Carregando os tipos disponíveis para o destino selecionado.';
+    if (catalogoDestino.status === 'error') return catalogoDestino.erro;
     return 'Escolha o tipo de solicitação — é ele que define quais campos você vai preencher.';
   })();
 
@@ -2502,7 +2456,7 @@ export default function NovaSolicitacao() {
           titulo="Dados da solicitação"
           variante="primario"
           cor="var(--sem-info)"
-          descricao="A obra libera o setor, o setor libera o tipo, e o tipo define quais campos aparecem abaixo."
+          descricao="A obra ou centro de custo define os tipos disponíveis. Toda nova solicitação entra em GEO com status PENDENTE."
         >
           <FormSecao legenda="Origem" colunas={2}>
             <CampoForm
@@ -2564,32 +2518,6 @@ export default function NovaSolicitacao() {
               )}
             </CampoForm>
 
-            <CampoForm
-              label="Para qual setor deseja enviar?"
-              obrigatorio
-              hint={!form.obra_id ? 'Selecione a obra/centro de custo para habilitar a área responsável.' : undefined}
-            >
-              {/* R12: select de FORMULÁRIO (entrada de dado da solicitação),
-                  não de filtro — continua legítimo pela própria regra. */}
-              <select
-                name="area_responsavel"
-                onChange={handleChange}
-                className="input input-sm"
-                required
-                value={form.area_responsavel}
-                disabled={!form.obra_id}
-              >
-                <option value="">
-                  {form.obra_id ? 'Selecione' : 'Selecione a obra/centro de custo primeiro'}
-                </option>
-                {setoresFiltrados.map(s => (
-                  <option key={s.id} value={s.codigo}>
-                    {s.nome}
-                  </option>
-                ))}
-              </select>
-            </CampoForm>
-
             <CampoForm label="Tipo de Solicitação" obrigatorio>
               <select
                 name="tipo_solicitacao_id"
@@ -2597,16 +2525,46 @@ export default function NovaSolicitacao() {
                 className="input input-sm"
                 required
                 value={form.tipo_solicitacao_id}
-                disabled={!form.area_responsavel}
+                disabled={!form.obra_id || catalogoDestino.status !== 'success'}
               >
-                <option value="">{form.area_responsavel ? 'Selecione' : 'Selecione o setor primeiro'}</option>
-                {tiposFiltradosPorSetor.map(t => (
+                <option value="">
+                  {!form.obra_id
+                    ? 'Selecione a obra/centro de custo primeiro'
+                    : catalogoDestino.status === 'loading'
+                      ? 'Carregando tipos...'
+                      : tiposDisponiveis.length === 0
+                        ? 'Nenhum tipo disponível'
+                        : 'Selecione'}
+                </option>
+                {tiposDisponiveis.map(t => (
                   <option key={t.id} value={t.id}>{t.nome}</option>
                 ))}
               </select>
             </CampoForm>
 
-            {form.area_responsavel && !tipoSolicitacaoEscolhido && (
+            {catalogoDestino.status === 'success' && (
+              <div className="form-campo--linha flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-xs">
+                <span className="font-semibold text-[var(--c-text)]">
+                  Destino inicial: {catalogoDestino.destino?.nome || 'GEO'}
+                </span>
+                <span className="text-[var(--c-muted)]">Status: PENDENTE</span>
+                <span className="text-[var(--c-muted)]">
+                  Catálogo: {catalogoDestino.contexto === 'CENTRO_CUSTO' ? 'específico deste Centro de Custo' : 'padrão para Obras'}
+                </span>
+              </div>
+            )}
+
+            {catalogoDestino.status === 'error' && (
+              <p className="form-campo--linha form-hint text-[var(--c-danger)]">{catalogoDestino.erro}</p>
+            )}
+
+            {catalogoDestino.status === 'success' && tiposDisponiveis.length === 0 && (
+              <p className="form-campo--linha form-hint">
+                Nenhum tipo foi configurado para este Centro de Custo. Solicite a configuração antes de abrir a solicitação.
+              </p>
+            )}
+
+            {form.area_responsavel && tiposDisponiveis.length > 0 && !tipoSolicitacaoEscolhido && (
               <p className="form-campo--linha form-hint">
                 Selecione o tipo de solicitação para carregar somente os campos necessários.
               </p>

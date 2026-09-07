@@ -10,10 +10,15 @@ Solicitacoes e o hub operacional entre usuarios, setores, obras, parceiros, cont
 
 ## Dados e regras
 
-- toda solicitacao exige obra, area responsavel e tipo compativel;
+- toda solicitacao exige obra/centro de custo e tipo compativel;
 - parceiro, valor, vencimento, contrato e apropriacao dependem do tipo e dos modulos ativos;
-- o backend valida a combinacao entre area, tipo e obra;
-- para novas solicitacoes, `area_responsavel` representa desde a criacao o setor operacional selecionado;
+- o backend valida a combinacao entre tipo e Obra/Centro de Custo;
+- a tela Nova Solicitacao nao recebe mais a area responsavel do usuario;
+- o backend define o destino inicial como o setor com capacidade `eh_setor_geo` e grava status `PENDENTE`;
+- todas as Obras compartilham o catalogo marcado em `tipo_solicitacao.disponivel_para_obras`;
+- cada Centro de Custo usa somente os tipos explicitamente vinculados em `centro_custo_tipos_solicitacao`;
+- Centro de Custo sem vinculos nao recebe catalogo por fallback; a criacao fica bloqueada ate a configuracao;
+- subtipos ativos herdam a disponibilidade do tipo macro;
 - assumir e enviar dependem do setor atual e das permissoes do usuario;
 - usuarios podem possuir setor principal e setores adicionais;
 - `SUPERADMIN` e excecao administrativa, mas a excecao deve continuar auditada;
@@ -23,7 +28,7 @@ Solicitacoes e o hub operacional entre usuarios, setores, obras, parceiros, cont
 
 ## Encaminhamento atual, compatibilidade e automacoes
 
-Novas solicitacoes seguem diretamente para a area responsavel selecionada e nao entram no fluxo de aprovacao por diretoria. Os campos e endpoints de diretoria permanecem no backend somente para compatibilidade com registros antigos que ja possuam `fluxo_aprovacao_diretoria = true`; eles nao devem ser reutilizados para criar novos fluxos. Prioridades da diretoria continuam sendo um dominio operacional separado e nao alteram o setor responsavel. Tipos compartilhados ampliam visibilidade sem transferir propriedade. Automacao por status so ocorre depois de uma transicao valida e nao pode ignorar permissoes ou consistencia.
+Novas solicitacoes abertas pela tela entram em `GEO / PENDENTE`; o navegador nao pode substituir esse destino por payload. Os campos e endpoints de diretoria permanecem no backend somente para compatibilidade com registros antigos que ja possuam `fluxo_aprovacao_diretoria = true`; eles nao devem ser reutilizados para criar novos fluxos. Prioridades da diretoria continuam sendo um dominio operacional separado e nao alteram o setor responsavel. A configuracao `Tipos por Setor (Recebimento)` continua controlando visibilidade e modo de recebimento depois que a solicitacao chega a um setor, mas nao controla o catalogo de abertura. Automacao por status so ocorre depois de uma transicao valida e nao pode ignorar permissoes ou consistencia.
 
 ## Dependencias
 
@@ -39,4 +44,4 @@ Visibilidade combina perfil, setores, obra, autoria, atribuicao, historico e con
 
 ## Mudanca segura
 
-Alteracoes em status, area, tipo, obra, parceiro ou apropriacao exigem testes de criacao direta no setor selecionado, compatibilidade de registros antigos de diretoria, detalhe, listagem, filtros, exportacao, prioridades, automacao, compras, financeiro, notificacoes e usuarios multissetor.
+Alteracoes em status, area, tipo, obra, parceiro ou apropriacao exigem testes do catalogo comum de Obras, catalogo explicito de Centro de Custo, criacao inicial em GEO/PENDENTE, rejeicao de payload com tipo nao permitido, compatibilidade de registros antigos de diretoria, detalhe, listagem, filtros, exportacao, prioridades, automacao, compras, contratos, financeiro, notificacoes e usuarios multissetor.

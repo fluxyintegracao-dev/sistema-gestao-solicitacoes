@@ -27,6 +27,7 @@ db.Historico = require('./Historico')(sequelize, Sequelize);
 db.Anexo = require('./Anexo')(sequelize, Sequelize);
 db.MensagemSetor = require('./MensagemSetor')(sequelize, Sequelize);
 db.TipoSolicitacao = require('./TipoSolicitacao')(sequelize, Sequelize);
+db.CentroCustoTipoSolicitacao = require('./CentroCustoTipoSolicitacao')(sequelize, Sequelize);
 db.EtapaSetor = require('./EtapaSetor')(sequelize, Sequelize);
 db.Cargo = require('./Cargo')(sequelize, Sequelize);
 db.Comprovante = require('./Comprovante')(sequelize, Sequelize);
@@ -862,6 +863,26 @@ db.User.belongsTo(db.Cargo, {
 db.TipoSolicitacao.hasMany(db.Solicitacao, {
   foreignKey: 'tipo_solicitacao_id',
   as: 'solicitacoes'
+});
+
+db.TipoSolicitacao.hasMany(db.CentroCustoTipoSolicitacao, {
+  foreignKey: 'tipo_solicitacao_id',
+  as: 'disponibilidadesCentroCusto'
+});
+
+db.CentroCustoTipoSolicitacao.belongsTo(db.TipoSolicitacao, {
+  foreignKey: 'tipo_solicitacao_id',
+  as: 'tipoSolicitacao'
+});
+
+db.Obra.hasMany(db.CentroCustoTipoSolicitacao, {
+  foreignKey: 'centro_custo_id',
+  as: 'tiposSolicitacaoDisponiveis'
+});
+
+db.CentroCustoTipoSolicitacao.belongsTo(db.Obra, {
+  foreignKey: 'centro_custo_id',
+  as: 'centroCusto'
 });
 
 db.Solicitacao.belongsTo(db.TipoSolicitacao, {

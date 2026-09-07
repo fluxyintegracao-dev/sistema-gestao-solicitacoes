@@ -1,5 +1,7 @@
 # Fluxos de solicitacoes iniciais do setor OBRA
 
+> **Documento historico de auditoria (fotografia de 06/08/2026).** A matriz de destinos selecionaveis abaixo nao descreve mais a abertura vigente. Na regra atual, a Nova Solicitacao nao exibe Area Responsavel: toda abertura nasce em `GEO / PENDENTE`. Obras compartilham um catalogo comum de tipos; Centros de Custo possuem catalogos explicitos; subtipos herdam o tipo macro. O restante deste arquivo e preservado como evidencia da configuracao anterior e dos fluxos posteriores a criacao.
+
 ## Objetivo e fonte
 
 Este documento descreve o que um usuario do setor `OBRA` pode iniciar hoje, para onde cada solicitacao segue e quais campos e automacoes afetam o caminho. Ele e uma fotografia da producao e deve ser atualizado quando as configuracoes administrativas ou as regras de criacao forem alteradas.

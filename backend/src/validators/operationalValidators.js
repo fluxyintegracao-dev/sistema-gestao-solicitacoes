@@ -1680,7 +1680,9 @@ function validateSolicitacaoCreateBody(body = {}) {
       : undefined,
     cartao_recarga_id: parseInteger(body.cartao_recarga_id, 'Cartao de recarga'),
     apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao'),
-    area_responsavel: parseOptionalText(body.area_responsavel, 'Area responsavel', 120, { required: true }),
+    // Compatibilidade temporaria com frontends anteriores: o campo ainda e aceito, mas o
+    // controller nao confia nele e sempre deriva o destino GEO no servidor.
+    area_responsavel: parseOptionalText(body.area_responsavel, 'Area responsavel', 120),
     diretoria_fluxo_codigo: parseOptionalText(body.diretoria_fluxo_codigo, 'Diretoria de aprovacao', 120),
     codigo_contrato: parseOptionalText(body.codigo_contrato, 'Codigo do contrato', 255),
     contrato_id: parseInteger(body.contrato_id, 'Contrato'),

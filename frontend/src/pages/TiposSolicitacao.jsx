@@ -7,11 +7,6 @@ import {
   desativarTipoSolicitacao,
   excluirTipoSolicitacao
 } from '../services/tiposSolicitacao';
-import { getSetores } from '../services/setores';
-import {
-  getTiposSolicitacaoPorSetor,
-  salvarTiposSolicitacaoPorSetor
-} from '../services/configuracoesSistema';
 import {
   FINALIDADES_DATA_SOLICITACAO,
   getDefaultTipoSolicitacaoBehavior,
@@ -60,43 +55,17 @@ function formatarRegrasTipo(tipo) {
     .map(field => field.label);
 }
 
-function setorKey(item) {
-  return String(item?.codigo || item?.nome || item?.id || '').trim().toUpperCase();
-}
-
-function normalizarIdsTipos(values) {
-  return Array.from(
-    new Set((Array.isArray(values) ? values : []).map(Number).filter(Number.isFinite))
-  );
-}
-
-function getTiposEfetivosSetor(tipos, regrasTiposPorSetor, setorSelecionado) {
-  const listaTipos = Array.isArray(tipos) ? tipos : [];
-  if (!setorSelecionado) return listaTipos;
-
-  const regra = regrasTiposPorSetor?.[setorSelecionado];
-  const ids = normalizarIdsTipos(regra?.tipos);
-
-  if (ids.length === 0) {
-    return listaTipos;
-  }
-
-  const idsPermitidos = new Set(ids);
-  return listaTipos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
-}
-
 export default function TiposSolicitacao() {
   const [tipos, setTipos] = useState([]);
-  const [setores, setSetores] = useState([]);
-  const [regrasTiposPorSetor, setRegrasTiposPorSetor] = useState({});
-  const [setorSelecionado, setSetorSelecionado] = useState('');
   const [nome, setNome] = useState('');
   const [codigoInterno, setCodigoInterno] = useState('');
   const [comportamento, setComportamento] = useState(getDefaultTipoSolicitacaoBehavior());
+  const [disponivelParaObras, setDisponivelParaObras] = useState(true);
   const [editId, setEditId] = useState(null);
   const [editNome, setEditNome] = useState('');
   const [editCodigoInterno, setEditCodigoInterno] = useState('');
   const [editComportamento, setEditComportamento] = useState(getDefaultTipoSolicitacaoBehavior());
+  const [editDisponivelParaObras, setEditDisponivelParaObras] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
   // R3: aviso e confirmação do sistema no lugar das caixas do navegador.
@@ -104,23 +73,8 @@ export default function TiposSolicitacao() {
   const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   async function carregar() {
-    const [tiposData, setoresData, cfg] = await Promise.all([
-      getTiposSolicitacao(),
-      getSetores(),
-      getTiposSolicitacaoPorSetor()
-    ]);
-
-    const listaTipos = Array.isArray(tiposData) ? tiposData : [];
-    const listaSetores = Array.isArray(setoresData) ? setoresData : [];
-    const regras = cfg?.regras && typeof cfg.regras === 'object' ? cfg.regras : {};
-
-    setTipos(listaTipos);
-    setSetores(listaSetores);
-    setRegrasTiposPorSetor(regras);
-
-    if (!setorSelecionado && listaSetores.length > 0) {
-      setSetorSelecionado(setorKey(listaSetores[0]));
-    }
+    const tiposData = await getTiposSolicitacao();
+    setTipos(Array.isArray(tiposData) ? tiposData : []);
   }
 
   useEffect(() => {
@@ -134,49 +88,23 @@ export default function TiposSolicitacao() {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (!setorSelecionado) {
-      avisar.alerta('Selecione o setor para vincular o tipo.');
-      return;
-    }
-
     const nomeNormalizado = String(nome || '').trim();
     if (!nomeNormalizado) {
       avisar.alerta('Informe o nome do tipo.');
       return;
     }
 
-    const novoTipo = await criarTipoSolicitacao({
+    await criarTipoSolicitacao({
       nome: nomeNormalizado,
       codigo_interno: codigoInterno,
-      comportamento
+      comportamento,
+      disponivel_para_obras: disponivelParaObras
     });
-
-    const regraAtual = regrasTiposPorSetor?.[setorSelecionado] || { tipos: [], modos: {} };
-    const tiposBase = getTiposEfetivosSetor(tipos, regrasTiposPorSetor, setorSelecionado);
-    const tiposAtualizados = normalizarIdsTipos([
-      ...tiposBase.map(item => item?.id),
-      novoTipo.id
-    ]);
-    const modosBase =
-      regraAtual.modos && typeof regraAtual.modos === 'object' ? regraAtual.modos : {};
-    const modosAtualizados = tiposAtualizados.reduce((acc, tipoId) => {
-      acc[String(tipoId)] = modosBase[String(tipoId)] || 'TODOS_VISIVEIS';
-      return acc;
-    }, {});
-    const novasRegras = {
-      ...regrasTiposPorSetor,
-      [setorSelecionado]: {
-        tipos: tiposAtualizados,
-        modos: modosAtualizados
-      }
-    };
-
-    await salvarTiposSolicitacaoPorSetor({ regras: novasRegras });
-    setRegrasTiposPorSetor(novasRegras);
 
     setNome('');
     setCodigoInterno('');
     setComportamento(getDefaultTipoSolicitacaoBehavior());
+    setDisponivelParaObras(true);
     setFormAberto(false);
     carregar();
   }
@@ -220,6 +148,7 @@ export default function TiposSolicitacao() {
     setEditNome(item.nome);
     setEditCodigoInterno(item.codigo_interno || '');
     setEditComportamento(getTipoSolicitacaoBehavior(item));
+    setEditDisponivelParaObras(item.disponivel_para_obras === true || Number(item.disponivel_para_obras) === 1);
   }
 
   function cancelarEdicao() {
@@ -227,6 +156,7 @@ export default function TiposSolicitacao() {
     setEditNome('');
     setEditCodigoInterno('');
     setEditComportamento(getDefaultTipoSolicitacaoBehavior());
+    setEditDisponivelParaObras(true);
   }
 
   async function salvarEdicao(id) {
@@ -235,7 +165,8 @@ export default function TiposSolicitacao() {
       await atualizarTipoSolicitacao(id, {
         nome: editNome,
         codigo_interno: editCodigoInterno,
-        comportamento: editComportamento
+        comportamento: editComportamento,
+        disponivel_para_obras: editDisponivelParaObras
       });
       cancelarEdicao();
       carregar();
@@ -252,11 +183,7 @@ export default function TiposSolicitacao() {
   // atrás do fundo escuro); fechado, logo abaixo do PageHeader.
   const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
 
-  const tiposFiltrados = (() => {
-    return getTiposEfetivosSetor(tipos, regrasTiposPorSetor, setorSelecionado);
-  })();
-
-  const setorAtual = setores.find(s => setorKey(s) === setorSelecionado);
+  const tiposFiltrados = tipos;
 
   const colunas = [
     {
@@ -307,6 +234,14 @@ export default function TiposSolicitacao() {
       render: (t) => (
         editId === t.id ? (
           <div className="grid gap-2 md:grid-cols-2">
+            <label className="flex items-center gap-2 text-xs md:col-span-2">
+              <input
+                type="checkbox"
+                checked={editDisponivelParaObras}
+                onChange={e => setEditDisponivelParaObras(e.target.checked)}
+              />
+              <span>Disponível no catálogo comum de todas as Obras</span>
+            </label>
             <label className="grid gap-1 text-xs md:col-span-2">
               <span className="font-semibold text-[var(--c-text)]">Finalidade da data</span>
               <select
@@ -334,6 +269,9 @@ export default function TiposSolicitacao() {
           </div>
         ) : (
           <div className="flex flex-wrap gap-1">
+            <span className={`fx-badge ${t.disponivel_para_obras ? 'fx-badge--success' : 'fx-badge--neutral'}`}>
+              {t.disponivel_para_obras ? 'Disponível para Obras' : 'Somente por Centro de Custo'}
+            </span>
             <span className="fx-badge fx-badge--neutral">
               {obterRotuloDataSolicitacao(getTipoSolicitacaoBehavior(t))}
             </span>
@@ -404,6 +342,19 @@ export default function TiposSolicitacao() {
                 </CampoForm>
               </FormSecao>
 
+              <label className="flex items-start gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={disponivelParaObras}
+                  onChange={e => setDisponivelParaObras(e.target.checked)}
+                />
+                <span>
+                  <strong className="block text-[var(--c-text)]">Disponível para todas as Obras</strong>
+                  <span className="text-xs text-[var(--c-muted)]">Centros de Custo são configurados separadamente na página “Tipos por Obra/Centro de Custo”.</span>
+                </span>
+              </label>
+
               <BlocoConteudo
                 titulo="Comportamento do tipo"
                 variante="secundario"
@@ -441,7 +392,7 @@ export default function TiposSolicitacao() {
               </BlocoConteudo>
 
               <p className="app-note">
-                O tipo é criado no cadastro geral e automaticamente vinculado ao setor selecionado na lista abaixo.
+                O tipo é criado no cadastro geral. O recebimento por setor continua configurado separadamente e não controla mais o catálogo da Nova Solicitação.
               </p>
 
               <div className="app-actionbar">
@@ -458,29 +409,9 @@ export default function TiposSolicitacao() {
       )}
 
       <BlocoConteudo
-        titulo={setorAtual ? `Tipos do setor ${setorAtual.nome || setorAtual.codigo}` : 'Tipos'}
+        titulo="Cadastro geral de tipos"
         variante="primario"
         cor="var(--c-primary)"
-        acoes={(
-          // R12: este select é seletor de CONTEXTO (define o setor listado
-          // E a qual setor novos tipos são vinculados) — não é filtro.
-          <label className="app-busca flex items-center gap-2 text-sm font-normal">
-            <span className="text-[var(--c-muted)]">Setor</span>
-            <select
-              className="input input-sm flex-1"
-              value={setorSelecionado}
-              onChange={e => setSetorSelecionado(e.target.value)}
-              aria-label="Setor dos tipos listados e do vínculo de novos tipos"
-            >
-              <option value="">Selecione</option>
-              {setores.map(s => (
-                <option key={s.id} value={setorKey(s)}>
-                  {s.nome || s.codigo}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       >
         <TabelaPadrao
           colunas={colunas}
@@ -494,7 +425,7 @@ export default function TiposSolicitacao() {
           }}
           vazio={{
             title: 'Nenhum tipo cadastrado',
-            message: 'Use "Novo tipo" para criar o primeiro registro deste setor.'
+            message: 'Use "Novo tipo" para criar o primeiro registro.'
           }}
           acoesLinha={(t) => (
             editId === t.id ? (

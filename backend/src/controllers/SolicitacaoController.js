@@ -111,6 +111,8 @@ const {
 const {
   obterRegrasSetoresVisiveisPorUsuario
 } = require('../services/setoresVisiveisUsuarioService');
+const { resolverDestinoInicialNovaSolicitacao } = require('../services/novaSolicitacaoDestinoService');
+const { assertTipoDisponivelNoDestino } = require('../services/tipoSolicitacaoDisponibilidadeService');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
@@ -2859,7 +2861,6 @@ module.exports = {
         despesa_eventual_declaracoes,
         cartao_recarga_id,
         apropriacao_id,
-        area_responsavel,
         codigo_contrato,
         contrato_id,
         data_vencimento,
@@ -2879,31 +2880,28 @@ module.exports = {
         anexos_pendentes_nomes: anexosPendentesNomes
       } = req.body;
 
-      if (!obra_id || !tipo_solicitacao_id || !area_responsavel) {
+      if (!obra_id || !tipo_solicitacao_id) {
         return res.status(400).json({
           error: 'Campos obrigatorios nao informados'
         });
       }
 
-      const setorDestinoSelecionado = await resolveSetorReferencia(area_responsavel, {
-        attributes: ['id', 'nome', 'codigo', 'eh_setor_obra', 'eh_setor_financeiro', 'eh_setor_compras', 'eh_setor_geo', 'eh_setor_administrativo']
-      });
-      if (!setorDestinoSelecionado) {
-        return res.status(400).json({
-          error: 'Setor responsavel nao encontrado no cadastro.'
-        });
-      }
-      const areaResponsavelPersistida = resolveSetorPersistenciaValue(setorDestinoSelecionado, area_responsavel);
+      // O destino inicial nao e uma escolha do navegador. Centralizar a resolucao no backend
+      // impede payload forjado e mantem todas as entradas da Nova Solicitacao em GEO/PENDENTE.
+      // `area_responsavel` continua persistida porque sustenta fila, retorno, historico e acesso.
+      const destinoInicial = await resolverDestinoInicialNovaSolicitacao();
+      const setorDestinoSelecionado = destinoInicial.setor;
+      const areaResponsavelPersistida = destinoInicial.areaResponsavel;
+      const area_responsavel = areaResponsavelPersistida;
 
       const obraSelecionada = await Obra.findByPk(obra_id, {
-        attributes: ['id', 'codigo', 'nome', 'classificacao', 'tipo_centro_custo']
+        attributes: ['id', 'codigo', 'nome', 'ativo', 'classificacao', 'tipo_centro_custo']
       });
       if (!obraSelecionada) {
         return res.status(400).json({ error: 'Obra/Centro de custo informado nao foi encontrado.' });
       }
       const registroSelecionadoEhObra = isObraCentroCusto(obraSelecionada.tipo_centro_custo);
 
-      const regrasAreasPorSetor = await obterRegrasAreasPorSetorOrigem();
       const areaUsuario = await obterAreaUsuario(req);
       const tokensSetorUsuario = await obterTokensSetorUsuario(req, areaUsuario);
       const perfilUsuario = String(req.user?.perfil || '').trim().toUpperCase();
@@ -2928,21 +2926,6 @@ module.exports = {
         }
       }
 
-      const destinosPermitidos = new Set();
-      tokensSetorUsuario.forEach(token => {
-        const lista = regrasAreasPorSetor[String(token || '').toUpperCase()] || [];
-        lista.forEach(item => destinosPermitidos.add(String(item || '').toUpperCase()));
-      });
-
-      if (destinosPermitidos.size > 0) {
-        const destino = String(areaResponsavelPersistida || '').trim().toUpperCase();
-        if (!destinosPermitidos.has(destino)) {
-          return res.status(403).json({
-            error: 'Area responsavel nao permitida para o seu setor.'
-          });
-        }
-      }
-
       const tipoSelecionado = await TipoSolicitacao.findByPk(tipo_solicitacao_id);
       if (!tipoSelecionado) {
         return res.status(400).json({
@@ -2958,19 +2941,7 @@ module.exports = {
           error: 'Este tipo de solicitacao e de uso do sistema e nao pode ser aberto manualmente.'
         });
       }
-      const tiposPorSetorConfig = await obterTiposSolicitacaoPorSetorConfig();
-      const regraTiposSetorDestino = obterRegrasTipoPorTokensSetor(
-        tiposPorSetorConfig,
-        buildSetorComparisonTokens(setorDestinoSelecionado)
-      );
-      if (regraTiposSetorDestino && Array.isArray(regraTiposSetorDestino.tipos) && regraTiposSetorDestino.tipos.length > 0) {
-        const tipoIdNum = Number(tipo_solicitacao_id);
-        if (!regraTiposSetorDestino.tipos.includes(tipoIdNum)) {
-          return res.status(403).json({
-            error: 'Tipo de solicitacao nao permitido para o setor selecionado.'
-          });
-        }
-      }
+      await assertTipoDisponivelNoDestino(obraSelecionada, tipoSelecionado);
       const comportamentoBase = normalizeTipoSolicitacaoBehavior(tipoSelecionado);
       const usaFluxoDespesaEventual = tipoEhDespesaEventual(tipoSelecionado);
       const usaFluxoRecargaCartao = tipoEhRecargaCartao(tipoSelecionado);
