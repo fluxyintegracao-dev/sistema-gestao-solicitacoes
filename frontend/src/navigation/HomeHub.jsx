@@ -13,6 +13,7 @@ import { Pagina, PageHeader, BlocoConteudo, BlocosPersonalizaveis } from '../com
 import NavCard from './NavCard';
 import SeusAtalhos from './SeusAtalhos';
 import { vencimentoHumano } from '../utils/formatarTexto';
+import { nomeProprio } from '../utils/texto';
 import {
   HiOutlineExclamationTriangle,
   HiOutlineClock,
@@ -575,7 +576,7 @@ export default function HomeHub() {
         comentário do `isMobileHome`.
       */}
       <PageHeader
-        titulo={user?.nome ? user.nome : 'Início'}
+        titulo={user?.nome ? nomeProprio(user.nome) : 'Início'}
         contagem={`${totalPendencias} pendência(s)`}
         descricao={papel || 'Início do sistema'}
         secundarias={isMobileHome ? [] : [{

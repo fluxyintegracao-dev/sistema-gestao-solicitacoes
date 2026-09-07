@@ -23,6 +23,7 @@ import { AtalhosProvider } from '../navigation/AtalhosContext';
 import AtalhosTopbar from '../navigation/AtalhosTopbar';
 import { isNativeApp, registerNativeBackButtonHandler } from '../mobile/runtime';
 import { getFallbackRoute, hasSafeBrowserHistory } from '../utils/navigation';
+import { nomeProprio } from '../utils/texto';
 import OperationalAuditTracker from '../modules/governanca/components/OperationalAuditTracker';
 import cscLogo from '../assets/CSC_logo_lockup_cropped.png';
 import fluxyMark from '../assets/fluxy_mark_cropped.png';
@@ -369,8 +370,8 @@ export default function Layout() {
                 <Link
                   to="/perfil"
                   className="theme-toggle"
-                  aria-label={`Meu perfil — ${user?.nome || 'usuário'} (${perfilUpper || 'USUARIO'})`}
-                  title={`${user?.nome || 'Usuário'} · ${perfilUpper || 'USUARIO'}`}
+                  aria-label={`Meu perfil — ${nomeProprio(user?.nome) || 'usuário'} (${perfilUpper || 'USUARIO'})`}
+                  title={`${nomeProprio(user?.nome) || 'Usuário'} · ${perfilUpper || 'USUARIO'}`}
                 >
                   <span
                     aria-hidden="true"
@@ -392,7 +393,7 @@ export default function Layout() {
                   >
                     {String(user?.nome || 'U').trim().charAt(0).toUpperCase()}
                   </span>
-                  <span className="hidden lg:inline">{String(user?.nome || '').split(' ')[0]}</span>
+                  <span className="hidden lg:inline">{nomeProprio(String(user?.nome || '').split(' ')[0])}</span>
                 </Link>
 
                 <button
