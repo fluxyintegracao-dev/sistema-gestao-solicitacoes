@@ -2639,5 +2639,16 @@ if (EXECUTADO_DIRETO && !CREDENCIAIS_AUSENTES) {
 export {
   checarFaixa, checarRedimensionamento, checarEtiquetasFiltro,
   checarModalCadastro, checarMobile, checarAlinhamentoDaColuna,
-  r3Para, m2Para, login, esperarCarregar, mirarAlvo, telaDeclaraChaveDeBloco
+  r3Para, m2Para, login, esperarCarregar, mirarAlvo, telaDeclaraChaveDeBloco,
+  /*
+    RESOLVEDORES sai daqui para quem mais precisa ABRIR um registro (07/09).
+
+    A sonda dos três ajustes escreveu o seu próprio "abre a solicitação" e
+    errou do mesmo jeito que este arquivo já documenta na
+    `abrirPiorRegistro`: procurou a linha em `.app-tabela` quando
+    /solicitacoes usa `ListaAvancada`. Uma segunda maneira de abrir registro
+    neste repositório é a terceira maneira de fazer a mesma coisa — e ela
+    nasceu errada. Então há UMA, e é esta.
+  */
+  RESOLVEDORES
 };

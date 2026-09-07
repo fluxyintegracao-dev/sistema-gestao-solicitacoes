@@ -24,6 +24,9 @@
 import { chromium } from 'playwright';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+/* Quem abre registro é o resolvedor do harness, não um seletor escrito de
+   novo aqui — ver a nota no `export` do verificar.mjs. */
+import { RESOLVEDORES } from './verificar.mjs';
 
 const BASE = process.env.QA_PREVIEW_BASE || 'https://refactor-dev.jrfluxy.com.br';
 const USUARIO = process.env.QA_PREVIEW_USER;
@@ -54,12 +57,13 @@ const TELAS_DA_FAIXA = [
    registro da listagem, então elas vêm por resolvedor, não por rota fixa. */
 const DETALHES_DA_FAIXA = [
   /*
-    O rótulo esperado fica VAZIO de propósito. "Redistribuir lead" só aparece
-    com `podeRedistribuir`, que é permissão do usuário — cobrar o rótulo aqui
+    O rótulo esperado fica VAZIO de propósito. "Redistribuir lead" e "Cancelar
+    cotação" só aparecem com permissão do usuário — cobrar o rótulo aqui
     acusaria a tela pela permissão do robô. O que se mede nestas duas é o que
     NÃO depende de permissão: o "⋯" não existe e nada está cortado.
   */
-  ['crm-lead-detalhe', '/crm/leads', /\/crm\/leads\/\d+/, []]
+  ['crm-lead-detalhe', 'crmLeadDetalhe', []],
+  ['gerenciar-cotacao', 'gerenciarCotacao', []]
 ];
 
 function codigoTotp(segredo) {
@@ -175,17 +179,13 @@ try {
     );
   }
 
-  for (const [id, lista, padrao, rotulos] of DETALHES_DA_FAIXA) {
-    await page.goto(`${BASE}${lista}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.app-tabela tbody tr, .la-tabela tbody tr', { timeout: 40000 }).catch(() => {});
-    await page.waitForTimeout(3000);
-    const href = await page.evaluate((prefixo) => {
-      const ancora = Array.from(document.querySelectorAll('a[href]'))
-        .find((a) => new RegExp(prefixo).test(a.getAttribute('href') || ''));
-      return ancora ? ancora.getAttribute('href') : null;
-    }, padrao.source);
-    if (!href) { registrar(false, `${id} :: não há registro na base para abrir o detalhe — SEM MEDIÇÃO`); continue; }
-    await page.goto(`${BASE}${href}`, { waitUntil: 'domcontentloaded' });
+  for (const [id, resolvedor, rotulos] of DETALHES_DA_FAIXA) {
+    try {
+      await RESOLVEDORES[resolvedor](page);
+    } catch (erro) {
+      registrar(false, `${id} :: não abriu (${String(erro.message || erro).slice(0, 90)}) — SEM MEDIÇÃO`);
+      continue;
+    }
     await page.waitForSelector('.app-page-header', { timeout: 40000 }).catch(() => {});
     await page.waitForTimeout(2500);
     const medida = await page.evaluate((esperados) => {
@@ -218,27 +218,24 @@ try {
 
   /* --------- ITENS 1 e 3: o detalhe de uma solicitação de verdade -------- */
   console.log('\n— itens 1 e 3: o detalhe da solicitação —');
-  await page.goto(`${BASE}/solicitacoes`, { waitUntil: 'domcontentloaded' });
   /*
-    LISTAGEM TEM DOIS COMPONENTES NESTE REPOSITÓRIO, e /solicitacoes usa o
-    OUTRO. A primeira sonda procurou `.app-tabela tbody tr` (TabelaPadrao) e
-    disse "não há linha de solicitação na base de desenvolvimento" — acusando
-    a base de um defeito da sonda. A listagem principal do módulo usa
-    `ListaAvancada` (`.la-tabela`). É a mesma armadilha que o resolvedor do
-    harness já documenta, e eu caí nela de novo: "de quantos jeitos isso é
-    feito aqui?" antes de escrever o seletor.
+    ABRIR A SOLICITAÇÃO É DO RESOLVEDOR DO HARNESS, não de um seletor escrito
+    aqui. Duas versões desta sonda tentaram escrever o seu: a primeira
+    procurou a linha em `.app-tabela` (TabelaPadrao) e disse "não há linha de
+    solicitação na base de desenvolvimento" — acusando a base de um defeito
+    da sonda, porque /solicitacoes usa `ListaAvancada` (`.la-tabela`); a
+    segunda achou a linha e não achou o botão. A armadilha está documentada
+    dentro do próprio `abrirPiorRegistro`, e eu caí nela duas vezes ao
+    reescrever em vez de reusar. Agora é UMA.
   */
-  await page.waitForSelector('.app-tabela tbody tr, .la-tabela tbody tr', { timeout: 40000 }).catch(() => {});
-  await page.waitForTimeout(3000);
-  /* Só NAVEGAÇÃO para o detalhe — o único clique da sonda, e ele não
-     escreve nada. Nenhum outro botão da linha é tocado. */
-  const verBotao = page.locator('.app-tabela tbody tr, .la-tabela tbody tr')
-    .locator('button', { hasText: /^Ver$/ }).first();
-  if (await verBotao.count() === 0) {
-    registrar(false, 'não há linha de solicitação na base de desenvolvimento — os itens 1 e 3 ficam SEM MEDIÇÃO');
-  } else {
-    await verBotao.click();
-    await page.waitForURL(/\/solicitacoes\/\d+/, { timeout: 40000 }).catch(() => {});
+  let abriuDetalhe = true;
+  try {
+    await RESOLVEDORES.solicitacaoDetalhe(page);
+  } catch (erro) {
+    abriuDetalhe = false;
+    registrar(false, `não abriu o detalhe da solicitação (${String(erro.message || erro).slice(0, 90)}) — itens 1 e 3 SEM MEDIÇÃO`);
+  }
+  if (abriuDetalhe) {
     await page.waitForSelector('.app-bloco', { timeout: 40000 }).catch(() => {});
     await page.waitForTimeout(4000);
     const detalhe = await page.evaluate(() => {
