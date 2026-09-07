@@ -42,6 +42,7 @@ import RhDpJornada from './RhDpJornada';
 import RhDpApuracao from './RhDpApuracao';
 import { canViewRhDpApuracao, hasAnyExplicitPermissao } from '../utils/acessoProduto';
 import { formatCurrencyInput, getCpfCnpjError, getPixDocumentError, maskCpfCnpj, normalizeCurrencyTyping } from '../utils/formatters';
+import DateInputBR from '../components/DateInputBR';
 
 /**
  * A TELA CONSOLIDADA DO DP (Fase 6 do modulo DP, 26/08).
@@ -1307,7 +1308,7 @@ export default function RhDpPessoal() {
 
                 <label className="form-field">
                   <span className="form-label form-label--required">Data de admissao</span>
-                  <input className="form-control" type="date" value={formulario.data_admissao}
+                  <DateInputBR className="form-control" value={formulario.data_admissao}
                     onChange={(e) => setFormulario({ ...formulario, data_admissao: e.target.value })} required />
                 </label>
 
@@ -1477,13 +1478,13 @@ export default function RhDpPessoal() {
                   <div className="rh-colaboradores-filter-grid">
                     <label className="form-field">
                       <span className="form-label form-label--required">Data inicial do afastamento</span>
-                      <input className="form-control" type="date" required value={formulario.data_inicial || ''}
+                      <DateInputBR className="form-control" required value={formulario.data_inicial || ''}
                         onChange={(e) => setFormulario({ ...formulario, data_inicial: e.target.value })} />
                     </label>
 
                     <label className="form-field">
                       <span className="form-label form-label--required">Data final do afastamento</span>
-                      <input className="form-control" type="date" required value={formulario.data_final || ''}
+                      <DateInputBR className="form-control" required value={formulario.data_final || ''}
                         onChange={(e) => setFormulario({ ...formulario, data_final: e.target.value })} />
                     </label>
                     {/*
@@ -1517,7 +1518,7 @@ export default function RhDpPessoal() {
 
                     <label className="form-field">
                       <span className="form-label">A partir de</span>
-                      <input className="form-control" type="date" value={formulario.data_vigencia || ''}
+                      <DateInputBR className="form-control" value={formulario.data_vigencia || ''}
                         onChange={(e) => setFormulario({ ...formulario, data_vigencia: e.target.value })} />
                     </label>
                   </div>
@@ -1549,7 +1550,7 @@ export default function RhDpPessoal() {
 
                     <label className="form-field">
                       <span className="form-label form-label--required">Vale a partir de</span>
-                      <input className="form-control" type="date" required value={formulario.data_vigencia || ''}
+                      <DateInputBR className="form-control" required value={formulario.data_vigencia || ''}
                         onChange={(e) => setFormulario({ ...formulario, data_vigencia: e.target.value })} />
                     </label>
 
@@ -1589,7 +1590,7 @@ export default function RhDpPessoal() {
 
                 <label className="form-field">
                   <span className="form-label">A partir de</span>
-                  <input className="form-control" type="date" value={formulario.data_vigencia}
+                  <DateInputBR className="form-control" value={formulario.data_vigencia}
                     onChange={(e) => setFormulario({ ...formulario, data_vigencia: e.target.value })} />
                 </label>
                 {formulario.admissaoFutura ? (
@@ -1658,7 +1659,7 @@ export default function RhDpPessoal() {
 
                 <label className="form-field">
                   <span className="form-label form-label--required">Ultimo dia trabalhado</span>
-                  <input className="form-control" type="date" required
+                  <DateInputBR className="form-control" required
                     value={formulario.ultimo_dia_trabalhado || ''}
                     onChange={(e) => setFormulario({ ...formulario, ultimo_dia_trabalhado: e.target.value })} />
                 </label>
@@ -1697,7 +1698,7 @@ export default function RhDpPessoal() {
                 ) : null}
                 <label className="form-field">
                   <span className="form-label form-label--required">Data de desligamento</span>
-                  <input className="form-control" type="date" value={formulario.data_desligamento}
+                  <DateInputBR className="form-control" value={formulario.data_desligamento}
                     onChange={(e) => setFormulario({ ...formulario, data_desligamento: e.target.value })} />
                 </label>
                 {formulario.tem_aviso_previo && formulario.tipo_aviso_previo === 'TRABALHADO' ? (
@@ -1768,7 +1769,7 @@ export default function RhDpPessoal() {
 
                   <label className="form-field">
                     <span className="form-label form-label--required">Vale a partir de</span>
-                    <input className="form-control" type="date" value={formulario.data_vigencia}
+                    <DateInputBR className="form-control" value={formulario.data_vigencia}
                       onChange={(e) => setFormulario({ ...formulario, data_vigencia: e.target.value })} required />
                   </label>
 

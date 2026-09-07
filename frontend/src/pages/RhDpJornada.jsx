@@ -112,6 +112,28 @@ export default function RhDpJornada() {
     ou do estado da tela e cair sobre um filtro escondido; o painel REVELA em
     vez de apagar, porque o recorte foi o usuário que montou.
   */
+  /*
+    ESTAS DUAS DECLARACOES MORAM AQUI, E NAO 25 LINHAS ABAIXO (06/09).
+
+    Elas estavam DEPOIS do `useMemo` de `filtrosPreenchidos`, cujo array de
+    dependencias le as duas. Array de dependencia e ARGUMENTO: o JavaScript
+    o avalia ANTES de chamar o `useMemo`. Ler um `const` antes da declaracao
+    e zona morta temporal, e o erro real era
+
+        ReferenceError: Cannot access 'competencia' before initialization
+
+    disparado na PRIMEIRA linha do corpo do render — antes de qualquer
+    efeito, antes de qualquer requisicao. A tela nunca chegava a pedir dado
+    nenhum, e por isso NENHUM estado de base fazia ela abrir.
+
+    Veio do commit 8052bf2, que aplicou este mesmo bloco em 49 arquivos. So
+    este ficou na ordem errada. Nem `vite build` nem o portao pegavam:
+    ordem de declaracao e sintaxe valida, e o defeito so existe em execucao.
+    Quem tranca isso agora e `scripts/provas/ordemDeDeclaracao.mjs`.
+  */
+  const [competencia, setCompetencia] = useState(COMPETENCIA_ATUAL);
+  const [diasBase, setDiasBase] = useState(DIAS_BASE_PADRAO);
+
   const filtrosPreenchidos = useMemo(
     () => FILTROS_DA_TELA.filter((filtro) => {
       /* Competência e dias base NASCEM com o valor que o sistema propõe
@@ -147,8 +169,6 @@ export default function RhDpJornada() {
       setAtivos((atuais) => ({ ...atuais, [id]: new Set() }));
     }
   });
-  const [competencia, setCompetencia] = useState(COMPETENCIA_ATUAL);
-  const [diasBase, setDiasBase] = useState(DIAS_BASE_PADRAO);
 
   const [linhas, setLinhas] = useState([]);
   const [carregando, setCarregando] = useState(false);
