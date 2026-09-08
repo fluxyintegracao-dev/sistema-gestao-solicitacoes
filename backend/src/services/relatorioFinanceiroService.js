@@ -177,7 +177,7 @@ async function resolveObraScope(req, obraId) {
 }
 
 function resolvePeriodo(filters = {}, options = {}) {
-  const maxDays = options.maxDays === undefined ? 366 : options.maxDays;
+  const maxDays = options.maxDays === undefined ? null : options.maxDays;
   const hoje = parseDateOnly(getHoje());
   const preset = String(filters.periodo || '').trim().toUpperCase();
   const hasCustomDates = Boolean(filters.data_inicial && filters.data_final);
@@ -5177,6 +5177,7 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
 }
 
 module.exports = {
+  resolvePeriodo,
   gerarRelatorioAnalitico,
   gerarRelatorioConciliacaoContas,
   gerarRelatorioFinanceiroObras,
