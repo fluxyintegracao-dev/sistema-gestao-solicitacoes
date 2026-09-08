@@ -23,6 +23,7 @@ export default function ApropriacaoAutocomplete({
   required = false,
   placeholder = 'Buscar por código ou nome...',
   disabledPlaceholder = 'Selecione',
+  emptyText = 'Nenhuma apropriação encontrada',
   className = '',
   inputClassName = 'input w-full',
 }) {
@@ -201,7 +202,7 @@ export default function ApropriacaoAutocomplete({
             ))
           ) : (
             <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
-              Nenhuma apropriação encontrada
+              {emptyText}
             </div>
           )}
         </div>

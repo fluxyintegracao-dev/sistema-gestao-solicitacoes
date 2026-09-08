@@ -44,6 +44,7 @@ import { canViewRhDpApuracao, hasAnyExplicitPermissao, isBusinessAdmin } from '.
 import { userHasSetorCapability } from '../utils/setor';
 import { formatCurrencyInput, getCpfCnpjError, getPixDocumentError, maskCpfCnpj, normalizeCurrencyTyping } from '../utils/formatters';
 import DateInputBR from '../components/DateInputBR';
+import ObraAutocomplete from '../components/ui/ObraAutocomplete';
 
 /**
  * A TELA CONSOLIDADA DO DP (Fase 6 do modulo DP, 26/08).
@@ -513,6 +514,12 @@ export default function RhDpPessoal() {
     limpar();
 
     const f = formulario;
+    const ehTransferencia = f.tipo === 'TROCA_OBRA'
+      || (f.tipo === 'MOVIMENTACAO' && f.subtipo === 'TRANSFERENCIA_OBRA');
+    if (ehTransferencia && !Number(f.obra_destino_id)) {
+      avisar.erro('Selecione uma obra de destino na lista da pesquisa.');
+      return;
+    }
     if (f.tipo === 'ADMISSAO') {
       const cpfErro = getCpfCnpjError(f.cpf, { required: true, type: 'cpf' });
       if (cpfErro) {
@@ -1548,18 +1555,16 @@ export default function RhDpPessoal() {
                       <span className="form-label form-label--required">
                         {formulario.primeiraLotacao ? 'Obra' : 'Obra de destino'}
                       </span>
-                      <select className="form-control" required value={formulario.obra_destino_id || ''}
-                        disabled={statusObrasDestino === 'carregando'}
-                        onChange={(e) => setFormulario({ ...formulario, obra_destino_id: e.target.value })}>
-                        <option value="">
-                          {statusObrasDestino === 'carregando'
-                            ? 'Carregando obras ativas...'
-                            : statusObrasDestino === 'erro'
-                              ? 'Nao foi possivel carregar as obras'
-                              : 'Selecione'}
-                        </option>
-                        {obrasDestino.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
-                      </select>
+                      <ObraAutocomplete
+                        required
+                        value={formulario.obra_destino_id || ''}
+                        options={obrasDestino}
+                        disabled={statusObrasDestino !== 'pronto'}
+                        disabledPlaceholder={statusObrasDestino === 'carregando'
+                          ? 'Carregando obras ativas...'
+                          : 'Nao foi possivel carregar as obras'}
+                        onChange={(obraId) => setFormulario({ ...formulario, obra_destino_id: obraId })}
+                      />
                     </label>
 
                     <label className="form-field">
@@ -1627,18 +1632,16 @@ export default function RhDpPessoal() {
                   <span className="form-label form-label--required">
                     {formulario.primeiraLotacao ? 'Obra' : 'Obra de destino'}
                   </span>
-                  <select className="form-control" value={formulario.obra_destino_id}
-                    disabled={statusObrasDestino === 'carregando'}
-                    onChange={(e) => setFormulario({ ...formulario, obra_destino_id: e.target.value })} required>
-                    <option value="">
-                      {statusObrasDestino === 'carregando'
-                        ? 'Carregando obras ativas...'
-                        : statusObrasDestino === 'erro'
-                          ? 'Nao foi possivel carregar as obras'
-                          : 'Selecione'}
-                    </option>
-                    {obrasDestino.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
-                  </select>
+                  <ObraAutocomplete
+                    required
+                    value={formulario.obra_destino_id || ''}
+                    options={obrasDestino}
+                    disabled={statusObrasDestino !== 'pronto'}
+                    disabledPlaceholder={statusObrasDestino === 'carregando'
+                      ? 'Carregando obras ativas...'
+                      : 'Nao foi possivel carregar as obras'}
+                    onChange={(obraId) => setFormulario({ ...formulario, obra_destino_id: obraId })}
+                  />
                 </label>
 
                 <label className="form-field">
