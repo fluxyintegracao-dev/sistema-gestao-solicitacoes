@@ -3165,7 +3165,10 @@ module.exports = {
       });
 
       if (!vinculada) {
-        return res.status(404).json({ error: 'Compra direta vinculada nao encontrada' });
+        return res.status(404).json({
+          error: 'Esta compra direta e legada e nao possui itens estruturados para gerenciamento.',
+          code: 'COMPRA_LEGADA_SEM_ITENS_ESTRUTURADOS'
+        });
       }
 
       const solicitacao = await carregarSolicitacaoCompra(vinculada.id);
@@ -3182,6 +3185,52 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar compra direta vinculada' });
+    }
+  },
+
+  async showPorSolicitacaoPrincipal(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      const vinculada = await SolicitacaoCompra.findOne({
+        where: {
+          solicitacao_principal_id: Number(req.params.solicitacaoId)
+        },
+        attributes: ['id'],
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (!vinculada) {
+        return res.status(404).json({
+          error: 'Esta solicitacao e legada e nao possui itens estruturados para gerenciamento.',
+          code: 'COMPRA_LEGADA_SEM_ITENS_ESTRUTURADOS'
+        });
+      }
+
+      const solicitacao = await carregarSolicitacaoCompra(vinculada.id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao de compra nao encontrada' });
+      }
+
+      if (!isSolicitacaoCompraDireta(solicitacao)) {
+        if (!podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao)) {
+          return responderCompraAguardandoDiretoria(res);
+        }
+
+        if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao))) {
+          return responderCompraAguardandoLiberacao(res);
+        }
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
+        return;
+      }
+
+      return res.json(solicitacao);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar itens vinculados a solicitacao' });
     }
   },
 

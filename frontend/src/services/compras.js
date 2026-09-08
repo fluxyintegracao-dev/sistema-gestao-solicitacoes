@@ -253,6 +253,13 @@ export async function obterCompraDiretaPorSolicitacao(solicitacaoId) {
   return handleJsonResponse(response, 'Erro ao buscar compra direta vinculada');
 }
 
+export async function obterSolicitacaoCompraPorSolicitacao(solicitacaoId) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/por-solicitacao/${solicitacaoId}`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar itens vinculados a solicitacao');
+}
+
 export async function inativarSolicitacaoCompra(id) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}`, {
     method: 'DELETE',

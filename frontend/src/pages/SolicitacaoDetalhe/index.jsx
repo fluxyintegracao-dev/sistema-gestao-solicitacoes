@@ -47,7 +47,7 @@ import {
 } from '../../services/solicitacoes';
 import {
   atualizarApropriacoesItemSolicitacaoCompra,
-  obterCompraDiretaPorSolicitacao
+  obterSolicitacaoCompraPorSolicitacao
 } from '../../services/compras';
 import { listarApropriacoes } from '../../services/apropriacoes';
 import {
@@ -61,9 +61,11 @@ import {
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import {
   canAccessFinanceiro,
+  canAlterarQuantidadeSolicitacaoCompra,
   canCatalogarItensManuaisCompras,
   canDeleteSolicitacaoAnexo,
   canEditarApropriacoesItemCompraDireta,
+  canEditarApropriacoesItemSolicitacaoCompra,
   canEditarApropriacoesSolicitacao,
   canViewSolicitacaoFinanceiro,
   hasConfiguredAreaPermissions,
@@ -280,6 +282,9 @@ export default function SolicitacaoDetalhe() {
   const moduloComprasHabilitado = hasEnabledModule(user, 'COMPRAS');
   const podeEditarApropriacoes = moduloComprasHabilitado && canEditarApropriacoesSolicitacao(user);
   const podeEditarItensCompraDiretaBase = moduloComprasHabilitado && canEditarApropriacoesItemCompraDireta(user);
+  const podeEditarItensSolicitacaoCompraBase = moduloComprasHabilitado && (
+    canAlterarQuantidadeSolicitacaoCompra(user) || canEditarApropriacoesItemSolicitacaoCompra(user)
+  );
   const podeCatalogarItensManuaisCompra = moduloComprasHabilitado && canCatalogarItensManuaisCompras(user);
 
   const [solicitacao, setSolicitacao] = useState(null);
@@ -353,6 +358,7 @@ export default function SolicitacaoDetalhe() {
     solicitacao?.descricao_tipo
   );
   const isCompraDiretaSolicitacao = tipoSolicitacaoNormalizado.includes('COMPRA DIRETA');
+  const isSolicitacaoCompra = isCompraDiretaSolicitacao || tipoSolicitacaoNormalizado.includes('SOLICITACAO DE COMPRA');
   const isRecargaCartaoSolicitacao = tipoSolicitacaoNormalizado.includes('RECARGA DE CARTAO');
   // Numa solicitacao de Abertura de Contrato o rateio que vale e o do CONTRATO
   // (`contrato_apropriacoes`). O card da solicitacao grava em `solicitacao_apropriacoes`, que ali
@@ -367,8 +373,9 @@ export default function SolicitacaoDetalhe() {
     && !isCompraDiretaSolicitacao
     && !solicitacaoEhContrato;
   const podeEditarItensCompraDireta = podeInteragirSolicitacao && podeEditarItensCompraDiretaBase && isCompraDiretaSolicitacao;
-  const podeGerenciarItensCompraDireta = isCompraDiretaSolicitacao && (
-    podeEditarItensCompraDireta || (podeInteragirSolicitacao && podeCatalogarItensManuaisCompra)
+  const podeGerenciarItensCompra = isSolicitacaoCompra && podeInteragirSolicitacao && (
+    (isCompraDiretaSolicitacao ? podeEditarItensCompraDiretaBase : podeEditarItensSolicitacaoCompraBase)
+    || podeCatalogarItensManuaisCompra
   );
   const contratoSomenteLeitura = contratoDoFluxo && !podeInteragirSolicitacao
     ? { ...contratoDoFluxo, permissoes: {} }
@@ -740,7 +747,7 @@ export default function SolicitacaoDetalhe() {
     ];
   }
 
-  async function abrirModalCompraDireta() {
+  async function abrirGerenciamentoItensCompra() {
     if (!solicitacao?.id) return;
 
     try {
@@ -749,12 +756,20 @@ export default function SolicitacaoDetalhe() {
       setRateiosCompraDireta([]);
       setMotivoCompraDireta('');
       setAcaoItemCompraDireta(podeCatalogarItensManuaisCompra ? 'CATALOGAR' : 'APROPRIAR');
-      const data = await obterCompraDiretaPorSolicitacao(solicitacao.id);
+      const data = await obterSolicitacaoCompraPorSolicitacao(solicitacao.id);
+      if (!isCompraDiretaSolicitacao) {
+        navigate(`/solicitacoes-compra/${data.id}`);
+        return;
+      }
       setCompraDiretaDetalhe(data || null);
       setModalCompraDiretaAberto(true);
     } catch (error) {
       console.error(error);
-      avisar.erro(error?.message || 'Erro ao carregar itens da compra direta');
+      avisar.erro(
+        error?.code === 'COMPRA_LEGADA_SEM_ITENS_ESTRUTURADOS'
+          ? 'Registro legado sem itens estruturados. Os itens precisam ser reconstruídos antes de usar o gerenciamento.'
+          : error?.message || 'Erro ao carregar itens da compra'
+      );
     } finally {
       setCarregandoCompraDireta(false);
     }
@@ -785,7 +800,7 @@ export default function SolicitacaoDetalhe() {
     if (!solicitacao?.id) return;
 
     try {
-      const data = await obterCompraDiretaPorSolicitacao(solicitacao.id);
+      const data = await obterSolicitacaoCompraPorSolicitacao(solicitacao.id);
       setCompraDiretaDetalhe(data || null);
       const itemAtualizado = (data?.itensManuais || []).find(
         (item) => Number(item.id) === Number(itemCompraDiretaSelecionado?.id)
@@ -1122,18 +1137,20 @@ export default function SolicitacaoDetalhe() {
       />
     ) : null,
 
-    itens_compra_direta: podeGerenciarItensCompraDireta ? (
+    itens_compra_direta: podeGerenciarItensCompra ? (
       <BlocoConteudo
-        titulo="Itens da compra direta"
+        titulo={isCompraDiretaSolicitacao ? 'Itens da compra direta' : 'Itens da solicitação de compra'}
         variante="secundario"
-        descricao={podeCatalogarItensManuaisCompra
+        descricao={!isCompraDiretaSolicitacao
+          ? 'Abra o gerenciamento completo para revisar quantidades, apropriações e itens manuais.'
+          : podeCatalogarItensManuaisCompra
           ? 'Trate os itens manuais para reutiliza-los em novas compras, mantendo o registro original.'
           : 'Ajuste as apropriacoes item por item, com motivo e auditoria.'}
         acoes={(
           <button
             type="button"
             className="btn btn-outline btn-sm"
-            onClick={abrirModalCompraDireta}
+            onClick={abrirGerenciamentoItensCompra}
             disabled={carregandoCompraDireta}
           >
             {carregandoCompraDireta ? 'Carregando itens...' : 'Gerenciar itens'}
