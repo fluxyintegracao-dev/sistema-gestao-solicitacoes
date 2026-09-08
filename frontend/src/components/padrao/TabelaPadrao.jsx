@@ -7,16 +7,18 @@ import { TIPO_COLUNAS, TIPO_VISUAL, usePreferenciaDeLista } from '../../contexts
 import EmptyState from '../ui/EmptyState';
 import { ehToken } from '../../utils/token';
 
-function useEhMovel() {
+function useEhMovel(larguraMaximaParaCards = 767) {
+  const mediaQuery = `(max-width: ${larguraMaximaParaCards}px)`;
   const [ehMovel, setEhMovel] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+    () => typeof window !== 'undefined' && window.matchMedia(mediaQuery).matches
   );
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
+    const mq = window.matchMedia(mediaQuery);
     const aoMudar = (event) => setEhMovel(event.matches);
+    setEhMovel(mq.matches);
     mq.addEventListener('change', aoMudar);
     return () => mq.removeEventListener('change', aoMudar);
-  }, []);
+  }, [mediaQuery]);
   return ehMovel;
 }
 
@@ -790,6 +792,10 @@ export default function TabelaPadrao({
   total,                // number|undefined — total do conjunto, além da fatia à vista
   rotuloRegistro = 'linha',
   rodapeContagem = true, // saída explícita para a tabela em que o rodapé é ruído
+  // Tabelas operacionais com campos editáveis podem precisar virar cartões
+  // ainda no tablet. O padrão de todas as tabelas continua sendo 767px;
+  // a tela só amplia o corte quando a interação realmente exige.
+  larguraMaximaParaCards = 767,
   /*
     ROLAGEM INFINITA POR PADRÃO, COM A ESCOLHA SALVA POR LISTA (decisão do
     cliente, 05/09) — o mesmo arranjo que já valia na listagem de
@@ -808,7 +814,7 @@ export default function TabelaPadrao({
   */
   paginaLocal = 50      // linhas por fatia; 0 desliga a rolagem infinita local
 }) {
-  const ehMovel = useEhMovel();
+  const ehMovel = useEhMovel(larguraMaximaParaCards);
   const shellRef = useRef(null);
   const [larguraDisponivel, setLarguraDisponivel] = useState(null);
   const [expandidas, setExpandidas] = useState(() => new Set());

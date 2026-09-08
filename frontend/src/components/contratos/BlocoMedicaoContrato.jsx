@@ -282,26 +282,26 @@ export default function BlocoMedicaoContrato({
   if (!contratoId) return null;
 
   return (
-    <div className="card space-y-3" style={{ marginTop: 12 }}>
-      <div className="text-sm" style={{ fontWeight: 700 }}>Medição — títulos do contrato</div>
+    <div className="card mt-3 min-w-0 space-y-4 overflow-hidden">
+      <div className="text-sm font-bold">Medição — títulos do contrato</div>
 
       {periodo && onPeriodoChange && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="grid gap-1 text-sm">
+        <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2">
+          <label className="grid min-w-0 gap-1 text-sm">
             Data inicial (Medição)
             <DateInputBR
               name="data_inicio_medicao"
-              className="input input-sm"
+              className="input input-sm w-full min-w-0"
               value={periodo.inicio || ''}
               onChange={onPeriodoChange}
               required={periodoObrigatorio}
             />
           </label>
-          <label className="grid gap-1 text-sm">
+          <label className="grid min-w-0 gap-1 text-sm">
             Data final (Medição)
             <DateInputBR
               name="data_fim_medicao"
-              className="input input-sm"
+              className="input input-sm w-full min-w-0"
               value={periodo.fim || ''}
               onChange={onPeriodoChange}
               required={periodoObrigatorio}
@@ -314,7 +314,7 @@ export default function BlocoMedicaoContrato({
       {erro && <div className="app-alert app-alert--error">{erro}</div>}
 
       {saldo && (
-        <div className="text-sm" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-2 text-sm">
           <span><strong>Valor do contrato:</strong> {formatarMoeda(saldo.valor_contrato)}</span>
           {/* Comprometido conta medicao ja solicitada, mesmo sem pagamento (PI-6). */}
           <span><strong>Já comprometido:</strong> {formatarMoeda(saldo.comprometido)}</span>
@@ -350,7 +350,7 @@ export default function BlocoMedicaoContrato({
               // tabela vira extrato e nao sobra caminho para medir a parcela.
               sempreVisivel: true,
               titulo: 'Medir',
-              tipo: 'status',
+              tipo: 'badge',
               // `medivel` e nao `editavel`: parcela ja medida segue com o titulo ABERTO ate o
               // pagamento, entao `editavel` continua verdadeiro nela — e o checkbox ficava liberado
               // para medir a mesma parcela de novo.
@@ -374,8 +374,8 @@ export default function BlocoMedicaoContrato({
             },
             {
               id: 'numero',
-              titulo: '#',
-              tipo: 'codigo',
+              titulo: 'Parcela',
+              tipo: 'numero',
               noCard: 'titulo',
               render: (p) => atenuada(p, p.numero)
             },
@@ -392,7 +392,7 @@ export default function BlocoMedicaoContrato({
                 return atenuada(p, (
                   <>
                     <input
-                      className="input" type="number" step="0.01"
+                      className="input input-sm w-full min-w-0" type="number" step="0.01"
                       value={sel.valor ?? valorProjetado}
                       disabled={!p.editavel || p.medivel === false || !sel.marcada}
                       onChange={(e) => alterar(p.id, 'valor', e.target.value)}
@@ -415,7 +415,7 @@ export default function BlocoMedicaoContrato({
                 const sel = selecao[p.id] || {};
                 return atenuada(p, (
                   <DateInputBR
-                    className="input"
+                    className="input input-sm w-full min-w-0"
                     name={`vencimento_parcela_${p.id}`}
                     value={sel.vencimento ?? p.vencimento ?? ''}
                     disabled={!p.editavel || p.medivel === false || !sel.marcada}
@@ -458,6 +458,8 @@ export default function BlocoMedicaoContrato({
           storageKey="tabela:contrato-medicao:parcelas"
           rotuloRolagem="Parcelas do contrato para medicao"
           vazio="Este contrato não possui parcelas para medir."
+          larguraMaximaParaCards={1023}
+          rotuloRegistro="parcela"
           /* R17: linha de parcela — numero, valor, vencimento e status; nao ha
              nome de registro, a parcela e identificada pelo numero. */
           semIdentidade
@@ -471,10 +473,10 @@ export default function BlocoMedicaoContrato({
           Pagamento desta medição
         </div>
 
-        <label className="grid max-w-md gap-1 text-sm">
+        <label className="grid min-w-0 max-w-md gap-1 text-sm">
           Forma de pagamento *
           <select
-            className="input input-sm"
+            className="input input-sm w-full min-w-0"
             name="forma_pagamento_medicao"
             value={formaPagamentoId}
             onChange={(e) => {
@@ -496,7 +498,7 @@ export default function BlocoMedicaoContrato({
 
         {formaPagamentoId && (
           <div className="space-y-2" data-testid="pagamento-medicao-favorecido">
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex min-w-0 items-start gap-2 text-sm">
               <input
                 type="checkbox"
                 name="favorecido_e_credor"
@@ -514,15 +516,14 @@ export default function BlocoMedicaoContrato({
                   }
                 }}
               />
-              <span>O favorecido e o proprio credor do contrato{credorDoContrato ? ` (${credorDoContrato.nome})` : ''}</span>
+              <span className="min-w-0 break-words">O favorecido e o proprio credor do contrato{credorDoContrato ? ` (${credorDoContrato.nome})` : ''}</span>
             </label>
 
             {(!usarCredor || !credorDoContrato) && (
               <div className="space-y-2">
                 <div className="relative">
                   <input
-                    className="input input-sm"
-                    style={{ width: '100%' }}
+                    className="input input-sm w-full min-w-0"
                     name="busca_favorecido"
                     placeholder="Buscar por nome, telefone, CPF/CNPJ ou PIX"
                     value={buscaFavorecido}
@@ -578,7 +579,7 @@ export default function BlocoMedicaoContrato({
                 <label className="grid gap-1 text-sm">
                   Chave PIX do favorecido *
                   <input
-                    className="input input-sm"
+                    className="input input-sm w-full min-w-0"
                     name="favorecido_chave_pix"
                     value={chavePix}
                     onChange={(e) => { setChavePix(e.target.value); setConfirmado(false); }}
@@ -588,7 +589,7 @@ export default function BlocoMedicaoContrato({
                 <label className="grid gap-1 text-sm">
                   Contato do favorecido
                   <input
-                    className="input input-sm"
+                    className="input input-sm w-full min-w-0"
                     name="favorecido_contato"
                     value={contato}
                     onChange={(e) => { setContato(e.target.value); setConfirmado(false); }}
@@ -599,10 +600,10 @@ export default function BlocoMedicaoContrato({
             )}
 
             {!pagamentoViaPix && !pagamentoViaBoleto && (
-              <label className="grid max-w-2xl gap-1 text-sm" data-testid="pagamento-medicao-dados">
+              <label className="grid min-w-0 max-w-2xl gap-1 text-sm" data-testid="pagamento-medicao-dados">
                 Dados para pagamento *
                 <textarea
-                  className="input input-sm"
+                  className="input input-sm w-full min-w-0"
                   name="favorecido_dados_pagamento"
                   rows={2}
                   maxLength={180}
@@ -649,14 +650,14 @@ export default function BlocoMedicaoContrato({
             sozinho sempre que um dos dados de pagamento muda — confirmar e depois alterar deixaria
             uma confirmacao que nao se refere ao que sera pago. */}
         {formaPagamentoId && (
-          <label className="flex items-start gap-2 text-sm">
+          <label className="flex min-w-0 items-start gap-2 text-sm">
             <input
               type="checkbox"
               name="dados_pagamento_confirmados"
               checked={confirmado}
               onChange={(e) => setConfirmado(e.target.checked)}
             />
-            <span>Confirmo que os dados de pagamento acima estão corretos *</span>
+            <span className="min-w-0 break-words">Confirmo que os dados de pagamento acima estão corretos *</span>
           </label>
         )}
       </div>

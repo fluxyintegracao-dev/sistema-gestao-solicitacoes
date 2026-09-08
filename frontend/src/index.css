@@ -2987,8 +2987,9 @@ a:hover {
 }
 
 .solicitacao-nova-page {
+  --nova-solicitacao-largura-maxima: 1120px;
   gap: 1.2rem;
-  max-width: 1120px;
+  max-width: var(--nova-solicitacao-largura-maxima);
 }
 
 .solicitacao-nova-page .page-title,
