@@ -82,6 +82,7 @@ export default function TiposSolicitacao() {
   }, []);
 
   function abrirNovoTipo() {
+    cancelarEdicao();
     setFormAberto(true);
   }
 
@@ -144,6 +145,7 @@ export default function TiposSolicitacao() {
   }
 
   function iniciarEdicao(item) {
+    setFormAberto(false);
     setEditId(item.id);
     setEditNome(item.nome);
     setEditCodigoInterno(item.codigo_interno || '');
@@ -182,6 +184,7 @@ export default function TiposSolicitacao() {
   // dele (a validação do "Novo tipo" avisa com o modal aberto e ficaria
   // atrás do fundo escuro); fechado, logo abaixo do PageHeader.
   const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+  const modalAberto = formAberto || editId !== null;
 
   const tiposFiltrados = tipos;
 
@@ -191,97 +194,35 @@ export default function TiposSolicitacao() {
       titulo: 'Nome',
       tipo: 'identidade',
       noCard: 'titulo',
-      render: (t) => (
-        editId === t.id ? (
-          <input
-            className="input input-sm w-full"
-            value={editNome}
-            onChange={e => setEditNome(e.target.value)}
-            aria-label="Nome do tipo"
-          />
-        ) : (
-          t.nome
-        )
-      )
+      render: (t) => t.nome
     },
     {
       id: 'codigo_interno',
-      // TRAVADAS (05/09): em edicao, codigo interno e regras sao os campos do
-      // formulario da linha — sem elas o tipo nao tem como ser editado.
-      sempreVisivel: true,
       titulo: 'Código interno',
       // Codigo interno é longo (ex: SOLICITACAO_DE_COMPRA) — não cabe nos
       // 130px do tipo 'codigo'; 'texto' dá a medida de leitura.
       tipo: 'texto',
-      render: (t) => (
-        editId === t.id ? (
-          <input
-            className="input input-sm w-full"
-            value={editCodigoInterno}
-            onChange={e => setEditCodigoInterno(e.target.value.toUpperCase())}
-            aria-label="Código interno do tipo"
-          />
-        ) : (
-          t.codigo_interno || '-'
-        )
-      )
+      render: (t) => t.codigo_interno || '-'
     },
     {
       id: 'regras',
-      sempreVisivel: true,
       titulo: 'Regras',
-      tipo: 'badge',
+      tipo: 'texto',
+      flex: 3,
       render: (t) => (
-        editId === t.id ? (
-          <div className="grid gap-2 md:grid-cols-2">
-            <label className="flex items-center gap-2 text-xs md:col-span-2">
-              <input
-                type="checkbox"
-                checked={editDisponivelParaObras}
-                onChange={e => setEditDisponivelParaObras(e.target.checked)}
-              />
-              <span>Disponível no catálogo comum de todas as Obras</span>
-            </label>
-            <label className="grid gap-1 text-xs md:col-span-2">
-              <span className="font-semibold text-[var(--c-text)]">Finalidade da data</span>
-              <select
-                className="select select-sm w-full"
-                value={editComportamento.finalidade_data_vencimento}
-                onChange={e => setEditComportamento(prev => ({
-                  ...prev,
-                  finalidade_data_vencimento: e.target.value
-                }))}
-              >
-                <option value={FINALIDADES_DATA_SOLICITACAO.RESPOSTA}>Data de Resposta</option>
-                <option value={FINALIDADES_DATA_SOLICITACAO.PAGAMENTO}>Data de Pagamento</option>
-              </select>
-            </label>
-            {BEHAVIOR_FIELDS.map(field => (
-              <label key={field.key} className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={Boolean(editComportamento[field.key])}
-                  onChange={e => setEditComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
-                />
-                <span>{field.label}</span>
-              </label>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-1">
-            <span className={`fx-badge ${t.disponivel_para_obras ? 'fx-badge--success' : 'fx-badge--neutral'}`}>
-              {t.disponivel_para_obras ? 'Disponível para Obras' : 'Somente por Centro de Custo'}
+        <div className="flex flex-wrap gap-1">
+          <span className={`fx-badge ${t.disponivel_para_obras ? 'fx-badge--success' : 'fx-badge--neutral'}`}>
+            {t.disponivel_para_obras ? 'Disponível para Obras' : 'Somente por Centro de Custo'}
+          </span>
+          <span className="fx-badge fx-badge--neutral">
+            {obterRotuloDataSolicitacao(getTipoSolicitacaoBehavior(t))}
+          </span>
+          {formatarRegrasTipo(t).length > 0 ? formatarRegrasTipo(t).map(label => (
+            <span key={label} className="fx-badge fx-badge--neutral">
+              {label}
             </span>
-            <span className="fx-badge fx-badge--neutral">
-              {obterRotuloDataSolicitacao(getTipoSolicitacaoBehavior(t))}
-            </span>
-            {formatarRegrasTipo(t).length > 0 ? formatarRegrasTipo(t).map(label => (
-              <span key={label} className="fx-badge fx-badge--neutral">
-                {label}
-              </span>
-            )) : <span className="text-xs text-[var(--c-muted)]">Padrão</span>}
-          </div>
-        )
+          )) : <span className="text-xs text-[var(--c-muted)]">Padrão</span>}
+        </div>
       )
     },
     {
@@ -303,14 +244,14 @@ export default function TiposSolicitacao() {
         acaoPrincipal={{ rotulo: 'Novo tipo', onClick: abrirNovoTipo }}
       />
 
-      {!formAberto && faixaAvisos}
+      {!modalAberto && faixaAvisos}
 
       {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
           principal do cabeçalho; a lista é o bloco primário PERMANENTE.
           O ritmo vertical vem do Pagina. */}
       {formAberto && (
-        <OverlayModal rotulo="Novo tipo" onFechar={() => setFormAberto(false)}>
-          <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+        <OverlayModal rotulo="Novo tipo" largura="var(--modal-max-w-xl, 1120px)" onFechar={() => setFormAberto(false)}>
+          <div data-modal="cabecalho" className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
             <h3 className="text-lg font-semibold text-[var(--c-text)]">Novo tipo</h3>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
               Fechar
@@ -389,6 +330,11 @@ export default function TiposSolicitacao() {
                     </label>
                   ))}
                 </div>
+                {comportamento.usa_fluxo_despesa_eventual ? (
+                  <p className="app-note mt-3">
+                    O fluxo de Despesa Eventual torna obrigatórios automaticamente: valor, credor, favorecido, forma de pagamento, apropriação principal, subtipo, justificativa, anexos e a data operacional. Para este fluxo, use a finalidade “Data de Pagamento”.
+                  </p>
+                ) : null}
               </BlocoConteudo>
 
               <p className="app-note">
@@ -408,6 +354,107 @@ export default function TiposSolicitacao() {
         </OverlayModal>
       )}
 
+      {editId !== null && (
+        <OverlayModal
+          rotulo="Editar tipo de solicitação"
+          largura="var(--modal-max-w-xl, 1120px)"
+          onFechar={cancelarEdicao}
+        >
+          <div data-modal="cabecalho" className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--c-text)]">Editar tipo de solicitação</h3>
+              <p className="mt-1 text-xs text-[var(--c-muted)]">Ajuste a identificação, a disponibilidade e os campos exibidos na abertura.</p>
+            </div>
+            <button type="button" className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
+              Fechar
+            </button>
+          </div>
+
+          <div className="space-y-4 px-4 py-3">
+            {faixaAvisos}
+            <FormSecao legenda="Identificação" colunas={2}>
+              <CampoForm label="Nome do tipo" obrigatorio>
+                <input
+                  className="input w-full"
+                  value={editNome}
+                  onChange={e => setEditNome(e.target.value)}
+                  required
+                />
+              </CampoForm>
+              <CampoForm label="Código interno" hint="Usado por integrações e regras internas.">
+                <input
+                  className="input w-full"
+                  value={editCodigoInterno}
+                  onChange={e => setEditCodigoInterno(e.target.value.toUpperCase())}
+                />
+              </CampoForm>
+            </FormSecao>
+
+            <label className="flex items-start gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={editDisponivelParaObras}
+                onChange={e => setEditDisponivelParaObras(e.target.checked)}
+              />
+              <span>
+                <strong className="block text-[var(--c-text)]">Disponível para todas as Obras</strong>
+                <span className="text-xs text-[var(--c-muted)]">Centros de Custo são configurados separadamente na página “Tipos por Obra/Centro de Custo”.</span>
+              </span>
+            </label>
+
+            <BlocoConteudo titulo="Comportamento do tipo" variante="secundario">
+              <CampoForm
+                label="Finalidade da data"
+                hint="Define se a abertura mostra Data de Resposta ou Data de Pagamento."
+              >
+                <select
+                  className="select w-full"
+                  value={editComportamento.finalidade_data_vencimento}
+                  onChange={e => setEditComportamento(prev => ({
+                    ...prev,
+                    finalidade_data_vencimento: e.target.value
+                  }))}
+                >
+                  <option value={FINALIDADES_DATA_SOLICITACAO.RESPOSTA}>Data de Resposta</option>
+                  <option value={FINALIDADES_DATA_SOLICITACAO.PAGAMENTO}>Data de Pagamento</option>
+                </select>
+              </CampoForm>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {BEHAVIOR_FIELDS.map(field => (
+                  <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editComportamento[field.key])}
+                      onChange={e => setEditComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                    />
+                    <span>{field.label}</span>
+                  </label>
+                ))}
+              </div>
+              {editComportamento.usa_fluxo_despesa_eventual ? (
+                <p className="app-note mt-3">
+                  O fluxo de Despesa Eventual torna obrigatórios automaticamente: valor, credor, favorecido, forma de pagamento, apropriação principal, subtipo, justificativa, anexos e a data operacional. Para este fluxo, use a finalidade “Data de Pagamento”.
+                </p>
+              ) : null}
+            </BlocoConteudo>
+
+            <p className="app-note">
+              Subtipos são cadastrados separadamente em “Cadastros &gt; Subtipos de Contrato” e vinculados a este tipo macro.
+            </p>
+          </div>
+
+          <div data-modal="rodape" className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-4 py-3">
+            <button type="button" className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => salvarEdicao(editId)} disabled={saving || !editNome.trim()}>
+              {saving ? 'Salvando...' : 'Salvar alterações'}
+            </button>
+          </div>
+        </OverlayModal>
+      )}
+
       <BlocoConteudo
         titulo="Cadastro geral de tipos"
         variante="primario"
@@ -416,53 +463,38 @@ export default function TiposSolicitacao() {
         <TabelaPadrao
           colunas={colunas}
           itens={tiposFiltrados}
-          storageKey="tabela:tipos-solicitacao"
-          larguraAcoes={320}
-          aoClicarLinha={(t) => {
-            // Clique na linha abre a edição inline; com uma edição ativa
-            // o clique não faz nada (evita perder o que foi digitado).
-            if (editId === null) iniciarEdicao(t);
-          }}
+          storageKey="tabela:tipos-solicitacao:v2"
+          larguraAcoes={260}
+          aoClicarLinha={iniciarEdicao}
           vazio={{
             title: 'Nenhum tipo cadastrado',
             message: 'Use "Novo tipo" para criar o primeiro registro.'
           }}
           acoesLinha={(t) => (
-            editId === t.id ? (
-              <>
-                <button type="button" className="btn btn-primary btn-sm" onClick={() => salvarEdicao(t.id)} disabled={saving}>
-                  {saving ? 'Salvando...' : 'Salvar'}
+            <>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(t)}>
+                Editar
+              </button>
+              {t.ativo ? (
+                <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => toggle(t)}>
+                  Desativar
                 </button>
-                <button type="button" className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
-                  Cancelar
+              ) : (
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => toggle(t)}>
+                  Ativar
                 </button>
-              </>
-            ) : (
-              <>
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(t)}>
-                  Editar
+              )}
+              <span className="app-actionbar-apartada">
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm btn-perigo-suave"
+                  onClick={() => excluir(t)}
+                  title="Excluir definitivamente este tipo"
+                >
+                  Excluir
                 </button>
-                {t.ativo ? (
-                  <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => toggle(t)}>
-                    Desativar
-                  </button>
-                ) : (
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => toggle(t)}>
-                    Ativar
-                  </button>
-                )}
-                <span className="app-actionbar-apartada">
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm btn-perigo-suave"
-                    onClick={() => excluir(t)}
-                    title="Excluir definitivamente este tipo"
-                  >
-                    Excluir
-                  </button>
-                </span>
-              </>
-            )
+              </span>
+            </>
           )}
         />
       </BlocoConteudo>
