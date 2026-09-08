@@ -370,7 +370,7 @@ export default function SolicitacaoDetalhe() {
     : Boolean(solicitacao?.area_responsavel && solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user));
   const podeEditarApropriacoesSolicitacaoNormal = podeEditarApropriacoes
     && podeInteragirSolicitacao
-    && !isCompraDiretaSolicitacao
+    && !isSolicitacaoCompra
     && !solicitacaoEhContrato;
   const podeEditarItensCompraDireta = podeInteragirSolicitacao && podeEditarItensCompraDiretaBase && isCompraDiretaSolicitacao;
   const podeGerenciarItensCompra = isSolicitacaoCompra && podeInteragirSolicitacao && (
