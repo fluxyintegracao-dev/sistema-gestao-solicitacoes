@@ -2363,6 +2363,10 @@ async function canAccessRhDp(user) {
     return true;
   }
 
+  if (await isRhDpUsuarioObra(user)) {
+    return true;
+  }
+
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, RH_DP_AREA_PERMISSION_KEYS);
   }
@@ -2381,6 +2385,16 @@ async function canAccessRhDp(user) {
     'rh_dp_obrigacoes_view',
     'rh_dp.relatorios.visualizar'
   ]);
+}
+
+async function isRhDpUsuarioObra(user) {
+  if (isBusinessAdmin(user)) return false;
+  return userHasSetorCapability(user, 'eh_setor_obra');
+}
+
+async function getRhDpObraScopeIds(user) {
+  if (!(await isRhDpUsuarioObra(user))) return null;
+  return getUserObraIds(user);
 }
 
 async function canAccessProvisoes(user) {
@@ -2939,6 +2953,7 @@ async function canManageSstArea(user, area) {
 }
 
 async function canViewRhDpDashboard(user) {
+  if (await isRhDpUsuarioObra(user)) return false;
   return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.dashboard.visualizar', 'rh_dp.relatorios.visualizar'], ['rh_dp_dashboard_view']);
 }
 
@@ -2947,10 +2962,13 @@ async function canManageRhDpEmpresas(user) {
     return true;
   }
 
+  if (await isRhDpUsuarioObra(user)) return false;
+
   return userHasAreaPermissionWhenConfigured(user, ['rh_dp.empresas.gerenciar']);
 }
 
 async function canViewRhDpColaboradores(user) {
+  if (await isRhDpUsuarioObra(user)) return true;
   return userHasAreaOrRhDpLegacyPermission(user, [
     'rh_dp.colaboradores.visualizar',
     'rh_dp.colaboradores.editar'
@@ -2958,10 +2976,12 @@ async function canViewRhDpColaboradores(user) {
 }
 
 async function canManageRhDpColaboradores(user) {
+  if (await isRhDpUsuarioObra(user)) return false;
   return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.colaboradores.editar'], ['rh_dp_colaboradores_edit']);
 }
 
 async function canViewRhDpDocumentos(user) {
+  if (await isRhDpUsuarioObra(user)) return false;
   return userHasAreaOrRhDpLegacyPermission(user, [
     'rh_dp.documentos.visualizar',
     'rh_dp.documentos.gerenciar'
@@ -2969,10 +2989,12 @@ async function canViewRhDpDocumentos(user) {
 }
 
 async function canManageRhDpDocumentos(user) {
+  if (await isRhDpUsuarioObra(user)) return false;
   return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.documentos.gerenciar'], ['rh_dp_documentos_manage']);
 }
 
 async function canExecuteRhDpImportacoes(user) {
+  if (await isRhDpUsuarioObra(user)) return false;
   return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.importacoes.executar'], ['rh_dp_importacoes_execute']);
 }
 
@@ -2989,6 +3011,7 @@ async function canEditRhDpApuracao(user) {
 }
 
 async function canViewRhDpObrigacoes(user) {
+  if (await isRhDpUsuarioObra(user)) return false;
   return userHasAreaOrRhDpLegacyPermission(user, [
     'rh_dp.obrigacoes.visualizar',
     'rh_dp.fechamento.executar',
@@ -2997,10 +3020,12 @@ async function canViewRhDpObrigacoes(user) {
 }
 
 async function canExecuteRhDpFechamento(user) {
+  if (await isRhDpUsuarioObra(user)) return false;
   return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.fechamento.executar'], ['rh_dp_fechamento_execute']);
 }
 
 async function canReopenRhDpFechamento(user) {
+  if (await isRhDpUsuarioObra(user)) return false;
   return userHasAreaOrRhDpLegacyPermission(user, ['rh_dp.fechamento.reabrir'], ['rh_dp_fechamento_reopen']);
 }
 
@@ -3415,6 +3440,8 @@ module.exports = {
   canViewComunicacao,
   canSendComunicacao,
   getRhDpCapabilitiesForUser,
+  getRhDpObraScopeIds,
+  isRhDpUsuarioObra,
   isAdministrador,
   isBusinessAdmin,
   canManageUsers,

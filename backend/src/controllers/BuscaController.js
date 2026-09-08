@@ -37,6 +37,7 @@ const {
   canAccessFinanceiro,
   getFinanceiroObraScopeIds,
   getUserObraScopeIds,
+  getRhDpObraScopeIds,
   canViewRhDpColaboradores,
   canManageUsers,
   canManageConfiguracoesArea,
@@ -385,6 +386,11 @@ async function grupoParceiros(req, q) {
 async function grupoColaboradores(req, q) {
   if (!(await canViewRhDpColaboradores(req.user))) return null;
 
+  const obraIds = await getRhDpObraScopeIds(req.user);
+  if (Array.isArray(obraIds) && !obraIds.length) {
+    return { temMais: false, itens: [] };
+  }
+
   const where = {
     [Op.or]: [
       ...condicoesTermo(q, {
@@ -394,6 +400,9 @@ async function grupoColaboradores(req, q) {
       { nome: { [Op.like]: `${q}%` } }
     ]
   };
+  if (Array.isArray(obraIds)) {
+    where.obra_id = { [Op.in]: obraIds };
+  }
   const linhas = await RhColaborador.findAll({
     where,
     attributes: ['id', 'nome', 'cpf'],
@@ -406,7 +415,9 @@ async function grupoColaboradores(req, q) {
       id: c.id,
       titulo: c.nome,
       subtitulo: c.cpf ? `Colaborador · CPF ${c.cpf}` : 'Colaborador',
-      link: `/rh-dp/colaboradores?q=${encodeURIComponent(c.nome)}`
+      link: Array.isArray(obraIds)
+        ? '/rh-dp/pessoal?aba=colaboradores'
+        : `/rh-dp/colaboradores?q=${encodeURIComponent(c.nome)}`
     }))
   };
 }

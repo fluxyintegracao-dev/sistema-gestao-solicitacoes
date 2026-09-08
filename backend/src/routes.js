@@ -350,6 +350,7 @@ const {
   canViewIntegracaoSienge,
   canViewRhDpApuracao,
   canViewRhDpColaboradores,
+  canViewRhDpDashboard,
   userHasStrictAreaPermission,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
@@ -1411,6 +1412,14 @@ const allowRhDpColaboradoresRead = permit({
       : 'Acesso negado para colaboradores do RH/DP'
   )
 });
+const allowRhDpDashboardRead = permit({
+  resource: 'RH_DP_RELATORIOS',
+  custom: async (req) => (
+    (await canViewRhDpDashboard(req.user))
+      ? true
+      : 'Acesso negado para relatorios do RH/DP'
+  )
+});
 const allowRhDpColaboradoresWrite = permit({
   resource: 'RH_DP_COLABORADORES',
   custom: async (req) => (
@@ -1864,7 +1873,7 @@ router.patch('/empresas-grupo/:id', allowConfiguracoesCadastros, criticalRateLim
 router.get('/rh/empresas-grupo', allowRhDpEmpresasManage, validateRequest({ query: validateRhEmpresaGrupoQuery }), RhEmpresaGrupoController.index);
 router.post('/rh/empresas-grupo', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ body: validateRhEmpresaGrupoCreateBody }), RhEmpresaGrupoController.create);
 router.patch('/rh/empresas-grupo/:id', allowRhDpEmpresasManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empresa do grupo RH/DP'), body: validateRhEmpresaGrupoUpdateBody }), RhEmpresaGrupoController.update);
-router.get('/rh/relatorios/operacional', allowRhDpColaboradoresRead, validateRequest({ query: validateRhRelatorioOperacionalQuery }), RhRelatorioController.operacional);
+router.get('/rh/relatorios/operacional', allowRhDpDashboardRead, validateRequest({ query: validateRhRelatorioOperacionalQuery }), RhRelatorioController.operacional);
 router.get('/rh/colaboradores', allowRhDpColaboradoresRead, validateRequest({ query: validateRhColaboradorQuery }), RhColaboradorController.index);
 router.get('/rh/colaboradores/:id', allowRhDpColaboradoresRead, validateRequest({ params: validateNumericIdParam('id', 'Colaborador RH/DP') }), RhColaboradorController.show);
 router.post('/rh/colaboradores', allowRhDpColaboradoresWrite, criticalRateLimit, validateRequest({ body: validateRhColaboradorCreateBody }), RhColaboradorController.create);

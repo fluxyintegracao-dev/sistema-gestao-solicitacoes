@@ -1131,6 +1131,7 @@ const RH_DP_LEGACY_TO_AREA = {
 export function canAccessRhDp(user) {
   if (!hasEnabledModule(user, 'RH_DP')) return false;
   if (isBusinessAdmin(user)) return true;
+  if (userHasSetorCapability(user, 'eh_setor_obra')) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, RH_DP_AREA_PERMISSION_KEYS);
   }
@@ -1167,6 +1168,7 @@ export function hasRhDpCapability(user, capability) {
 
 export function canAccessRhDpDashboard(user) {
   if (!canAccessRhDp(user)) return false;
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, ['rh_dp.dashboard.visualizar', 'rh_dp.relatorios.visualizar']);
   }
@@ -1176,6 +1178,7 @@ export function canAccessRhDpDashboard(user) {
 export function canAccessRhDpEmpresas(user) {
   if (!hasEnabledModule(user, 'RH_DP')) return false;
   if (isBusinessAdmin(user)) return true;
+  if (userHasSetorCapability(user, 'eh_setor_obra')) return false;
   if (hasConfiguredAreaPermissions(user)) {
     return hasPermissao(user, 'rh_dp.empresas.gerenciar');
   }
@@ -1183,6 +1186,8 @@ export function canAccessRhDpEmpresas(user) {
 }
 
 export function canViewRhDpColaboradores(user) {
+  if (!canAccessRhDp(user)) return false;
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return true;
   return canAccessRhDp(user) && (
     hasRhDpCapability(user, 'rh_dp_colaboradores_view') ||
     hasRhDpCapability(user, 'rh_dp_colaboradores_edit')
@@ -1190,10 +1195,17 @@ export function canViewRhDpColaboradores(user) {
 }
 
 export function canManageRhDpColaboradores(user) {
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
   return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_colaboradores_edit');
 }
 
+export function canAccessRhDpCadastroColaboradores(user) {
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
+  return canViewRhDpColaboradores(user);
+}
+
 export function canViewRhDpDocumentos(user) {
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
   return canAccessRhDp(user) && (
     hasRhDpCapability(user, 'rh_dp_documentos_view') ||
     hasRhDpCapability(user, 'rh_dp_documentos_manage')
@@ -1201,10 +1213,12 @@ export function canViewRhDpDocumentos(user) {
 }
 
 export function canManageRhDpDocumentos(user) {
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
   return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_documentos_manage');
 }
 
 export function canExecuteRhDpImportacoes(user) {
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
   return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_importacoes_execute');
 }
 
@@ -1221,6 +1235,7 @@ export function canEditRhDpApuracao(user) {
 }
 
 export function canViewRhDpObrigacoes(user) {
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
   return canAccessRhDp(user) && (
     hasRhDpCapability(user, 'rh_dp_obrigacoes_view') ||
     hasRhDpCapability(user, 'rh_dp_fechamento_execute') ||
@@ -1229,10 +1244,12 @@ export function canViewRhDpObrigacoes(user) {
 }
 
 export function canExecuteRhDpFechamento(user) {
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
   return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_fechamento_execute');
 }
 
 export function canReopenRhDpFechamento(user) {
+  if (userHasSetorCapability(user, 'eh_setor_obra') && !isBusinessAdmin(user)) return false;
   return canAccessRhDp(user) && hasRhDpCapability(user, 'rh_dp_fechamento_reopen');
 }
 

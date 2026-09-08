@@ -11,13 +11,14 @@ import {
   useFiltrosVisiveis
 } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
-import { getObras } from '../services/obras';
+import { getMinhasObras, getObras } from '../services/obras';
 import {
   colaboradoresParaJornadaRh,
   getRhEmpresasGrupo,
   registrarJornadaRh
 } from '../services/rhDp';
-import { hasAnyExplicitPermissao } from '../utils/acessoProduto';
+import { hasAnyExplicitPermissao, isBusinessAdmin } from '../utils/acessoProduto';
+import { userHasSetorCapability } from '../utils/setor';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
 
 /**
@@ -98,6 +99,8 @@ const FILTROS_DA_TELA = [
 
 export default function RhDpJornada() {
   const { user } = useAuth();
+  const usuarioOperacionalDaObra = !isBusinessAdmin(user)
+    && userHasSetorCapability(user, 'eh_setor_obra');
   const { avisos, avisar, fechar, limpar } = useAvisos();
   const { confirmar, elementoConfirmacao } = useConfirmacao();
 
@@ -182,7 +185,9 @@ export default function RhDpJornada() {
   useEffect(() => {
     (async () => {
       try {
-        const listaObras = await getObras();
+        const listaObras = await (
+          usuarioOperacionalDaObra ? getMinhasObras({ escopo: 'OBRAS' }) : getObras()
+        );
         setObras(Array.isArray(listaObras) ? listaObras : []);
       } catch (error) {
         avisar.erro(error.message || 'Não foi possível carregar as obras.');
@@ -203,7 +208,7 @@ export default function RhDpJornada() {
         setEmpresas([]);
       }
     })();
-  }, [avisar]);
+  }, [avisar, usuarioOperacionalDaObra]);
 
   const carregar = useCallback(async () => {
     if (!obra || !competencia) {

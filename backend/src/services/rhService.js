@@ -929,6 +929,20 @@ async function atualizarEmpresaGrupoRh(id, data, user) {
 
 async function listarColaboradoresRh(filters = {}) {
   const where = {};
+  const obraIdsPermitidas = Array.isArray(filters.obra_ids)
+    ? [...new Set(filters.obra_ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))]
+    : null;
+
+  if (Array.isArray(obraIdsPermitidas) && obraIdsPermitidas.length === 0) {
+    return [];
+  }
+
+  if (filters.obra_id && Array.isArray(obraIdsPermitidas)) {
+    const obraSolicitada = Number(filters.obra_id);
+    if (!obraIdsPermitidas.includes(obraSolicitada)) {
+      throw new ValidationError('Acesso negado aos colaboradores desta obra.', 403);
+    }
+  }
 
   if (filters.q) {
     const digits = normalizeDigits(filters.q);
@@ -947,7 +961,9 @@ async function listarColaboradoresRh(filters = {}) {
   if (filters.empresa_grupo_id) {
     where.empresa_grupo_id = filters.empresa_grupo_id;
   }
-  if (filters.obra_id) {
+  if (Array.isArray(obraIdsPermitidas)) {
+    where.obra_id = { [Op.in]: obraIdsPermitidas };
+  } else if (filters.obra_id) {
     where.obra_id = filters.obra_id;
   }
   if (filters.setor_id) {
@@ -986,7 +1002,7 @@ async function listarColaboradoresRh(filters = {}) {
    * alfabetica, depois quem nao tem em ordem alfabetica. Sem isso a lista mudaria de ordem a cada
    * pedido novo e ninguem acharia mais ninguem.
    */
-  const abertosPorColaborador = await pedidosAbertosPorColaborador(filters.obra_ids || null);
+  const abertosPorColaborador = await pedidosAbertosPorColaborador(obraIdsPermitidas);
 
   const comPedido = [];
   const semPedido = [];
@@ -1010,12 +1026,28 @@ async function listarColaboradoresRh(filters = {}) {
   return [...comPedido, ...semPedido];
 }
 
-async function detalharColaboradorRh(id) {
-  const colaborador = await RhColaborador.findByPk(id, {
+async function detalharColaboradorRh(id, options = {}) {
+  const obraIdsPermitidas = Array.isArray(options.obra_ids)
+    ? [...new Set(options.obra_ids.map(Number).filter((obraId) => Number.isInteger(obraId) && obraId > 0))]
+    : null;
+  const where = { id };
+
+  if (Array.isArray(obraIdsPermitidas)) {
+    if (!obraIdsPermitidas.length) {
+      throw new ValidationError('Acesso negado a este colaborador.', 403);
+    }
+    where.obra_id = { [Op.in]: obraIdsPermitidas };
+  }
+
+  const colaborador = await RhColaborador.findOne({
+    where,
     include: COLABORADOR_INCLUDE
   });
 
   if (!colaborador) {
+    if (Array.isArray(obraIdsPermitidas)) {
+      throw new ValidationError('Acesso negado a este colaborador.', 403);
+    }
     throw new ValidationError('Colaborador nao encontrado.', 404);
   }
 

@@ -112,6 +112,7 @@ import {
   canViewFinanceiroRelatorios,
   hasPermissao,
   canViewRhDpColaboradores,
+  canAccessRhDpCadastroColaboradores,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
   canViewSolicitacoesRelatorios,
@@ -504,7 +505,7 @@ export const NAV_MODULES = [
         Pessoal é a porta do dia a dia; Colaboradores é o cadastro.
       */
       { id: 'rhdp-pessoal', ordem: 10, label: 'Pessoal', desc: 'Solicitações, colaboradores, jornada e apuração — o dia a dia do DP.', icon: HiOutlineUserGroup, to: '/rh-dp/pessoal', can: (user) => canViewRhDpColaboradores(user) },
-      { id: 'rhdp-colaboradores', ordem: 20, label: 'Colaboradores', desc: 'Cadastro de colaboradores.', icon: HiOutlineUsers, to: '/rh-dp/colaboradores', can: (user) => canViewRhDpColaboradores(user) },
+      { id: 'rhdp-colaboradores', ordem: 20, label: 'Colaboradores', desc: 'Cadastro de colaboradores.', icon: HiOutlineUsers, to: '/rh-dp/colaboradores', can: (user) => canAccessRhDpCadastroColaboradores(user) },
       { id: 'rhdp-importacoes', ordem: 50, label: 'Importações', desc: 'Importações de jornada e eventos.', icon: HiOutlineCloudArrowUp, to: '/rh-dp/importacoes', can: (user) => canExecuteRhDpImportacoes(user) },
       { id: 'rhdp-documentos', ordem: 60, label: 'Documentos', desc: 'Documentos dos colaboradores.', icon: HiOutlineFolderOpen, to: '/rh-dp/documentos', can: (user) => canViewRhDpDocumentos(user) },
       { id: 'rhdp-fechamentos', ordem: 40, label: 'Fechamentos', desc: 'Fechamentos que geram títulos financeiros.', icon: HiOutlineBanknotes, to: '/rh-dp/fechamentos', can: (user) => canViewRhDpObrigacoes(user) && hasEnabledModule(user, 'FINANCEIRO') },

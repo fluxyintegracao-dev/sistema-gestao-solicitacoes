@@ -41,6 +41,7 @@ import {
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
   canViewRhDpColaboradores,
+  canAccessRhDpCadastroColaboradores,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
   canViewFinanceiroRelatorio,
@@ -791,6 +792,14 @@ function RhDpColaboradoresRoute({ children }) {
   return children;
 }
 
+function RhDpCadastroColaboradoresRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessRhDpCadastroColaboradores(user)) {
+    return <Navigate to="/rh-dp/pessoal?aba=colaboradores" replace />;
+  }
+  return children;
+}
+
 function RhDpDocumentosRoute({ children }) {
   const { user } = useAuth();
   if (!canViewRhDpDocumentos(user)) {
@@ -996,7 +1005,7 @@ export default function App() {
         */}
         <Route path="rh-dp" element={<Navigate to="/hub/rhdp" replace />} />
         <Route path="rh-dp/relatorios" element={<RhDpDashboardRoute><ModuloRelatorios modulo="rhdp" /></RhDpDashboardRoute>} />
-        <Route path="rh-dp/relatorios/operacional" element={<RhDpColaboradoresRoute><RhDpRelatorioOperacional /></RhDpColaboradoresRoute>} />
+        <Route path="rh-dp/relatorios/operacional" element={<RhDpDashboardRoute><RhDpRelatorioOperacional /></RhDpDashboardRoute>} />
         {/*
           D2 (02/09): Empresas do grupo passa a existir uma vez so, em
           Cadastros. Redirecionamento em vez de rota morta.
@@ -1009,7 +1018,7 @@ export default function App() {
           antigas levam a aba certa em vez de quebrar.
         */}
         <Route path="rh-dp/jornada" element={<Navigate to="/rh-dp/pessoal?aba=jornada" replace />} />
-        <Route path="rh-dp/colaboradores" element={<RhDpColaboradoresRoute><RhDpColaboradores /></RhDpColaboradoresRoute>} />
+        <Route path="rh-dp/colaboradores" element={<RhDpCadastroColaboradoresRoute><RhDpColaboradores /></RhDpCadastroColaboradoresRoute>} />
         <Route path="rh-dp/documentos" element={<RhDpDocumentosRoute><RhDpDocumentos /></RhDpDocumentosRoute>} />
         <Route path="rh-dp/importacoes" element={<RhDpImportacoesRoute><RhDpImportacoes /></RhDpImportacoesRoute>} />
         <Route path="rh-dp/apuracao" element={<Navigate to="/rh-dp/pessoal?aba=apuracao" replace />} />

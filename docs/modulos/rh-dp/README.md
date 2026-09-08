@@ -15,6 +15,9 @@ RH/DP e dono do cadastro funcional de colaboradores, documentos, vinculos, compe
 - fechamento bloqueia edicao direta; correcao cria revisao ou reabertura auditada;
 - geracao financeira usa referencia unica por colaborador, competencia e verba;
 - desligamento nao apaga historico nem documentos obrigatorios.
+- usuario operacional do setor OBRA acessa somente a porta `Pessoal` do modulo;
+- para usuario de OBRA, listas, detalhes, solicitacoes e jornada ficam limitados as obras vinculadas em `usuarios_obras`, inclusive quando a API e chamada diretamente;
+- o cadastro geral de colaboradores, documentos, importacoes, fechamentos e relatorios permanece restrito ao RH/DP e aos administradores autorizados.
 
 ## Integracoes
 

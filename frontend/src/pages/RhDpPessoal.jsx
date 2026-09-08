@@ -21,7 +21,7 @@ import {
   useConfirmacao
 } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
-import { getObras } from '../services/obras';
+import { getMinhasObras, getObras } from '../services/obras';
 import {
   abrirRhSolicitacao,
   aprovarRhSolicitacao,
@@ -40,7 +40,8 @@ import {
 import RhDpPessoalSolicitacoes from './RhDpPessoalSolicitacoes';
 import RhDpJornada from './RhDpJornada';
 import RhDpApuracao from './RhDpApuracao';
-import { canViewRhDpApuracao, hasAnyExplicitPermissao } from '../utils/acessoProduto';
+import { canViewRhDpApuracao, hasAnyExplicitPermissao, isBusinessAdmin } from '../utils/acessoProduto';
+import { userHasSetorCapability } from '../utils/setor';
 import { formatCurrencyInput, getCpfCnpjError, getPixDocumentError, maskCpfCnpj, normalizeCurrencyTyping } from '../utils/formatters';
 import DateInputBR from '../components/DateInputBR';
 
@@ -265,6 +266,8 @@ function formularioVazio(tipo) {
 
 export default function RhDpPessoal() {
   const { user } = useAuth();
+  const usuarioOperacionalDaObra = !isBusinessAdmin(user)
+    && userHasSetorCapability(user, 'eh_setor_obra');
 
   const [colaboradores, setColaboradores] = useState([]);
   const [obras, setObras] = useState([]);
@@ -456,7 +459,9 @@ export default function RhDpPessoal() {
     try {
       const [lista, listaObras] = await Promise.all([
         getRhColaboradores({ obra_id: filtroObra || undefined, q: busca || undefined }),
-        obras.length ? Promise.resolve(obras) : getObras()
+        obras.length
+          ? Promise.resolve(obras)
+          : (usuarioOperacionalDaObra ? getMinhasObras({ escopo: 'OBRAS' }) : getObras())
       ]);
       setColaboradores(Array.isArray(lista) ? lista : []);
       if (!obras.length) setObras(Array.isArray(listaObras) ? listaObras : []);
@@ -466,7 +471,7 @@ export default function RhDpPessoal() {
       setCarregando(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroObra, busca, obras, empresas]);
+  }, [filtroObra, busca, obras, empresas, usuarioOperacionalDaObra]);
 
   /**
    * A marcacao aplica sozinha; a busca digitada espera 350ms para nao martelar

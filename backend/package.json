@@ -60,6 +60,7 @@
     "test:compra-oferta-saldo-mesmo-fornecedor": "node scripts/validarCompraOfertaSaldoMesmoFornecedor.js",
     "test:pedido-financeiro-geo": "node scripts/validarPedidoCompraFinanceiroGeo.js",
     "test:tipos-solicitacao-destino": "node scripts/validarTiposSolicitacaoPorDestino.js",
+    "test:rhdp-escopo-obra": "node scripts/validarEscopoRhDpUsuarioObra.js",
     "test:filtro-valor-titulos": "node scripts/validarFiltroValorTitulos.js",
     "test:intercompany-cartoes": "node scripts/validarIntercompanyCartoesMultiplasEmpresas.js",
     "test:live-updates": "node scripts/validarLiveUpdates.js",
