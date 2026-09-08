@@ -24,6 +24,7 @@ export default function ApropriacaoAutocomplete({
   placeholder = 'Buscar por código ou nome...',
   disabledPlaceholder = 'Selecione',
   emptyText = 'Nenhuma apropriação encontrada',
+  portalZIndex = 'var(--z-dropdown-portal)',
   className = '',
   inputClassName = 'input w-full',
 }) {
@@ -168,7 +169,7 @@ export default function ApropriacaoAutocomplete({
         <div
           ref={painelRef}
           className="max-h-60 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
-          style={{ ...caixa.estilo, zIndex: 'var(--z-dropdown-portal)' }}
+          style={{ ...caixa.estilo, zIndex: portalZIndex }}
         >
           {filteredOptions.length ? (
             filteredOptions.map((option, i) => (

@@ -19,6 +19,7 @@ export default function ObraAutocomplete({
       disabledPlaceholder={disabledPlaceholder}
       emptyText="Nenhuma obra ativa encontrada"
       inputClassName="form-control"
+      portalZIndex="var(--z-modal-acima)"
     />
   );
 }
