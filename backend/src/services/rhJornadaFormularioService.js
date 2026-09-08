@@ -4,8 +4,10 @@ const { Op } = require('sequelize');
 const {
   RhImportacao,
   RhImportacaoLinha,
+  RhJornadaEdicao,
   RhColaborador,
   RhColaboradorVinculo,
+  Obra,
   sequelize
 } = require('../models');
 const { ValidationError } = require('../middlewares/validation');
@@ -31,6 +33,7 @@ const rhVinculoObraService = require('./rhVinculoObraService');
  */
 
 const ORIGENS = new Set(['FORMULARIO', 'INDIVIDUAL']);
+const PERIODICIDADES = new Set(['SEMANAL', 'QUINZENAL', 'MENSAL']);
 
 function competenciaValida(valor) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(valor || '').trim());
@@ -61,6 +64,82 @@ function limitesDaCompetencia(competencia) {
   };
 }
 
+function dataIsoValida(valor) {
+  const texto = paraDataIso(valor);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(texto || ''))) return false;
+  const data = new Date(`${texto}T00:00:00.000Z`);
+  return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === texto;
+}
+
+function diasInclusivos(inicio, fim) {
+  const de = new Date(`${inicio}T00:00:00.000Z`);
+  const ate = new Date(`${fim}T00:00:00.000Z`);
+  return Math.floor((ate.getTime() - de.getTime()) / 86400000) + 1;
+}
+
+/** Registros antigos sem datas continuam equivalendo ao mes completo da competencia. */
+function periodoDaImportacao(importacao) {
+  const padrao = limitesDaCompetencia(importacao.competencia);
+  return {
+    periodicidade: String(importacao.periodicidade || 'MENSAL').toUpperCase(),
+    inicio: paraDataIso(importacao.periodo_inicio) || padrao.inicio,
+    fim: paraDataIso(importacao.periodo_fim) || padrao.fim
+  };
+}
+
+function normalizarPeriodo(dados, competencia) {
+  const periodicidade = String(dados.periodicidade || 'MENSAL').trim().toUpperCase();
+  if (!PERIODICIDADES.has(periodicidade)) {
+    throw new ValidationError('Informe a periodicidade: semanal, quinzenal ou mensal.');
+  }
+
+  const limites = limitesDaCompetencia(competencia);
+  const inicio = paraDataIso(dados.periodo_inicio) || (periodicidade === 'MENSAL' ? limites.inicio : null);
+  const fim = paraDataIso(dados.periodo_fim) || (periodicidade === 'MENSAL' ? limites.fim : null);
+  if (!dataIsoValida(inicio) || !dataIsoValida(fim) || fim < inicio) {
+    throw new ValidationError('Informe um periodo de jornada valido.');
+  }
+  if (!inicio.startsWith(`${competencia}-`) || !fim.startsWith(`${competencia}-`)) {
+    throw new ValidationError('O periodo da jornada precisa estar dentro da competencia selecionada.');
+  }
+
+  const dias = diasInclusivos(inicio, fim);
+  if (periodicidade === 'SEMANAL' && dias > 7) {
+    throw new ValidationError('Uma jornada semanal pode abranger no maximo 7 dias.');
+  }
+  if (periodicidade === 'QUINZENAL' && dias > 16) {
+    throw new ValidationError('Uma jornada quinzenal pode abranger no maximo 16 dias.');
+  }
+  if (periodicidade === 'MENSAL' && (inicio !== limites.inicio || fim !== limites.fim)) {
+    throw new ValidationError('A jornada mensal deve abranger a competencia inteira.');
+  }
+
+  return { periodicidade, inicio, fim, dias };
+}
+
+function periodosSobrepostos(a, b) {
+  return a.inicio <= b.fim && b.inicio <= a.fim;
+}
+
+function mesmoPeriodo(a, b) {
+  return a.inicio === b.inicio && a.fim === b.fim;
+}
+
+async function linhasConfirmadasDaCompetencia(obraId, competencia, transaction = undefined) {
+  return RhImportacaoLinha.findAll({
+    where: { status: 'CONFIRMADA' },
+    include: [{
+      association: 'importacao',
+      required: true,
+      attributes: ['id', 'competencia', 'periodicidade', 'periodo_inicio', 'periodo_fim', 'status'],
+      where: { obra_id: obraId, competencia, tipo: 'JORNADA', status: 'CONFIRMADA' }
+    }],
+    order: [['id', 'DESC']],
+    transaction,
+    ...(transaction ? { lock: transaction.LOCK.UPDATE } : {})
+  });
+}
+
 /**
  * Registra a jornada de uma obra numa competencia.
  *
@@ -81,6 +160,13 @@ async function registrarJornada(dados = {}, contexto = {}) {
 
     const obraId = Number(dados.obra_id);
     if (!obraId) throw new ValidationError('Informe a obra da jornada.');
+
+    const periodo = normalizarPeriodo(dados, competencia);
+
+    // Serializa os envios da mesma obra para impedir dois cliques simultaneos de gravarem o mesmo
+    // colaborador e periodo antes de um deles enxergar o outro.
+    const obra = await Obra.findByPk(obraId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!obra) throw new ValidationError('Obra da jornada nao encontrada.', 404);
 
     const linhas = Array.isArray(dados.linhas) ? dados.linhas : [];
     if (!linhas.length) throw new ValidationError('Informe ao menos um colaborador na jornada.');
@@ -120,34 +206,85 @@ async function registrarJornada(dados = {}, contexto = {}) {
      * comparar com `rh_colaboradores.obra_id`, a obra ATUAL — e quem foi transferido no meio do mes
      * apareceria como "nao e desta obra" na folha do mes em que ainda estava nela.
      */
-    const { inicio, fim } = limitesDaCompetencia(competencia);
-    const vinculosDaObra = await rhVinculoObraService.colaboradoresDaObraEm(obraId, inicio, fim);
+    const vinculosDaObra = await rhVinculoObraService.colaboradoresDaObraEm(
+      obraId,
+      periodo.inicio,
+      periodo.fim
+    );
     const estiveramNaObra = new Set(vinculosDaObra.map((v) => Number(v.colaborador_id)));
 
     for (const id of vistos) {
       if (!estiveramNaObra.has(id)) {
         const colaborador = porId.get(id);
         throw new ValidationError(
-          `${colaborador.nome} nao esteve nesta obra em ${competencia}. `
+          `${colaborador.nome} nao esteve nesta obra no periodo informado. `
           + 'Se houve transferencia, abra uma solicitacao de troca de obra antes de lancar a jornada.'
         );
       }
     }
 
-    // O envio anterior sai de cena, mas fica legivel.
-    await RhImportacao.update(
-      { status: 'SUBSTITUIDA' },
-      {
-        where: { competencia, obra_id: obraId, tipo: 'JORNADA', status: 'CONFIRMADA' },
-        transaction
+    const existentes = await linhasConfirmadasDaCompetencia(obraId, competencia, transaction);
+    const linhasSubstituidas = [];
+    const autorizacoesUsadas = [];
+
+    for (const linha of linhas) {
+      const colaboradorId = Number(linha.colaborador_id);
+      const sobrepostas = existentes.filter((existente) => (
+        Number(existente.colaborador_id) === colaboradorId
+        && periodosSobrepostos(periodo, periodoDaImportacao(existente.importacao))
+      ));
+      if (!sobrepostas.length) continue;
+
+      const periodoDiferente = sobrepostas.find(
+        (existente) => !mesmoPeriodo(periodo, periodoDaImportacao(existente.importacao))
+      );
+      if (periodoDiferente) {
+        const periodoExistente = periodoDaImportacao(periodoDiferente.importacao);
+        throw new ValidationError(
+          `Ja existe jornada de ${porId.get(colaboradorId).nome} entre `
+          + `${periodoExistente.inicio} e ${periodoExistente.fim}. Os periodos nao podem se sobrepor.`,
+          409
+        );
       }
-    );
+
+      for (const existente of sobrepostas) {
+        if (!contexto.podeDecidir) {
+          // A liberacao e pontual e vale uma vez para a linha que o DP analisou.
+          // eslint-disable-next-line no-await-in-loop
+          const autorizacao = await RhJornadaEdicao.findOne({
+            where: { importacao_linha_id: existente.id, status: 'AUTORIZADA' },
+            order: [['id', 'DESC']],
+            transaction,
+            lock: transaction.LOCK.UPDATE
+          });
+          if (!autorizacao) {
+            throw new ValidationError(
+              `A jornada de ${porId.get(colaboradorId).nome} neste periodo ja foi enviada. `
+              + 'Solicite autorizacao do Departamento Pessoal para editar.',
+              409
+            );
+          }
+          autorizacoesUsadas.push(autorizacao.id);
+        }
+        linhasSubstituidas.push(existente.id);
+      }
+    }
+
+    if (linhasSubstituidas.length) {
+      await RhImportacaoLinha.update(
+        { status: 'SUBSTITUIDA' },
+        { where: { id: { [Op.in]: linhasSubstituidas } }, transaction }
+      );
+    }
 
     const importacao = await RhImportacao.create(
       {
         tipo: 'JORNADA',
         origem,
         competencia,
+        periodicidade: periodo.periodicidade,
+        periodo_inicio: periodo.inicio,
+        periodo_fim: periodo.fim,
         empresa_grupo_id: dados.empresa_grupo_id || null,
         obra_id: obraId,
         tipo_vinculo: dados.tipo_vinculo || null,
@@ -176,13 +313,13 @@ async function registrarJornada(dados = {}, contexto = {}) {
 
       if (dias > diasBase) {
         throw new ValidationError(
-          `Dias trabalhados (${dias}) do colaborador #${colaboradorId} passam da base do mes (${diasBase}).`
+          `Dias trabalhados (${dias}) do colaborador #${colaboradorId} passam da base do periodo (${diasBase}).`
         );
       }
       if (dias + faltas > diasBase) {
         throw new ValidationError(
           `Dias trabalhados (${dias}) mais faltas (${faltas}) do colaborador #${colaboradorId} `
-          + `passam da base do mes (${diasBase}).`
+          + `passam da base do periodo (${diasBase}).`
         );
       }
 
@@ -228,6 +365,13 @@ async function registrarJornada(dados = {}, contexto = {}) {
       linhasGravadas.push(gravada);
     }
 
+    if (autorizacoesUsadas.length) {
+      await RhJornadaEdicao.update(
+        { status: 'UTILIZADA', utilizada_em: new Date() },
+        { where: { id: { [Op.in]: autorizacoesUsadas } }, transaction }
+      );
+    }
+
     return { importacao, linhas: linhasGravadas };
   });
 }
@@ -268,13 +412,14 @@ async function registrarPagamentoIndividual(dados = {}, contexto = {}) {
  * Vem do VINCULO, nao de `rh_colaboradores.obra_id`: a folha de um mes passado tem de listar quem
  * estava la NAQUELE mes, e nao quem esta la hoje.
  */
-async function colaboradoresParaJornada(obraId, competencia) {
+async function colaboradoresParaJornada(obraId, competencia, filtros = {}) {
   if (!competenciaValida(competencia)) {
     throw new ValidationError(`A competencia deve estar no formato AAAA-MM (recebi "${competencia}").`);
   }
 
-  const { inicio, fim } = limitesDaCompetencia(competencia);
-  const vinculos = await rhVinculoObraService.colaboradoresDaObraEm(obraId, inicio, fim);
+  const periodo = normalizarPeriodo(filtros, competencia);
+
+  const vinculos = await rhVinculoObraService.colaboradoresDaObraEm(obraId, periodo.inicio, periodo.fim);
 
   /**
    * QUEM AINDA NAO COMECOU TAMBEM APARECE — desligado, com a data (26/08).
@@ -291,21 +436,31 @@ async function colaboradoresParaJornada(obraId, competencia) {
    * e listar sem marcar seria oferecer uma linha que o servidor vai rejeitar.
    */
   const futuros = await RhColaboradorVinculo.findAll({
-    where: { obra_id: obraId, vigencia_inicio: { [Op.gt]: fim } },
+    where: { obra_id: obraId, vigencia_inicio: { [Op.gt]: periodo.fim } },
     order: [['vigencia_inicio', 'ASC']],
     include: [{ association: 'colaborador', required: true }]
   });
 
-  const jaInformado = await RhImportacaoLinha.findAll({
-    include: [{
-      association: 'importacao',
-      required: true,
-      where: { competencia, obra_id: obraId, tipo: 'JORNADA', status: 'CONFIRMADA' }
-    }]
+  const confirmadas = await linhasConfirmadasDaCompetencia(obraId, competencia);
+  const jaInformado = confirmadas.filter(
+    (linha) => mesmoPeriodo(periodo, periodoDaImportacao(linha.importacao))
+  );
+  const idsLinhas = jaInformado.map((linha) => Number(linha.id));
+  const solicitacoesEdicao = idsLinhas.length ? await RhJornadaEdicao.findAll({
+    where: { importacao_linha_id: { [Op.in]: idsLinhas } },
+    order: [['id', 'DESC']]
+  }) : [];
+  const edicaoPorLinha = new Map();
+  solicitacoesEdicao.forEach((item) => {
+    const linhaId = Number(item.importacao_linha_id);
+    if (!edicaoPorLinha.has(linhaId)) edicaoPorLinha.set(linhaId, item);
   });
 
   const porColaborador = new Map(
-    jaInformado.map((linha) => [Number(linha.colaborador_id), linha.payload_json])
+    jaInformado.map((linha) => [Number(linha.colaborador_id), {
+      linha,
+      edicao: edicaoPorLinha.get(Number(linha.id)) || null
+    }])
   );
 
   const linhaDe = (vinculo, extras = {}) => ({
@@ -314,7 +469,10 @@ async function colaboradoresParaJornada(obraId, competencia) {
     matricula: vinculo.colaborador.matricula,
     tipo_vinculo: vinculo.colaborador.tipo_vinculo,
     salario_base: vinculo.colaborador.salario_base,
-    jornada_informada: porColaborador.get(Number(vinculo.colaborador_id)) || null,
+    jornada_informada: porColaborador.get(Number(vinculo.colaborador_id))?.linha?.payload_json || null,
+    jornada_linha_id: porColaborador.get(Number(vinculo.colaborador_id))?.linha?.id || null,
+    edicao_jornada: porColaborador.get(Number(vinculo.colaborador_id))?.edicao || null,
+    periodo_jornada: periodo,
     ainda_nao_comecou: false,
     comeca_em: null,
     ...extras
@@ -329,11 +487,101 @@ async function colaboradoresParaJornada(obraId, competencia) {
   ];
 }
 
+async function solicitarEdicaoJornada(dados = {}, contexto = {}) {
+  return sequelize.transaction(async (transaction) => {
+    const linhaId = Number(dados.importacao_linha_id);
+    if (!linhaId) throw new ValidationError('Informe a jornada que precisa ser editada.');
+    const motivo = String(dados.motivo || '').trim();
+    if (motivo.length < 5) throw new ValidationError('Informe o motivo da edicao com ao menos 5 caracteres.');
+
+    const linha = await RhImportacaoLinha.findByPk(linhaId, {
+      include: [{ association: 'importacao', required: true }],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!linha || linha.status !== 'CONFIRMADA' || linha.importacao?.status !== 'CONFIRMADA') {
+      throw new ValidationError('Esta jornada nao esta mais disponivel para edicao.', 409);
+    }
+    if (linha.importacao?.tipo !== 'JORNADA') {
+      throw new ValidationError('A linha informada nao pertence a uma jornada.', 409);
+    }
+    const obraId = Number(linha.importacao.obra_id);
+    if (Array.isArray(contexto.obraIds) && !contexto.obraIds.includes(obraId)) {
+      throw new ValidationError('Acesso negado: a obra nao esta vinculada ao usuario.', 403);
+    }
+
+    const existente = await RhJornadaEdicao.findOne({
+      where: { importacao_linha_id: linha.id, status: { [Op.in]: ['PENDENTE', 'AUTORIZADA'] } },
+      order: [['id', 'DESC']],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (existente) return existente;
+
+    const periodo = periodoDaImportacao(linha.importacao);
+    return RhJornadaEdicao.create({
+      importacao_linha_id: linha.id,
+      obra_id: obraId,
+      colaborador_id: Number(linha.colaborador_id),
+      competencia: linha.importacao.competencia,
+      periodicidade: periodo.periodicidade,
+      periodo_inicio: periodo.inicio,
+      periodo_fim: periodo.fim,
+      status: 'PENDENTE',
+      motivo,
+      solicitada_por: contexto.usuarioId,
+      solicitada_em: new Date()
+    }, { transaction });
+  });
+}
+
+async function decidirEdicaoJornada(id, decisao = {}, contexto = {}) {
+  return sequelize.transaction(async (transaction) => {
+    const solicitacao = await RhJornadaEdicao.findByPk(Number(id), {
+      include: [{ association: 'linhaOriginal', required: true }],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!solicitacao) throw new ValidationError('Solicitacao de edicao nao encontrada.', 404);
+    if (solicitacao.status !== 'PENDENTE') {
+      throw new ValidationError('Esta solicitacao de edicao ja foi decidida.', 409);
+    }
+    if (solicitacao.linhaOriginal?.status !== 'CONFIRMADA') {
+      throw new ValidationError('A jornada original ja foi substituida.', 409);
+    }
+
+    const aprovar = Boolean(decisao.aprovar);
+    await solicitacao.update({
+      status: aprovar ? 'AUTORIZADA' : 'NEGADA',
+      motivo_decisao: String(decisao.motivo || '').trim() || null,
+      decidida_por: contexto.usuarioId,
+      decidida_em: new Date()
+    }, { transaction });
+    return solicitacao;
+  });
+}
+
+async function listarEdicoesJornadaPendentes() {
+  return RhJornadaEdicao.findAll({
+    where: { status: 'PENDENTE' },
+    include: [
+      { association: 'obra', attributes: ['id', 'codigo', 'nome'] },
+      { association: 'colaborador', attributes: ['id', 'nome', 'matricula'] },
+      { association: 'solicitadaPor', attributes: ['id', 'nome', 'email'] }
+    ],
+    order: [['solicitada_em', 'ASC'], ['id', 'ASC']]
+  });
+}
+
 module.exports = {
   ORIGENS,
   competenciaValida,
   limitesDaCompetencia,
+  normalizarPeriodo,
   registrarJornada,
   registrarPagamentoIndividual,
-  colaboradoresParaJornada
+  colaboradoresParaJornada,
+  solicitarEdicaoJornada,
+  decidirEdicaoJornada,
+  listarEdicoesJornadaPendentes
 };

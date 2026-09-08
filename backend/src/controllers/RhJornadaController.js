@@ -1,7 +1,10 @@
 const {
   registrarJornada,
   registrarPagamentoIndividual,
-  colaboradoresParaJornada
+  colaboradoresParaJornada,
+  solicitarEdicaoJornada,
+  decidirEdicaoJornada,
+  listarEdicoesJornadaPendentes
 } = require('../services/rhJornadaFormularioService');
 const { eventosVigentes, desativarEventoRecorrente, itensDaLinha } = require('../services/rhEventoRecorrenteService');
 const { historicoDoColaborador: historicoDeVinculo } = require('../services/rhVinculoObraService');
@@ -10,7 +13,7 @@ const { responderErroController } = require('../utils/controllerError');
 const { codigoDoSetor } = require('../utils/codigoDoSetor');
 const { RhColaborador } = require('../models');
 const { ValidationError } = require('../middlewares/validation');
-const { getRhDpObraScopeIds } = require('../services/authorizationService');
+const { getRhDpObraScopeIds, userHasAreaPermission } = require('../services/authorizationService');
 
 /**
  * Jornada por formulario, eventos recorrentes e os historicos (Fase 4/5 do modulo DP, 26/08).
@@ -49,7 +52,8 @@ module.exports = {
       await exigirObraNoEscopoDoUsuario(req, req.query.obra_id);
       const dados = await colaboradoresParaJornada(
         Number(req.query.obra_id),
-        String(req.query.competencia || '')
+        String(req.query.competencia || ''),
+        req.query
       );
       return res.json(dados);
     } catch (error) {
@@ -61,7 +65,9 @@ module.exports = {
   async registrar(req, res) {
     try {
       await exigirObraNoEscopoDoUsuario(req, req.body?.obra_id);
-      const dados = await registrarJornada(req.body || {}, contextoDe(req));
+      const contexto = contextoDe(req);
+      contexto.podeDecidir = await userHasAreaPermission(req.user, ['rh_dp.solicitacoes.decidir']);
+      const dados = await registrarJornada(req.body || {}, contexto);
       return res.status(201).json(dados);
     } catch (error) {
       console.error(error);
@@ -72,11 +78,44 @@ module.exports = {
   async pagamentoIndividual(req, res) {
     try {
       await exigirObraNoEscopoDoUsuario(req, req.body?.obra_id);
-      const dados = await registrarPagamentoIndividual(req.body || {}, contextoDe(req));
+      const contexto = contextoDe(req);
+      contexto.podeDecidir = await userHasAreaPermission(req.user, ['rh_dp.solicitacoes.decidir']);
+      const dados = await registrarPagamentoIndividual(req.body || {}, contexto);
       return res.status(201).json(dados);
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao registrar o pagamento individual');
+    }
+  },
+
+  async solicitarEdicao(req, res) {
+    try {
+      const contexto = contextoDe(req);
+      contexto.obraIds = await getRhDpObraScopeIds(req.user);
+      const dados = await solicitarEdicaoJornada(req.body || {}, contexto);
+      return res.status(201).json(dados);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao solicitar edicao da jornada');
+    }
+  },
+
+  async listarEdicoesPendentes(req, res) {
+    try {
+      return res.json(await listarEdicoesJornadaPendentes());
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao listar solicitacoes de edicao da jornada');
+    }
+  },
+
+  async decidirEdicao(req, res) {
+    try {
+      const dados = await decidirEdicaoJornada(req.params.id, req.body || {}, contextoDe(req));
+      return res.json(dados);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao decidir edicao da jornada');
     }
   },
 

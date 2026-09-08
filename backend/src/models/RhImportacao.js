@@ -21,6 +21,18 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(7),
       allowNull: false
     },
+    periodicidade: {
+      type: DataTypes.STRING(15),
+      allowNull: true
+    },
+    periodo_inicio: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    periodo_fim: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
     empresa_grupo_id: {
       type: DataTypes.INTEGER,
       allowNull: true

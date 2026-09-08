@@ -14,8 +14,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { getMinhasObras, getObras } from '../services/obras';
 import {
   colaboradoresParaJornadaRh,
+  decidirEdicaoJornadaRh,
+  getEdicoesJornadaPendentesRh,
   getRhEmpresasGrupo,
-  registrarJornadaRh
+  registrarJornadaRh,
+  solicitarEdicaoJornadaRh
 } from '../services/rhDp';
 import { hasAnyExplicitPermissao, isBusinessAdmin } from '../utils/acessoProduto';
 import { userHasSetorCapability } from '../utils/setor';
@@ -42,6 +45,45 @@ const COMPETENCIA_ATUAL = new Date().toISOString().slice(0, 7);
    campo contaria como preenchido sempre e nunca sairia da faixa. */
 const DIAS_BASE_PADRAO = 30;
 const SEM_FILTRO = { obra: new Set(), empresa: new Set() };
+const PERIODICIDADES = [
+  { valor: 'SEMANAL', rotulo: 'Semanal' },
+  { valor: 'QUINZENAL', rotulo: 'Quinzenal' },
+  { valor: 'MENSAL', rotulo: 'Mensal' }
+];
+
+function limitesDaCompetencia(competencia) {
+  const [ano, mes] = String(competencia || '').split('-').map(Number);
+  if (!ano || !mes) return { inicio: '', fim: '' };
+  const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  return {
+    inicio: `${competencia}-01`,
+    fim: `${competencia}-${String(ultimoDia).padStart(2, '0')}`
+  };
+}
+
+function periodoPadrao(competencia, periodicidade) {
+  const limites = limitesDaCompetencia(competencia);
+  if (periodicidade === 'SEMANAL') {
+    return { inicio: limites.inicio, fim: `${competencia}-07`, diasBase: 7 };
+  }
+  if (periodicidade === 'QUINZENAL') {
+    return { inicio: limites.inicio, fim: `${competencia}-15`, diasBase: 15 };
+  }
+  return { ...limites, diasBase: DIAS_BASE_PADRAO };
+}
+
+function diasInclusivos(inicio, fim) {
+  const de = new Date(`${inicio}T00:00:00`);
+  const ate = new Date(`${fim}T00:00:00`);
+  if (Number.isNaN(de.getTime()) || Number.isNaN(ate.getTime())) return 0;
+  return Math.floor((ate.getTime() - de.getTime()) / 86400000) + 1;
+}
+
+function formatarData(valor) {
+  if (!valor) return '—';
+  const data = new Date(`${valor}T00:00:00`);
+  return Number.isNaN(data.getTime()) ? valor : data.toLocaleDateString('pt-BR');
+}
 
 /** Dimensao de valor UNICO: o `ativos` guarda um conjunto, o servico recebe um id. */
 function primeiroValor(conjunto) {
@@ -50,12 +92,16 @@ function primeiroValor(conjunto) {
 
 function linhaVazia(colaborador) {
   const ja = colaborador.jornada_informada || {};
+  const edicao = colaborador.edicao_jornada || null;
   return {
     colaborador_id: colaborador.colaborador_id,
     nome: colaborador.nome,
     tipo_vinculo: colaborador.tipo_vinculo,
     salario_base: colaborador.salario_base,
     jaInformado: Boolean(colaborador.jornada_informada),
+    jornadaLinhaId: colaborador.jornada_linha_id || null,
+    edicaoId: edicao?.id || null,
+    edicaoStatus: edicao?.status || null,
     aindaNaoComecou: Boolean(colaborador.ainda_nao_comecou),
     comecaEm: colaborador.comeca_em || null,
     dias_trabalhados: ja.dias_trabalhados ?? '',
@@ -92,8 +138,7 @@ function linhaVazia(colaborador) {
 */
 const FILTROS_DA_TELA = [
   { id: 'competencia', rotulo: 'Competência' },
-  { id: 'diasBase', rotulo: 'Dias base do mês' },
-  { id: 'obra', rotulo: 'Obra' },
+  { id: 'diasBase', rotulo: 'Dias base do período' },
   { id: 'empresa', rotulo: 'Empresa do grupo' }
 ];
 
@@ -106,9 +151,8 @@ export default function RhDpJornada() {
 
   const [obras, setObras] = useState([]);
   const [empresas, setEmpresas] = useState([]);
-  // R12: obra e empresa sao recortes ENUMERAVEIS — marcacao com etiqueta
-  // removivel, e nao lista suspensa. Ambas com `unico`, porque o servico
-  // recebe UM id por recorte (marcar dois mandaria nenhum).
+  // Empresa continua como recorte opcional. Obra e um campo explicito e
+  // obrigatorio, pois sem ela nao existe jornada que possa ser montada.
   const [ativos, setAtivos] = useState(SEM_FILTRO);
   /*
     N53 — filtro com VALOR é filtro VISÍVEL. Um recorte pode chegar pela URL
@@ -136,6 +180,13 @@ export default function RhDpJornada() {
   */
   const [competencia, setCompetencia] = useState(COMPETENCIA_ATUAL);
   const [diasBase, setDiasBase] = useState(DIAS_BASE_PADRAO);
+  const [periodicidade, setPeriodicidade] = useState('MENSAL');
+  const [periodoInicio, setPeriodoInicio] = useState(
+    () => periodoPadrao(COMPETENCIA_ATUAL, 'MENSAL').inicio
+  );
+  const [periodoFim, setPeriodoFim] = useState(
+    () => periodoPadrao(COMPETENCIA_ATUAL, 'MENSAL').fim
+  );
 
   const filtrosPreenchidos = useMemo(
     () => FILTROS_DA_TELA.filter((filtro) => {
@@ -176,11 +227,53 @@ export default function RhDpJornada() {
   const [linhas, setLinhas] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [processandoEdicao, setProcessandoEdicao] = useState(null);
+  const [edicoesPendentes, setEdicoesPendentes] = useState([]);
 
   const obra = useMemo(() => primeiroValor(ativos.obra), [ativos]);
   const empresa = useMemo(() => primeiroValor(ativos.empresa), [ativos]);
 
   const podeEnviar = hasAnyExplicitPermissao(user, ['rh_dp.solicitacoes.abrir']);
+  const podeDecidirEdicao = hasAnyExplicitPermissao(user, ['rh_dp.solicitacoes.decidir']);
+
+  function mudarCompetencia(valor) {
+    setCompetencia(valor);
+    const proximo = periodoPadrao(valor, periodicidade);
+    setPeriodoInicio(proximo.inicio);
+    setPeriodoFim(proximo.fim);
+    setDiasBase(proximo.diasBase);
+    setLinhas([]);
+  }
+
+  function mudarPeriodicidade(valor) {
+    setPeriodicidade(valor);
+    const proximo = periodoPadrao(competencia, valor);
+    setPeriodoInicio(proximo.inicio);
+    setPeriodoFim(proximo.fim);
+    setDiasBase(proximo.diasBase);
+    setLinhas([]);
+  }
+
+  function podeEditarLinha(linha) {
+    return !linha.jaInformado || podeDecidirEdicao || linha.edicaoStatus === 'AUTORIZADA';
+  }
+
+  const carregarEdicoesPendentes = useCallback(async () => {
+    if (!podeDecidirEdicao) {
+      setEdicoesPendentes([]);
+      return;
+    }
+    try {
+      const lista = await getEdicoesJornadaPendentesRh();
+      setEdicoesPendentes(Array.isArray(lista) ? lista : []);
+    } catch (error) {
+      setEdicoesPendentes([]);
+    }
+  }, [podeDecidirEdicao]);
+
+  useEffect(() => {
+    carregarEdicoesPendentes();
+  }, [carregarEdicoesPendentes]);
 
   useEffect(() => {
     (async () => {
@@ -188,7 +281,15 @@ export default function RhDpJornada() {
         const listaObras = await (
           usuarioOperacionalDaObra ? getMinhasObras({ escopo: 'OBRAS' }) : getObras()
         );
-        setObras(Array.isArray(listaObras) ? listaObras : []);
+        const obrasCarregadas = Array.isArray(listaObras) ? listaObras : [];
+        setObras(obrasCarregadas);
+        if (obrasCarregadas.length === 1) {
+          setAtivos((atuais) => (
+            atuais.obra?.size
+              ? atuais
+              : { ...atuais, obra: new Set([String(obrasCarregadas[0].id)]) }
+          ));
+        }
       } catch (error) {
         avisar.erro(error.message || 'Não foi possível carregar as obras.');
       }
@@ -211,14 +312,36 @@ export default function RhDpJornada() {
   }, [avisar, usuarioOperacionalDaObra]);
 
   const carregar = useCallback(async () => {
-    if (!obra || !competencia) {
-      avisar.erro('Escolha a obra e a competência.');
+    if (!obra || !competencia || !periodoInicio || !periodoFim) {
+      avisar.erro('Escolha a obra, a competência e o período da jornada.');
+      return;
+    }
+    const limites = limitesDaCompetencia(competencia);
+    const quantidadeDias = diasInclusivos(periodoInicio, periodoFim);
+    if (periodoInicio < limites.inicio || periodoFim > limites.fim || periodoFim < periodoInicio) {
+      avisar.erro('O período precisa estar dentro da competência selecionada.');
+      return;
+    }
+    if ((periodicidade === 'SEMANAL' && quantidadeDias > 7)
+        || (periodicidade === 'QUINZENAL' && quantidadeDias > 16)) {
+      avisar.erro(`O período ${periodicidade === 'SEMANAL' ? 'semanal' : 'quinzenal'} informado é maior que o permitido.`);
+      return;
+    }
+    if (periodicidade === 'MENSAL'
+        && (periodoInicio !== limites.inicio || periodoFim !== limites.fim)) {
+      avisar.erro('A jornada mensal deve abranger a competência inteira.');
       return;
     }
     setCarregando(true);
     limpar();
     try {
-      const lista = await colaboradoresParaJornadaRh({ obra_id: obra, competencia });
+      const lista = await colaboradoresParaJornadaRh({
+        obra_id: obra,
+        competencia,
+        periodicidade,
+        periodo_inicio: periodoInicio,
+        periodo_fim: periodoFim
+      });
       setLinhas((Array.isArray(lista) ? lista : []).map(linhaVazia));
       const comecaram = (Array.isArray(lista) ? lista : []).filter((c) => !c.ainda_nao_comecou);
       const futuros = (Array.isArray(lista) ? lista : []).filter((c) => c.ainda_nao_comecou);
@@ -227,11 +350,11 @@ export default function RhDpJornada() {
         // A resposta "nenhum colaborador" e tecnicamente certa e pratica errada: quem acabou de
         // lotar alguem nesta obra conclui que a lotacao nao funcionou.
         avisar.alerta(
-          `Ninguem trabalhou nesta obra em ${competencia}, mas `
+          'Ninguem trabalhou nesta obra neste período, mas '
           + `${futuros.length} colaborador(es) comecam depois — eles aparecem abaixo, sem campos.`
         );
       } else if (!comecaram.length) {
-        avisar.alerta('Nenhum colaborador esteve nesta obra nesta competência.');
+        avisar.alerta('Nenhum colaborador esteve nesta obra neste período.');
       }
     } catch (error) {
       avisar.erro(error.message || 'Não foi possível montar a lista.');
@@ -239,19 +362,21 @@ export default function RhDpJornada() {
     } finally {
       setCarregando(false);
     }
-  }, [obra, competencia, avisar, limpar]);
+  }, [obra, competencia, periodicidade, periodoInicio, periodoFim, avisar, limpar]);
 
   function alterar(indice, campo, valor) {
     setLinhas((atuais) => atuais.map((linha, i) => (i === indice ? { ...linha, [campo]: valor } : linha)));
   }
 
-  /** Preenche o mês cheio de uma vez — o caso comum é quase todo mundo ter trabalhado tudo. */
+  /** Preenche o período de uma vez — o caso comum é quase todo mundo ter trabalhado todos os dias. */
   function preencherMesCheio() {
-    setLinhas((atuais) => atuais.map((linha) => (linha.aindaNaoComecou ? linha : {
+    setLinhas((atuais) => atuais.map((linha) => (
+      linha.aindaNaoComecou || !podeEditarLinha(linha) ? linha : {
       ...linha,
       dias_trabalhados: linha.dias_trabalhados === '' ? String(diasBase) : linha.dias_trabalhados,
       faltas: linha.faltas === '' ? '0' : linha.faltas
-    })));
+      }
+    )));
   }
 
   // `alterar` age por POSICAO na lista; a tabela precisa do indice junto do
@@ -270,12 +395,7 @@ export default function RhDpJornada() {
   }), [linhas, diasBase]);
 
   const dimensoesFiltro = useMemo(() => {
-    const dimensoes = [{
-      id: 'obra',
-      rotulo: 'Obra',
-      unico: true,
-      opcoes: obras.map((o) => ({ valor: o.id, rotulo: o.nome }))
-    }];
+    const dimensoes = [];
     // A empresa do grupo so aparece para quem consegue le-la — sem permissao
     // a lista vem vazia e o recorte nao existe (era um select opcional).
     if (empresas.length) {
@@ -287,7 +407,97 @@ export default function RhDpJornada() {
       });
     }
     return dimensoes;
-  }, [obras, empresas]);
+  }, [empresas]);
+
+  async function solicitarLiberacaoEdicao(linha) {
+    const { ok } = await confirmar({
+      titulo: 'Solicitar edição ao DP',
+      mensagem: `A jornada de ${linha.nome} neste período já foi enviada. `
+        + 'Deseja pedir ao Departamento Pessoal uma autorização pontual para corrigi-la?',
+      rotuloConfirmar: 'Solicitar autorização'
+    });
+    if (!ok) return;
+    setProcessandoEdicao(linha.colaborador_id);
+    limpar();
+    try {
+      const solicitacao = await solicitarEdicaoJornadaRh({
+        importacao_linha_id: linha.jornadaLinhaId,
+        motivo: 'Correção solicitada pela obra para a jornada enviada.'
+      });
+      setLinhas((atuais) => atuais.map((item) => (
+        item.colaborador_id === linha.colaborador_id
+          ? { ...item, edicaoId: solicitacao.id, edicaoStatus: solicitacao.status }
+          : item
+      )));
+      avisar.sucesso('Solicitação enviada ao Departamento Pessoal.');
+    } catch (error) {
+      avisar.erro(error.message || 'Não foi possível solicitar a edição.');
+    } finally {
+      setProcessandoEdicao(null);
+    }
+  }
+
+  async function decidirLiberacaoEdicao(linha, aprovar) {
+    const { ok } = await confirmar({
+      titulo: aprovar ? 'Autorizar edição da jornada' : 'Negar edição da jornada',
+      mensagem: aprovar
+        ? `Liberar uma correção da jornada de ${linha.nome} neste período? A autorização será consumida no próximo envio.`
+        : `Negar a solicitação de correção da jornada de ${linha.nome}?`,
+      rotuloConfirmar: aprovar ? 'Autorizar edição' : 'Negar solicitação',
+      perigo: !aprovar
+    });
+    if (!ok) return;
+    setProcessandoEdicao(linha.colaborador_id);
+    limpar();
+    try {
+      const solicitacao = await decidirEdicaoJornadaRh(linha.edicaoId, {
+        aprovar,
+        motivo: aprovar ? 'Edição autorizada pelo Departamento Pessoal.' : 'Edição não autorizada pelo Departamento Pessoal.'
+      });
+      setLinhas((atuais) => atuais.map((item) => (
+        item.colaborador_id === linha.colaborador_id
+          ? { ...item, edicaoStatus: solicitacao.status }
+          : item
+      )));
+      avisar.sucesso(aprovar ? 'Edição liberada para um novo envio.' : 'Solicitação de edição negada.');
+      await carregarEdicoesPendentes();
+    } catch (error) {
+      avisar.erro(error.message || 'Não foi possível decidir a solicitação.');
+    } finally {
+      setProcessandoEdicao(null);
+    }
+  }
+
+  async function decidirPedidoPendente(pedido, aprovar) {
+    const nome = pedido.colaborador?.nome || `colaborador #${pedido.colaborador_id}`;
+    const { ok } = await confirmar({
+      titulo: aprovar ? 'Autorizar edição da jornada' : 'Negar edição da jornada',
+      mensagem: `${aprovar ? 'Autorizar' : 'Negar'} a correção solicitada para ${nome}, `
+        + `no período de ${formatarData(pedido.periodo_inicio)} a ${formatarData(pedido.periodo_fim)}?`,
+      rotuloConfirmar: aprovar ? 'Autorizar edição' : 'Negar solicitação',
+      perigo: !aprovar
+    });
+    if (!ok) return;
+    setProcessandoEdicao(`pedido-${pedido.id}`);
+    limpar();
+    try {
+      await decidirEdicaoJornadaRh(pedido.id, {
+        aprovar,
+        motivo: aprovar ? 'Edição autorizada pelo Departamento Pessoal.' : 'Edição não autorizada pelo Departamento Pessoal.'
+      });
+      await carregarEdicoesPendentes();
+      setLinhas((atuais) => atuais.map((linha) => (
+        linha.edicaoId === pedido.id
+          ? { ...linha, edicaoStatus: aprovar ? 'AUTORIZADA' : 'NEGADA' }
+          : linha
+      )));
+      avisar.sucesso(aprovar ? 'Edição autorizada.' : 'Solicitação negada.');
+    } catch (error) {
+      avisar.erro(error.message || 'Não foi possível decidir a solicitação.');
+    } finally {
+      setProcessandoEdicao(null);
+    }
+  }
 
   async function enviar(evento) {
     evento.preventDefault();
@@ -302,9 +512,10 @@ export default function RhDpJornada() {
      */
     const preenchidas = linhas
       .filter((l) => !l.aindaNaoComecou)
+      .filter((l) => podeEditarLinha(l))
       .filter((l) => l.dias_trabalhados !== '' || l.faltas !== '');
     if (!preenchidas.length) {
-      avisar.erro('Informe a jornada de ao menos um colaborador.');
+      avisar.erro('Informe a jornada de um colaborador novo ou solicite ao DP a edição de uma linha já enviada.');
       return;
     }
 
@@ -316,12 +527,12 @@ export default function RhDpJornada() {
       return;
     }
 
-    if (jaInformados) {
+    const substituicoes = preenchidas.filter((linha) => linha.jaInformado);
+    if (substituicoes.length) {
       const { ok } = await confirmar({
         titulo: 'Substituir a jornada já informada',
-        mensagem: `Ja existe jornada informada nesta obra em ${competencia}. O envio novo `
-          + 'SUBSTITUI o anterior — ele nao soma. O envio anterior fica guardado como historico. '
-          + 'Enviar mesmo assim?',
+        mensagem: `O envio substituirá a jornada anterior de ${substituicoes.length} colaborador(es) `
+          + 'neste mesmo período. A versão anterior ficará no histórico. Enviar mesmo assim?',
         rotuloConfirmar: 'Substituir e enviar'
       });
       if (!ok) return;
@@ -331,6 +542,9 @@ export default function RhDpJornada() {
     try {
       await registrarJornadaRh({
         competencia,
+        periodicidade,
+        periodo_inicio: periodoInicio,
+        periodo_fim: periodoFim,
         obra_id: Number(obra),
         empresa_grupo_id: empresa ? Number(empresa) : undefined,
         dias_base: Number(diasBase),
@@ -354,7 +568,7 @@ export default function RhDpJornada() {
        */
       await carregar();
       avisar.sucesso(
-        `Jornada de ${preenchidas.length} colaborador(es) registrada. `
+        `Jornada de ${preenchidas.length} colaborador(es) registrada para o período. `
         + 'O Departamento Pessoal pode gerar a apuração desta competência.'
       );
     } catch (error) {
@@ -367,6 +581,77 @@ export default function RhDpJornada() {
   return (
     <div className="app-pagina">
       <Avisos avisos={avisos} aoFechar={fechar} />
+
+      {podeDecidirEdicao && edicoesPendentes.length ? (
+        <BlocoConteudo
+          titulo="Edições de jornada aguardando o DP"
+          descricao="A autorização é pontual e será consumida quando a obra reenviar a linha corrigida."
+          contagem={`${edicoesPendentes.length} pendente(s)`}
+        >
+          <TabelaPadrao
+            colunasConfiguraveis={false}
+            colunas={[
+              {
+                id: 'colaborador',
+                titulo: 'Colaborador',
+                tipo: 'identidade',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={item.colaborador?.nome || `Colaborador #${item.colaborador_id}`}
+                    sub={item.solicitadaPor?.nome ? `solicitado por ${item.solicitadaPor.nome}` : ''}
+                  />
+                )
+              },
+              {
+                id: 'obra',
+                titulo: 'Obra',
+                tipo: 'texto',
+                render: (item) => item.obra?.nome || `Obra #${item.obra_id}`
+              },
+              {
+                id: 'periodo',
+                titulo: 'Período',
+                tipo: 'texto',
+                render: (item) => `${formatarData(item.periodo_inicio)} a ${formatarData(item.periodo_fim)}`
+              },
+              {
+                id: 'motivo',
+                titulo: 'Motivo',
+                tipo: 'texto',
+                render: (item) => item.motivo
+              },
+              {
+                id: 'acoes',
+                titulo: 'Ações',
+                tipo: 'acao',
+                render: (item) => (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={processandoEdicao === `pedido-${item.id}`}
+                      onClick={() => decidirPedidoPendente(item, true)}
+                    >
+                      Autorizar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      disabled={processandoEdicao === `pedido-${item.id}`}
+                      onClick={() => decidirPedidoPendente(item, false)}
+                    >
+                      Negar
+                    </button>
+                  </div>
+                )
+              }
+            ]}
+            itens={edicoesPendentes}
+            getId={(item) => item.id}
+            vazio="Nenhuma edição aguardando decisão."
+          />
+        </BlocoConteudo>
+      ) : null}
 
       {/*
         B2 — um primário por tela, e a hierarquia SEGUE O FOCO (mesmo padrão
@@ -383,35 +668,83 @@ export default function RhDpJornada() {
         variante={linhas.length ? undefined : 'primario'}
         cor={linhas.length ? undefined : 'var(--c-primary)'}
       >
-        {/* R12/R16: o cartao de filtros com grade de select saiu inteiro.
-            Competencia e dias base sao CONTINUOS e vao em `campos`; obra e
-            empresa sao enumeraveis e vao em `filtros`, com marcacao unica e
-            etiqueta removivel. */}
+        {/* Obra e requisito operacional para montar a jornada, portanto fica
+            sempre visivel como campo. Empresa permanece um recorte opcional. */}
         <BarraFiltros
           campos={[
+            {
+              id: 'obra',
+              rotulo: 'Obra *',
+              tipo: 'select',
+              valor: obra,
+              aoMudar: (valor) => {
+                setAtivos((atuais) => ({
+                  ...atuais,
+                  obra: valor ? new Set([String(valor)]) : new Set()
+                }));
+                setLinhas([]);
+              },
+              placeholder: obras.length ? 'Selecione a obra' : 'Nenhuma obra vinculada',
+              opcoes: obras.map((item) => ({
+                valor: item.id,
+                rotulo: item.codigo ? `${item.codigo} - ${item.nome}` : item.nome
+              })),
+              required: true,
+              disabled: obras.length === 0
+            },
             {
               id: 'competencia',
               rotulo: 'Competência',
               tipo: 'month',
               valor: competencia,
-              aoMudar: setCompetencia
+              aoMudar: mudarCompetencia
+            },
+            {
+              id: 'periodicidade',
+              rotulo: 'Periodicidade *',
+              tipo: 'select',
+              valor: periodicidade,
+              aoMudar: mudarPeriodicidade,
+              opcoes: PERIODICIDADES,
+              required: true
+            },
+            {
+              id: 'periodoInicio',
+              rotulo: 'Início do período *',
+              tipo: 'date',
+              valor: periodoInicio,
+              aoMudar: (valor) => { setPeriodoInicio(valor); setLinhas([]); },
+              min: limitesDaCompetencia(competencia).inicio,
+              max: limitesDaCompetencia(competencia).fim
+            },
+            {
+              id: 'periodoFim',
+              rotulo: 'Fim do período *',
+              tipo: 'date',
+              valor: periodoFim,
+              aoMudar: (valor) => { setPeriodoFim(valor); setLinhas([]); },
+              min: periodoInicio || limitesDaCompetencia(competencia).inicio,
+              max: limitesDaCompetencia(competencia).fim
             },
             {
               id: 'diasBase',
-              rotulo: 'Dias base do mês',
+              rotulo: 'Dias base do período',
               tipo: 'number',
               valor: diasBase,
               aoMudar: setDiasBase,
               min: 1,
               max: 31
             }
-          ].filter((campo) => visibilidadeFiltros.ehVisivel(campo.id))}
+          ].filter((campo) => (
+            ['obra', 'periodicidade', 'periodoInicio', 'periodoFim'].includes(campo.id)
+            || visibilidadeFiltros.ehVisivel(campo.id)
+          ))}
           filtros={dimensoesFiltro.filter((dim) => visibilidadeFiltros.ehVisivel(dim.id))}
           ativos={ativos}
           aoAlternar={(dimensao, valor, opcoes) => setAtivos(
             (atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes)
           )}
-          aoLimpar={() => setAtivos(SEM_FILTRO)}
+          aoLimpar={() => setAtivos((atuais) => ({ ...atuais, empresa: new Set() }))}
           visibilidade={visibilidadeFiltros}
         />
 
@@ -422,7 +755,7 @@ export default function RhDpJornada() {
             </button>
             {linhas.length ? (
               <button type="button" className="btn btn-outline" onClick={preencherMesCheio}>
-                Preencher mês cheio
+                Preencher período
               </button>
             ) : null}
           </div>
@@ -444,8 +777,8 @@ export default function RhDpJornada() {
 
       {jaInformados ? (
         <div className="alert alert-warning">
-          Esta obra ja tem jornada informada em {competencia} ({jaInformados} colaborador(es)).
-          Um envio novo <strong>substitui</strong> o anterior — ele nao soma.
+          Este período já tem jornada informada para {jaInformados} colaborador(es). Linhas enviadas
+          ficam bloqueadas; a obra precisa solicitar autorização do DP para corrigi-las.
         </div>
       ) : null}
 
@@ -479,7 +812,9 @@ export default function RhDpJornada() {
                       principal={linha.nome}
                       sub={linha.aindaNaoComecou
                         ? `comeca nesta obra em ${new Date(`${linha.comecaEm}T00:00:00`).toLocaleDateString('pt-BR')}`
-                        : (linha.jaInformado ? 'ja informado nesta competencia' : '')}
+                        : (linha.jaInformado
+                          ? (linha.edicaoStatus === 'AUTORIZADA' ? 'edição autorizada pelo DP' : 'já informado neste período')
+                          : '')}
                     />
                   )
                 },
@@ -508,6 +843,7 @@ export default function RhDpJornada() {
                       max={diasBase}
                       aria-label={`Dias trabalhados de ${linha.nome}`}
                       value={linha.dias_trabalhados}
+                      disabled={!podeEditarLinha(linha)}
                       onChange={(e) => alterar(linha.__indice, 'dias_trabalhados', e.target.value)}
                     />
                   ))
@@ -524,6 +860,7 @@ export default function RhDpJornada() {
                       max={diasBase}
                       aria-label={`Faltas de ${linha.nome}`}
                       value={linha.faltas}
+                      disabled={!podeEditarLinha(linha)}
                       onChange={(e) => alterar(linha.__indice, 'faltas', e.target.value)}
                     />
                   ))
@@ -540,6 +877,7 @@ export default function RhDpJornada() {
                       step="0.5"
                       aria-label={`Horas extras de ${linha.nome}`}
                       value={linha.horas_extras}
+                      disabled={!podeEditarLinha(linha)}
                       onChange={(e) => alterar(linha.__indice, 'horas_extras', e.target.value)}
                     />
                   ))
@@ -553,6 +891,7 @@ export default function RhDpJornada() {
                       className="form-control rh-jornada-numero"
                       aria-label={`Acréscimos de ${linha.nome}`}
                       value={linha.adicionais}
+                      disabled={!podeEditarLinha(linha)}
                       onChange={(e) => alterar(linha.__indice, 'adicionais', formatCurrencyInput(e.target.value))}
                     />
                   ))
@@ -566,6 +905,7 @@ export default function RhDpJornada() {
                       className="form-control rh-jornada-numero"
                       aria-label={`Descontos de ${linha.nome}`}
                       value={linha.descontos}
+                      disabled={!podeEditarLinha(linha)}
                       onChange={(e) => alterar(linha.__indice, 'descontos', formatCurrencyInput(e.target.value))}
                     />
                   ))
@@ -579,9 +919,53 @@ export default function RhDpJornada() {
                       className="form-control"
                       aria-label={`Observação de ${linha.nome}`}
                       value={linha.observacoes}
+                      disabled={!podeEditarLinha(linha)}
                       onChange={(e) => alterar(linha.__indice, 'observacoes', e.target.value)}
                     />
                   ))
+                },
+                {
+                  id: 'acaoEdicao',
+                  titulo: 'Edição',
+                  tipo: 'acao',
+                  render: (linha) => {
+                    if (!linha.jaInformado || linha.aindaNaoComecou) return '—';
+                    const processando = processandoEdicao === linha.colaborador_id;
+                    if (linha.edicaoStatus === 'PENDENTE') {
+                      return podeDecidirEdicao ? (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            disabled={processando}
+                            onClick={() => decidirLiberacaoEdicao(linha, true)}
+                          >
+                            Autorizar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            disabled={processando}
+                            onClick={() => decidirLiberacaoEdicao(linha, false)}
+                          >
+                            Negar
+                          </button>
+                        </div>
+                      ) : 'Aguardando DP';
+                    }
+                    if (linha.edicaoStatus === 'AUTORIZADA') return 'Liberada para um envio';
+                    if (podeDecidirEdicao) return 'DP pode corrigir';
+                    return (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        disabled={processando}
+                        onClick={() => solicitarLiberacaoEdicao(linha)}
+                      >
+                        {linha.edicaoStatus === 'NEGADA' ? 'Solicitar novamente' : 'Solicitar edição'}
+                      </button>
+                    );
+                  }
                 }
               ]}
               itens={linhasTabela}
@@ -594,7 +978,7 @@ export default function RhDpJornada() {
                 if (Number(linha.dias_trabalhados || 0) + Number(linha.faltas || 0) > Number(diasBase)) return 'danger';
                 return linha.aindaNaoComecou ? 'warning' : null;
               }}
-              vazio="Nenhum colaborador nesta obra e competência."
+              vazio="Nenhum colaborador nesta obra e período."
             />
           </BlocoConteudo>
 

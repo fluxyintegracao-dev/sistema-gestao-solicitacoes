@@ -426,6 +426,31 @@ export async function registrarJornadaRh(data) {
   return parseJson(response, 'Erro ao registrar a jornada');
 }
 
+export async function solicitarEdicaoJornadaRh(data) {
+  const response = await fetch(`${API_URL}/rh/jornada/edicoes/solicitar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao solicitar a edicao da jornada');
+}
+
+export async function decidirEdicaoJornadaRh(id, data) {
+  const response = await fetch(`${API_URL}/rh/jornada/edicoes/${id}/decidir`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao decidir a edicao da jornada');
+}
+
+export async function getEdicoesJornadaPendentesRh() {
+  const response = await fetch(`${API_URL}/rh/jornada/edicoes/pendentes`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao listar as edicoes de jornada pendentes');
+}
+
 export async function registrarPagamentoIndividualRh(data) {
   const response = await fetch(`${API_URL}/rh/jornada/individual`, {
     method: 'POST',

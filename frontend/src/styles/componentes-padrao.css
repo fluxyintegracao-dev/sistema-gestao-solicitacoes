@@ -1721,6 +1721,11 @@ fieldset.form-section {
   --campo-filtro-max: var(--campo-filtro-numero-max);
 }
 
+.app-filtros .app-filtros-campo[data-tipo="select"] {
+  --campo-filtro-min: var(--campo-filtro-texto-min);
+  --campo-filtro-max: var(--campo-filtro-texto-max);
+}
+
 .app-filtros .app-filtros-campo-rotulo {
   font-size: var(--fonte-detalhe);
   line-height: var(--lh-detalhe);
@@ -1733,7 +1738,8 @@ fieldset.form-section {
    parado na largura intrínseca dentro de um rótulo largo — o vazio só mudava
    de lugar. `min-width: 0` porque input tem largura intrínseca de `size` e
    ela impediria o campo de encolher até o piso do tipo em faixa estreita. */
-.app-filtros .app-filtros-campo input {
+.app-filtros .app-filtros-campo input,
+.app-filtros .app-filtros-campo select {
   width: 100%;
   min-width: 0;
   min-height: 32px;
@@ -1745,7 +1751,8 @@ fieldset.form-section {
   border-radius: var(--raio-1);
 }
 
-.app-filtros .app-filtros-campo input:focus-visible {
+.app-filtros .app-filtros-campo input:focus-visible,
+.app-filtros .app-filtros-campo select:focus-visible {
   outline: 2px solid var(--c-primary);
   outline-offset: 1px;
 }

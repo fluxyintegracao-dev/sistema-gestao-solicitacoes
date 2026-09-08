@@ -39,10 +39,10 @@ import PainelFiltrosVisiveis from './PainelFiltrosVisiveis';
  * (R16b: o padrão cresce, a exceção não se acumula).
  *
  * Então `campos` é um espaço declarado, na MESMA faixa, antes da linha de
- * marcação: `[{ id, rotulo, tipo: 'month'|'date'|'number', valor, aoMudar }]`.
- * NÃO use para recorte enumerável — status, obra, vínculo e empresa são
- * `filtros`, com marcação e etiqueta removível. Campo aqui é exceção
- * declarada, não porta dos fundos.
+ * marcação: `[{ id, rotulo, tipo: 'month'|'date'|'number'|'select', valor, aoMudar }]`.
+ * O `select` fica reservado a requisito operacional de escolha única, como
+ * a obra sem a qual uma jornada não pode ser montada. Recortes opcionais —
+ * status, vínculo e empresa — continuam em `filtros`, com etiquetas.
  *
  * ## `visibilidade` — QUAIS filtros aparecem (05/09, fechamento do N53)
  *
@@ -81,7 +81,7 @@ import PainelFiltrosVisiveis from './PainelFiltrosVisiveis';
  */
 export default function BarraFiltros({
   busca,               // { valor, aoMudar, placeholder }
-  campos = [],         // [{ id, rotulo, tipo, valor, aoMudar, min, max, step, placeholder, sugestoes }]
+  campos = [],         // [{ id, rotulo, tipo, valor, aoMudar, min, max, step, placeholder, sugestoes, opcoes }]
   filtros = [],        // [{ id, rotulo, unico?, opcoes: [{ valor, rotulo }] }]
   ativos = {},         // { [id]: Set<string> }
   visibilidade = null, // retorno de `useFiltrosVisiveis` — ver acima
@@ -192,26 +192,45 @@ export default function BarraFiltros({
                   O `data-tipo` do label continua `date`: a LARGURA do campo
                   sai dos tokens --campo-filtro-data-*, e ela nao mudou.
               */}
-              {campo.tipo === 'date' ? (
+              {campo.tipo === 'select' ? (
+                <select
+                  name={campo.id}
+                  value={campo.valor ?? ''}
+                  required={campo.required}
+                  disabled={campo.disabled}
+                  onChange={(event) => campo.aoMudar(event.target.value)}
+                >
+                  <option value="">{campo.placeholder || 'Selecione'}</option>
+                  {(campo.opcoes || []).map((opcao) => (
+                    <option key={String(opcao.valor)} value={String(opcao.valor)}>
+                      {opcao.rotulo}
+                    </option>
+                  ))}
+                </select>
+              ) : campo.tipo === 'date' ? (
                 <DateInputBR
                   name={campo.id}
                   value={campo.valor ?? ''}
                   min={campo.min}
                   max={campo.max}
+                  required={campo.required}
+                  disabled={campo.disabled}
                   placeholder={campo.placeholder}
                   onChange={(event) => campo.aoMudar(event.target.value)}
                 />
               ) : (
-              <input
-                type={campo.tipo || 'text'}
-                value={campo.valor ?? ''}
-                min={campo.min}
-                max={campo.max}
-                step={campo.step}
-                placeholder={campo.placeholder}
-                list={campo.sugestoes?.length ? `sugestoes-${campo.id}` : undefined}
-                onChange={(event) => campo.aoMudar(event.target.value)}
-              />
+                <input
+                  type={campo.tipo || 'text'}
+                  value={campo.valor ?? ''}
+                  min={campo.min}
+                  max={campo.max}
+                  step={campo.step}
+                  required={campo.required}
+                  disabled={campo.disabled}
+                  placeholder={campo.placeholder}
+                  list={campo.sugestoes?.length ? `sugestoes-${campo.id}` : undefined}
+                  onChange={(event) => campo.aoMudar(event.target.value)}
+                />
               )}
               {campo.sugestoes?.length ? (
                 <datalist id={`sugestoes-${campo.id}`}>

@@ -74,6 +74,7 @@ db.RhSolicitacaoChecklist = require('./RhSolicitacaoChecklist')(sequelize, Seque
 db.RhDocumento = require('./RhDocumento')(sequelize, Sequelize);
 db.RhImportacao = require('./RhImportacao')(sequelize, Sequelize);
 db.RhImportacaoLinha = require('./RhImportacaoLinha')(sequelize, Sequelize);
+db.RhJornadaEdicao = require('./RhJornadaEdicao')(sequelize, Sequelize);
 db.RhApuracao = require('./RhApuracao')(sequelize, Sequelize);
 db.RhApuracaoEvento = require('./RhApuracaoEvento')(sequelize, Sequelize);
 db.RhFechamento = require('./RhFechamento')(sequelize, Sequelize);
@@ -1898,6 +1899,36 @@ db.RhColaborador.hasMany(db.RhImportacaoLinha, {
 db.RhImportacaoLinha.belongsTo(db.RhColaborador, {
   foreignKey: 'colaborador_id',
   as: 'colaborador'
+});
+
+db.RhImportacaoLinha.hasMany(db.RhJornadaEdicao, {
+  foreignKey: 'importacao_linha_id',
+  as: 'solicitacoesEdicaoJornada'
+});
+
+db.RhJornadaEdicao.belongsTo(db.RhImportacaoLinha, {
+  foreignKey: 'importacao_linha_id',
+  as: 'linhaOriginal'
+});
+
+db.RhJornadaEdicao.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
+});
+
+db.RhJornadaEdicao.belongsTo(db.RhColaborador, {
+  foreignKey: 'colaborador_id',
+  as: 'colaborador'
+});
+
+db.RhJornadaEdicao.belongsTo(db.User, {
+  foreignKey: 'solicitada_por',
+  as: 'solicitadaPor'
+});
+
+db.RhJornadaEdicao.belongsTo(db.User, {
+  foreignKey: 'decidida_por',
+  as: 'decididaPor'
 });
 
 db.RhEmpresaGrupo.hasMany(db.RhApuracao, {
