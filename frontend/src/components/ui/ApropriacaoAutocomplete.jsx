@@ -24,7 +24,7 @@ export default function ApropriacaoAutocomplete({
   placeholder = 'Buscar por código ou nome...',
   disabledPlaceholder = 'Selecione',
   emptyText = 'Nenhuma apropriação encontrada',
-  portalZIndex = 'var(--z-dropdown-portal)',
+  portalZIndex,
   className = '',
   inputClassName = 'input w-full',
 }) {
@@ -62,6 +62,22 @@ export default function ApropriacaoAutocomplete({
   const caixa = usePosicaoFlutuante(campoRef, painelRef, open && !disabled, {
     larguraDaAncora: true
   });
+  /*
+    O painel vive no `body`, portanto deixa de herdar o contexto de
+    empilhamento do lugar em que o campo foi renderizado. Na página ele deve
+    ficar abaixo de qualquer modal; dentro de um modal, precisa subir um
+    degrau para não ser pintado atrás do próprio diálogo.
+
+    A decisão é feita pelo contexto real do campo, não por cada tela. Isso
+    cobre todos os usos deste autocomplete em `OverlayModal`/`ModalPortal` e
+    evita que um novo modal precise conhecer a escala global de camadas.
+    `portalZIndex` continua disponível para uma exceção explícita.
+  */
+  const zIndexPainel = portalZIndex ?? (
+    campoRef.current?.closest?.('[role="dialog"][aria-modal="true"], .app-modal-portal')
+      ? 'var(--z-modal-acima)'
+      : 'var(--z-dropdown-portal)'
+  );
 
   const selectedOption = useMemo(
     () => options.find((item) => String(item.id) === String(value || '')),
@@ -169,7 +185,7 @@ export default function ApropriacaoAutocomplete({
         <div
           ref={painelRef}
           className="max-h-60 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
-          style={{ ...caixa.estilo, zIndex: portalZIndex }}
+          style={{ ...caixa.estilo, zIndex: zIndexPainel }}
         >
           {filteredOptions.length ? (
             filteredOptions.map((option, i) => (

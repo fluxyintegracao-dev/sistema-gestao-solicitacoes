@@ -67,6 +67,7 @@ const D = params.get('d') || '';
   qualquer pessoa faz com o painel aberto.
 */
 const EIXO = params.get('eixo') === 'v' ? 'v' : 'h';
+const EM_MODAL = params.get('modal') === '1';
 
 /* Os 15 filtros da Consulta de títulos, que é a faixa mais larga do
    sistema e a da captura — inclusive o rótulo comprido do aviso. */
@@ -269,8 +270,43 @@ function Linha({ lado }) {
   );
 }
 
+/*
+  O caso que não existe nas âncoras acima: o autocomplete usa portal no
+  `body`, mas o CAMPO está dentro de um modal. A lista precisa ficar acima
+  do diálogo (`--z-modal-acima`), embora na página comum deva continuar
+  abaixo dele (`--z-dropdown-portal`).
+*/
+function ModalComApropriacao() {
+  const [apropriacao, setApropriacao] = useState('');
+  return (
+    <div className="prova-pagina">
+      <div
+        data-fixture-modal
+        role="dialog"
+        aria-modal="true"
+        aria-label="Apropriar item"
+        className="fixed inset-0 flex items-center justify-center bg-slate-900/45 p-6"
+        style={{ zIndex: 'var(--z-modal)' }}
+      >
+        <div className="card" style={{ width: 560, padding: 24 }}>
+          <label className="grid gap-2">
+            <span>Apropriação</span>
+            <ApropriacaoAutocomplete
+              value={apropriacao}
+              options={APROPRIACOES}
+              onChange={setApropriacao}
+            />
+          </label>
+        </div>
+      </div>
+      <div className="prova-vazio" />
+    </div>
+  );
+}
+
 function App() {
   const classe = `prova-pagina${D === 'semPosicao' ? ' prova-defeito' : ''}`;
+  if (EM_MODAL) return <ModalComApropriacao />;
   if (EIXO === 'v') {
     return (
       <div className={classe}>

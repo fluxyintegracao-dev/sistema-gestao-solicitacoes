@@ -214,8 +214,13 @@ async function main() {
   const servidor = await criarServidorDeCamadas();
   /* SEM PROXY: esta prova só fala com 127.0.0.1, e o Chromium herda
      `http_proxy` do ambiente se ninguém disser o contrário. */
+  const chromiumDoAmbiente = [
+    '/opt/pw-browsers/chromium',
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+  ].find((caminho) => fs.existsSync(caminho));
   const navegador = await chromium.launch({
-    executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined,
+    executablePath: chromiumDoAmbiente,
     args: ['--no-proxy-server']
   });
 
@@ -349,6 +354,56 @@ async function main() {
           await pagina.waitForTimeout(140);
         }
       }
+      await pagina.close();
+      await contexto.close();
+    }
+
+    /*
+      AUTOCOMPLETE DENTRO DE MODAL — a lista é portal no `body`, então a
+      geometria pode estar perfeita e ainda assim ela ficar ATRÁS do painel.
+      Comparamos as camadas calculadas e também o pixel efetivamente pintado;
+      o segundo critério impede uma aprovação baseada só no número declarado.
+    */
+    console.log('\n— empilhamento: autocomplete aberto dentro de modal —');
+    {
+      const contexto = await navegador.newContext({ viewport: { width: 1366, height: 900 } });
+      const pagina = await contexto.newPage();
+      await pagina.goto(servidor.rota('?modal=1'), { waitUntil: 'domcontentloaded' });
+      const input = pagina.locator('input[role="combobox"]').first();
+      await input.click({ timeout: 8000 });
+      await pagina.waitForTimeout(260);
+      const camada = await pagina.evaluate(() => {
+        const modal = document.querySelector('[data-fixture-modal]');
+        const painel = document.querySelector('div.max-h-60.overflow-y-auto');
+        if (!modal || !painel) return { erro: 'modal ou lista do autocomplete não entrou no DOM' };
+        const caixa = painel.getBoundingClientRect();
+        const ponto = document.elementFromPoint(
+          Math.round(caixa.left + caixa.width / 2),
+          Math.round(caixa.top + Math.min(caixa.height / 2, 24))
+        );
+        return {
+          zModal: Number(getComputedStyle(modal).zIndex),
+          zPainel: Number(getComputedStyle(painel).zIndex),
+          pintadoPorCima: Boolean(ponto && painel.contains(ponto))
+        };
+      });
+      const acima = !camada.erro
+        && Number.isFinite(camada.zModal)
+        && Number.isFinite(camada.zPainel)
+        && camada.zPainel > camada.zModal
+        && camada.pintadoPorCima;
+      registrar(acima, camada.erro || `lista z=${camada.zPainel}, modal z=${camada.zModal}`
+        + (camada.pintadoPorCima ? ' — lista pintada por cima' : ' — lista coberta pelo modal'));
+
+      const primeiraOpcao = pagina.locator('div.max-h-60.overflow-y-auto button').first();
+      await primeiraOpcao.click({ timeout: 8000 });
+      const selecionou = await pagina.waitForFunction(
+        () => document.querySelector('input[role="combobox"]')?.value.includes('3.01.001'),
+        null,
+        { timeout: 2000 }
+      ).then(() => true).catch(() => false);
+      registrar(selecionou,
+        'a opção continua selecionável acima do modal');
       await pagina.close();
       await contexto.close();
     }
