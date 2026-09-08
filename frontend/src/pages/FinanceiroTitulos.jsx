@@ -2375,9 +2375,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             >
               <option value="">Todos</option>
               <option value="EM_ABERTO">Em aberto (previsão + aberto + parcial)</option>
+              <option value="VENCIDO">Vencidos (previsão + aberto + parcial)</option>
               <option value="PREVISAO">Previsão</option>
+              <option value="PREVISAO_VENCIDA">Previsão - vencida</option>
               <option value="ABERTO">Aberto</option>
+              <option value="ABERTO_VENCIDO">Aberto - vencido</option>
               <option value="PARCIAL">Parcial</option>
+              <option value="PARCIAL_VENCIDO">Parcial - vencido</option>
               <option value="QUITADO">Quitado</option>
               <option value="CANCELADO">Cancelado</option>
               <option value="ESTORNADO">Estornado</option>

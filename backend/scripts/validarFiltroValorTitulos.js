@@ -5,6 +5,9 @@ const path = require('path');
 const {
   validateFinanceTituloQuery
 } = require('../src/validators/financialValidators');
+const {
+  resolveTituloStatusFilter
+} = require('../src/utils/tituloFinanceiroStatusFilter');
 
 function expectValidationError(callback, messagePart) {
   assert.throws(callback, (error) => (
@@ -34,6 +37,17 @@ expectValidationError(
   'Valor minimo nao pode ser maior que valor maximo.'
 );
 
+assert.strictEqual(validateFinanceTituloQuery({ status: 'ABERTO_VENCIDO' }).status, 'ABERTO_VENCIDO');
+assert.strictEqual(validateFinanceTituloQuery({ status: 'VENCIDO' }).status, 'VENCIDO');
+assert.deepStrictEqual(resolveTituloStatusFilter('EM_ABERTO'), {
+  statuses: ['PREVISAO', 'ABERTO', 'PARCIAL'],
+  vencido: false
+});
+assert.deepStrictEqual(resolveTituloStatusFilter('ABERTO_VENCIDO'), {
+  statuses: ['ABERTO'],
+  vencido: true
+});
+
 expectValidationError(
   () => validateFinanceTituloQuery({ valor_min: '-1' }),
   'Valor minimo invalido.'
@@ -43,6 +57,10 @@ const serviceSource = fs.readFileSync(
   path.resolve(__dirname, '../src/services/tituloFinanceiroService.js'),
   'utf8'
 );
+const frontendSource = fs.readFileSync(
+  path.resolve(__dirname, '../../frontend/src/pages/FinanceiroTitulos.jsx'),
+  'utf8'
+);
 
 assert(
   serviceSource.includes('where.valor_original[Op.gte] = valorMinimo')
@@ -50,4 +68,10 @@ assert(
   'O filtro de valor dos titulos deve manter os limites minimo e maximo inclusivos.'
 );
 
-console.log('Validacao dos filtros de valor dos titulos concluida com sucesso.');
+assert(
+  frontendSource.includes('<option value="VENCIDO">')
+    && frontendSource.includes('<option value="ABERTO_VENCIDO">'),
+  'A consulta de titulos deve expor os filtros de vencimento calculado.'
+);
+
+console.log('Validacao dos filtros de valor e status dos titulos concluida com sucesso.');

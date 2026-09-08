@@ -55,6 +55,7 @@ const {
 const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFinanceiroStatusService');
 const { reabrirConciliacoesPorMovimentos } = require('./conciliacaoEstornoService');
 const { assertTituloDisponivelParaBaixa } = require('./tituloBloqueioRetornoObraService');
+const { resolveTituloStatusFilter } = require('../utils/tituloFinanceiroStatusFilter');
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -2201,11 +2202,18 @@ async function listarTitulos(req, filters = {}) {
     where.tipo = filters.tipo;
   }
   if (filters.status) {
-    // 'EM_ABERTO' é o composto usado pelos cartões de pendência do Hub:
-    // o MESMO conjunto de status que os contadores somam.
-    where.status = String(filters.status).trim().toUpperCase() === 'EM_ABERTO'
-      ? { [Op.in]: ['PREVISAO', 'ABERTO', 'PARCIAL'] }
-      : filters.status;
+    const statusFilter = resolveTituloStatusFilter(filters.status);
+    where.status = statusFilter.statuses.length === 1
+      ? statusFilter.statuses[0]
+      : { [Op.in]: statusFilter.statuses };
+
+    if (statusFilter.vencido) {
+      where[Op.and] = [
+        ...(Array.isArray(where[Op.and]) ? where[Op.and] : []),
+        { data_vencimento: { [Op.lt]: getHoje() } },
+        { valor_saldo: { [Op.gt]: 0 } }
+      ];
+    }
   }
   if (filters.codigo) {
     where[Op.and] = [

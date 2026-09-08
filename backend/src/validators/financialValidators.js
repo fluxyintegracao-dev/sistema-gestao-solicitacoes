@@ -9,6 +9,7 @@ const {
   CLASSIFICACOES_GERENCIAIS_FINANCEIRAS
 } = require('../constants/categoriaFinanceiraGerencial');
 const { onlyDigits, isValidCpfCnpj } = require('../utils/cpfCnpj');
+const { STATUS_TITULO_FILTROS_CALCULADOS } = require('../utils/tituloFinanceiroStatusFilter');
 
 const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
@@ -453,7 +454,12 @@ function validateFinanceTituloQuery(query = {}) {
 
   return {
     tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
-    status: parseEnum(query.status, 'Status', [...STATUS_TITULO, 'ATIVA', 'CANCELADA']),
+    status: parseEnum(query.status, 'Status', [
+      ...STATUS_TITULO,
+      ...STATUS_TITULO_FILTROS_CALCULADOS,
+      'ATIVA',
+      'CANCELADA'
+    ]),
     q: parseOptionalText(query.q, 'Busca', 120),
     codigo: parseOptionalText(query.codigo, 'Codigo do titulo', 40),
     empresa_id: parseInteger(query.empresa_id, 'Empresa do grupo'),

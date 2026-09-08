@@ -16,11 +16,16 @@ const COLORS = {
 };
 
 const STATUS_LABELS = {
+  EM_ABERTO: 'Em aberto',
+  ABERTO_VENCIDO: 'Aberto - vencido',
   ABERTO: 'Aberto',
+  PARCIAL_VENCIDO: 'Parcial - vencido',
   PARCIAL: 'Parcial',
+  PREVISAO: 'Previsao',
+  PREVISAO_VENCIDA: 'Previsao - vencida',
   PAGO: 'Pago',
   QUITADO: 'Quitado',
-  VENCIDO: 'Vencido',
+  VENCIDO: 'Vencidos em aberto',
   CANCELADO: 'Cancelado',
   CANCELADA: 'Cancelada',
   ATIVO: 'Ativo',

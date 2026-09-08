@@ -3,6 +3,7 @@ const {
   CategoriaFinanceira,
   ConciliacaoBancaria,
   ContaBancaria,
+  ContratoComercialParcela,
   EmpresaGrupo,
   MovimentoFinanceiro,
   ObraCustoHistorico,
@@ -303,6 +304,26 @@ function roundCurrency(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+function isTituloComercialPermuta(titulo = {}) {
+  const parcelas = Array.isArray(titulo?.parcelasComerciais)
+    ? titulo.parcelasComerciais
+    : [];
+  return parcelas.some((parcela) => (
+    String(parcela?.forma_recebimento_prevista || '').trim().toUpperCase() === 'PERMUTA'
+    || String(parcela?.periodicidade || '').trim().toUpperCase() === 'PERMUTA'
+  ));
+}
+
+function isFluxoCaixaPermuta(item = {}) {
+  return String(item?.forma_recebimento || '').trim().toUpperCase() === 'PERMUTA'
+    || Boolean(String(item?.tipo_permuta || '').trim())
+    || isTituloComercialPermuta(item?.titulo || item);
+}
+
+function limitarDataFinalRealizados(periodo, hoje = getHoje()) {
+  return String(periodo.data_final) < String(hoje) ? periodo.data_final : hoje;
+}
+
 async function carregarTitulosPrevistos(periodo, obraWhere) {
   if (obraWhere === null) {
     return [];
@@ -324,12 +345,22 @@ async function carregarTitulosPrevistos(periodo, obraWhere) {
   return TituloFinanceiro.findAll({
     attributes: ['id', 'tipo', 'data_vencimento', 'valor_saldo', 'intercompany', 'elimina_consolidado'],
     where,
-    raw: true
+    include: [{
+      model: ContratoComercialParcela,
+      as: 'parcelasComerciais',
+      attributes: ['forma_recebimento_prevista', 'periodicidade'],
+      required: false
+    }]
   });
 }
 
 async function carregarMovimentosRealizados(periodo, obraWhere) {
   if (obraWhere === null) {
+    return [];
+  }
+
+  const dataFinalRealizados = limitarDataFinalRealizados(periodo);
+  if (String(periodo.data_inicial) > String(dataFinalRealizados)) {
     return [];
   }
 
@@ -339,11 +370,20 @@ async function carregarMovimentosRealizados(periodo, obraWhere) {
   );
 
   return MovimentoFinanceiro.findAll({
-    attributes: ['id', 'data_movimento', 'valor_quitacao', 'juros', 'multa', 'desconto'],
+    attributes: [
+      'id',
+      'data_movimento',
+      'valor_quitacao',
+      'juros',
+      'multa',
+      'desconto',
+      'forma_recebimento',
+      'tipo_permuta'
+    ],
     where: {
       status: 'ATIVO',
       data_movimento: {
-        [Op.between]: [periodo.data_inicial, periodo.data_final]
+        [Op.between]: [periodo.data_inicial, dataFinalRealizados]
       }
     },
     include: [
@@ -352,7 +392,13 @@ async function carregarMovimentosRealizados(periodo, obraWhere) {
         as: 'titulo',
         attributes: ['id', 'tipo', 'intercompany', 'elimina_consolidado'],
         required: true,
-        where: tituloWhere
+        where: tituloWhere,
+        include: [{
+          model: ContratoComercialParcela,
+          as: 'parcelasComerciais',
+          attributes: ['forma_recebimento_prevista', 'periodicidade'],
+          required: false
+        }]
       }
     ],
     raw: false
@@ -453,11 +499,13 @@ async function gerarRelatorioFluxoCaixa(req, filters = {}) {
     carregarTitulosPrevistos(periodo, obraWhere),
     carregarMovimentosRealizados(periodo, obraWhere)
   ]);
+  const previstosMonetarios = previstos.filter((item) => !isFluxoCaixaPermuta(item));
+  const realizadosMonetarios = realizados.filter((item) => !isFluxoCaixaPermuta(item));
 
   const serie = acumularSerie({
     buckets: createBuckets(periodo),
-    previstos,
-    realizados,
+    previstos: previstosMonetarios,
+    realizados: realizadosMonetarios,
     agrupamento: periodo.agrupamento
   });
 
@@ -471,8 +519,8 @@ async function gerarRelatorioFluxoCaixa(req, filters = {}) {
       obra_id: filters.obra_id ? Number(filters.obra_id) : null
     },
     resumo: montarResumo({
-      previstos,
-      realizados,
+      previstos: previstosMonetarios,
+      realizados: realizadosMonetarios,
       serie
     }),
     serie
@@ -5177,6 +5225,9 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
 }
 
 module.exports = {
+  acumularSerie,
+  isFluxoCaixaPermuta,
+  limitarDataFinalRealizados,
   resolvePeriodo,
   gerarRelatorioAnalitico,
   gerarRelatorioConciliacaoContas,

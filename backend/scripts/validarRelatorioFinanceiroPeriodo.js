@@ -1,7 +1,11 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { resolvePeriodo } = require('../src/services/relatorioFinanceiroService');
+const {
+  isFluxoCaixaPermuta,
+  limitarDataFinalRealizados,
+  resolvePeriodo
+} = require('../src/services/relatorioFinanceiroService');
 
 function run() {
   const periodoLongo = resolvePeriodo({
@@ -31,6 +35,19 @@ function run() {
     }, { maxDays: 366 }),
     /periodo maximo do relatorio/
   );
+
+  assert.equal(limitarDataFinalRealizados({ data_final: '2100-12-31' }, '2026-09-08'), '2026-09-08');
+  assert.equal(limitarDataFinalRealizados({ data_final: '2026-08-31' }, '2026-09-08'), '2026-08-31');
+  assert.equal(isFluxoCaixaPermuta({ forma_recebimento: 'PERMUTA' }), true);
+  assert.equal(isFluxoCaixaPermuta({
+    titulo: {
+      parcelasComerciais: [{ periodicidade: 'PERMUTA' }]
+    }
+  }), true);
+  assert.equal(isFluxoCaixaPermuta({
+    forma_recebimento: 'PIX',
+    titulo: { parcelasComerciais: [] }
+  }), false);
 
   console.log('Validacao de periodo dos relatorios financeiros concluida com sucesso.');
 }
