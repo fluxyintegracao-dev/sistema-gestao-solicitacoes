@@ -79,7 +79,7 @@ function combinarItensSolicitacaoCompra(solicitacao, apropriacoes = []) {
     item_tipo: 'CADASTRADO',
     tipo: 'CADASTRADO',
     nome: item.insumo?.nome || '-',
-    unidade: item.unidade?.sigla || '-',
+    unidade: item.unidade_sigla_manual || item.unidade?.sigla || item.unidade?.nome || '-',
     quantidade: item.quantidade,
     especificacao: item.especificacao || '-',
     apropriacao_id: item.apropriacao_id || '',

@@ -987,6 +987,13 @@ function prepararItemCompraPayload({
     arquivo_nome_original: item?.arquivo_nome_original || null
   };
 
+  const unidadeManual = String(item?.unidade_sigla_manual || '').trim();
+  if (unidadeManual.length > 50) {
+    return {
+      erro: `Item ${index + 1}: a unidade deve ter no maximo 50 caracteres.`
+    };
+  }
+
   if (item?.manual || !item?.insumo_id) {
     if (!String(item?.nome_manual || '').trim() || !String(item?.unidade_sigla_manual || '').trim()) {
       return {
@@ -1011,13 +1018,19 @@ function prepararItemCompraPayload({
     };
   }
 
+  if (!Number(item?.unidade_id) && !unidadeManual) {
+    return {
+      erro: `Item ${index + 1}: informe uma unidade cadastrada ou uma UN livre.`
+    };
+  }
+
   return {
     manual: false,
     item: {
       ...baseItem,
       insumo_id: Number(item.insumo_id),
-      unidade_id: item?.unidade_id ? Number(item.unidade_id) : null,
-      unidade_sigla_manual: item?.unidade_sigla_manual || null
+      unidade_id: unidadeManual ? null : (item?.unidade_id ? Number(item.unidade_id) : null),
+      unidade_sigla_manual: unidadeManual || null
     },
     rateios
   };

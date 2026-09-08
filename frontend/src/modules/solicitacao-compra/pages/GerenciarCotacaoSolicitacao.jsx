@@ -3017,7 +3017,7 @@ export default function GerenciarCotacaoSolicitacao() {
       item_tipo: 'CADASTRADO',
       item_referencia_id: item.id,
       nome: item.insumo?.nome || '-',
-      unidade: item.unidade?.sigla || '-',
+      unidade: item.unidade_sigla_manual || item.unidade?.sigla || item.unidade?.nome || '-',
       quantidade: item.quantidade,
       especificacao: item.especificacao || '-',
       apropriacao_linhas: montarLinhasResumoApropriacao(item),

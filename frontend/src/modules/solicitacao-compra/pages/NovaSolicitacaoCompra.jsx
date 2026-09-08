@@ -135,11 +135,14 @@ function calcularValorTotalItem(item) {
 }
 
 function criarItemBase(insumo) {
+  const unidadeManual = String(insumo?.unidade_manual || '').trim();
+  const unidadeCadastrada = insumo?.unidade || null;
   return {
     insumo_id: insumo.id,
     insumo_nome: insumo.nome,
-    unidade_id: insumo.unidade_id,
-    unidade_sigla: insumo.unidade_manual || insumo.unidade?.sigla || '',
+    unidade_id: unidadeManual ? null : (insumo.unidade_id || unidadeCadastrada?.id || null),
+    unidade_sigla: unidadeManual || unidadeCadastrada?.sigla || unidadeCadastrada?.nome || '',
+    unidade_sigla_manual: unidadeManual,
     quantidade: '1',
     valor_unitario: '',
     valor_total: '',
@@ -577,10 +580,10 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 insumo_nome: item.manual
                   ? item.nome_manual || item.insumo_nome || ''
                   : resumoItem?.insumo_nome || item.insumo_nome || '',
-                unidade_id: item.manual ? null : item.unidade_id,
+                unidade_id: item.manual ? null : (item.unidade_sigla_manual ? null : item.unidade_id),
                 unidade_sigla: item.manual
                   ? item.unidade_sigla_manual || item.unidade_sigla || ''
-                  : resumoItem?.unidade_sigla || '',
+                  : item.unidade_sigla_manual || item.unidade_sigla || resumoItem?.unidade_sigla || '',
                 quantidade: String(item.quantidade ?? '1'),
                 valor_unitario: item.valor_unitario ? String(item.valor_unitario) : '',
                 valor_total: item.valor_total ? String(item.valor_total) : '',
@@ -593,9 +596,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 arquivo_nome_original: item.arquivo_nome_original || '',
                 manual: Boolean(item.manual),
                 nome_manual: item.manual ? item.nome_manual || item.insumo_nome || '' : '',
-                unidade_sigla_manual: item.manual
-                  ? item.unidade_sigla_manual || item.unidade_sigla || ''
-                  : ''
+                unidade_sigla_manual: item.unidade_sigla_manual
+                  || (item.manual ? item.unidade_sigla || '' : '')
               });
             })
           : []
@@ -1157,13 +1159,20 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     );
   }
 
-  function atualizarUnidadeItem(index, unidadeIdSelecionada) {
-    const unidade = unidades.find((item) => String(item.id) === String(unidadeIdSelecionada));
+  function atualizarUnidadeItem(index, valorDigitado) {
+    const texto = String(valorDigitado || '');
+    const itemAtual = itens[index];
+    const textoNormalizado = normalizarTexto(texto).trim();
+    const unidade = unidades.find((item) => (
+      [item.sigla, item.nome, `${item.sigla || ''} - ${item.nome || ''}`]
+        .some((valor) => normalizarTexto(valor).trim() === textoNormalizado)
+    ));
+    const unidadeSigla = unidade?.sigla || unidade?.nome || texto;
     limparErroItem(index, 'unidade');
     atualizarCamposItem(index, {
       unidade_id: unidade?.id || null,
-      unidade_sigla: unidade?.sigla || unidade?.nome || '',
-      unidade_sigla_manual: unidade?.sigla || unidade?.nome || ''
+      unidade_sigla: unidadeSigla,
+      unidade_sigla_manual: itemAtual?.manual ? unidadeSigla : (unidade ? '' : texto)
     });
   }
 
@@ -1426,6 +1435,10 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         reprovarItem(index, 'quantidade', `Item ${index + 1}: informe a quantidade.`);
         return;
       }
+      if (!item.unidade_id && !String(item.unidade_sigla || item.unidade_sigla_manual || '').trim()) {
+        reprovarItem(index, 'unidade', `Item ${index + 1}: informe a unidade.`);
+        return;
+      }
       if (modoCompraDireta && parseValorMonetario(item.valor_unitario) <= 0) {
         reprovarItem(index, 'valor_unitario', `Item ${index + 1}: informe o valor unitario.`);
         return;
@@ -1523,7 +1536,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         itens: itensNormalizados.map((item) => ({
           manual: Boolean(item.manual),
           insumo_id: item.manual ? null : item.insumo_id,
-          unidade_id: item.manual ? null : item.unidade_id,
+          unidade_id: item.manual || item.unidade_sigla_manual ? null : item.unidade_id,
           apropriacao_id: item.apropriacao_id,
           apropriacoes: item.apropriacoes,
           quantidade: Number(item.quantidade),
@@ -1535,7 +1548,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           arquivo_url: item.arquivo_url || null,
           arquivo_nome_original: item.arquivo_nome_original || null,
           nome_manual: item.manual ? item.nome_manual : null,
-          unidade_sigla_manual: item.manual ? item.unidade_sigla_manual : (item.unidade_id ? null : item.unidade_sigla)
+          unidade_sigla_manual: item.unidade_sigla_manual
+            || (item.unidade_id ? null : item.unidade_sigla)
         }))
       };
 
@@ -2205,21 +2219,28 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                   tipo: 'codigo',
                   render: (item) => (
                     <>
-                      <select
+                      <input
                         className="input"
                         aria-label="Unidade do item"
-                        value={item.unidade_id ? String(item.unidade_id) : ''}
+                        list={`unidades-item-${item.__indice}`}
+                        value={item.unidade_sigla || ''}
+                        maxLength={50}
+                        placeholder="Digite ou selecione a UN"
                         onChange={(event) => atualizarUnidadeItem(item.__indice, event.target.value)}
-                      >
-                        <option value="">Selecione</option>
+                      />
+                      <datalist id={`unidades-item-${item.__indice}`}>
                         {unidades.map((unidade) => (
-                          <option key={unidade.id || unidade.sigla} value={unidade.id}>
-                            {unidade.sigla || unidade.nome}{unidade.nome && unidade.sigla ? ` - ${unidade.nome}` : ''}
-                          </option>
+                          <option
+                            key={unidade.id || unidade.sigla}
+                            value={unidade.sigla || unidade.nome}
+                            label={unidade.nome && unidade.sigla ? unidade.nome : undefined}
+                          />
                         ))}
-                      </select>
+                      </datalist>
                       {!item.unidade_id && item.unidade_sigla ? (
-                        <p className="mt-1 text-xs text-[var(--c-muted)]">Atual: {item.unidade_sigla}</p>
+                        <p className="mt-1 text-xs text-[var(--sem-warning)]">
+                          UN ainda não cadastrada; será mantida neste item para tratamento pelo GEO.
+                        </p>
                       ) : null}
                       <ErroCampo mensagem={erroDoItem(item.__indice, 'unidade')} />
                     </>

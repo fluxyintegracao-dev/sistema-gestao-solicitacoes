@@ -431,7 +431,7 @@ function obterBaseItemPorResposta(solicitacao, resposta) {
       solicitacao_compra_item_id: item.id,
       solicitacao_compra_item_manual_id: null,
       descricao: item.insumo?.nome || `Item ${item.id}`,
-      unidade: item.unidade?.sigla || null,
+      unidade: item.unidade_sigla_manual || item.unidade?.sigla || item.unidade?.nome || null,
       quantidade_solicitada: roundQty(item.quantidade)
     };
   }
@@ -998,7 +998,7 @@ function montarMapaSaldosSolicitacao(solicitacao) {
       item_tipo: 'CADASTRADO',
       item_referencia_id: Number(item.id),
       descricao: item.insumo?.nome || `Item ${item.id}`,
-      unidade: item.unidade?.sigla || null,
+      unidade: item.unidade_sigla_manual || item.unidade?.sigla || item.unidade?.nome || null,
       quantidade_atual: roundQty(item.quantidade),
       quantidade_fechada: 0,
       saldo: 0

@@ -135,7 +135,7 @@ function obterItensCotaveis(solicitacao) {
       item_referencia_id: obterItemReferenciaId(item),
       nome: item.insumo?.nome || '-',
       quantidade: Number(item.quantidade || 0),
-      unidade: item.unidade?.sigla || '-',
+      unidade: item.unidade_sigla_manual || item.unidade?.sigla || item.unidade?.nome || '-',
       especificacao: item.especificacao || '',
       necessario_para: item.necessario_para || null,
       link_produto: item.link_produto || null,

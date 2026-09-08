@@ -741,7 +741,7 @@ export default function SolicitacaoDetalhe() {
         ...item,
         item_tipo: 'CADASTRADO',
         descricao: item?.insumo?.nome || item?.descricao || `Item #${item?.id || ''}`,
-        unidade_label: item?.unidade?.sigla || item?.unidade?.nome || item?.unidade_sigla || ''
+        unidade_label: item?.unidade_sigla_manual || item?.unidade?.sigla || item?.unidade?.nome || item?.unidade_sigla || ''
       })),
       ...itensManuais.map(mapearItemManualCompraDireta)
     ];
