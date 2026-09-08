@@ -762,10 +762,8 @@ export default function NovaSolicitacao() {
   const rotuloDataSolicitacao = obterRotuloDataSolicitacao(comportamentoTipo, {
     recargaCartao: usaFluxoRecargaCartao
   });
-  const rotuloContratoVinculado = tipoEhDeMedicao ? 'Título do Contrato' : 'Ref. do Contrato';
-  const placeholderContratoVinculado = tipoEhDeMedicao
-    ? 'Buscar pelo título do contrato'
-    : 'Buscar por referência do contrato';
+  const rotuloContratoVinculado = 'Ref. do Contrato';
+  const placeholderContratoVinculado = 'Buscar por referência do contrato';
 
   useEffect(() => {
     if (!usaApropriacaoAutomaticaObra || !form.obra_id || !form.tipo_solicitacao_id) {
@@ -1499,8 +1497,8 @@ export default function NovaSolicitacao() {
       reprovarCampo('contrato_id', 'Selecione um contrato.');
       return;
     }
-    if (camposContratoObrigatorios && !refContratoBusca.trim()) {
-      reprovarCampo('ref_contrato', `Informe ${tipoEhDeMedicao ? 'o título do contrato' : 'a ref. do contrato'}.`);
+    if (camposContratoObrigatorios && !tipoEhDeMedicao && !refContratoBusca.trim()) {
+      reprovarCampo('ref_contrato', 'Informe a ref. do contrato.');
       return;
     }
     if (itensApropriacaoObrigatorio && !form.itens_apropriacao && apropriacoesRateioSelecionadas.length === 0) {
@@ -2013,6 +2011,13 @@ export default function NovaSolicitacao() {
   }
 
   const contratosDisponiveis = contratosRef.length > 0 ? contratosRef : contratos;
+  const contratosAutocomplete = useMemo(() => contratosDisponiveis.map((contrato) => ({
+    ...contrato,
+    descricao: [
+      contrato.ref_contrato || contrato.titulo || 'Sem título informado',
+      contrato.disponivel_medicao === false ? 'retorno necessário' : ''
+    ].filter(Boolean).join(' — ')
+  })), [contratosDisponiveis]);
   const contratoSelecionado = useMemo(() => {
     if (!form.contrato_id) return null;
     return [...contratosDisponiveis, ...contratos, ...contratosRef]
@@ -2542,18 +2547,6 @@ export default function NovaSolicitacao() {
               </select>
             </CampoForm>
 
-            {catalogoDestino.status === 'success' && (
-              <div className="form-campo--linha flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-xs">
-                <span className="font-semibold text-[var(--c-text)]">
-                  Destino inicial: {catalogoDestino.destino?.nome || 'GEO'}
-                </span>
-                <span className="text-[var(--c-muted)]">Status: PENDENTE</span>
-                <span className="text-[var(--c-muted)]">
-                  Catálogo: {catalogoDestino.contexto === 'CENTRO_CUSTO' ? 'específico deste Centro de Custo' : 'padrão para Obras'}
-                </span>
-              </div>
-            )}
-
             {catalogoDestino.status === 'error' && (
               <p className="form-campo--linha form-hint text-[var(--c-danger)]">{catalogoDestino.erro}</p>
             )}
@@ -2580,7 +2573,7 @@ export default function NovaSolicitacao() {
             onSolicitacaoAnteriorEnviada={limparCamposNovaRecargaAposReenvio}
           />
 
-          {(exibirCamposContrato || exibirCampoSubtipo || exibirCampoCredor
+          {!tipoEhDeMedicao && (exibirCamposContrato || exibirCampoSubtipo || exibirCampoCredor
             || exibirFormaPagamento || exibirFavorecidoPagamento) && (
             <FormSecao legenda="Vínculo e pagamento" colunas={2}>
               {exibirCamposContrato && (
@@ -2820,7 +2813,9 @@ export default function NovaSolicitacao() {
         {exibirCamposContrato && (
           <BlocoConteudo
             titulo="Contrato"
-            descricao="Contrato ao qual esta solicitação se vincula e a divisão dela entre as apropriações do contrato."
+            descricao={tipoEhDeMedicao
+              ? 'Contrato e credor vinculados à medição, com a divisão entre as apropriações contratuais.'
+              : 'Contrato ao qual esta solicitação se vincula e a divisão dela entre as apropriações do contrato.'}
           >
             <FormSecao colunas={2}>
               <CampoForm
@@ -2828,31 +2823,30 @@ export default function NovaSolicitacao() {
                 obrigatorio={camposContratoObrigatorios}
                 erro={errosCampo.contrato_id}
               >
-                <select
-                  name="contrato_id"
-                  onChange={e => {
-                    const contratoId = e.target.value;
+                <ApropriacaoAutocomplete
+                  value={form.contrato_id}
+                  options={contratosAutocomplete}
+                  onChange={(contratoId) => {
                     const contrato = contratosDisponiveis.find(c => String(c.id) === String(contratoId));
                     limparErroCampo('contrato_id');
+                    limparErroCampo('ref_contrato');
                     aplicarContratoSelecionado(contrato || null);
                     if (!contratoId) {
                       setContratosRef([]);
                     }
                   }}
-                  className="input input-sm"
                   disabled={!form.obra_id && contratosDisponiveis.length === 0}
-                  value={form.contrato_id}
                   required={camposContratoObrigatorios}
-                >
-                  <option value="">Não vincular</option>
-                  {contratosDisponiveis.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.codigo} - {c.ref_contrato || '-'}
-                      {c.disponivel_medicao === false ? ' — retorno necessario' : ''}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Digite o código ou o título do contrato"
+                  disabledPlaceholder={!form.obra_id
+                    ? 'Selecione a obra primeiro'
+                    : 'Nenhum contrato disponível'}
+                  emptyText="Nenhum contrato encontrado"
+                  inputClassName="input input-sm w-full"
+                />
               </CampoForm>
+
+              {tipoEhDeMedicao && exibirCampoCredor && renderCampoCredor()}
             </FormSecao>
 
             {tipoEhDeMedicao && contratoSelecionadoMedicaoBloqueada && (
