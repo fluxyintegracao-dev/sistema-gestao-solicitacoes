@@ -11,6 +11,7 @@ import {
   atualizarQuantidadeItemSolicitacaoCompra,
   baixarPdfSolicitacaoCompra,
   cancelarSolicitacaoCompra,
+  cadastrarUnidadeItemSolicitacaoCompra,
   encaminharSolicitacaoCompraParaCompras,
   obterSolicitacaoCompra
 } from '../../../services/compras';
@@ -80,6 +81,8 @@ function combinarItensSolicitacaoCompra(solicitacao, apropriacoes = []) {
     tipo: 'CADASTRADO',
     nome: item.insumo?.nome || '-',
     unidade: item.unidade_sigla_manual || item.unidade?.sigla || item.unidade?.nome || '-',
+    unidade_id: item.unidade_id || item.unidade?.id || null,
+    unidade_sigla_manual: item.unidade_sigla_manual || '',
     quantidade: item.quantidade,
     especificacao: item.especificacao || '-',
     apropriacao_id: item.apropriacao_id || '',
@@ -139,6 +142,7 @@ export default function SolicitacaoCompraDetalheView() {
   const [loading, setLoading] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [salvandoQuantidadeId, setSalvandoQuantidadeId] = useState(null);
+  const [cadastrandoUnidadeId, setCadastrandoUnidadeId] = useState(null);
   /*
     A EDIÇÃO DE QUANTIDADE VIROU FORMULÁRIO (05/09).
 
@@ -231,6 +235,7 @@ export default function SolicitacaoCompraDetalheView() {
   const usuarioEhCompras = userHasSetorCapability(user, 'eh_setor_compras');
   const edicaoGeoPermitidaNoEstagio = !usuarioEhGeo || usuarioEhCompras || aguardandoRevisaoGeo;
   const podeEditarQuantidadeItem = canAlterarQuantidadeSolicitacaoCompra(user) && edicaoGeoPermitidaNoEstagio;
+  const podeCadastrarUnidadeItem = podeEditarQuantidadeItem;
   const podeEditarApropriacoesItem =
     (canEditarApropriacoesItemSolicitacaoCompra(user) || canEditarApropriacoesItemCompraDireta(user))
     && edicaoGeoPermitidaNoEstagio;
@@ -257,6 +262,31 @@ export default function SolicitacaoCompraDetalheView() {
       avisar.erro(error.message || 'Erro ao abrir PDF');
     } finally {
       setBaixando(false);
+    }
+  }
+
+  async function handleCadastrarUnidadeItem(item) {
+    const unidadeLivre = String(item?.unidade_sigla_manual || '').trim();
+    if (!unidadeLivre) return;
+
+    const { ok } = await confirmar({
+      titulo: 'Cadastrar unidade de medida',
+      mensagem: `Cadastrar "${unidadeLivre}" no catálogo de unidades e vinculá-la somente a este item? A unidade padrão do insumo não será alterada.`,
+      rotuloConfirmar: 'Cadastrar UN'
+    });
+    if (!ok) return;
+
+    const loadingKey = `${item.item_tipo}-${item.id}`;
+    try {
+      setCadastrandoUnidadeId(loadingKey);
+      const data = await cadastrarUnidadeItemSolicitacaoCompra(id, item.id);
+      setSolicitacao(data || null);
+      avisar.sucesso(`UN ${unidadeLivre} cadastrada e vinculada ao item.`);
+    } catch (error) {
+      console.error(error);
+      avisar.erro(error.message || 'Erro ao cadastrar a unidade informada no item');
+    } finally {
+      setCadastrandoUnidadeId(null);
     }
   }
 
@@ -666,11 +696,14 @@ export default function SolicitacaoCompraDetalheView() {
                 podeEditarQuantidade={podeEditarQuantidadeItem}
                 podeEditarApropriacao={podeEditarApropriacoesItem}
                 podeCatalogar={podeCatalogarItensManuais}
+                podeCadastrarUnidade={podeCadastrarUnidadeItem}
                 bloqueado={solicitacaoCompraCancelada}
+                cadastrandoUnidade={cadastrandoUnidadeId === loadingKey}
                 salvandoQuantidade={salvandoQuantidadeId === loadingKey}
                 salvandoApropriacao={salvandoApropriacaoId === loadingKey}
                 onEditarQuantidade={abrirModalQuantidade}
                 onEditarApropriacao={abrirModalApropriacao}
+                onCadastrarUnidade={handleCadastrarUnidadeItem}
                 onCatalogado={carregar}
               />
             );

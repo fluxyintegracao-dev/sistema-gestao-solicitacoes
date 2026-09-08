@@ -3412,6 +3412,117 @@ module.exports = {
     }
   },
 
+  async cadastrarUnidadeItem(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      const solicitacao = await carregarSolicitacaoCompra(req.params.id);
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const compraDireta = isSolicitacaoCompraDireta(solicitacao);
+      const podeGerenciar = await canEditarItensSolicitacaoCompra(usuario)
+        || (compraDireta && await canEditarApropriacoesItemCompraDireta(usuario));
+      if (!podeGerenciar) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para cadastrar a unidade informada no item.' });
+      }
+
+      if (['CANCELADA', 'CANCELADO', 'INATIVA'].includes(String(solicitacao.status || '').toUpperCase())) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Solicitacao cancelada ou inativa nao permite cadastrar unidade de item.' });
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
+      }
+
+      const item = await SolicitacaoCompraItem.findOne({
+        where: {
+          id: Number(req.params.itemId),
+          solicitacao_compra_id: Number(solicitacao.id)
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!item) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Item cadastrado da solicitacao de compra nao encontrado.' });
+      }
+
+      const unidadeLivre = String(item.unidade_sigla_manual || '').replace(/\s+/g, ' ').trim();
+      if (!unidadeLivre) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Este item nao possui uma UN livre pendente de cadastro.' });
+      }
+      if (unidadeLivre.length > 50) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'A UN livre deve ter no maximo 50 caracteres.' });
+      }
+
+      const tokenUnidade = normalizeTextCompra(unidadeLivre);
+      const unidades = await Unidade.findAll({
+        attributes: ['id', 'nome', 'sigla', 'ativo'],
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      let unidade = unidades.find((registro) => (
+        normalizeTextCompra(registro.sigla) === tokenUnidade
+        || normalizeTextCompra(registro.nome) === tokenUnidade
+      ));
+      const unidadeJaExistia = Boolean(unidade);
+
+      if (unidade) {
+        if (unidade.ativo === false) {
+          await unidade.update({ ativo: true }, { transaction });
+        }
+      } else {
+        unidade = await Unidade.create({
+          nome: unidadeLivre,
+          sigla: unidadeLivre,
+          ativo: true
+        }, { transaction });
+      }
+
+      await item.update({
+        unidade_id: Number(unidade.id),
+        unidade_sigla_manual: null
+      }, { transaction });
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'ITEM_UNIDADE_CADASTRADA',
+        descricao: `${unidadeJaExistia ? 'Unidade existente vinculada' : 'Unidade cadastrada'} ao item ${item.id}`,
+        metadados: {
+          item_id: item.id,
+          item_tipo: 'CADASTRADO',
+          unidade_id: unidade.id,
+          unidade_informada: unidadeLivre,
+          unidade_ja_existia: unidadeJaExistia
+        },
+        transaction
+      });
+
+      await transaction.commit();
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json(atualizada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao cadastrar a unidade informada no item.' });
+    }
+  },
+
   async atualizarApropriacoesItem(req, res) {
     const transaction = await SolicitacaoCompra.sequelize.transaction();
 

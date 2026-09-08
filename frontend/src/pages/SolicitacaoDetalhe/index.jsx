@@ -47,6 +47,7 @@ import {
 } from '../../services/solicitacoes';
 import {
   atualizarApropriacoesItemSolicitacaoCompra,
+  cadastrarUnidadeItemSolicitacaoCompra,
   obterSolicitacaoCompraPorSolicitacao
 } from '../../services/compras';
 import { listarApropriacoes } from '../../services/apropriacoes';
@@ -285,6 +286,7 @@ export default function SolicitacaoDetalhe() {
   const podeEditarItensSolicitacaoCompraBase = moduloComprasHabilitado && (
     canAlterarQuantidadeSolicitacaoCompra(user) || canEditarApropriacoesItemSolicitacaoCompra(user)
   );
+  const podeCadastrarUnidadeCompraDireta = podeEditarItensCompraDiretaBase || podeEditarItensSolicitacaoCompraBase;
   const podeCatalogarItensManuaisCompra = moduloComprasHabilitado && canCatalogarItensManuaisCompras(user);
 
   const [solicitacao, setSolicitacao] = useState(null);
@@ -812,6 +814,42 @@ export default function SolicitacaoDetalhe() {
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'O item foi catalogado, mas a lista nao pôde ser atualizada. Reabra os itens da compra direta.');
+    }
+  }
+
+  async function cadastrarUnidadeCompraDireta() {
+    const compraAlvo = Number(compraDiretaDetalhe?.id || 0);
+    const itemAlvo = itemCompraDiretaSelecionado;
+    const unidadeLivre = String(itemAlvo?.unidade_sigla_manual || '').trim();
+    if (!compraAlvo || itemAlvo?.item_tipo !== 'CADASTRADO' || !unidadeLivre) return;
+
+    const { ok } = await confirmar({
+      titulo: 'Cadastrar unidade de medida',
+      mensagem: `Cadastrar "${unidadeLivre}" no catálogo de unidades e vinculá-la somente a este item? A unidade padrão do insumo não será alterada.`,
+      rotuloConfirmar: 'Cadastrar UN'
+    });
+    if (!ok) return;
+
+    try {
+      setSalvandoCompraDireta(true);
+      const data = await cadastrarUnidadeItemSolicitacaoCompra(compraAlvo, itemAlvo.id);
+      setCompraDiretaDetalhe(data || null);
+      const itemAtualizado = (data?.itens || []).find((item) => Number(item.id) === Number(itemAlvo.id));
+      if (itemAtualizado) {
+        selecionarItemCompraDireta({
+          ...itemAtualizado,
+          item_tipo: 'CADASTRADO',
+          descricao: itemAtualizado?.insumo?.nome || itemAtualizado?.descricao || `Item #${itemAtualizado.id}`,
+          unidade_label: itemAtualizado?.unidade?.sigla || itemAtualizado?.unidade?.nome || ''
+        });
+      }
+      registrarMutacaoLocal(solicitacao?.id);
+      avisar.sucesso(`UN ${unidadeLivre} cadastrada e vinculada ao item.`);
+    } catch (error) {
+      console.error(error);
+      avisar.erro(error?.message || 'Erro ao cadastrar a unidade informada no item');
+    } finally {
+      setSalvandoCompraDireta(false);
     }
   }
 
@@ -1729,7 +1767,7 @@ export default function SolicitacaoDetalhe() {
                         <span className="text-xs text-muted">
                           {item.item_tipo === 'MANUAL'
                             ? (item.insumo_catalogado_id ? 'Manual · catalogado' : 'Manual · pendente de cadastro')
-                            : 'Cadastro oficial'}
+                            : (item.unidade_sigla_manual ? 'Cadastro oficial · UN pendente' : 'Cadastro oficial')}
                         </span>
                         <span className="text-xs text-muted">{resumoApropriacao}</span>
                       </span>
@@ -1771,6 +1809,20 @@ export default function SolicitacaoDetalhe() {
                           Editar apropriações
                         </button>
                       ) : null}
+                      {itemCompraDiretaSelecionado.item_tipo === 'CADASTRADO'
+                        && itemCompraDiretaSelecionado.unidade_sigla_manual
+                        && podeCadastrarUnidadeCompraDireta ? (
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={cadastrarUnidadeCompraDireta}
+                            disabled={salvandoCompraDireta}
+                          >
+                            {salvandoCompraDireta
+                              ? 'Cadastrando UN...'
+                              : `Cadastrar UN ${itemCompraDiretaSelecionado.unidade_sigla_manual}`}
+                          </button>
+                        ) : null}
                     </span>
                   )}
                 >

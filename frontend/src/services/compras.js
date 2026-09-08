@@ -752,6 +752,14 @@ export async function atualizarQuantidadeItemSolicitacaoCompra(id, itemId, data)
   return handleJsonResponse(response, 'Erro ao atualizar quantidade do item da solicitacao de compra');
 }
 
+export async function cadastrarUnidadeItemSolicitacaoCompra(id, itemId) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/itens/${itemId}/cadastrar-unidade`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao cadastrar a unidade informada no item');
+}
+
 export async function atualizarApropriacoesItemSolicitacaoCompra(id, itemId, data) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/itens/${itemId}/apropriacoes`, {
     method: 'PATCH',

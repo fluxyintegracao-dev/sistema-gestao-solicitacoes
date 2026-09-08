@@ -3,6 +3,9 @@ import { fileUrl } from '../../../services/api';
 import TratamentoItemManual from './TratamentoItemManual';
 
 export function statusCatalogacao(item) {
+  if (item.tipo !== 'MANUAL' && item.unidade_sigla_manual) {
+    return { label: 'UN pendente', className: 'is-pending' };
+  }
   if (item.tipo !== 'MANUAL') return { label: 'Cadastro oficial', className: 'is-official' };
   if (item.insumo_catalogado_id) return { label: 'Catalogado', className: 'is-cataloged' };
   return { label: 'Pendente de cadastro', className: 'is-pending' };
@@ -23,11 +26,14 @@ export default function ItemCompraDetalhe({
   podeEditarQuantidade,
   podeEditarApropriacao,
   podeCatalogar,
+  podeCadastrarUnidade,
   bloqueado,
+  cadastrandoUnidade,
   salvandoQuantidade,
   salvandoApropriacao,
   onEditarQuantidade,
   onEditarApropriacao,
+  onCadastrarUnidade,
   onCatalogado
 }) {
   const detalheId = `compra-item-detalhe-${item.item_tipo}-${item.id}`;
@@ -51,6 +57,11 @@ export default function ItemCompraDetalhe({
               {salvandoApropriacao ? 'Salvando apropriacao...' : 'Editar apropriacao'}
             </button>
           ) : null}
+          {item.tipo !== 'MANUAL' && item.unidade_sigla_manual && podeCadastrarUnidade && !bloqueado ? (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => onCadastrarUnidade(item)} disabled={cadastrandoUnidade}>
+              {cadastrandoUnidade ? 'Cadastrando UN...' : `Cadastrar UN ${item.unidade_sigla_manual}`}
+            </button>
+          ) : null}
           {item.link_produto ? (
             <a className="btn btn-outline btn-sm" href={item.link_produto} target="_blank" rel="noreferrer">
               <HiOutlineLink aria-hidden="true" /> Abrir link
@@ -63,6 +74,13 @@ export default function ItemCompraDetalhe({
           ) : null}
         </div>
       </div>
+
+      {item.tipo !== 'MANUAL' && item.unidade_sigla_manual ? (
+        <div className="compra-item-permission-note">
+          UN livre informada neste item: <strong>{item.unidade_sigla_manual}</strong>.
+          {podeCadastrarUnidade ? ' Cadastre para vinculá-la ao catálogo de unidades.' : ' Aguardando um usuário com permissão para gerenciar itens.'}
+        </div>
+      ) : null}
 
       {item.tipo === 'MANUAL' && item.insumoCatalogado ? (
         <div className="compra-item-cataloged-banner">
