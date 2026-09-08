@@ -692,6 +692,18 @@ export async function criarPrevisoesPedidoCompra(id, data) {
   return handleJsonResponse(response, 'Erro ao criar as previsoes do pedido');
 }
 
+export async function reparcelarPrevisoesPedidoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/financeiro/previsoes/reparcelar`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': pedidoFinanceiroIdempotencyKey('reparcelamento', id)
+    }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao alterar as parcelas das previsoes do pedido');
+}
+
 export async function registrarDocumentoFinanceiroPedidoCompra(id, data) {
   const response = await fetch(`${API_URL}/compras/pedidos/${id}/financeiro/documentos`, {
     method: 'POST',

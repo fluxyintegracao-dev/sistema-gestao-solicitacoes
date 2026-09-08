@@ -5,6 +5,7 @@ const {
   decidirReaberturaGeo,
   liberarTitulosPedido,
   obterResumoFinanceiroPedido,
+  reparcelarPrevisoesPedido,
   registrarDocumentoFinanceiro,
   solicitarReaberturaGeo
 } = require('../services/pedidoCompraFinanceiroService');
@@ -47,6 +48,16 @@ module.exports = {
       idempotencyKey: chaveIdempotencia(req),
       transaction
     }), 'Erro ao criar as previsoes financeiras do pedido', 201);
+  },
+
+  async reparcelarPrevisoes(req, res) {
+    return executarComTransacao(req, res, (transaction) => reparcelarPrevisoesPedido({
+      req,
+      pedidoId: req.params.id,
+      payload: req.body,
+      idempotencyKey: chaveIdempotencia(req),
+      transaction
+    }), 'Erro ao alterar as parcelas das previsoes financeiras do pedido');
   },
 
   async registrarDocumento(req, res) {

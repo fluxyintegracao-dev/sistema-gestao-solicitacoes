@@ -8,6 +8,7 @@ import {
   decidirReaberturaPedidoCompra,
   liberarTitulosPedidoCompra,
   obterUrlAssinadaCompra,
+  reparcelarPrevisoesPedidoCompra,
   registrarDocumentoFinanceiroPedidoCompra,
   uploadAnexoTemporarioCompra
 } from '../../../services/compras';
@@ -72,6 +73,7 @@ export default function PedidoCompraFinanceiro({ pedido, user, avisar, onAtualiz
   const [categoriaId, setCategoriaId] = useState('');
   const [descricao, setDescricao] = useState('');
   const [parcelas, setParcelas] = useState([{ valor: valorInput(totalPedido), data_vencimento: amanhaOuHoje() }]);
+  const [editandoParcelas, setEditandoParcelas] = useState(false);
   const [selecionados, setSelecionados] = useState([]);
   const [formaPagamentoId, setFormaPagamentoId] = useState('');
   const [documento, setDocumento] = useState({
@@ -84,6 +86,7 @@ export default function PedidoCompraFinanceiro({ pedido, user, avisar, onAtualiz
 
   useEffect(() => {
     setParcelas([{ valor: valorInput(totalPedido), data_vencimento: amanhaOuHoje() }]);
+    setEditandoParcelas(false);
   }, [pedido?.id, totalPedido]);
 
   const titulos = financeiro?.titulos || [];
@@ -95,6 +98,12 @@ export default function PedidoCompraFinanceiro({ pedido, user, avisar, onAtualiz
   );
   const pedidoFechado = ['FECHADO_FORNECEDOR', 'ENCERRADO'].includes(String(pedido?.status || '').toUpperCase());
   const podeCriarPrevisao = podePrever && !financeiro?.legado && titulosAtivos.length === 0 && pedidoFechado;
+  const podeReparcelarPrevisao = podePrever
+    && !financeiro?.legado
+    && pedidoFechado
+    && previsoes.length > 0
+    && previsoes.length === titulosAtivos.length;
+  const exibirFormularioParcelas = podeCriarPrevisao || (podeReparcelarPrevisao && editandoParcelas);
   const reabertura = financeiro?.reabertura;
 
   if (!podeVer || !financeiro) return null;
@@ -120,14 +129,53 @@ export default function PedidoCompraFinanceiro({ pedido, user, avisar, onAtualiz
   }
 
   function adicionarParcela() {
-    setParcelas((atuais) => [...atuais, { valor: '0,00', data_vencimento: amanhaOuHoje() }]);
+    if (parcelas.length >= 120) {
+      avisar.alerta('O pedido permite no máximo 120 parcelas.');
+      return;
+    }
+    setParcelas((atuais) => {
+      if (!atuais.length) return [{ valor: valorInput(totalPedido), data_vencimento: amanhaOuHoje() }];
+      const ultimoIndice = atuais.length - 1;
+      const ultimoValorCentavos = Math.round(numeroMoeda(atuais[ultimoIndice].valor) * 100);
+      if (ultimoValorCentavos <= 1) {
+        return [...atuais, { valor: '0,00', data_vencimento: atuais[ultimoIndice].data_vencimento || amanhaOuHoje() }];
+      }
+      const primeiraParte = Math.floor(ultimoValorCentavos / 2) / 100;
+      const segundaParte = (ultimoValorCentavos - Math.floor(ultimoValorCentavos / 2)) / 100;
+      return atuais.flatMap((parcela, index) => (
+        index === ultimoIndice
+          ? [
+              { ...parcela, valor: valorInput(primeiraParte) },
+              { ...parcela, valor: valorInput(segundaParte) }
+            ]
+          : [parcela]
+      ));
+    });
   }
 
   function removerParcela(index) {
     setParcelas((atuais) => atuais.filter((_, posicao) => posicao !== index));
   }
 
-  async function criarPrevisoes() {
+  function iniciarEdicaoParcelas() {
+    const atuais = previsoes.map((item) => ({
+      valor: valorInput(item.titulo?.valor_original),
+      data_vencimento: String(item.titulo?.data_vencimento || '').slice(0, 10)
+    }));
+    const primeiroTitulo = previsoes[0]?.titulo;
+    setCategoriaId(primeiroTitulo?.categoria_financeira_id ? String(primeiroTitulo.categoria_financeira_id) : '');
+    setDescricao(String(primeiroTitulo?.descricao || ''));
+    setParcelas(atuais.length ? atuais : [{ valor: valorInput(totalPedido), data_vencimento: amanhaOuHoje() }]);
+    setSelecionados([]);
+    setEditandoParcelas(true);
+  }
+
+  function cancelarEdicaoParcelas() {
+    setEditandoParcelas(false);
+    setParcelas([{ valor: valorInput(totalPedido), data_vencimento: amanhaOuHoje() }]);
+  }
+
+  async function salvarPrevisoes() {
     if (!categoriaId) return avisar.alerta('Selecione a categoria financeira.');
     if (!parcelas.length || parcelas.some((parcela) => numeroMoeda(parcela.valor) <= 0 || !parcela.data_vencimento)) {
       return avisar.alerta('Informe valor e vencimento válidos para todas as parcelas.');
@@ -135,14 +183,25 @@ export default function PedidoCompraFinanceiro({ pedido, user, avisar, onAtualiz
     if (Math.abs(somaParcelas - totalPedido) >= 0.01) {
       return avisar.alerta('A soma das parcelas precisa ser igual ao total devido ao fornecedor.');
     }
-    return executar('previsoes', () => criarPrevisoesPedidoCompra(pedido.id, {
+    const payload = {
       categoria_financeira_id: Number(categoriaId),
       descricao: descricao.trim() || undefined,
       parcelas: parcelas.map((parcela) => ({
         valor: numeroMoeda(parcela.valor),
         data_vencimento: parcela.data_vencimento
       }))
-    }), 'Previsões financeiras criadas para este pedido.');
+    };
+    const reparcelando = editandoParcelas && podeReparcelarPrevisao;
+    return executar('previsoes', async () => {
+      if (reparcelando) {
+        await reparcelarPrevisoesPedidoCompra(pedido.id, payload);
+        setEditandoParcelas(false);
+      } else {
+        await criarPrevisoesPedidoCompra(pedido.id, payload);
+      }
+    }, reparcelando
+      ? 'Parcelas das previsões atualizadas para este pedido.'
+      : 'Previsões financeiras criadas para este pedido.');
   }
 
   async function salvarDocumento() {
@@ -216,10 +275,13 @@ export default function PedidoCompraFinanceiro({ pedido, user, avisar, onAtualiz
         </div>
       ) : null}
 
-      {podeCriarPrevisao ? (
+      {exibirFormularioParcelas ? (
         <div className="mt-4 border-t border-[var(--c-border)] pt-4">
-          <h3 className="font-semibold text-[var(--c-text)]">Criar títulos de previsão</h3>
-          <p className="mt-1 text-sm text-[var(--c-muted)]">Distribua {moeda(totalPedido)} entre as parcelas. O Financeiro ainda não poderá baixá-las.</p>
+          <h3 className="font-semibold text-[var(--c-text)]">{editandoParcelas ? 'Editar parcelas das previsões' : 'Criar títulos de previsão'}</h3>
+          <p className="mt-1 text-sm text-[var(--c-muted)]">
+            Distribua {moeda(totalPedido)} entre as parcelas. O Financeiro ainda não poderá baixá-las.
+            {editandoParcelas ? ' As previsões atuais serão canceladas e substituídas somente ao salvar.' : ''}
+          </p>
           {!pedido?.fornecedor?.parceiro_id ? (
             <div className="app-alert mt-3">
               Vincule o fornecedor deste pedido a um parceiro antes de criar os títulos financeiros.
@@ -263,18 +325,34 @@ export default function PedidoCompraFinanceiro({ pedido, user, avisar, onAtualiz
             <span className={`font-semibold ${Math.abs(somaParcelas - totalPedido) < 0.01 ? 'text-[var(--sem-success)]' : 'text-[var(--sem-danger)]'}`}>
               Informado: {moeda(somaParcelas)} · Diferença: {moeda(totalPedido - somaParcelas)}
             </span>
-            <button type="button" className="btn btn-primary" disabled={Boolean(processando) || !pedido?.fornecedor?.parceiro_id} onClick={criarPrevisoes}>{processando === 'previsoes' ? 'Criando...' : 'Criar previsões'}</button>
+            <div className="flex flex-wrap gap-2">
+              {editandoParcelas ? (
+                <button type="button" className="btn btn-outline" disabled={Boolean(processando)} onClick={cancelarEdicaoParcelas}>Cancelar edição</button>
+              ) : null}
+              <button type="button" className="btn btn-primary" disabled={Boolean(processando) || !pedido?.fornecedor?.parceiro_id} onClick={salvarPrevisoes}>
+                {processando === 'previsoes'
+                  ? 'Salvando...'
+                  : (editandoParcelas ? 'Salvar novo parcelamento' : 'Criar previsões')}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {titulos.length ? (
+      {titulosAtivos.length ? (
         <div className="mt-4 border-t border-[var(--c-border)] pt-4">
-          <h3 className="font-semibold text-[var(--c-text)]">Títulos vinculados</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold text-[var(--c-text)]">Títulos vinculados</h3>
+            {podeReparcelarPrevisao && !editandoParcelas ? (
+              <button type="button" className="btn btn-outline btn-sm" disabled={Boolean(processando)} onClick={iniciarEdicaoParcelas}>
+                Editar parcelas
+              </button>
+            ) : null}
+          </div>
           <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--c-border)]">
             <table className="w-full min-w-[720px] text-sm">
               <thead className="bg-[var(--c-surface-2)] text-left"><tr><th className="p-3">Sel.</th><th className="p-3">Título</th><th className="p-3">Vencimento</th><th className="p-3">Valor</th><th className="p-3">Status</th><th className="p-3">Origem</th></tr></thead>
-              <tbody>{titulos.map((item) => (
+              <tbody>{titulosAtivos.map((item) => (
                 <tr key={`${item.origem}-${item.titulo?.id}`} className="border-t border-[var(--c-border)]">
                   <td className="p-3"><input type="checkbox" disabled={!podeLiberar || String(item.titulo?.status).toUpperCase() !== 'PREVISAO'} checked={selecionados.includes(Number(item.titulo?.id))} onChange={(event) => setSelecionados((atuais) => event.target.checked ? [...atuais, Number(item.titulo.id)] : atuais.filter((id) => id !== Number(item.titulo.id)))} /></td>
                   <td className="p-3">{podeAbrirTituloFinanceiro ? (
@@ -327,7 +405,7 @@ export default function PedidoCompraFinanceiro({ pedido, user, avisar, onAtualiz
           <CampoForm label="Forma de pagamento" obrigatorio>
             <select className="input min-w-64" value={formaPagamentoId} onChange={(event) => setFormaPagamentoId(event.target.value)}><option value="">Selecione</option>{(financeiro.opcoes?.formas_pagamento || []).map((forma) => <option key={forma.id} value={forma.id}>{forma.nome}</option>)}</select>
           </CampoForm>
-          <button type="button" className="btn btn-primary" disabled={Boolean(processando) || !selecionados.length} onClick={liberarSelecionados}>{processando === 'liberar' ? 'Liberando...' : `Liberar ${selecionados.length || ''} para pagamento`}</button>
+          <button type="button" className="btn btn-primary" disabled={Boolean(processando) || !selecionados.length || editandoParcelas} onClick={liberarSelecionados}>{processando === 'liberar' ? 'Liberando...' : `Liberar ${selecionados.length || ''} para pagamento`}</button>
         </div>
       ) : null}
 

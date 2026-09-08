@@ -537,11 +537,6 @@ async function criarPrevisoesPedido({ req, pedidoId, payload, idempotencyKey, tr
     throw httpError(409, 'O fornecedor do pedido precisa estar vinculado a um parceiro antes de gerar o titulo.');
   }
 
-  const existentes = await buscarTitulosPedido(pedido.id, { transaction, incluirLegados: true });
-  if (existentes.some((item) => !STATUS_TITULO_ENCERRADO.has(normalize(item.titulo?.status)))) {
-    throw httpError(409, 'Este pedido ja possui titulo financeiro ativo ou em previsao.', 'PEDIDO_JA_POSSUI_TITULO');
-  }
-
   const chave = String(idempotencyKey || '').trim();
   if (!chave) throw httpError(400, 'Chave de idempotencia obrigatoria.');
   const existenteChave = await PedidoCompraTitulo.findOne({
@@ -549,6 +544,11 @@ async function criarPrevisoesPedido({ req, pedidoId, payload, idempotencyKey, tr
     transaction
   });
   if (existenteChave) return obterResumoFinanceiroPedido(pedido, { transaction, incluirDetalhes: true });
+
+  const existentes = await buscarTitulosPedido(pedido.id, { transaction, incluirLegados: true });
+  if (existentes.some((item) => !STATUS_TITULO_ENCERRADO.has(normalize(item.titulo?.status)))) {
+    throw httpError(409, 'Este pedido ja possui titulo financeiro ativo ou em previsao.', 'PEDIDO_JA_POSSUI_TITULO');
+  }
 
   const valorPedido = roundMoney(pedido.valor_total_fornecedor ?? pedido.valor_total);
   const parcelas = normalizarParcelas(payload?.parcelas, valorPedido);
@@ -608,6 +608,100 @@ async function criarPrevisoesPedido({ req, pedidoId, payload, idempotencyKey, tr
     transaction
   });
   return obterResumoFinanceiroPedido(pedido, { transaction, incluirDetalhes: true });
+}
+
+async function reparcelarPrevisoesPedido({ req, pedidoId, payload, idempotencyKey, transaction }) {
+  const pedido = await PedidoCompra.findByPk(Number(pedidoId), {
+    include: [
+      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'parceiro_id'] },
+      { model: SolicitacaoCompra, as: 'solicitacao', attributes: ['id', 'solicitacao_principal_id'] }
+    ],
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+  if (!pedido) throw httpError(404, 'Pedido de compra nao encontrado.');
+  if (!pedido.financeiro_fluxo_versao) {
+    throw httpError(409, 'O pedido legado precisa ser revisado pelo GEO antes de alterar as previsoes.');
+  }
+  if (!STATUS_PEDIDO_FECHADO.has(normalize(pedido.status))) {
+    throw httpError(409, 'O pedido precisa estar fechado com o fornecedor para alterar as previsoes.');
+  }
+
+  const chave = String(idempotencyKey || '').trim();
+  if (!chave) throw httpError(400, 'Chave de idempotencia obrigatoria.');
+  const existenteChave = await PedidoCompraTitulo.findOne({
+    where: { idempotency_key: `PEDIDO:${pedido.id}:${chave}:1` },
+    transaction
+  });
+  if (existenteChave) return obterResumoFinanceiroPedido(pedido, { transaction, incluirDetalhes: true });
+
+  const titulos = await buscarTitulosPedido(pedido.id, { transaction, incluirLegados: true });
+  const ativos = titulos.filter((item) => !STATUS_TITULO_ENCERRADO.has(normalize(item.titulo?.status)));
+  if (!ativos.length) {
+    throw httpError(409, 'Este pedido nao possui previsoes ativas para reparticionar.');
+  }
+  if (ativos.some((item) => normalize(item.titulo?.status) !== 'PREVISAO')) {
+    throw httpError(409, 'Somente previsoes ainda nao liberadas podem ser reparticionadas.', 'PREVISAO_JA_LIBERADA');
+  }
+  if (ativos.some((item) => item.origem !== 'NOVO_FLUXO' || !item.vinculo_id)) {
+    throw httpError(409, 'Previsoes legadas precisam ser regularizadas antes do reparticionamento.');
+  }
+
+  const valorPedido = roundMoney(pedido.valor_total_fornecedor ?? pedido.valor_total);
+  normalizarParcelas(payload?.parcelas, valorPedido);
+
+  const agora = new Date();
+  const titulosAnteriores = [];
+  for (const item of ativos) {
+    const [quantidadeAtualizada] = await TituloFinanceiro.update({
+      status: 'CANCELADO',
+      valor_saldo: 0,
+      atualizado_por: req.user?.id || null
+    }, {
+      where: { id: item.titulo.id, status: 'PREVISAO' },
+      transaction
+    });
+    if (quantidadeAtualizada !== 1) {
+      throw httpError(409, 'As previsoes mudaram durante o reparticionamento. Atualize a tela e tente novamente.');
+    }
+    await PedidoCompraTitulo.update({
+      status_liberacao: 'CANCELADO',
+      cancelado_por: req.user?.id || null,
+      cancelado_em: agora,
+      motivo_cancelamento: 'Substituida por novo parcelamento antes da liberacao financeira.'
+    }, {
+      where: { id: item.vinculo_id },
+      transaction
+    });
+    titulosAnteriores.push(Number(item.titulo.id));
+  }
+
+  const resumo = await criarPrevisoesPedido({
+    req,
+    pedidoId: pedido.id,
+    payload,
+    idempotencyKey: chave,
+    transaction
+  });
+  const novosTitulos = (resumo?.titulos || [])
+    .filter((item) => item.origem === 'NOVO_FLUXO' && normalize(item.titulo?.status) === 'PREVISAO')
+    .map((item) => Number(item.titulo.id));
+
+  await registrarHistorico({
+    pedido,
+    solicitacao: pedido.solicitacao,
+    usuarioId: req.user?.id,
+    acao: 'PEDIDO_COMPRA_PREVISOES_REPARCELADAS',
+    descricao: `Previsoes de ${buildPedidoCodigo(pedido.id)} substituidas por ${novosTitulos.length} parcela(s).`,
+    metadata: {
+      titulos_cancelados_ids: titulosAnteriores,
+      titulos_novos_ids: novosTitulos,
+      valor_total: valorPedido
+    },
+    transaction
+  });
+
+  return resumo;
 }
 
 async function registrarDocumentoFinanceiro({ pedidoId, payload, usuarioId, idempotencyKey, transaction }) {
@@ -889,6 +983,7 @@ module.exports = {
   aplicarResumoFinanceiroPedidos,
   buscarTitulosPedido,
   criarPrevisoesPedido,
+  reparcelarPrevisoesPedido,
   decidirReaberturaGeo,
   derivarStatusFinanceiro,
   liberarTitulosPedido,
