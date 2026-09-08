@@ -271,6 +271,11 @@ export default function RhDpPessoal() {
 
   const [colaboradores, setColaboradores] = useState([]);
   const [obras, setObras] = useState([]);
+  // Lista propositalmente separada: filtros, admissao e jornada continuam limitados ao escopo
+  // normal do usuario. Somente a Obra de destino da transferencia precisa enxergar todas as obras
+  // ativas, pois a transferencia pode sair da obra atual para qualquer outra unidade operacional.
+  const [obrasDestino, setObrasDestino] = useState([]);
+  const [statusObrasDestino, setStatusObrasDestino] = useState('ocioso');
   const [empresas, setEmpresas] = useState([]);
   // O catalogo de cargos (Fase 7). Carregado sob demanda, e nao junto da lista principal: e usado
   // so na alteracao de cargo, e buscar sempre faria uma consulta que quase ninguem aproveita.
@@ -752,6 +757,33 @@ export default function RhDpPessoal() {
   }
 
   /**
+   * Catalogo exclusivo da Obra de destino.
+   *
+   * `obras` continua sendo a lista vinculada ao usuario de OBRA. Reaproveita-la aqui impediria a
+   * transferencia para uma obra diferente justamente porque ela ainda nao esta no escopo atual do
+   * usuario. A consulta geral fica restrita a este campo e o navegador descarta centros de custo e
+   * registros inativos antes de montar as opcoes.
+   */
+  async function carregarObrasDestinoSePreciso() {
+    if (['carregando', 'pronto'].includes(statusObrasDestino)) return;
+
+    setStatusObrasDestino('carregando');
+    try {
+      const lista = await getObras({ escopo: 'OBRAS' });
+      const ativas = (Array.isArray(lista) ? lista : []).filter((obra) => {
+        const ativo = ![false, 0, '0', 'false'].includes(obra?.ativo);
+        const tipo = String(obra?.tipo_centro_custo || 'OBRA').trim().toUpperCase();
+        return ativo && tipo === 'OBRA';
+      });
+      setObrasDestino(ativas);
+      setStatusObrasDestino('pronto');
+    } catch (error) {
+      setObrasDestino([]);
+      setStatusObrasDestino('erro');
+    }
+  }
+
+  /**
    * O QUE CADA MODAL PRECISA SABER, buscado SO quando ele abre.
    *
    * Cargos so importam na movimentacao (alteracao de cargo); apontamentos, so na demissao. Buscar
@@ -841,6 +873,7 @@ export default function RhDpPessoal() {
   function novoPedido(tipo, colaborador = null) {
     setConferencia(null);
     if (tipo === 'ADMISSAO') carregarEmpresasSePreciso();
+    if (tipo === 'TROCA_OBRA') carregarObrasDestinoSePreciso();
     carregarApoioDoModal(tipo, colaborador);
     carregarChecklist(tipo, null);
     setFormulario({
@@ -1471,6 +1504,7 @@ export default function RhDpPessoal() {
                     // uma mensagem que nao explica nada.
                     setFormulario({ ...formulario, subtipo, anexos: [] });
                     carregarChecklist(formulario.tipo, subtipo);
+                    if (subtipo === 'TRANSFERENCIA_OBRA') carregarObrasDestinoSePreciso();
                   }}>
                   <option value="">Selecione</option>
                   {subtiposParaColaborador(formulario).map((sub) => (
@@ -1515,9 +1549,16 @@ export default function RhDpPessoal() {
                         {formulario.primeiraLotacao ? 'Obra' : 'Obra de destino'}
                       </span>
                       <select className="form-control" required value={formulario.obra_destino_id || ''}
+                        disabled={statusObrasDestino === 'carregando'}
                         onChange={(e) => setFormulario({ ...formulario, obra_destino_id: e.target.value })}>
-                        <option value="">Selecione</option>
-                        {obras.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
+                        <option value="">
+                          {statusObrasDestino === 'carregando'
+                            ? 'Carregando obras ativas...'
+                            : statusObrasDestino === 'erro'
+                              ? 'Nao foi possivel carregar as obras'
+                              : 'Selecione'}
+                        </option>
+                        {obrasDestino.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
                       </select>
                     </label>
 
@@ -1587,9 +1628,16 @@ export default function RhDpPessoal() {
                     {formulario.primeiraLotacao ? 'Obra' : 'Obra de destino'}
                   </span>
                   <select className="form-control" value={formulario.obra_destino_id}
+                    disabled={statusObrasDestino === 'carregando'}
                     onChange={(e) => setFormulario({ ...formulario, obra_destino_id: e.target.value })} required>
-                    <option value="">Selecione</option>
-                    {obras.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
+                    <option value="">
+                      {statusObrasDestino === 'carregando'
+                        ? 'Carregando obras ativas...'
+                        : statusObrasDestino === 'erro'
+                          ? 'Nao foi possivel carregar as obras'
+                          : 'Selecione'}
+                    </option>
+                    {obrasDestino.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
                   </select>
                 </label>
 
