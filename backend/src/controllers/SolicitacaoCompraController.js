@@ -40,6 +40,7 @@ const { normalizeTipoSolicitacaoBehavior, normalizeTipoSolicitacaoCodigo } = req
 const { assertTipoDisponivelNoDestino } = require('../services/tipoSolicitacaoDisponibilidadeService');
 const {
   buildCotacaoItemKey,
+  calcularValorMercadoriasCotacao,
   carregarSolicitacaoCompraCompleta,
   isSolicitacaoCompraTerminal,
   gerarTokenCotacao,
@@ -1442,8 +1443,12 @@ function montarComparativoSolicitacao(solicitacao) {
         frete_item_valor: Number(resposta?.frete_valor || 0),
         valor_total_cotado: resposta
           ? arredondarMoeda(
-              Number(resposta.quantidade_disponivel ?? (resposta.disponivel ? item.quantidade : 0))
-              * Number(resposta.preco || 0)
+              calcularValorMercadoriasCotacao({
+                quantidadeSolicitada: item.quantidade,
+                quantidadeDisponivel: resposta.quantidade_disponivel,
+                escopoDisponibilidade: resposta.escopo_disponibilidade,
+                precoUnitario: resposta.preco
+              })
               + Number(resposta.ipi_valor || 0)
               + Number(resposta.icms_valor || 0)
               + Number(resposta.st_valor || 0)

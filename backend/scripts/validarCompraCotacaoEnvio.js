@@ -18,6 +18,48 @@ const {
 const {
   resolverCondicaoPagamentoPedido
 } = require('../src/services/pedidoCompraDocumentoUtils');
+const {
+  calcularValorMercadoriasCotacao,
+  obterQuantidadeBaseFinanceiraCotacao
+} = require('../src/services/comprasCotacao');
+
+function validarBaseFinanceiraDaCotacao() {
+  assert.strictEqual(
+    calcularValorMercadoriasCotacao({
+      quantidadeSolicitada: 10,
+      quantidadeDisponivel: 50,
+      precoUnitario: 20
+    }),
+    200,
+    'Quantidade disponivel nao pode alterar o valor das mercadorias cotadas.'
+  );
+  assert.strictEqual(
+    obterQuantidadeBaseFinanceiraCotacao({
+      quantidadeSolicitada: 10,
+      quantidadeDisponivel: 4,
+      escopoDisponibilidade: 'OFERTA_SALDO'
+    }),
+    4,
+    'Oferta adicional para saldo deve manter como base somente a quantidade da nova oferta.'
+  );
+
+  const publicPageSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx'),
+    'utf8'
+  );
+  const internalPageSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx'),
+    'utf8'
+  );
+  assert(
+    publicPageSource.includes('numeroCotacao(item?.preco) * numeroCotacao(item?.quantidade)'),
+    'Cotacao publica deve calcular mercadorias pela quantidade solicitada.'
+  );
+  assert(
+    internalPageSource.includes(': parseNumeroCompraDigitado(item?.quantidade_solicitada);'),
+    'Edicao interna deve calcular mercadorias pela quantidade solicitada.'
+  );
+}
 
 function itemSelecionado() {
   return {
@@ -132,7 +174,7 @@ function validarPrazoGeralRespostaInterna() {
     frete_valor: '150,00',
     frete_data_vencimento: '2026-08-10',
     frete_transportador_nome: 'Transportador opcional',
-    frete_transportador_cpf_cnpj: '12.345.678/0001-90',
+    frete_transportador_cpf_cnpj: '11.222.333/0001-81',
     finalizar: true
   });
 
@@ -474,6 +516,7 @@ function validarMultiplosArquivosRespostaCotacao() {
 }
 
 validarItensPorFornecedor();
+validarBaseFinanceiraDaCotacao();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
 validarFechamentoExcedenteAuditavel();

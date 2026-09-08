@@ -27,6 +27,7 @@ const {
 const {
   isSolicitacaoCompraCancelada,
   normalizeText: normalizeCotacaoText,
+  obterQuantidadeBaseFinanceiraCotacao,
   registrarLogSolicitacaoCompra
 } = require('./comprasCotacao');
 const {
@@ -1348,7 +1349,14 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       ? tributosAnterioresPorResposta.get(Number(resposta.id)) || { ipi: 0, icms: 0, st: 0 }
       : tributosAnterioresPorFornecedorItem.get(fornecedorItemKey) || { ipi: 0, icms: 0, st: 0 };
     const tributosRodada = tributosRodadaPorFornecedorItem.get(fornecedorItemKey) || { ipi: 0, icms: 0, st: 0 };
-    const percentualQuantidade = quantidadeDisponivel > 0 ? quantidadeAlocada / quantidadeDisponivel : 0;
+    const quantidadeBaseFinanceira = obterQuantidadeBaseFinanceiraCotacao({
+      quantidadeSolicitada: quantidadeBase,
+      quantidadeDisponivel,
+      escopoDisponibilidade: resposta.escopo_disponibilidade
+    });
+    const percentualQuantidade = quantidadeBaseFinanceira > 0
+      ? quantidadeAlocada / quantidadeBaseFinanceira
+      : 0;
     const ratearTributo = (total, anterior, rodada) => roundMoney(Math.min(
       Math.max(0, asNumber(total) - anterior - rodada),
       asNumber(total) * percentualQuantidade
@@ -1452,10 +1460,12 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     const baseCotada = roundMoney((vinculacaoFornecedor?.respostas || []).reduce((sum, resposta) => {
       if (!resposta.disponivel || asNumber(resposta.preco) <= 0) return sum;
       const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
-      const quantidadeDisponivel = roundQty(
-        resposta.quantidade_disponivel ?? (resposta.disponivel ? baseItem?.quantidade_solicitada : 0)
-      );
-      return sum + quantidadeDisponivel * asNumber(resposta.preco);
+      const quantidadeBaseFinanceira = obterQuantidadeBaseFinanceiraCotacao({
+        quantidadeSolicitada: baseItem?.quantidade_solicitada,
+        quantidadeDisponivel: resposta.quantidade_disponivel,
+        escopoDisponibilidade: resposta.escopo_disponibilidade
+      });
+      return sum + quantidadeBaseFinanceira * asNumber(resposta.preco);
     }, 0));
     const basesDifal = grupo.map((alocacao) => alocacao.valor_mercadoria);
     const difalDaRodada = baseCotada > 0

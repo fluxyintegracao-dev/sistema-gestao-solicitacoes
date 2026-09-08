@@ -355,9 +355,15 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados, opt
   };
 }
 
-function calcularTotalRespostaInternaItem(item, incluirFrete = false) {
+function obterQuantidadeBaseFinanceiraRespostaInterna(item, novaOfertaSaldo = false) {
+  return novaOfertaSaldo
+    ? parseNumeroCompraDigitado(item?.quantidade_disponivel)
+    : parseNumeroCompraDigitado(item?.quantidade_solicitada);
+}
+
+function calcularTotalRespostaInternaItem(item, incluirFrete = false, novaOfertaSaldo = false) {
   return (
-    parseNumeroCompra(item?.preco) * parseNumeroCompraDigitado(item?.quantidade_disponivel)
+    parseNumeroCompra(item?.preco) * obterQuantidadeBaseFinanceiraRespostaInterna(item, novaOfertaSaldo)
     + parseNumeroCompra(item?.ipi_valor)
     + parseNumeroCompra(item?.icms_valor)
     + parseNumeroCompra(item?.st_valor)
@@ -389,7 +395,9 @@ function ModalRespostaInternaCotacao({
     })
   );
   const valorMercadorias = form.itens.reduce(
-    (total, item) => total + parseNumeroCompra(item.preco) * parseNumeroCompraDigitado(item.quantidade_disponivel),
+    (total, item) => total
+      + parseNumeroCompra(item.preco)
+      * obterQuantidadeBaseFinanceiraRespostaInterna(item, form.nova_oferta_saldo),
     0
   );
   const valorTributos = form.itens.reduce(
@@ -702,6 +710,9 @@ function ModalRespostaInternaCotacao({
                       inputMode="decimal"
                       value={item.quantidade_disponivel}
                       aria-label={`Quantidade disponível de ${item.nome}`}
+                      title={form.nova_oferta_saldo
+                        ? 'Quantidade oferecida nesta nova rodada para o saldo.'
+                        : 'Informação de disponibilidade do fornecedor; não altera o valor cotado para a quantidade solicitada.'}
                       onChange={(e) => onChangeItem(item.__indice, 'quantidade_disponivel', sanitizeNumeroCompraInput(e.target.value))}
                     />
                   )
@@ -711,7 +722,11 @@ function ModalRespostaInternaCotacao({
                   titulo: 'Valor total',
                   tipo: 'valor',
                   render: (item) => (
-                    <span className="font-semibold">{fmtMoeda(calcularTotalRespostaInternaItem(item, form.frete_modo === 'POR_ITEM'))}</span>
+                    <span className="font-semibold">{fmtMoeda(calcularTotalRespostaInternaItem(
+                      item,
+                      form.frete_modo === 'POR_ITEM',
+                      form.nova_oferta_saldo
+                    ))}</span>
                   )
                 },
                 {

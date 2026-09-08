@@ -22,6 +22,35 @@ function normalizeText(value) {
     .toUpperCase();
 }
 
+function numeroCotacao(value) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function obterQuantidadeBaseFinanceiraCotacao({
+  quantidadeSolicitada,
+  quantidadeDisponivel,
+  escopoDisponibilidade
+}) {
+  const quantidade = normalizeText(escopoDisponibilidade) === 'OFERTA_SALDO'
+    ? quantidadeDisponivel
+    : quantidadeSolicitada;
+  return Math.max(0, numeroCotacao(quantidade));
+}
+
+function calcularValorMercadoriasCotacao({
+  quantidadeSolicitada,
+  quantidadeDisponivel,
+  escopoDisponibilidade,
+  precoUnitario
+}) {
+  return obterQuantidadeBaseFinanceiraCotacao({
+    quantidadeSolicitada,
+    quantidadeDisponivel,
+    escopoDisponibilidade
+  }) * Math.max(0, numeroCotacao(precoUnitario));
+}
+
 const STATUS_SOLICITACAO_COMPRA_TERMINAIS = new Set([
   'CANCELADA',
   'CANCELADO',
@@ -399,6 +428,7 @@ module.exports = {
   assertCotacaoFornecedorAtiva,
   assertSolicitacaoCompraAceitaCotacao,
   buildCotacaoItemKey,
+  calcularValorMercadoriasCotacao,
   carregarSolicitacaoCompraCompleta,
   filtrarItensCotaveisPorSelecao,
   gerarModeloCotacaoCsv,
@@ -410,6 +440,7 @@ module.exports = {
   isSolicitacaoCompraTerminal,
   normalizeText,
   obterCodigoProdutoCotacao,
+  obterQuantidadeBaseFinanceiraCotacao,
   obterItensCotaveis,
   obterItensCotaveisDaCotacao,
   parseCsvRows,
